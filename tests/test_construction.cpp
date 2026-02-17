@@ -280,19 +280,21 @@ static void test_server_bind_failures() {
 static void test_connect_to_failures() {
     std::this_thread::sleep_for(std::chrono::milliseconds(50));
 
-    BEGIN_TEST("ConnectTo ctor: throws SocketException when nothing is listening");
+    BEGIN_TEST(
+        "ConnectTo ctor: throws SocketException when nothing is listening");
     {
         bool threw = false;
         SocketError code = SocketError::None;
         std::string what;
         try {
-            // Port 1 is virtually never listening and requires no privilege to attempt
+            // Port 1 is virtually never listening and requires no privilege to
+            // attempt
             Socket c(SocketType::TCP, AddressFamily::IPv4,
                 ConnectTo{"127.0.0.1", 1});
         } catch (const SocketException& e) {
             threw = true;
-            code  = e.errorCode();
-            what  = e.what();
+            code = e.errorCode();
+            what = e.what();
         }
         REQUIRE(threw);
         REQUIRE(code == SocketError::ConnectFailed);
@@ -312,7 +314,7 @@ static void test_connect_to_failures() {
                 ConnectTo{"999.999.999.999", BASE + 20});
         } catch (const SocketException& e) {
             threw = true;
-            code  = e.errorCode();
+            code = e.errorCode();
         }
         REQUIRE(threw);
         REQUIRE(code == SocketError::ConnectFailed);
@@ -322,7 +324,8 @@ static void test_connect_to_failures() {
     // connectTimeoutMs only covers the TCP handshake phase, not DNS.
     // The .invalid TLD (RFC 2606) is guaranteed never to resolve; most OS
     // resolvers return NXDOMAIN quickly without a full DNS round-trip.
-    BEGIN_TEST("ConnectTo ctor: throws SocketException on unresolvable hostname");
+    BEGIN_TEST(
+        "ConnectTo ctor: throws SocketException on unresolvable hostname");
     {
         bool threw = false;
         SocketError code = SocketError::None;
@@ -331,19 +334,19 @@ static void test_connect_to_failures() {
                 ConnectTo{"this.host.does.not.exist.invalid", BASE + 21});
         } catch (const SocketException& e) {
             threw = true;
-            code  = e.errorCode();
+            code = e.errorCode();
         }
         REQUIRE(threw);
         REQUIRE(code == SocketError::ConnectFailed);
     }
 
-    // 192.0.2.0/24 is RFC 5737 TEST-NET-1: reserved for documentation,
-    // intended to be non-routable — SYNs should be silently dropped,
-    // so the connect should time out rather than be refused or succeed.
-    // If this machine has a route to this prefix (e.g. via a VPN default
-    // route) the connect may succeed; in that case the test self-skips.
-    static constexpr const char* nonRouteableIP = "192.0.2.1";
-    BEGIN_TEST("ConnectTo ctor: connectTimeoutMs fires for non-routable address");
+    // 10.255.255.1 is an unassigned address in the private 10/8 range that
+    // is not reachable on this network — SYNs are silently dropped,
+    // so a blocking connect would hang indefinitely without a timeout.
+    // (192.0.2.0/24 RFC 5737 TEST-NET is routable on this host via VPN.)
+    static constexpr const char* nonRouteableIP = "10.255.255.1";
+    BEGIN_TEST(
+        "ConnectTo ctor: connectTimeoutMs fires for non-routable address");
     {
         using clock = std::chrono::steady_clock;
         constexpr int TIMEOUT_MS = 500;
@@ -357,19 +360,21 @@ static void test_connect_to_failures() {
                 ConnectTo{nonRouteableIP, 9, TIMEOUT_MS});
         } catch (const SocketException& e) {
             threw = true;
-            code  = e.errorCode();
-            what  = e.what();
+            code = e.errorCode();
+            what = e.what();
         }
         auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
-            clock::now() - t0).count();
+            clock::now() - t0)
+                           .count();
 
         if (!threw) {
             // Address was reachable on this host (VPN / unexpected route).
             REQUIRE_MSG(true,
                 "SKIP - " + std::string(nonRouteableIP)
-                + " is routable on this host; timeout test not applicable");
+                    + " is routable on this host; timeout test not applicable");
         } else {
-            REQUIRE_MSG(code == SocketError::Timeout || code == SocketError::ConnectFailed,
+            REQUIRE_MSG(code == SocketError::Timeout
+                    || code == SocketError::ConnectFailed,
                 "error code is Timeout or ConnectFailed");
             REQUIRE_MSG(elapsed < TIMEOUT_MS * 3,
                 "returned within 3x the requested timeout");
