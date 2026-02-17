@@ -418,4 +418,130 @@ int SocketImpl::getLastSystemError() const {
 #endif
 }
 
+// Static utility methods
+std::vector<NetworkInterface> SocketImpl::getLocalAddresses() {
+    std::vector<NetworkInterface> interfaces;
+    platformInit();
+
+#ifdef _WIN32
+    // Windows implementation using GetAdaptersAddresses
+    ULONG bufferSize = 15000;
+    PIP_ADAPTER_ADDRESSES addresses = nullptr;
+    ULONG result;
+    
+    do {
+        addresses = reinterpret_cast<PIP_ADAPTER_ADDRESSES>(malloc(bufferSize));
+        if (!addresses) {
+            break;
+        }
+        
+        result = GetAdaptersAddresses(
+            AF_UNSPEC,
+            GAA_FLAG_INCLUDE_PREFIX,
+            nullptr,
+            addresses,
+            &bufferSize
+        );
+        
+        if (result == ERROR_BUFFER_OVERFLOW) {
+            free(addresses);
+            addresses = nullptr;
+        }
+    } while (result == ERROR_BUFFER_OVERFLOW);
+    
+    if (result == NO_ERROR && addresses) {
+        for (PIP_ADAPTER_ADDRESSES adapter = addresses; adapter != nullptr; adapter = adapter->Next) {
+            for (PIP_ADAPTER_UNICAST_ADDRESS unicast = adapter->FirstUnicastAddress; 
+                 unicast != nullptr; unicast = unicast->Next) {
+                
+                NetworkInterface iface;
+                iface.name = std::string(adapter->AdapterName);
+                
+                // Convert address to string
+                sockaddr* sa = unicast->Address.lpSockaddr;
+                if (sa->sa_family == AF_INET) {
+                    char buffer[INET_ADDRSTRLEN];
+                    sockaddr_in* sin = reinterpret_cast<sockaddr_in*>(sa);
+                    inet_ntop(AF_INET, &sin->sin_addr, buffer, INET_ADDRSTRLEN);
+                    iface.address = buffer;
+                    iface.family = AddressFamily::IPv4;
+                } else if (sa->sa_family == AF_INET6) {
+                    char buffer[INET6_ADDRSTRLEN];
+                    sockaddr_in6* sin6 = reinterpret_cast<sockaddr_in6*>(sa);
+                    inet_ntop(AF_INET6, &sin6->sin6_addr, buffer, INET6_ADDRSTRLEN);
+                    iface.address = buffer;
+                    iface.family = AddressFamily::IPv6;
+                } else {
+                    continue;
+                }
+                
+                iface.isLoopback = (adapter->IfType == IF_TYPE_SOFTWARE_LOOPBACK);
+                interfaces.push_back(iface);
+            }
+        }
+        free(addresses);
+    }
+#else
+    // Unix/Linux implementation using getifaddrs
+    struct ifaddrs* ifaddr = nullptr;
+    if (getifaddrs(&ifaddr) == 0) {
+        for (struct ifaddrs* ifa = ifaddr; ifa != nullptr; ifa = ifa->ifa_next) {
+            if (!ifa->ifa_addr) {
+                continue;
+            }
+            
+            NetworkInterface iface;
+            iface.name = ifa->ifa_name;
+            
+            int family = ifa->ifa_addr->sa_family;
+            if (family == AF_INET) {
+                char buffer[INET_ADDRSTRLEN];
+                sockaddr_in* sin = reinterpret_cast<sockaddr_in*>(ifa->ifa_addr);
+                inet_ntop(AF_INET, &sin->sin_addr, buffer, INET_ADDRSTRLEN);
+                iface.address = buffer;
+                iface.family = AddressFamily::IPv4;
+                iface.isLoopback = (iface.name == "lo" || iface.address == "127.0.0.1");
+                interfaces.push_back(iface);
+            } else if (family == AF_INET6) {
+                char buffer[INET6_ADDRSTRLEN];
+                sockaddr_in6* sin6 = reinterpret_cast<sockaddr_in6*>(ifa->ifa_addr);
+                inet_ntop(AF_INET6, &sin6->sin6_addr, buffer, INET6_ADDRSTRLEN);
+                iface.address = buffer;
+                iface.family = AddressFamily::IPv6;
+                iface.isLoopback = (iface.name == "lo" || iface.address == "::1");
+                interfaces.push_back(iface);
+            }
+        }
+        freeifaddrs(ifaddr);
+    }
+#endif
+    
+    return interfaces;
+}
+
+bool SocketImpl::isValidIPv4(const std::string& address) {
+    struct sockaddr_in sa;
+    return inet_pton(AF_INET, address.c_str(), &(sa.sin_addr)) == 1;
+}
+
+bool SocketImpl::isValidIPv6(const std::string& address) {
+    struct sockaddr_in6 sa;
+    return inet_pton(AF_INET6, address.c_str(), &(sa.sin6_addr)) == 1;
+}
+
+std::string SocketImpl::ipToString(const void* addr, AddressFamily family) {
+    if (family == AddressFamily::IPv4) {
+        char buffer[INET_ADDRSTRLEN];
+        if (inet_ntop(AF_INET, addr, buffer, INET_ADDRSTRLEN)) {
+            return std::string(buffer);
+        }
+    } else if (family == AddressFamily::IPv6) {
+        char buffer[INET6_ADDRSTRLEN];
+        if (inet_ntop(AF_INET6, addr, buffer, INET6_ADDRSTRLEN)) {
+            return std::string(buffer);
+        }
+    }
+    return "";
+}
+
 } // namespace aiSocks

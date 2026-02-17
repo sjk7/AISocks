@@ -2,11 +2,14 @@
 #define AISOCKS_SOCKET_IMPL_H
 
 #include "Socket.h"
+#include <vector>
 
 #ifdef _WIN32
     #include <winsock2.h>
     #include <ws2tcpip.h>
+    #include <iphlpapi.h>
     #pragma comment(lib, "ws2_32.lib")
+    #pragma comment(lib, "iphlpapi.lib")
     using SocketHandle = SOCKET;
     #define INVALID_SOCKET_HANDLE INVALID_SOCKET
     #define SOCKET_ERROR_CODE SOCKET_ERROR
@@ -19,6 +22,7 @@
     #include <fcntl.h>
     #include <netdb.h>
     #include <errno.h>
+    #include <ifaddrs.h>
     using SocketHandle = int;
     #define INVALID_SOCKET_HANDLE -1
     #define SOCKET_ERROR_CODE -1
@@ -34,6 +38,12 @@ public:
     // Platform initialization/cleanup
     static bool platformInit();
     static void platformCleanup();
+
+    // Static utility methods
+    static std::vector<NetworkInterface> getLocalAddresses();
+    static bool isValidIPv4(const std::string& address);
+    static bool isValidIPv6(const std::string& address);
+    static std::string ipToString(const void* addr, AddressFamily family);
 
     // Server operations
     bool bind(const std::string& address, uint16_t port);

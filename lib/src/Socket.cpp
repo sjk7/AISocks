@@ -83,4 +83,21 @@ std::string Socket::getErrorMessage() const {
     return pImpl->getErrorMessage();
 }
 
+// Static utility methods
+std::vector<NetworkInterface> Socket::getLocalAddresses() {
+    return SocketImpl::getLocalAddresses();
+}
+
+bool Socket::isValidIPv4(const std::string& address) {
+    return SocketImpl::isValidIPv4(address);
+}
+
+bool Socket::isValidIPv6(const std::string& address) {
+    return SocketImpl::isValidIPv6(address);
+}
+
+std::string Socket::ipToString(const void* addr, AddressFamily family) {
+    return SocketImpl::ipToString(addr, family);
+}
+
 } // namespace aiSocks

@@ -2,6 +2,7 @@ C:/Users/cool/Desktop/AISocks/build/CMakeFiles/aiSocksExample.dir
 C:/Users/cool/Desktop/AISocks/build/CMakeFiles/aiSocksNonBlocking.dir
 C:/Users/cool/Desktop/AISocks/build/CMakeFiles/aiSocksTestBlocking.dir
 C:/Users/cool/Desktop/AISocks/build/CMakeFiles/aiSocksTestIPv6.dir
+C:/Users/cool/Desktop/AISocks/build/CMakeFiles/aiSocksTestIPUtils.dir
 C:/Users/cool/Desktop/AISocks/build/CMakeFiles/ALL_BUILD.dir
 C:/Users/cool/Desktop/AISocks/build/CMakeFiles/ZERO_CHECK.dir
 C:/Users/cool/Desktop/AISocks/build/lib/CMakeFiles/aiSocksLib.dir
