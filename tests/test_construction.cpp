@@ -321,7 +321,7 @@ static void test_connect_to_failures() {
     }
 
     // NOTE: DNS resolution is synchronous in this single-threaded library.
-    // connectTimeoutMs only covers the TCP handshake phase, not DNS.
+    // connectTimeout only covers the TCP handshake phase, not DNS.
     // The .invalid TLD (RFC 2606) is guaranteed never to resolve; most OS
     // resolvers return NXDOMAIN quickly without a full DNS round-trip.
     BEGIN_TEST(
@@ -345,8 +345,7 @@ static void test_connect_to_failures() {
     // so a blocking connect would hang indefinitely without a timeout.
     // (192.0.2.0/24 RFC 5737 TEST-NET is routable on this host via VPN.)
     static constexpr const char* nonRouteableIP = "10.255.255.1";
-    BEGIN_TEST(
-        "ConnectTo ctor: connectTimeoutMs fires for non-routable address");
+    BEGIN_TEST("ConnectTo ctor: connectTimeout fires for non-routable address");
     {
         using clock = std::chrono::steady_clock;
         constexpr int TIMEOUT_MS = 500;
@@ -357,7 +356,7 @@ static void test_connect_to_failures() {
         std::string what;
         try {
             Socket c(SocketType::TCP, AddressFamily::IPv4,
-                ConnectTo{nonRouteableIP, 9, TIMEOUT_MS});
+                ConnectTo{nonRouteableIP, 9, Milliseconds{TIMEOUT_MS}});
         } catch (const SocketException& e) {
             threw = true;
             code = e.errorCode();
