@@ -22,3 +22,25 @@ endforeach()
 
 # test_construction spins up server threads; give it more room
 set_tests_properties(test_construction PROPERTIES TIMEOUT 60)
+
+# ---------------------------------------------------------------------------
+# Post-build test runner
+# ---------------------------------------------------------------------------
+# Runs every test automatically after each successful compile.
+# The build fails (non-zero exit) if any test fails, and the failing test's
+# full output is printed so the problem is immediately visible.
+#
+# Works on Windows (MSVC / Ninja), Linux, and macOS.
+# -C $<CONFIG> is a no-op on single-config generators but required for MSVC.
+# ---------------------------------------------------------------------------
+add_custom_target(run_all_tests ALL
+    COMMAND ${CMAKE_CTEST_COMMAND}
+        --output-on-failure
+        --no-compress-output
+        -C $<CONFIG>
+        --timeout 60
+    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+    COMMENT "========== Running aiSocks tests =========="
+    DEPENDS ${TEST_SOURCES}
+    VERBATIM
+)
