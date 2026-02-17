@@ -247,14 +247,18 @@ class Socket {
     std::unique_ptr<Socket> accept();
 
     // Client operations
-    bool connect(const std::string& address, Port port);
-
-    // Timed connect — same as the ConnectTo{} constructor path but callable
-    // after manual bind() or as a plain method invocation.
-    // timeout == defaultTimeout (30 s) when not supplied.
-    // timeout == Milliseconds{0} defers to the OS (blocks until the kernel
-    // gives up).
-    bool connectTo(const std::string& address, Port port,
+    //
+    // timeout controls how long to wait for the TCP handshake:
+    //   defaultTimeout (30 s) — used when not specified.
+    //   Milliseconds{0}       — defer to the OS (blocks indefinitely, or, on a
+    //                           non-blocking socket, initiates and returns
+    //                           WouldBlock so a Poller can detect completion).
+    //   any positive duration — fail with SocketError::Timeout if not connected
+    //                           within that duration; polls in 10 ms slices so
+    //                           the call stays responsive throughout.
+    //
+    // Note: DNS resolution is synchronous and not covered by the timeout.
+    bool connect(const std::string& address, Port port,
         Milliseconds timeout = defaultTimeout);
 
     // Data transfer (raw pointer overloads)

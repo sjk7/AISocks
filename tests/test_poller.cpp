@@ -83,7 +83,7 @@ static void test_poller_readable_on_connect() {
     std::thread clientThread([&]() {
         std::this_thread::sleep_for(std::chrono::milliseconds(5));
         Socket c(SocketType::TCP, AddressFamily::IPv4);
-        if (!c.connectTo("127.0.0.1", Port{BASE_PORT + 2}, Milliseconds{500})) {
+        if (!c.connect("127.0.0.1", Port{BASE_PORT + 2}, Milliseconds{500})) {
             return;
         }
         clientConnected = true;
@@ -134,7 +134,7 @@ static void test_poller_remove_stops_events() {
     std::thread clientThread([&]() {
         std::this_thread::sleep_for(std::chrono::milliseconds(5));
         Socket c(SocketType::TCP, AddressFamily::IPv4);
-        c.connectTo("127.0.0.1", Port{BASE_PORT + 3}, Milliseconds{200});
+        c.connect("127.0.0.1", Port{BASE_PORT + 3}, Milliseconds{200});
     });
 
     auto results = p.wait(Milliseconds{80}); // short wait — no events expected
@@ -159,7 +159,7 @@ static void test_send_all() {
     std::atomic<bool> done{false};
     std::thread clientThread([&]() {
         Socket c(SocketType::TCP, AddressFamily::IPv4);
-        if (!c.connectTo("127.0.0.1", Port{BASE_PORT + 4}, Milliseconds{500}))
+        if (!c.connect("127.0.0.1", Port{BASE_PORT + 4}, Milliseconds{500}))
             return;
         char buf[256]{};
         int n = c.receive(buf, sizeof(buf) - 1);
@@ -191,7 +191,7 @@ static void test_wait_readable_writable() {
     std::thread clientThread([&]() {
         std::this_thread::sleep_for(std::chrono::milliseconds(5));
         Socket c(SocketType::TCP, AddressFamily::IPv4);
-        c.connectTo("127.0.0.1", Port{BASE_PORT + 5}, Milliseconds{500});
+        c.connect("127.0.0.1", Port{BASE_PORT + 5}, Milliseconds{500});
         std::this_thread::sleep_for(std::chrono::milliseconds(50));
     });
 
