@@ -1,0 +1,8 @@
+{
+	"InstallScripts" : 
+	[
+		"/Users/stevekerr/Documents/AISocks/build-mac/cmake_install.cmake",
+		"/Users/stevekerr/Documents/AISocks/build-mac/lib/cmake_install.cmake"
+	],
+	"Parallel" : false
+}

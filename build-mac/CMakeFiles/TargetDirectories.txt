@@ -1,0 +1,11 @@
+/Users/stevekerr/Documents/AISocks/build-mac/CMakeFiles/aiSocksExample.dir
+/Users/stevekerr/Documents/AISocks/build-mac/CMakeFiles/aiSocksNonBlocking.dir
+/Users/stevekerr/Documents/AISocks/build-mac/CMakeFiles/aiSocksTestBlocking.dir
+/Users/stevekerr/Documents/AISocks/build-mac/CMakeFiles/aiSocksTestIPv6.dir
+/Users/stevekerr/Documents/AISocks/build-mac/CMakeFiles/aiSocksTestIPUtils.dir
+/Users/stevekerr/Documents/AISocks/build-mac/CMakeFiles/aiSocksTestMove.dir
+/Users/stevekerr/Documents/AISocks/build-mac/CMakeFiles/edit_cache.dir
+/Users/stevekerr/Documents/AISocks/build-mac/CMakeFiles/rebuild_cache.dir
+/Users/stevekerr/Documents/AISocks/build-mac/lib/CMakeFiles/aiSocksLib.dir
+/Users/stevekerr/Documents/AISocks/build-mac/lib/CMakeFiles/edit_cache.dir
+/Users/stevekerr/Documents/AISocks/build-mac/lib/CMakeFiles/rebuild_cache.dir
