@@ -8,9 +8,16 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 # Build options
 option(BUILD_EXAMPLES "Build example programs" ON)
+option(BUILD_TESTS "Build test programs" ON)
 
 # Add the library
 add_subdirectory(lib)
+
+# Enable CTest
+if(BUILD_TESTS)
+    enable_testing()
+    add_subdirectory(tests)
+endif()
 
 # Add examples
 if(BUILD_EXAMPLES)
