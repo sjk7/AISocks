@@ -589,8 +589,8 @@ int SocketImpl::sendTo(
 
 #ifdef _WIN32
     int sent = ::sendto(socketHandle, static_cast<const char*>(data),
-        static_cast<int>(length), 0,
-        reinterpret_cast<sockaddr*>(&addr), addrLen);
+        static_cast<int>(length), 0, reinterpret_cast<sockaddr*>(&addr),
+        addrLen);
 #else
     ssize_t sent = ::sendto(socketHandle, data, length, 0,
         reinterpret_cast<sockaddr*>(&addr), addrLen);
@@ -615,8 +615,8 @@ int SocketImpl::receiveFrom(void* buffer, size_t length, Endpoint& remote) {
 
 #ifdef _WIN32
     int recvd = ::recvfrom(socketHandle, static_cast<char*>(buffer),
-        static_cast<int>(length), 0,
-        reinterpret_cast<sockaddr*>(&addr), &addrLen);
+        static_cast<int>(length), 0, reinterpret_cast<sockaddr*>(&addr),
+        &addrLen);
 #else
     ssize_t recvd = ::recvfrom(socketHandle, buffer, length, 0,
         reinterpret_cast<sockaddr*>(&addr), &addrLen);
@@ -718,13 +718,13 @@ bool SocketImpl::shutdown(ShutdownHow how) {
         return false;
     }
 #ifdef _WIN32
-    int how_ = (how == ShutdownHow::Read)  ? SD_RECEIVE
-             : (how == ShutdownHow::Write) ? SD_SEND
-                                           : SD_BOTH;
+    int how_ = (how == ShutdownHow::Read) ? SD_RECEIVE
+        : (how == ShutdownHow::Write)     ? SD_SEND
+                                          : SD_BOTH;
 #else
-    int how_ = (how == ShutdownHow::Read)  ? SHUT_RD
-             : (how == ShutdownHow::Write) ? SHUT_WR
-                                           : SHUT_RDWR;
+    int how_ = (how == ShutdownHow::Read) ? SHUT_RD
+        : (how == ShutdownHow::Write)     ? SHUT_WR
+                                          : SHUT_RDWR;
 #endif
     if (::shutdown(socketHandle, how_) == SOCKET_ERROR_CODE) {
         setError(SocketError::Unknown, "shutdown() failed");
@@ -761,8 +761,8 @@ std::optional<Endpoint> SocketImpl::getLocalEndpoint() const {
     if (!isValid()) return std::nullopt;
     sockaddr_storage addr{};
     socklen_t len = sizeof(addr);
-    if (getsockname(
-            socketHandle, reinterpret_cast<sockaddr*>(&addr), &len) != 0)
+    if (getsockname(socketHandle, reinterpret_cast<sockaddr*>(&addr), &len)
+        != 0)
         return std::nullopt;
     return endpointFromSockaddr(addr);
 }
@@ -771,8 +771,8 @@ std::optional<Endpoint> SocketImpl::getPeerEndpoint() const {
     if (!isValid()) return std::nullopt;
     sockaddr_storage addr{};
     socklen_t len = sizeof(addr);
-    if (getpeername(
-            socketHandle, reinterpret_cast<sockaddr*>(&addr), &len) != 0)
+    if (getpeername(socketHandle, reinterpret_cast<sockaddr*>(&addr), &len)
+        != 0)
         return std::nullopt;
     return endpointFromSockaddr(addr);
 }
