@@ -14,6 +14,11 @@ enum class SocketType {
     UDP
 };
 
+enum class AddressFamily {
+    IPv4,
+    IPv6
+};
+
 enum class SocketError {
     None,
     CreateFailed,
@@ -33,7 +38,7 @@ enum class SocketError {
 
 class Socket {
 public:
-    Socket(SocketType type = SocketType::TCP);
+    Socket(SocketType type = SocketType::TCP, AddressFamily family = AddressFamily::IPv4);
     ~Socket();
 
     // Prevent copying
@@ -65,6 +70,7 @@ public:
     // Utility
     void close();
     bool isValid() const;
+    AddressFamily getAddressFamily() const;
     SocketError getLastError() const;
     std::string getErrorMessage() const;
 
