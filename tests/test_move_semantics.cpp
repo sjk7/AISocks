@@ -59,9 +59,9 @@ int main() {
         Socket b(std::move(a));
 
         // All of these must not crash and must return failure
-        REQUIRE(a.bind("127.0.0.1", 19500) == false);
+        REQUIRE(a.bind("127.0.0.1", Port{19500}) == false);
         REQUIRE(a.listen(5) == false);
-        REQUIRE(a.connect("127.0.0.1", 19500) == false);
+        REQUIRE(a.connect("127.0.0.1", Port{19500}) == false);
         REQUIRE(a.send("x", 1) <= 0);
         char buf[8];
         REQUIRE(a.receive(buf, sizeof(buf)) <= 0);

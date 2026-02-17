@@ -53,7 +53,7 @@ static void test_server_bind_happy() {
         bool threw = false;
         try {
             Socket s(SocketType::TCP, AddressFamily::IPv4,
-                ServerBind{"127.0.0.1", BASE});
+                ServerBind{"127.0.0.1", Port{BASE}});
             REQUIRE(s.isValid());
         } catch (const SocketException& e) {
             std::cerr << "  Unexpected exception: " << e.what() << "\n";
@@ -70,7 +70,7 @@ static void test_server_bind_happy() {
         std::atomic<bool> ready{false};
         try {
             Socket srv(SocketType::TCP, AddressFamily::IPv4,
-                ServerBind{"127.0.0.1", BASE + 1});
+                ServerBind{"127.0.0.1", Port{BASE + 1}});
             REQUIRE(srv.isValid());
             ready = true;
 
@@ -79,7 +79,7 @@ static void test_server_bind_happy() {
                 std::this_thread::sleep_for(std::chrono::milliseconds(30));
                 try {
                     Socket c(SocketType::TCP, AddressFamily::IPv4,
-                        ConnectTo{"127.0.0.1", BASE + 1});
+                        ConnectTo{"127.0.0.1", Port{BASE + 1}});
                     std::this_thread::sleep_for(std::chrono::milliseconds(100));
                 } catch (...) {
                 }
@@ -102,7 +102,7 @@ static void test_server_bind_happy() {
         bool threw = false;
         try {
             Socket s(SocketType::TCP, AddressFamily::IPv4,
-                ServerBind{"127.0.0.1", BASE + 2, 5, false});
+                ServerBind{"127.0.0.1", Port{BASE + 2}, 5, false});
             REQUIRE(s.isValid());
         } catch (const SocketException& e) {
             std::cerr << "  Unexpected exception: " << e.what() << "\n";
@@ -126,7 +126,7 @@ static void test_connect_to_happy() {
         std::thread srvThread([&]() {
             try {
                 Socket srv(SocketType::TCP, AddressFamily::IPv4,
-                    ServerBind{"127.0.0.1", BASE + 3});
+                    ServerBind{"127.0.0.1", Port{BASE + 3}});
                 ready = true;
                 auto peer = srv.accept();
                 if (peer) {
@@ -146,7 +146,7 @@ static void test_connect_to_happy() {
 
         try {
             Socket c(SocketType::TCP, AddressFamily::IPv4,
-                ConnectTo{"127.0.0.1", BASE + 3});
+                ConnectTo{"127.0.0.1", Port{BASE + 3}});
             REQUIRE(c.isValid());
         } catch (const SocketException& e) {
             std::cerr << "  Unexpected exception: " << e.what() << "\n";
@@ -168,7 +168,7 @@ static void test_connect_to_happy() {
         std::thread srvThread([&]() {
             try {
                 Socket srv(SocketType::TCP, AddressFamily::IPv4,
-                    ServerBind{"127.0.0.1", BASE + 4});
+                    ServerBind{"127.0.0.1", Port{BASE + 4}});
                 ready = true;
                 auto peer = srv.accept();
                 if (peer) {
@@ -190,7 +190,7 @@ static void test_connect_to_happy() {
         bool threw = false;
         try {
             Socket c(SocketType::TCP, AddressFamily::IPv4,
-                ConnectTo{"127.0.0.1", BASE + 4});
+                ConnectTo{"127.0.0.1", Port{BASE + 4}});
             c.send(payload.data(), payload.size());
         } catch (const SocketException& e) {
             std::cerr << "  Unexpected exception: " << e.what() << "\n";
@@ -213,14 +213,14 @@ static void test_server_bind_failures() {
     {
         // First socket holds the port
         Socket first(SocketType::TCP, AddressFamily::IPv4,
-            ServerBind{"127.0.0.1", BASE + 10, 5, false});
+            ServerBind{"127.0.0.1", Port{BASE + 10}, 5, false});
 
         bool threw = false;
         SocketError code = SocketError::None;
         std::string what;
         try {
             Socket second(SocketType::TCP, AddressFamily::IPv4,
-                ServerBind{"127.0.0.1", BASE + 10, 5, false});
+                ServerBind{"127.0.0.1", Port{BASE + 10}, 5, false});
         } catch (const SocketException& e) {
             threw = true;
             code = e.errorCode();
@@ -244,7 +244,7 @@ static void test_server_bind_failures() {
         SocketError code = SocketError::None;
         try {
             Socket s(SocketType::TCP, AddressFamily::IPv4,
-                ServerBind{"999.999.999.999", BASE + 11});
+                ServerBind{"999.999.999.999", Port{BASE + 11}});
         } catch (const SocketException& e) {
             threw = true;
             code = e.errorCode();
@@ -259,11 +259,11 @@ static void test_server_bind_failures() {
     {
         // Reuse the already-bound port scenario to reliably get a failure
         Socket occupant(SocketType::TCP, AddressFamily::IPv4,
-            ServerBind{"127.0.0.1", BASE + 12, 5, false});
+            ServerBind{"127.0.0.1", Port{BASE + 12}, 5, false});
         std::string what;
         try {
             Socket s(SocketType::TCP, AddressFamily::IPv4,
-                ServerBind{"127.0.0.1", BASE + 12, 5, false});
+                ServerBind{"127.0.0.1", Port{BASE + 12}, 5, false});
         } catch (const SocketException& e) {
             what = e.what();
         }
@@ -290,7 +290,7 @@ static void test_connect_to_failures() {
             // Port 1 is virtually never listening and requires no privilege to
             // attempt
             Socket c(SocketType::TCP, AddressFamily::IPv4,
-                ConnectTo{"127.0.0.1", 1});
+                ConnectTo{"127.0.0.1", Port{1}});
         } catch (const SocketException& e) {
             threw = true;
             code = e.errorCode();
@@ -311,7 +311,7 @@ static void test_connect_to_failures() {
         SocketError code = SocketError::None;
         try {
             Socket c(SocketType::TCP, AddressFamily::IPv4,
-                ConnectTo{"999.999.999.999", BASE + 20});
+                ConnectTo{"999.999.999.999", Port{BASE + 20}});
         } catch (const SocketException& e) {
             threw = true;
             code = e.errorCode();
@@ -331,7 +331,7 @@ static void test_connect_to_failures() {
         SocketError code = SocketError::None;
         try {
             Socket c(SocketType::TCP, AddressFamily::IPv4,
-                ConnectTo{"this.host.does.not.exist.invalid", BASE + 21});
+                ConnectTo{"this.host.does.not.exist.invalid", Port{BASE + 21}});
         } catch (const SocketException& e) {
             threw = true;
             code = e.errorCode();
@@ -356,7 +356,7 @@ static void test_connect_to_failures() {
         std::string what;
         try {
             Socket c(SocketType::TCP, AddressFamily::IPv4,
-                ConnectTo{nonRouteableIP, 9, Milliseconds{TIMEOUT_MS}});
+                ConnectTo{nonRouteableIP, Port{9}, Milliseconds{TIMEOUT_MS}});
         } catch (const SocketException& e) {
             threw = true;
             code = e.errorCode();
@@ -389,7 +389,7 @@ static void test_exception_is_std_exception() {
         bool caught = false;
         try {
             Socket c(SocketType::TCP, AddressFamily::IPv4,
-                ConnectTo{"127.0.0.1", 1});
+                ConnectTo{"127.0.0.1", Port{1}});
         } catch (const std::exception& e) {
             caught = true;
             REQUIRE_MSG(std::string(e.what()).size() > 0,
@@ -404,7 +404,7 @@ static void test_exception_is_std_exception() {
         SocketError code = SocketError::None;
         try {
             Socket c(SocketType::TCP, AddressFamily::IPv4,
-                ConnectTo{"127.0.0.1", 1});
+                ConnectTo{"127.0.0.1", Port{1}});
         } catch (const SocketException& e) {
             code = e.errorCode();
         }
@@ -423,7 +423,7 @@ static void test_move_after_server_bind() {
         bool threw = false;
         try {
             Socket s(SocketType::TCP, AddressFamily::IPv4,
-                ServerBind{"127.0.0.1", BASE + 30});
+                ServerBind{"127.0.0.1", Port{BASE + 30}});
             Socket moved(std::move(s));
             REQUIRE(moved.isValid());
             REQUIRE(!s.isValid());

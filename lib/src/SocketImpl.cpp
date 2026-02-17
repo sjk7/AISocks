@@ -77,7 +77,7 @@ SocketImpl::~SocketImpl() {
     close();
 }
 
-bool SocketImpl::bind(const std::string& address, uint16_t port) {
+bool SocketImpl::bind(const std::string& address, Port port) {
     if (!isValid()) {
         setError(SocketError::InvalidSocket, "Socket is not valid");
         return false;
@@ -171,8 +171,8 @@ std::unique_ptr<SocketImpl> SocketImpl::accept() {
     return std::make_unique<SocketImpl>(clientSocket, socketType, clientFamily);
 }
 
-bool SocketImpl::connect(const std::string& address, uint16_t port,
-    std::chrono::milliseconds timeout) {
+bool SocketImpl::connect(
+    const std::string& address, Port port, std::chrono::milliseconds timeout) {
     if (!isValid()) {
         setError(SocketError::InvalidSocket, "Socket is not valid");
         return false;
