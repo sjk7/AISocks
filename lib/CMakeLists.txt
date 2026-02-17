@@ -7,6 +7,15 @@ add_library(aiSocksLib STATIC
     src/SocketImpl.h
 )
 
+# Platform-specific Poller backend (exactly one is compiled)
+if(APPLE OR CMAKE_SYSTEM_NAME MATCHES "FreeBSD")
+    target_sources(aiSocksLib PRIVATE src/PollerKqueue.cpp)
+elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    target_sources(aiSocksLib PRIVATE src/PollerEpoll.cpp)
+elseif(WIN32)
+    target_sources(aiSocksLib PRIVATE src/PollerWSAPoll.cpp)
+endif()
+
 # Set C++17 standard
 target_compile_features(aiSocksLib PUBLIC cxx_std_17)
 
