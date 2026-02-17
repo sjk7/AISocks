@@ -4,6 +4,7 @@
 #include "SocketImpl.h"
 #include <chrono>
 #include <cstring>
+#include <mutex>
 #include <sstream>
 #ifndef _WIN32
 #include <signal.h>
@@ -13,33 +14,31 @@ namespace aiSocks {
 
 // Platform-specific initialization
 #ifdef _WIN32
-static bool wsaInitialized = false;
+static std::once_flag sWsaInitFlag;
+static bool sWsaInitOk = false;
 
 bool SocketImpl::platformInit() {
-    if (!wsaInitialized) {
+    std::call_once(sWsaInitFlag, []() {
         WSADATA wsaData;
-        int result = WSAStartup(MAKEWORD(2, 2), &wsaData);
-        if (result != 0) {
-            return false;
-        }
-        wsaInitialized = true;
-    }
-    return true;
+        sWsaInitOk = (WSAStartup(MAKEWORD(2, 2), &wsaData) == 0);
+    });
+    return sWsaInitOk;
 }
 
 void SocketImpl::platformCleanup() {
-    if (wsaInitialized) {
+    if (sWsaInitOk) {
         WSACleanup();
-        wsaInitialized = false;
     }
 }
 #else
+static std::once_flag sPlatformInitFlag;
+
 bool SocketImpl::platformInit() {
     // Suppress SIGPIPE process-wide.  Belt-and-suspenders with SO_NOSIGPIPE
     // (macOS, set per-socket) and MSG_NOSIGNAL (Linux, set per-call): this
     // catches any remaining path that bypasses those per-socket/per-call
     // guards.
-    ::signal(SIGPIPE, SIG_IGN);
+    std::call_once(sPlatformInitFlag, []() { ::signal(SIGPIPE, SIG_IGN); });
     return true;
 }
 
@@ -93,14 +92,7 @@ SocketImpl::SocketImpl(
 }
 
 SocketImpl::~SocketImpl() {
-    if (isValid()) {
-        // Gracefully shutdown the connection before closing
-#ifdef _WIN32
-        ::shutdown(socketHandle, SD_BOTH);
-#else
-        ::shutdown(socketHandle, SHUT_RDWR);
-#endif
-    }
+    // close() handles graceful shutdown + fd release.
     close();
 }
 
@@ -180,22 +172,37 @@ std::unique_ptr<SocketImpl> SocketImpl::accept() {
     sockaddr_storage clientAddr{};
     socklen_t clientAddrLen = sizeof(clientAddr);
 
-    SocketHandle clientSocket = ::accept(
-        socketHandle, reinterpret_cast<sockaddr*>(&clientAddr), &clientAddrLen);
+    for (;;) {
+        SocketHandle clientSocket = ::accept(socketHandle,
+            reinterpret_cast<sockaddr*>(&clientAddr), &clientAddrLen);
 
-    if (clientSocket == INVALID_SOCKET_HANDLE) {
+        if (clientSocket != INVALID_SOCKET_HANDLE) {
+            AddressFamily clientFamily
+                = (reinterpret_cast<sockaddr*>(&clientAddr)->sa_family
+                      == AF_INET6)
+                ? AddressFamily::IPv6
+                : AddressFamily::IPv4;
+            lastError = SocketError::None;
+            return std::make_unique<SocketImpl>(
+                clientSocket, socketType, clientFamily);
+        }
+
+        int err = getLastSystemError();
+#ifndef _WIN32
+        if (err == EINTR) continue; // signal interrupted; retry
+#endif
+#ifdef _WIN32
+        if (err == WSAEWOULDBLOCK)
+#else
+        if (err == EWOULDBLOCK || err == EAGAIN)
+#endif
+        {
+            setError(SocketError::WouldBlock, "No connection pending");
+            return nullptr;
+        }
         setError(SocketError::AcceptFailed, "Failed to accept connection");
         return nullptr;
     }
-
-    // Determine address family from accepted connection
-    AddressFamily clientFamily
-        = (reinterpret_cast<sockaddr*>(&clientAddr)->sa_family == AF_INET6)
-        ? AddressFamily::IPv6
-        : AddressFamily::IPv4;
-
-    lastError = SocketError::None;
-    return std::make_unique<SocketImpl>(clientSocket, socketType, clientFamily);
 }
 
 bool SocketImpl::connect(
@@ -436,6 +443,15 @@ int SocketImpl::send(const void* data, size_t length) {
             setError(SocketError::Timeout, "send() timed out");
             return -1;
         }
+#ifdef _WIN32
+        if (error == WSAECONNRESET || error == WSAECONNABORTED)
+#else
+        if (error == ECONNRESET || error == EPIPE)
+#endif
+        {
+            setError(SocketError::ConnectionReset, "Connection reset by peer");
+            return -1;
+        }
         setError(SocketError::SendFailed, "Failed to send data");
         return -1;
     }
@@ -479,6 +495,15 @@ int SocketImpl::receive(void* buffer, size_t length) {
 #endif
         {
             setError(SocketError::Timeout, "recv() timed out");
+            return -1;
+        }
+#ifdef _WIN32
+        if (error == WSAECONNRESET || error == WSAECONNABORTED)
+#else
+        if (error == ECONNRESET)
+#endif
+        {
+            setError(SocketError::ConnectionReset, "Connection reset by peer");
             return -1;
         }
         setError(SocketError::ReceiveFailed, "Failed to receive data");
@@ -573,16 +598,24 @@ bool SocketImpl::setTimeout(std::chrono::milliseconds timeout) {
 
 void SocketImpl::close() {
     if (isValid()) {
-        // Attempt graceful shutdown (ignore errors as socket may not be
-        // connected)
+        // Only call ::shutdown() if the user hasn't already done so.
+        // If shutdown(Write) was called for a deliberate half-close sequence,
+        // a second shutdown(RDWR) here could interfere with the FIN exchange
+        // or send an RST with SO_LINGER.
+        if (!shutdownCalled_) {
 #ifdef _WIN32
-        ::shutdown(socketHandle, SD_BOTH);
+            ::shutdown(socketHandle, SD_BOTH);
+#else
+            ::shutdown(socketHandle, SHUT_RDWR);
+#endif
+        }
+#ifdef _WIN32
         closesocket(socketHandle);
 #else
-        ::shutdown(socketHandle, SHUT_RDWR);
         ::close(socketHandle);
 #endif
         socketHandle = INVALID_SOCKET_HANDLE;
+        shutdownCalled_ = false;
     }
 }
 
@@ -723,6 +756,15 @@ int SocketImpl::sendTo(
             setError(SocketError::Timeout, "sendTo() timed out");
             return -1;
         }
+#ifdef _WIN32
+        if (error == WSAECONNRESET || error == WSAECONNABORTED)
+#else
+        if (error == ECONNRESET || error == EPIPE)
+#endif
+        {
+            setError(SocketError::ConnectionReset, "Connection reset by peer");
+            return -1;
+        }
         setError(SocketError::SendFailed, "sendTo() failed");
         return -1;
     }
@@ -772,6 +814,15 @@ int SocketImpl::receiveFrom(void* buffer, size_t length, Endpoint& remote) {
 #endif
         {
             setError(SocketError::Timeout, "recvfrom() timed out");
+            return -1;
+        }
+#ifdef _WIN32
+        if (err == WSAECONNRESET || err == WSAECONNABORTED)
+#else
+        if (err == ECONNRESET)
+#endif
+        {
+            setError(SocketError::ConnectionReset, "Connection reset by peer");
             return -1;
         }
         setError(SocketError::ReceiveFailed, "receiveFrom() failed");
@@ -902,6 +953,7 @@ bool SocketImpl::shutdown(ShutdownHow how) {
         setError(SocketError::Unknown, "shutdown() failed");
         return false;
     }
+    shutdownCalled_ = true;
     lastError = SocketError::None;
     return true;
 }
