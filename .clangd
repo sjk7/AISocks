@@ -17,6 +17,9 @@ CompileFlags:
 Index:
   StandardLibrary: false
 
+Diagnostics:
+  UnusedIncludes: None
+
 # ------------------------------------------------------------------
 # Per-path overrides: silence diagnostics and skip background
 # indexing for system SDK, OS, and socket headers.
