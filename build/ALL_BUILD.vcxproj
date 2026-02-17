@@ -197,6 +197,10 @@ if %errorlevel% neq 0 goto :VCEnd</Command>
       <Project>{02C42AFC-14F9-37DF-99C2-78168FA5225E}</Project>
       <Name>aiSocksTestIPv6</Name>
     </ProjectReference>
+    <ProjectReference Include="C:\Users\cool\Desktop\AISocks\build\aiSocksTestMove.vcxproj">
+      <Project>{736A2376-ADF2-3768-870D-6AC4709CA74F}</Project>
+      <Name>aiSocksTestMove</Name>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
