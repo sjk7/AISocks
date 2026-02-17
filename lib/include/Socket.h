@@ -149,7 +149,7 @@ enum class SocketError {
     ConnectFailed,
     SendFailed,
     ReceiveFailed,
-    CloseFailed,
+    ConnectionReset, // peer closed / ECONNRESET / EPIPE / WSAECONNRESET
     SetOptionFailed,
     InvalidSocket,
     Timeout,
