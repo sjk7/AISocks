@@ -67,6 +67,14 @@ SocketImpl::SocketImpl(SocketHandle handle, SocketType type, AddressFamily famil
 }
 
 SocketImpl::~SocketImpl() {
+    if (isValid()) {
+        // Gracefully shutdown the connection before closing
+#ifdef _WIN32
+        ::shutdown(socketHandle, SD_BOTH);
+#else
+        ::shutdown(socketHandle, SHUT_RDWR);
+#endif
+    }
     close();
 }
 
@@ -367,9 +375,12 @@ bool SocketImpl::setTimeout(int seconds) {
 
 void SocketImpl::close() {
     if (isValid()) {
+        // Attempt graceful shutdown (ignore errors as socket may not be connected)
 #ifdef _WIN32
+        ::shutdown(socketHandle, SD_BOTH);
         closesocket(socketHandle);
 #else
+        ::shutdown(socketHandle, SHUT_RDWR);
         ::close(socketHandle);
 #endif
         socketHandle = INVALID_SOCKET_HANDLE;
