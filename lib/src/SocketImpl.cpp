@@ -1,4 +1,5 @@
 #include "SocketImpl.h"
+#include <chrono>
 #include <cstring>
 #include <sstream>
 
@@ -185,16 +186,18 @@ bool SocketImpl::connect(
     if (addressFamily == AddressFamily::IPv6) {
         auto* a6 = reinterpret_cast<sockaddr_in6*>(&serverAddr);
         a6->sin6_family = AF_INET6;
-        a6->sin6_port   = htons(port);
+        a6->sin6_port = htons(port);
         if (inet_pton(AF_INET6, address.c_str(), &a6->sin6_addr) <= 0) {
             struct addrinfo hints{}, *res = nullptr;
-            hints.ai_family   = AF_INET6;
-            hints.ai_socktype = (socketType == SocketType::TCP) ? SOCK_STREAM : SOCK_DGRAM;
+            hints.ai_family = AF_INET6;
+            hints.ai_socktype
+                = (socketType == SocketType::TCP) ? SOCK_STREAM : SOCK_DGRAM;
             if (getaddrinfo(address.c_str(), nullptr, &hints, &res) != 0) {
-                setError(SocketError::ConnectFailed, "Failed to resolve hostname");
+                setError(
+                    SocketError::ConnectFailed, "Failed to resolve hostname");
                 return false;
             }
-            *a6           = *reinterpret_cast<sockaddr_in6*>(res->ai_addr);
+            *a6 = *reinterpret_cast<sockaddr_in6*>(res->ai_addr);
             a6->sin6_port = htons(port);
             freeaddrinfo(res);
         }
@@ -202,16 +205,18 @@ bool SocketImpl::connect(
     } else {
         auto* a4 = reinterpret_cast<sockaddr_in*>(&serverAddr);
         a4->sin_family = AF_INET;
-        a4->sin_port   = htons(port);
+        a4->sin_port = htons(port);
         if (inet_pton(AF_INET, address.c_str(), &a4->sin_addr) <= 0) {
             struct addrinfo hints{}, *res = nullptr;
-            hints.ai_family   = AF_INET;
-            hints.ai_socktype = (socketType == SocketType::TCP) ? SOCK_STREAM : SOCK_DGRAM;
+            hints.ai_family = AF_INET;
+            hints.ai_socktype
+                = (socketType == SocketType::TCP) ? SOCK_STREAM : SOCK_DGRAM;
             if (getaddrinfo(address.c_str(), nullptr, &hints, &res) != 0) {
-                setError(SocketError::ConnectFailed, "Failed to resolve hostname");
+                setError(
+                    SocketError::ConnectFailed, "Failed to resolve hostname");
                 return false;
             }
-            *a4          = *reinterpret_cast<sockaddr_in*>(res->ai_addr);
+            *a4 = *reinterpret_cast<sockaddr_in*>(res->ai_addr);
             a4->sin_port = htons(port);
             freeaddrinfo(res);
         }
@@ -221,8 +226,8 @@ bool SocketImpl::connect(
     // --- Phase 2: connect (with optional select()-based timeout) ------------
     if (timeoutMs <= 0) {
         // Blocking connect.
-        if (::connect(socketHandle,
-                reinterpret_cast<sockaddr*>(&serverAddr), addrLen)
+        if (::connect(
+                socketHandle, reinterpret_cast<sockaddr*>(&serverAddr), addrLen)
             == SOCKET_ERROR_CODE) {
             setError(SocketError::ConnectFailed, "Failed to connect to server");
             return false;
@@ -240,19 +245,20 @@ bool SocketImpl::connect(
     fcntl(socketHandle, F_SETFL, savedFlags | O_NONBLOCK);
 #endif
 
-    // Restore blocking mode on any exit path from here.
+    // Restore flags and sync blockingMode on any exit path.
     auto restoreBlocking = [&]() {
 #ifdef _WIN32
         u_long blkMode = 0;
         ioctlsocket(socketHandle, FIONBIO, &blkMode);
+        blockingMode = true;
 #else
         fcntl(socketHandle, F_SETFL, savedFlags);
+        blockingMode = (savedFlags & O_NONBLOCK) == 0;
 #endif
-        blockingMode = true;
     };
 
-    int rc = ::connect(socketHandle,
-                       reinterpret_cast<sockaddr*>(&serverAddr), addrLen);
+    int rc = ::connect(
+        socketHandle, reinterpret_cast<sockaddr*>(&serverAddr), addrLen);
     if (rc == 0) {
         // Immediate success (rare but valid on loopback).
         restoreBlocking();
@@ -274,47 +280,80 @@ bool SocketImpl::connect(
         return false;
     }
 
-    // Wait for the socket to become writable (= connect finished or failed).
-    fd_set writeSet, errSet;
-    FD_ZERO(&writeSet); FD_SET(socketHandle, &writeSet);
-    FD_ZERO(&errSet);   FD_SET(socketHandle, &errSet);
-    struct timeval tv;
-    tv.tv_sec  = timeoutMs / 1000;
-    tv.tv_usec = (timeoutMs % 1000) * 1000;
+    // Poll with short intervals so this thread blocks for at most
+    // POLL_INTERVAL_MS at a time, keeping it responsive to cancellation.
+    // The deadline is measured with steady_clock (monotonic) so it is
+    // immune to wall-clock adjustments and EINTR restarts cost only the
+    // remaining slice, not the full timeout.
+    static constexpr int POLL_INTERVAL_MS = 10;
+    auto deadline = std::chrono::steady_clock::now()
+        + std::chrono::milliseconds(timeoutMs);
 
-    int sel = ::select(static_cast<int>(socketHandle) + 1,
-                       nullptr, &writeSet, &errSet, &tv);
-    if (sel == 0) {
-        setError(SocketError::Timeout,
-            "connect() timed out after " + std::to_string(timeoutMs) + " ms");
-        restoreBlocking();
-        return false;
-    }
-    if (sel < 0) {
-        setError(SocketError::ConnectFailed, "select() failed during connect");
-        restoreBlocking();
-        return false;
-    }
+    for (;;) {
+        auto remaining
+            = std::chrono::duration_cast<std::chrono::milliseconds>(
+                  deadline - std::chrono::steady_clock::now())
+                  .count();
+        if (remaining <= 0) {
+            setError(SocketError::Timeout,
+                "connect() timed out after " + std::to_string(timeoutMs)
+                    + " ms");
+            restoreBlocking();
+            return false;
+        }
 
-    // select() returned > 0: check whether the connection actually succeeded.
-    int sockErr = 0;
-    socklen_t sockErrLen = sizeof(sockErr);
-    getsockopt(socketHandle, SOL_SOCKET, SO_ERROR,
-               reinterpret_cast<char*>(&sockErr), &sockErrLen);
-    if (sockErr != 0) {
-#ifdef _WIN32
-        WSASetLastError(sockErr);
-#else
-        errno = sockErr;
+        // Use the shorter of the poll interval and remaining time.
+        long long sliceMs = (remaining < POLL_INTERVAL_MS) ? remaining
+                                                           : POLL_INTERVAL_MS;
+        struct timeval tv;
+        tv.tv_sec  = static_cast<long>(sliceMs / 1000);
+        tv.tv_usec = static_cast<long>((sliceMs % 1000) * 1000);
+
+        fd_set writeSet, errSet;
+        FD_ZERO(&writeSet);
+        FD_SET(socketHandle, &writeSet);
+        FD_ZERO(&errSet);
+        FD_SET(socketHandle, &errSet);
+
+        int sel = ::select(
+            static_cast<int>(socketHandle) + 1, nullptr, &writeSet, &errSet,
+            &tv);
+
+        if (sel < 0) {
+#ifndef _WIN32
+            if (errno == EINTR) continue; // signal interrupted; retry
 #endif
-        setError(SocketError::ConnectFailed, "Failed to connect to server");
-        restoreBlocking();
-        return false;
-    }
+            setError(
+                SocketError::ConnectFailed, "select() failed during connect");
+            restoreBlocking();
+            return false;
+        }
 
-    restoreBlocking();
-    lastError = SocketError::None;
-    return true;
+        if (sel == 0) {
+            // Slice timed out; check overall deadline at top of loop.
+            continue;
+        }
+
+        // select() returned > 0: check whether the connection succeeded.
+        int sockErr = 0;
+        socklen_t sockErrLen = sizeof(sockErr);
+        getsockopt(socketHandle, SOL_SOCKET, SO_ERROR,
+            reinterpret_cast<char*>(&sockErr), &sockErrLen);
+        if (sockErr != 0) {
+#ifdef _WIN32
+            WSASetLastError(sockErr);
+#else
+            errno = sockErr;
+#endif
+            setError(SocketError::ConnectFailed, "Failed to connect to server");
+            restoreBlocking();
+            return false;
+        }
+
+        restoreBlocking();
+        lastError = SocketError::None;
+        return true;
+    }
 }
 
 int SocketImpl::send(const void* data, size_t length) {
