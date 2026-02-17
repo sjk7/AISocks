@@ -3,6 +3,7 @@
 
 #include "Socket.h"
 #include <chrono>
+#include <optional>
 #include <vector>
 
 #ifdef _WIN32
@@ -24,6 +25,7 @@ using SocketHandle = SOCKET;
 #include <netdb.h>
 #include <errno.h>
 #include <ifaddrs.h>
+#include <netinet/tcp.h>
 using SocketHandle = int;
 #define INVALID_SOCKET_HANDLE -1
 #define SOCKET_ERROR_CODE -1
@@ -60,12 +62,18 @@ class SocketImpl {
     // Data transfer
     int send(const void* data, size_t length);
     int receive(void* buffer, size_t length);
+    int sendTo(const void* data, size_t length, const Endpoint& remote);
+    int receiveFrom(void* buffer, size_t length, Endpoint& remote);
 
     // Socket options
     bool setBlocking(bool blocking);
     bool isBlocking() const;
     bool setReuseAddress(bool reuse);
     bool setTimeout(std::chrono::milliseconds timeout);
+    bool setSendTimeout(std::chrono::milliseconds timeout);
+    bool setNoDelay(bool noDelay);
+    bool setKeepAlive(bool enable);
+    bool shutdown(ShutdownHow how);
 
     // Utility
     void close();
@@ -73,6 +81,8 @@ class SocketImpl {
     AddressFamily getAddressFamily() const;
     SocketError getLastError() const;
     std::string getErrorMessage() const;
+    std::optional<Endpoint> getLocalEndpoint() const;
+    std::optional<Endpoint> getPeerEndpoint() const;
 
     // Constructor for accepted connections (public for make_unique)
     SocketImpl(SocketHandle handle, SocketType type, AddressFamily family);
@@ -87,6 +97,7 @@ class SocketImpl {
 
     void setError(SocketError error, const std::string& message);
     int getLastSystemError() const;
+    static Endpoint endpointFromSockaddr(const sockaddr_storage& addr);
 };
 
 } // namespace aiSocks

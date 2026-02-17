@@ -4,6 +4,7 @@
 #include <chrono>
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -66,11 +67,31 @@ struct Port {
     }
 };
 
+enum class AddressFamily { IPv4, IPv6 };
+
+// Network endpoint: an (address, port, family) triple returned by
+// getLocalEndpoint() and getPeerEndpoint(), and passed to sendTo().
+struct Endpoint {
+    std::string address; // dotted-decimal or colon-hex string
+    Port port{0}; // port number
+    AddressFamily family{}; // IPv4 or IPv6
+
+    // Convenience: "addr:port" string for logging.
+    std::string toString() const {
+        return address + ":" + std::to_string(port.value);
+    }
+};
+
+// Controls which direction shutdown() closes.
+enum class ShutdownHow {
+    Read, // discard queued input; peer SEND will get RST      (SHUT_RD)
+    Write, // send FIN; peer recv will see EOF                  (SHUT_WR)
+    Both, // both directions                                   (SHUT_RDWR)
+};
+
 class SocketImpl;
 
 enum class SocketType { TCP, UDP };
-
-enum class AddressFamily { IPv4, IPv6 };
 
 struct NetworkInterface {
     std::string name; // Interface name (e.g., "eth0", "Ethernet")
@@ -180,10 +201,17 @@ class Socket {
     int send(const void* data, size_t length);
     int receive(void* buffer, size_t length);
 
+    // UDP-only data transfer (connected or connectionless)
+    // sendTo: sends a datagram to the specified remote endpoint.
+    // receiveFrom: receives a datagram and fills `remote` with the sender.
+    int sendTo(const void* data, size_t length, const Endpoint& remote);
+    int receiveFrom(void* buffer, size_t length, Endpoint& remote);
+
     // Socket options
     bool setBlocking(bool blocking);
     bool isBlocking() const;
     bool setReuseAddress(bool reuse);
+
     // Set SO_RCVTIMEO on the socket.
     //   defaultTimeout (30 s) — used when not specified.
     //   Milliseconds{0}       — disables the timeout; recv() blocks
@@ -192,12 +220,38 @@ class Socket {
     //                           waiting this long with no data.
     bool setTimeout(Milliseconds timeout);
 
+    // Set SO_SNDTIMEO on the socket (same semantics as setTimeout).
+    bool setSendTimeout(Milliseconds timeout);
+
+    // Disable/enable Nagle's algorithm (TCP only).
+    // setNoDelay(true) reduces latency for small writes at the cost of
+    // increased packet count.
+    bool setNoDelay(bool noDelay);
+
+    // Enable/disable SO_KEEPALIVE.  Requires OS idle/interval/count tuning
+    // for meaningful control; enabling the option is still useful to detect
+    // dead peers on long-lived connections.
+    bool setKeepAlive(bool enable);
+
+    // Half-close the connection in the specified direction.
+    // Unlike close(), the socket fd remains valid after shutdown().
+    bool shutdown(ShutdownHow how);
+
     // Utility
     void close();
     bool isValid() const;
     AddressFamily getAddressFamily() const;
     SocketError getLastError() const;
     std::string getErrorMessage() const;
+
+    // Query the local address/port assigned to this socket
+    // (populated after bind() or connect()).
+    // Returns std::nullopt if the socket is invalid or getsockname fails.
+    std::optional<Endpoint> getLocalEndpoint() const;
+
+    // Query the remote address/port this socket is connected to.
+    // Returns std::nullopt if not connected or the socket is invalid.
+    std::optional<Endpoint> getPeerEndpoint() const;
 
     // Static utility methods
     static std::vector<NetworkInterface> getLocalAddresses();

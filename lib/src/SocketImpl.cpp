@@ -560,6 +560,223 @@ int SocketImpl::getLastSystemError() const {
 #endif
 }
 
+// -----------------------------------------------------------------------
+// sendTo / receiveFrom (UDP)
+// -----------------------------------------------------------------------
+int SocketImpl::sendTo(
+    const void* data, size_t length, const Endpoint& remote) {
+    if (!isValid()) {
+        setError(SocketError::InvalidSocket, "Socket is not valid");
+        return -1;
+    }
+
+    sockaddr_storage addr{};
+    socklen_t addrLen = 0;
+
+    if (remote.family == AddressFamily::IPv6) {
+        auto* a6 = reinterpret_cast<sockaddr_in6*>(&addr);
+        a6->sin6_family = AF_INET6;
+        a6->sin6_port = htons(remote.port);
+        inet_pton(AF_INET6, remote.address.c_str(), &a6->sin6_addr);
+        addrLen = sizeof(sockaddr_in6);
+    } else {
+        auto* a4 = reinterpret_cast<sockaddr_in*>(&addr);
+        a4->sin_family = AF_INET;
+        a4->sin_port = htons(remote.port);
+        inet_pton(AF_INET, remote.address.c_str(), &a4->sin_addr);
+        addrLen = sizeof(sockaddr_in);
+    }
+
+#ifdef _WIN32
+    int sent = ::sendto(socketHandle, static_cast<const char*>(data),
+        static_cast<int>(length), 0,
+        reinterpret_cast<sockaddr*>(&addr), addrLen);
+#else
+    ssize_t sent = ::sendto(socketHandle, data, length, 0,
+        reinterpret_cast<sockaddr*>(&addr), addrLen);
+#endif
+
+    if (sent == SOCKET_ERROR_CODE) {
+        setError(SocketError::SendFailed, "sendTo() failed");
+        return -1;
+    }
+    lastError = SocketError::None;
+    return static_cast<int>(sent);
+}
+
+int SocketImpl::receiveFrom(void* buffer, size_t length, Endpoint& remote) {
+    if (!isValid()) {
+        setError(SocketError::InvalidSocket, "Socket is not valid");
+        return -1;
+    }
+
+    sockaddr_storage addr{};
+    socklen_t addrLen = sizeof(addr);
+
+#ifdef _WIN32
+    int recvd = ::recvfrom(socketHandle, static_cast<char*>(buffer),
+        static_cast<int>(length), 0,
+        reinterpret_cast<sockaddr*>(&addr), &addrLen);
+#else
+    ssize_t recvd = ::recvfrom(socketHandle, buffer, length, 0,
+        reinterpret_cast<sockaddr*>(&addr), &addrLen);
+#endif
+
+    if (recvd == SOCKET_ERROR_CODE) {
+        int err = getLastSystemError();
+#ifdef _WIN32
+        if (err == WSAEWOULDBLOCK)
+#else
+        if (err == EWOULDBLOCK || err == EAGAIN)
+#endif
+            setError(SocketError::WouldBlock, "Operation would block");
+        else
+            setError(SocketError::ReceiveFailed, "receiveFrom() failed");
+        return -1;
+    }
+
+    remote = endpointFromSockaddr(addr);
+    lastError = SocketError::None;
+    return static_cast<int>(recvd);
+}
+
+// -----------------------------------------------------------------------
+// setSendTimeout
+// -----------------------------------------------------------------------
+bool SocketImpl::setSendTimeout(std::chrono::milliseconds timeout) {
+    if (!isValid()) {
+        setError(SocketError::InvalidSocket, "Socket is not valid");
+        return false;
+    }
+    const long long ms = timeout.count();
+#ifdef _WIN32
+    DWORD tv = static_cast<DWORD>(ms);
+    if (setsockopt(socketHandle, SOL_SOCKET, SO_SNDTIMEO,
+            reinterpret_cast<const char*>(&tv), sizeof(tv))
+        == SOCKET_ERROR_CODE) {
+        setError(SocketError::SetOptionFailed, "Failed to set send timeout");
+        return false;
+    }
+#else
+    struct timeval tv;
+    tv.tv_sec = static_cast<long>(ms / 1000);
+    tv.tv_usec = static_cast<long>((ms % 1000) * 1000);
+    if (setsockopt(socketHandle, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv))
+        == SOCKET_ERROR_CODE) {
+        setError(SocketError::SetOptionFailed, "Failed to set send timeout");
+        return false;
+    }
+#endif
+    lastError = SocketError::None;
+    return true;
+}
+
+// -----------------------------------------------------------------------
+// setNoDelay (TCP_NODELAY)
+// -----------------------------------------------------------------------
+bool SocketImpl::setNoDelay(bool noDelay) {
+    if (!isValid()) {
+        setError(SocketError::InvalidSocket, "Socket is not valid");
+        return false;
+    }
+    int optval = noDelay ? 1 : 0;
+    if (setsockopt(socketHandle, IPPROTO_TCP, TCP_NODELAY,
+            reinterpret_cast<const char*>(&optval), sizeof(optval))
+        == SOCKET_ERROR_CODE) {
+        setError(SocketError::SetOptionFailed, "Failed to set TCP_NODELAY");
+        return false;
+    }
+    lastError = SocketError::None;
+    return true;
+}
+
+// -----------------------------------------------------------------------
+// setKeepAlive (SO_KEEPALIVE)
+// -----------------------------------------------------------------------
+bool SocketImpl::setKeepAlive(bool enable) {
+    if (!isValid()) {
+        setError(SocketError::InvalidSocket, "Socket is not valid");
+        return false;
+    }
+    int optval = enable ? 1 : 0;
+    if (setsockopt(socketHandle, SOL_SOCKET, SO_KEEPALIVE,
+            reinterpret_cast<const char*>(&optval), sizeof(optval))
+        == SOCKET_ERROR_CODE) {
+        setError(SocketError::SetOptionFailed, "Failed to set SO_KEEPALIVE");
+        return false;
+    }
+    lastError = SocketError::None;
+    return true;
+}
+
+// -----------------------------------------------------------------------
+// shutdown(ShutdownHow)
+// -----------------------------------------------------------------------
+bool SocketImpl::shutdown(ShutdownHow how) {
+    if (!isValid()) {
+        setError(SocketError::InvalidSocket, "Socket is not valid");
+        return false;
+    }
+#ifdef _WIN32
+    int how_ = (how == ShutdownHow::Read)  ? SD_RECEIVE
+             : (how == ShutdownHow::Write) ? SD_SEND
+                                           : SD_BOTH;
+#else
+    int how_ = (how == ShutdownHow::Read)  ? SHUT_RD
+             : (how == ShutdownHow::Write) ? SHUT_WR
+                                           : SHUT_RDWR;
+#endif
+    if (::shutdown(socketHandle, how_) == SOCKET_ERROR_CODE) {
+        setError(SocketError::Unknown, "shutdown() failed");
+        return false;
+    }
+    lastError = SocketError::None;
+    return true;
+}
+
+// -----------------------------------------------------------------------
+// getLocalEndpoint / getPeerEndpoint
+// -----------------------------------------------------------------------
+Endpoint SocketImpl::endpointFromSockaddr(const sockaddr_storage& addr) {
+    Endpoint ep;
+    if (addr.ss_family == AF_INET6) {
+        ep.family = AddressFamily::IPv6;
+        const auto* a6 = reinterpret_cast<const sockaddr_in6*>(&addr);
+        ep.port = Port{ntohs(a6->sin6_port)};
+        char buf[INET6_ADDRSTRLEN];
+        inet_ntop(AF_INET6, &a6->sin6_addr, buf, sizeof(buf));
+        ep.address = buf;
+    } else {
+        ep.family = AddressFamily::IPv4;
+        const auto* a4 = reinterpret_cast<const sockaddr_in*>(&addr);
+        ep.port = Port{ntohs(a4->sin_port)};
+        char buf[INET_ADDRSTRLEN];
+        inet_ntop(AF_INET, &a4->sin_addr, buf, sizeof(buf));
+        ep.address = buf;
+    }
+    return ep;
+}
+
+std::optional<Endpoint> SocketImpl::getLocalEndpoint() const {
+    if (!isValid()) return std::nullopt;
+    sockaddr_storage addr{};
+    socklen_t len = sizeof(addr);
+    if (getsockname(
+            socketHandle, reinterpret_cast<sockaddr*>(&addr), &len) != 0)
+        return std::nullopt;
+    return endpointFromSockaddr(addr);
+}
+
+std::optional<Endpoint> SocketImpl::getPeerEndpoint() const {
+    if (!isValid()) return std::nullopt;
+    sockaddr_storage addr{};
+    socklen_t len = sizeof(addr);
+    if (getpeername(
+            socketHandle, reinterpret_cast<sockaddr*>(&addr), &len) != 0)
+        return std::nullopt;
+    return endpointFromSockaddr(addr);
+}
+
 // Static utility methods
 std::vector<NetworkInterface> SocketImpl::getLocalAddresses() {
     std::vector<NetworkInterface> interfaces;

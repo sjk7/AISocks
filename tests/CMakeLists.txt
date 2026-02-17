@@ -6,6 +6,7 @@ set(TEST_SOURCES
     test_loopback_tcp
     test_error_handling
     test_construction
+    test_new_features
 )
 
 foreach(TEST_NAME ${TEST_SOURCES})

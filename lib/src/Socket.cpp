@@ -95,6 +95,16 @@ int Socket::receive(void* buffer, size_t length) {
     return pImpl->receive(buffer, length);
 }
 
+int Socket::sendTo(const void* data, size_t length, const Endpoint& remote) {
+    if (!pImpl) return -1;
+    return pImpl->sendTo(data, length, remote);
+}
+
+int Socket::receiveFrom(void* buffer, size_t length, Endpoint& remote) {
+    if (!pImpl) return -1;
+    return pImpl->receiveFrom(buffer, length, remote);
+}
+
 bool Socket::setBlocking(bool blocking) {
     if (!pImpl) return false;
     return pImpl->setBlocking(blocking);
@@ -113,6 +123,26 @@ bool Socket::setReuseAddress(bool reuse) {
 bool Socket::setTimeout(Milliseconds timeout) {
     if (!pImpl) return false;
     return pImpl->setTimeout(timeout);
+}
+
+bool Socket::setSendTimeout(Milliseconds timeout) {
+    if (!pImpl) return false;
+    return pImpl->setSendTimeout(timeout);
+}
+
+bool Socket::setNoDelay(bool noDelay) {
+    if (!pImpl) return false;
+    return pImpl->setNoDelay(noDelay);
+}
+
+bool Socket::setKeepAlive(bool enable) {
+    if (!pImpl) return false;
+    return pImpl->setKeepAlive(enable);
+}
+
+bool Socket::shutdown(ShutdownHow how) {
+    if (!pImpl) return false;
+    return pImpl->shutdown(how);
 }
 
 void Socket::close() {
@@ -138,6 +168,16 @@ SocketError Socket::getLastError() const {
 std::string Socket::getErrorMessage() const {
     if (!pImpl) return "Invalid socket (moved-from state)";
     return pImpl->getErrorMessage();
+}
+
+std::optional<Endpoint> Socket::getLocalEndpoint() const {
+    if (!pImpl) return std::nullopt;
+    return pImpl->getLocalEndpoint();
+}
+
+std::optional<Endpoint> Socket::getPeerEndpoint() const {
+    if (!pImpl) return std::nullopt;
+    return pImpl->getPeerEndpoint();
 }
 
 // Static utility methods
