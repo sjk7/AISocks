@@ -80,13 +80,18 @@ class SocketImpl {
     bool setBlocking(bool blocking);
     bool isBlocking() const;
     bool setReuseAddress(bool reuse);
+    bool setReusePort(bool enable);
     bool setTimeout(std::chrono::milliseconds timeout);
     bool setSendTimeout(std::chrono::milliseconds timeout);
     bool setNoDelay(bool noDelay);
     bool setKeepAlive(bool enable);
+    bool setLingerAbort(bool enable);
     bool setReceiveBufferSize(int bytes);
     bool setSendBufferSize(int bytes);
     bool shutdown(ShutdownHow how);
+    bool sendAll(const void* data, size_t length);
+    bool waitReadable(std::chrono::milliseconds timeout);
+    bool waitWritable(std::chrono::milliseconds timeout);
 
     // Utility
     void close();
@@ -97,6 +102,7 @@ class SocketImpl {
     ErrorContext getErrorContext() const;
     std::optional<Endpoint> getLocalEndpoint() const;
     std::optional<Endpoint> getPeerEndpoint() const;
+    SocketHandle getRawHandle() const noexcept { return socketHandle; }
 
     // Constructor for accepted connections (public for make_unique)
     SocketImpl(SocketHandle handle, SocketType type, AddressFamily family);

@@ -900,6 +900,152 @@ bool SocketImpl::setKeepAlive(bool enable) {
 }
 
 // -----------------------------------------------------------------------
+// setLingerAbort (SO_LINGER, l_linger=0 → RST on close)
+// -----------------------------------------------------------------------
+bool SocketImpl::setLingerAbort(bool enable) {
+    if (!isValid()) {
+        setError(SocketError::InvalidSocket, "Socket is not valid");
+        return false;
+    }
+    struct linger lg{};
+    lg.l_onoff = enable ? 1 : 0;
+    lg.l_linger = 0; // l_linger=0 → RST on close
+    if (setsockopt(socketHandle, SOL_SOCKET, SO_LINGER,
+            reinterpret_cast<const char*>(&lg), sizeof(lg))
+        == SOCKET_ERROR_CODE) {
+        setError(SocketError::SetOptionFailed, "Failed to set SO_LINGER");
+        return false;
+    }
+    lastError = SocketError::None;
+    return true;
+}
+
+// -----------------------------------------------------------------------
+// setReusePort (SO_REUSEPORT)
+// -----------------------------------------------------------------------
+bool SocketImpl::setReusePort(bool enable) {
+    if (!isValid()) {
+        setError(SocketError::InvalidSocket, "Socket is not valid");
+        return false;
+    }
+#ifdef SO_REUSEPORT
+    int optval = enable ? 1 : 0;
+    if (setsockopt(socketHandle, SOL_SOCKET, SO_REUSEPORT,
+            reinterpret_cast<const char*>(&optval), sizeof(optval))
+        == SOCKET_ERROR_CODE) {
+        setError(SocketError::SetOptionFailed, "Failed to set SO_REUSEPORT");
+        return false;
+    }
+    lastError = SocketError::None;
+    return true;
+#else
+    (void)enable;
+    setError(SocketError::SetOptionFailed,
+        "SO_REUSEPORT is not supported on this platform");
+    return false;
+#endif
+}
+
+// -----------------------------------------------------------------------
+// sendAll — loop until all bytes sent or error
+// -----------------------------------------------------------------------
+bool SocketImpl::sendAll(const void* data, size_t length) {
+    const auto* ptr = static_cast<const char*>(data);
+    size_t remaining = length;
+    while (remaining > 0) {
+        int sent = send(ptr, remaining);
+        if (sent < 0) {
+            return false; // error already recorded by send()
+        }
+        ptr += static_cast<size_t>(sent);
+        remaining -= static_cast<size_t>(sent);
+    }
+    lastError = SocketError::None;
+    return true;
+}
+
+// -----------------------------------------------------------------------
+// waitReadable / waitWritable — single-fd select convenience
+// -----------------------------------------------------------------------
+bool SocketImpl::waitReadable(std::chrono::milliseconds timeout) {
+    if (!isValid()) {
+        setError(SocketError::InvalidSocket, "Socket is not valid");
+        return false;
+    }
+    auto deadline = std::chrono::steady_clock::now() + timeout;
+
+    for (;;) {
+        auto rem = std::chrono::duration_cast<std::chrono::milliseconds>(
+            deadline - std::chrono::steady_clock::now())
+                       .count();
+        if (rem < 0) rem = 0;
+
+        struct timeval tv;
+        tv.tv_sec = static_cast<long>(rem / 1000);
+        tv.tv_usec = static_cast<long>((rem % 1000) * 1000);
+
+        fd_set readSet;
+        FD_ZERO(&readSet);
+        FD_SET(socketHandle, &readSet);
+
+        int sel = ::select(static_cast<int>(socketHandle) + 1, &readSet,
+            nullptr, nullptr, &tv);
+        if (sel < 0) {
+#ifndef _WIN32
+            if (errno == EINTR) continue;
+#endif
+            setError(SocketError::Unknown, "select() failed in waitReadable");
+            return false;
+        }
+        if (sel == 0) {
+            setError(SocketError::Timeout, "waitReadable() timed out");
+            return false;
+        }
+        lastError = SocketError::None;
+        return true;
+    }
+}
+
+bool SocketImpl::waitWritable(std::chrono::milliseconds timeout) {
+    if (!isValid()) {
+        setError(SocketError::InvalidSocket, "Socket is not valid");
+        return false;
+    }
+    auto deadline = std::chrono::steady_clock::now() + timeout;
+
+    for (;;) {
+        auto rem = std::chrono::duration_cast<std::chrono::milliseconds>(
+            deadline - std::chrono::steady_clock::now())
+                       .count();
+        if (rem < 0) rem = 0;
+
+        struct timeval tv;
+        tv.tv_sec = static_cast<long>(rem / 1000);
+        tv.tv_usec = static_cast<long>((rem % 1000) * 1000);
+
+        fd_set writeSet;
+        FD_ZERO(&writeSet);
+        FD_SET(socketHandle, &writeSet);
+
+        int sel = ::select(static_cast<int>(socketHandle) + 1, nullptr,
+            &writeSet, nullptr, &tv);
+        if (sel < 0) {
+#ifndef _WIN32
+            if (errno == EINTR) continue;
+#endif
+            setError(SocketError::Unknown, "select() failed in waitWritable");
+            return false;
+        }
+        if (sel == 0) {
+            setError(SocketError::Timeout, "waitWritable() timed out");
+            return false;
+        }
+        lastError = SocketError::None;
+        return true;
+    }
+}
+
+// -----------------------------------------------------------------------
 // setReceiveBufferSize / setSendBufferSize (SO_RCVBUF / SO_SNDBUF)
 // -----------------------------------------------------------------------
 bool SocketImpl::setReceiveBufferSize(int bytes) {

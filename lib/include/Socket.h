@@ -249,9 +249,22 @@ class Socket {
     // Client operations
     bool connect(const std::string& address, Port port);
 
+    // Timed connect — same as the ConnectTo{} constructor path but callable
+    // after manual bind() or as a plain method invocation.
+    // timeout == defaultTimeout (30 s) when not supplied.
+    // timeout == Milliseconds{0} defers to the OS (blocks until the kernel
+    // gives up).
+    bool connectTo(const std::string& address, Port port,
+        Milliseconds timeout = defaultTimeout);
+
     // Data transfer (raw pointer overloads)
     int send(const void* data, size_t length);
     int receive(void* buffer, size_t length);
+
+    // Send all bytes, looping until every byte is delivered or an error
+    // occurs.  Returns true on success; false on error (check getLastError()).
+    bool sendAll(const void* data, size_t length);
+    bool sendAll(Span<const std::byte> data);
 
     // Span-based overloads — delegates to the raw-pointer overloads.
     // On C++20 these accept std::span<const std::byte> / std::span<std::byte>
@@ -274,6 +287,15 @@ class Socket {
     bool setBlocking(bool blocking);
     bool isBlocking() const;
     bool setReuseAddress(bool reuse);
+
+    // Block until the socket has readable data (or EOF) within the given
+    // timeout.  Returns true if ready, false on timeout (SocketError::Timeout)
+    // or select() failure (SocketError::Unknown).
+    bool waitReadable(Milliseconds timeout);
+
+    // Block until the socket send-buffer has space within the given timeout.
+    // Returns true if ready, false on timeout or select() failure.
+    bool waitWritable(Milliseconds timeout);
 
     // Set SO_RCVTIMEO on the socket.
     //   defaultTimeout (30 s) — used when not specified.
@@ -308,6 +330,19 @@ class Socket {
     // Unlike close(), the socket fd remains valid after shutdown().
     bool shutdown(ShutdownHow how);
 
+    // Configure SO_LINGER with l_linger=0: close() sends RST instead of FIN.
+    // Useful in test code (avoids TIME_WAIT on rapid connect/disconnect cycles)
+    // and server accept-loops that want to hard-reject bad clients.
+    // DO NOT pass l_linger>0 (blocking linger); use shutdown(Write)+drain
+    // instead.
+    bool setLingerAbort(bool enable);
+
+    // Enable multiple sockets to bind the same address/port (SO_REUSEPORT).
+    // The kernel distributes incoming connections/datagrams across all bound
+    // sockets.  Returns false with SetOptionFailed on platforms that lack the
+    // option (some older Windows builds).
+    bool setReusePort(bool enable);
+
     // Utility
     void close();
     bool isValid() const;
@@ -329,6 +364,11 @@ class Socket {
     static bool isValidIPv4(const std::string& address);
     static bool isValidIPv6(const std::string& address);
     static std::string ipToString(const void* addr, AddressFamily family);
+
+    // Returns the underlying OS socket descriptor as an opaque integer.
+    // Advanced use only (e.g. Poller integration).  Returns (uintptr_t)-1 if
+    // the socket is invalid or moved-from.
+    uintptr_t getNativeHandle() const noexcept;
 
     private:
     // Private constructor for accepted connections

@@ -100,6 +100,12 @@ bool Socket::connect(const std::string& address, Port port) {
     return pImpl->connect(address, port);
 }
 
+bool Socket::connectTo(
+    const std::string& address, Port port, Milliseconds timeout) {
+    if (!pImpl) return false;
+    return pImpl->connect(address, port, timeout);
+}
+
 int Socket::send(const void* data, size_t length) {
     if (!pImpl) return -1;
     return pImpl->send(data, length);
@@ -108,6 +114,15 @@ int Socket::send(const void* data, size_t length) {
 int Socket::receive(void* buffer, size_t length) {
     if (!pImpl) return -1;
     return pImpl->receive(buffer, length);
+}
+
+bool Socket::sendAll(const void* data, size_t length) {
+    if (!pImpl) return false;
+    return pImpl->sendAll(data, length);
+}
+
+bool Socket::sendAll(Span<const std::byte> data) {
+    return sendAll(data.data(), data.size());
 }
 
 // Span overloads — delegate to the raw-pointer implementations.
@@ -148,9 +163,24 @@ bool Socket::isBlocking() const {
     return pImpl->isBlocking();
 }
 
+bool Socket::waitReadable(Milliseconds timeout) {
+    if (!pImpl) return false;
+    return pImpl->waitReadable(timeout);
+}
+
+bool Socket::waitWritable(Milliseconds timeout) {
+    if (!pImpl) return false;
+    return pImpl->waitWritable(timeout);
+}
+
 bool Socket::setReuseAddress(bool reuse) {
     if (!pImpl) return false;
     return pImpl->setReuseAddress(reuse);
+}
+
+bool Socket::setReusePort(bool enable) {
+    if (!pImpl) return false;
+    return pImpl->setReusePort(enable);
 }
 
 bool Socket::setTimeout(Milliseconds timeout) {
@@ -181,6 +211,11 @@ bool Socket::setSendBufferSize(int bytes) {
 bool Socket::setKeepAlive(bool enable) {
     if (!pImpl) return false;
     return pImpl->setKeepAlive(enable);
+}
+
+bool Socket::setLingerAbort(bool enable) {
+    if (!pImpl) return false;
+    return pImpl->setLingerAbort(enable);
 }
 
 bool Socket::shutdown(ShutdownHow how) {
@@ -238,6 +273,11 @@ bool Socket::isValidIPv6(const std::string& address) {
 
 std::string Socket::ipToString(const void* addr, AddressFamily family) {
     return SocketImpl::ipToString(addr, family);
+}
+
+uintptr_t Socket::getNativeHandle() const noexcept {
+    if (!pImpl) return static_cast<uintptr_t>(-1);
+    return static_cast<uintptr_t>(pImpl->getRawHandle());
 }
 
 } // namespace aiSocks

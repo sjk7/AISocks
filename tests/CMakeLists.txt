@@ -8,6 +8,7 @@ set(TEST_SOURCES
     test_construction
     test_new_features
     test_error_messages
+    test_poller
 )
 
 foreach(TEST_NAME ${TEST_SOURCES})
