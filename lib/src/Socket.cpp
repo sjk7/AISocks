@@ -3,8 +3,8 @@
 
 namespace aiSocks {
 
-Socket::Socket(SocketType type)
-    : pImpl(std::make_unique<SocketImpl>(type))
+Socket::Socket(SocketType type, AddressFamily family)
+    : pImpl(std::make_unique<SocketImpl>(type, family))
 {
 }
 
@@ -69,6 +69,10 @@ void Socket::close() {
 
 bool Socket::isValid() const {
     return pImpl->isValid();
+}
+
+AddressFamily Socket::getAddressFamily() const {
+    return pImpl->getAddressFamily();
 }
 
 SocketError Socket::getLastError() const {

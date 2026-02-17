@@ -6,6 +6,7 @@ A modern C++ socket library that abstracts platform differences between Windows,
 
 - ✅ Cross-platform support (Windows, macOS, Linux)
 - ✅ Clean pimpl-based API hiding platform details
+- ✅ IPv4 and IPv6 support
 - ✅ TCP and UDP socket support
 - ✅ Blocking and non-blocking modes
 - ✅ Server and client functionality
@@ -70,14 +71,14 @@ The example demonstrates a simple client-server communication where:
 
 ## Usage
 
-### Basic Server
+### Basic IPv4 Server
 
 ```cpp
 #include "Socket.h"
 
 using namespace aiSocks;
 
-Socket serverSocket(SocketType::TCP);
+Socket serverSocket(SocketType::TCP, AddressFamily::IPv4);
 serverSocket.setReuseAddress(true);
 serverSocket.bind("0.0.0.0", 8080);
 serverSocket.listen(5);
@@ -87,18 +88,34 @@ char buffer[1024];
 int bytesReceived = clientSocket->receive(buffer, sizeof(buffer));
 ```
 
-### Basic Client
+### Basic IPv4 Client
 
 ```cpp
 #include "Socket.h"
 
 using namespace aiSocks;
 
-Socket clientSocket(SocketType::TCP);
+Socket clientSocket(SocketType::TCP, AddressFamily::IPv4);
 clientSocket.connect("127.0.0.1", 8080);
 
 const char* message = "Hello!";
 clientSocket.send(message, strlen(message));
+```
+
+### IPv6 Server
+
+```cpp
+Socket serverSocket(SocketType::TCP, AddressFamily::IPv6);
+serverSocket.setReuseAddress(true);
+serverSocket.bind("::1", 8080);  // IPv6 loopback
+serverSocket.listen(5);
+```
+
+### IPv6 Client
+
+```cpp
+Socket clientSocket(SocketType::TCP, AddressFamily::IPv6);
+clientSocket.connect("::1", 8080);  // Connect to IPv6 loopback
 ```
 
 ## API Overview
@@ -106,7 +123,7 @@ clientSocket.send(message, strlen(message));
 ### Socket Class
 
 **Constructor:**
-- `Socket(SocketType type = SocketType::TCP)` - Create a TCP or UDP socket
+- `Socket(SocketType type = SocketType::TCP, AddressFamily family = AddressFamily::IPv4)` - Create a TCP or UDP socket with IPv4 or IPv6
 
 **Server Operations:**
 - `bool bind(const std::string& address, uint16_t port)` - Bind to an address/port
@@ -122,12 +139,14 @@ clientSocket.send(message, strlen(message));
 
 **Socket Options:**
 - `bool setBlocking(bool blocking)` - Set blocking/non-blocking mode
+- `bool isBlocking() const` - Check if socket is in blocking mode
 - `bool setReuseAddress(bool reuse)` - Enable SO_REUSEADDR
 - `bool setTimeout(int seconds)` - Set receive timeout
 
 **Utility:**
 - `void close()` - Close the socket
 - `bool isValid()` - Check if socket is valid
+- `AddressFamily getAddressFamily() const` - Get the address family (IPv4/IPv6)
 - `SocketError getLastError()` - Get last error code
 - `std::string getErrorMessage()` - Get last error message
 
@@ -135,6 +154,11 @@ clientSocket.send(message, strlen(message));
 
 - `SocketType::TCP` - Stream socket (SOCK_STREAM)
 - `SocketType::UDP` - Datagram socket (SOCK_DGRAM)
+
+### Address Families
+
+- `AddressFamily::IPv4` - Internet Protocol version 4
+- `AddressFamily::IPv6` - Internet Protocol version 6
 
 ### Error Codes
 

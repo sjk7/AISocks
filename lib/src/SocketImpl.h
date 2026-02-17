@@ -28,7 +28,7 @@ namespace aiSocks {
 
 class SocketImpl {
 public:
-    SocketImpl(SocketType type);
+    SocketImpl(SocketType type, AddressFamily family);
     ~SocketImpl();
 
     // Platform initialization/cleanup
@@ -56,15 +56,17 @@ public:
     // Utility
     void close();
     bool isValid() const;
+    AddressFamily getAddressFamily() const;
     SocketError getLastError() const;
     std::string getErrorMessage() const;
 
     // Constructor for accepted connections (public for make_unique)
-    SocketImpl(SocketHandle handle, SocketType type);
+    SocketImpl(SocketHandle handle, SocketType type, AddressFamily family);
 
 private:
     SocketHandle socketHandle;
     SocketType socketType;
+    AddressFamily addressFamily;
     SocketError lastError;
     std::string lastErrorMessage;
     bool blockingMode;
