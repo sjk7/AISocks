@@ -39,7 +39,10 @@ int main() {
         for (int i = 0; i < 6; ++i) {
             bool target = (i % 2 == 0) ? false : true;
             s.setBlocking(target);
-            if (s.isBlocking() != target) { ok = false; break; }
+            if (s.isBlocking() != target) {
+                ok = false;
+                break;
+            }
         }
         REQUIRE(ok);
     }
@@ -54,7 +57,8 @@ int main() {
         REQUIRE(s.isBlocking());
     }
 
-    BEGIN_TEST("Non-blocking recv on unconnected socket returns WouldBlock or error instantly");
+    BEGIN_TEST("Non-blocking recv on unconnected socket returns WouldBlock or "
+               "error instantly");
     {
         Socket s(SocketType::TCP, AddressFamily::IPv4);
         s.setBlocking(false);
@@ -65,7 +69,8 @@ int main() {
         REQUIRE(quickReturn);
     }
 
-    BEGIN_TEST("Accepted socket inherits blocking state (defaults to blocking)");
+    BEGIN_TEST(
+        "Accepted socket inherits blocking state (defaults to blocking)");
     {
         Socket server(SocketType::TCP, AddressFamily::IPv4);
         server.setReuseAddress(true);

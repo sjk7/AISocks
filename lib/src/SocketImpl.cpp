@@ -42,8 +42,7 @@ SocketImpl::SocketImpl(SocketType type, AddressFamily family)
     , socketType(type)
     , addressFamily(family)
     , lastError(SocketError::None)
-    , blockingMode(true)
-{
+    , blockingMode(true) {
     platformInit();
 
     int af = (family == AddressFamily::IPv6) ? AF_INET6 : AF_INET;
@@ -57,14 +56,13 @@ SocketImpl::SocketImpl(SocketType type, AddressFamily family)
     }
 }
 
-SocketImpl::SocketImpl(SocketHandle handle, SocketType type, AddressFamily family)
+SocketImpl::SocketImpl(
+    SocketHandle handle, SocketType type, AddressFamily family)
     : socketHandle(handle)
     , socketType(type)
     , addressFamily(family)
     , lastError(SocketError::None)
-    , blockingMode(true)
-{
-}
+    , blockingMode(true) {}
 
 SocketImpl::~SocketImpl() {
     if (isValid()) {
@@ -98,7 +96,9 @@ bool SocketImpl::bind(const std::string& address, uint16_t port) {
             }
         }
 
-        if (::bind(socketHandle, reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) == SOCKET_ERROR_CODE) {
+        if (::bind(
+                socketHandle, reinterpret_cast<sockaddr*>(&addr), sizeof(addr))
+            == SOCKET_ERROR_CODE) {
             setError(SocketError::BindFailed, "Failed to bind socket");
             return false;
         }
@@ -116,7 +116,9 @@ bool SocketImpl::bind(const std::string& address, uint16_t port) {
             }
         }
 
-        if (::bind(socketHandle, reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) == SOCKET_ERROR_CODE) {
+        if (::bind(
+                socketHandle, reinterpret_cast<sockaddr*>(&addr), sizeof(addr))
+            == SOCKET_ERROR_CODE) {
             setError(SocketError::BindFailed, "Failed to bind socket");
             return false;
         }
@@ -150,9 +152,8 @@ std::unique_ptr<SocketImpl> SocketImpl::accept() {
     sockaddr_storage clientAddr{};
     socklen_t clientAddrLen = sizeof(clientAddr);
 
-    SocketHandle clientSocket = ::accept(socketHandle, 
-                                         reinterpret_cast<sockaddr*>(&clientAddr), 
-                                         &clientAddrLen);
+    SocketHandle clientSocket = ::accept(
+        socketHandle, reinterpret_cast<sockaddr*>(&clientAddr), &clientAddrLen);
 
     if (clientSocket == INVALID_SOCKET_HANDLE) {
         setError(SocketError::AcceptFailed, "Failed to accept connection");
@@ -160,73 +161,158 @@ std::unique_ptr<SocketImpl> SocketImpl::accept() {
     }
 
     // Determine address family from accepted connection
-    AddressFamily clientFamily = (reinterpret_cast<sockaddr*>(&clientAddr)->sa_family == AF_INET6) 
-                                 ? AddressFamily::IPv6 : AddressFamily::IPv4;
+    AddressFamily clientFamily
+        = (reinterpret_cast<sockaddr*>(&clientAddr)->sa_family == AF_INET6)
+        ? AddressFamily::IPv6
+        : AddressFamily::IPv4;
 
     lastError = SocketError::None;
     return std::make_unique<SocketImpl>(clientSocket, socketType, clientFamily);
 }
 
-bool SocketImpl::connect(const std::string& address, uint16_t port) {
+bool SocketImpl::connect(
+    const std::string& address, uint16_t port, int timeoutMs) {
     if (!isValid()) {
         setError(SocketError::InvalidSocket, "Socket is not valid");
         return false;
     }
 
+    // --- Phase 1: resolve address (synchronous; DNS is a known limitation
+    //     of this single-threaded library --- no timeout applies here) -------
+    sockaddr_storage serverAddr{};
+    socklen_t addrLen = 0;
+
     if (addressFamily == AddressFamily::IPv6) {
-        sockaddr_in6 serverAddr{};
-        serverAddr.sin6_family = AF_INET6;
-        serverAddr.sin6_port = htons(port);
-        
-        if (inet_pton(AF_INET6, address.c_str(), &serverAddr.sin6_addr) <= 0) {
-            // Try to resolve hostname
-            struct addrinfo hints{}, *result = nullptr;
-            hints.ai_family = AF_INET6;
+        auto* a6 = reinterpret_cast<sockaddr_in6*>(&serverAddr);
+        a6->sin6_family = AF_INET6;
+        a6->sin6_port   = htons(port);
+        if (inet_pton(AF_INET6, address.c_str(), &a6->sin6_addr) <= 0) {
+            struct addrinfo hints{}, *res = nullptr;
+            hints.ai_family   = AF_INET6;
             hints.ai_socktype = (socketType == SocketType::TCP) ? SOCK_STREAM : SOCK_DGRAM;
-
-            if (getaddrinfo(address.c_str(), nullptr, &hints, &result) != 0) {
+            if (getaddrinfo(address.c_str(), nullptr, &hints, &res) != 0) {
                 setError(SocketError::ConnectFailed, "Failed to resolve hostname");
                 return false;
             }
-
-            serverAddr = *reinterpret_cast<sockaddr_in6*>(result->ai_addr);
-            serverAddr.sin6_port = htons(port);
-            freeaddrinfo(result);
+            *a6           = *reinterpret_cast<sockaddr_in6*>(res->ai_addr);
+            a6->sin6_port = htons(port);
+            freeaddrinfo(res);
         }
-
-        if (::connect(socketHandle, reinterpret_cast<sockaddr*>(&serverAddr), 
-                      sizeof(serverAddr)) == SOCKET_ERROR_CODE) {
-            setError(SocketError::ConnectFailed, "Failed to connect to server");
-            return false;
-        }
+        addrLen = sizeof(sockaddr_in6);
     } else {
-        sockaddr_in serverAddr{};
-        serverAddr.sin_family = AF_INET;
-        serverAddr.sin_port = htons(port);
-        
-        if (inet_pton(AF_INET, address.c_str(), &serverAddr.sin_addr) <= 0) {
-            // Try to resolve hostname
-            struct addrinfo hints{}, *result = nullptr;
-            hints.ai_family = AF_INET;
+        auto* a4 = reinterpret_cast<sockaddr_in*>(&serverAddr);
+        a4->sin_family = AF_INET;
+        a4->sin_port   = htons(port);
+        if (inet_pton(AF_INET, address.c_str(), &a4->sin_addr) <= 0) {
+            struct addrinfo hints{}, *res = nullptr;
+            hints.ai_family   = AF_INET;
             hints.ai_socktype = (socketType == SocketType::TCP) ? SOCK_STREAM : SOCK_DGRAM;
-
-            if (getaddrinfo(address.c_str(), nullptr, &hints, &result) != 0) {
+            if (getaddrinfo(address.c_str(), nullptr, &hints, &res) != 0) {
                 setError(SocketError::ConnectFailed, "Failed to resolve hostname");
                 return false;
             }
-
-            serverAddr = *reinterpret_cast<sockaddr_in*>(result->ai_addr);
-            serverAddr.sin_port = htons(port);
-            freeaddrinfo(result);
+            *a4          = *reinterpret_cast<sockaddr_in*>(res->ai_addr);
+            a4->sin_port = htons(port);
+            freeaddrinfo(res);
         }
-
-        if (::connect(socketHandle, reinterpret_cast<sockaddr*>(&serverAddr), 
-                      sizeof(serverAddr)) == SOCKET_ERROR_CODE) {
-            setError(SocketError::ConnectFailed, "Failed to connect to server");
-            return false;
-        }
+        addrLen = sizeof(sockaddr_in);
     }
 
+    // --- Phase 2: connect (with optional select()-based timeout) ------------
+    if (timeoutMs <= 0) {
+        // Blocking connect.
+        if (::connect(socketHandle,
+                reinterpret_cast<sockaddr*>(&serverAddr), addrLen)
+            == SOCKET_ERROR_CODE) {
+            setError(SocketError::ConnectFailed, "Failed to connect to server");
+            return false;
+        }
+        lastError = SocketError::None;
+        return true;
+    }
+
+    // Switch to non-blocking so connect() returns immediately.
+#ifdef _WIN32
+    u_long nbMode = 1;
+    ioctlsocket(socketHandle, FIONBIO, &nbMode);
+#else
+    int savedFlags = fcntl(socketHandle, F_GETFL, 0);
+    fcntl(socketHandle, F_SETFL, savedFlags | O_NONBLOCK);
+#endif
+
+    // Restore blocking mode on any exit path from here.
+    auto restoreBlocking = [&]() {
+#ifdef _WIN32
+        u_long blkMode = 0;
+        ioctlsocket(socketHandle, FIONBIO, &blkMode);
+#else
+        fcntl(socketHandle, F_SETFL, savedFlags);
+#endif
+        blockingMode = true;
+    };
+
+    int rc = ::connect(socketHandle,
+                       reinterpret_cast<sockaddr*>(&serverAddr), addrLen);
+    if (rc == 0) {
+        // Immediate success (rare but valid on loopback).
+        restoreBlocking();
+        lastError = SocketError::None;
+        return true;
+    }
+
+    int sysErr = getLastSystemError();
+    bool inProgress =
+#ifdef _WIN32
+        (sysErr == WSAEWOULDBLOCK) || (sysErr == WSAEINPROGRESS);
+#else
+        (sysErr == EINPROGRESS) || (sysErr == EAGAIN);
+#endif
+
+    if (!inProgress) {
+        setError(SocketError::ConnectFailed, "Failed to connect to server");
+        restoreBlocking();
+        return false;
+    }
+
+    // Wait for the socket to become writable (= connect finished or failed).
+    fd_set writeSet, errSet;
+    FD_ZERO(&writeSet); FD_SET(socketHandle, &writeSet);
+    FD_ZERO(&errSet);   FD_SET(socketHandle, &errSet);
+    struct timeval tv;
+    tv.tv_sec  = timeoutMs / 1000;
+    tv.tv_usec = (timeoutMs % 1000) * 1000;
+
+    int sel = ::select(static_cast<int>(socketHandle) + 1,
+                       nullptr, &writeSet, &errSet, &tv);
+    if (sel == 0) {
+        setError(SocketError::Timeout,
+            "connect() timed out after " + std::to_string(timeoutMs) + " ms");
+        restoreBlocking();
+        return false;
+    }
+    if (sel < 0) {
+        setError(SocketError::ConnectFailed, "select() failed during connect");
+        restoreBlocking();
+        return false;
+    }
+
+    // select() returned > 0: check whether the connection actually succeeded.
+    int sockErr = 0;
+    socklen_t sockErrLen = sizeof(sockErr);
+    getsockopt(socketHandle, SOL_SOCKET, SO_ERROR,
+               reinterpret_cast<char*>(&sockErr), &sockErrLen);
+    if (sockErr != 0) {
+#ifdef _WIN32
+        WSASetLastError(sockErr);
+#else
+        errno = sockErr;
+#endif
+        setError(SocketError::ConnectFailed, "Failed to connect to server");
+        restoreBlocking();
+        return false;
+    }
+
+    restoreBlocking();
     lastError = SocketError::None;
     return true;
 }
@@ -238,8 +324,8 @@ int SocketImpl::send(const void* data, size_t length) {
     }
 
 #ifdef _WIN32
-    int bytesSent = ::send(socketHandle, static_cast<const char*>(data), 
-                           static_cast<int>(length), 0);
+    int bytesSent = ::send(socketHandle, static_cast<const char*>(data),
+        static_cast<int>(length), 0);
 #else
     ssize_t bytesSent = ::send(socketHandle, data, length, 0);
 #endif
@@ -269,8 +355,8 @@ int SocketImpl::receive(void* buffer, size_t length) {
     }
 
 #ifdef _WIN32
-    int bytesReceived = ::recv(socketHandle, static_cast<char*>(buffer), 
-                               static_cast<int>(length), 0);
+    int bytesReceived = ::recv(
+        socketHandle, static_cast<char*>(buffer), static_cast<int>(length), 0);
 #else
     ssize_t bytesReceived = ::recv(socketHandle, buffer, length, 0);
 #endif
@@ -335,9 +421,11 @@ bool SocketImpl::setReuseAddress(bool reuse) {
     }
 
     int optval = reuse ? 1 : 0;
-    if (setsockopt(socketHandle, SOL_SOCKET, SO_REUSEADDR, 
-                   reinterpret_cast<const char*>(&optval), sizeof(optval)) == SOCKET_ERROR_CODE) {
-        setError(SocketError::SetOptionFailed, "Failed to set reuse address option");
+    if (setsockopt(socketHandle, SOL_SOCKET, SO_REUSEADDR,
+            reinterpret_cast<const char*>(&optval), sizeof(optval))
+        == SOCKET_ERROR_CODE) {
+        setError(
+            SocketError::SetOptionFailed, "Failed to set reuse address option");
         return false;
     }
 
@@ -353,8 +441,9 @@ bool SocketImpl::setTimeout(int seconds) {
 
 #ifdef _WIN32
     DWORD timeout = seconds * 1000;
-    if (setsockopt(socketHandle, SOL_SOCKET, SO_RCVTIMEO, 
-                   reinterpret_cast<const char*>(&timeout), sizeof(timeout)) == SOCKET_ERROR_CODE) {
+    if (setsockopt(socketHandle, SOL_SOCKET, SO_RCVTIMEO,
+            reinterpret_cast<const char*>(&timeout), sizeof(timeout))
+        == SOCKET_ERROR_CODE) {
         setError(SocketError::SetOptionFailed, "Failed to set timeout");
         return false;
     }
@@ -362,8 +451,8 @@ bool SocketImpl::setTimeout(int seconds) {
     struct timeval tv;
     tv.tv_sec = seconds;
     tv.tv_usec = 0;
-    if (setsockopt(socketHandle, SOL_SOCKET, SO_RCVTIMEO, 
-                   &tv, sizeof(tv)) == SOCKET_ERROR_CODE) {
+    if (setsockopt(socketHandle, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv))
+        == SOCKET_ERROR_CODE) {
         setError(SocketError::SetOptionFailed, "Failed to set timeout");
         return false;
     }
@@ -375,7 +464,8 @@ bool SocketImpl::setTimeout(int seconds) {
 
 void SocketImpl::close() {
     if (isValid()) {
-        // Attempt graceful shutdown (ignore errors as socket may not be connected)
+        // Attempt graceful shutdown (ignore errors as socket may not be
+        // connected)
 #ifdef _WIN32
         ::shutdown(socketHandle, SD_BOTH);
         closesocket(socketHandle);
@@ -405,8 +495,22 @@ std::string SocketImpl::getErrorMessage() const {
 
 void SocketImpl::setError(SocketError error, const std::string& message) {
     lastError = error;
+    int code = getLastSystemError();
+    std::string sysText;
+#ifdef _WIN32
+    char buf[512] = {};
+    DWORD len = FormatMessageA(
+        FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, nullptr,
+        static_cast<DWORD>(code), 0, buf, sizeof(buf), nullptr);
+    // Strip trailing CR/LF from FormatMessage output
+    while (len > 0 && (buf[len - 1] == '\r' || buf[len - 1] == '\n'))
+        buf[--len] = '\0';
+    sysText = buf;
+#else
+    sysText = ::strerror(code);
+#endif
     std::ostringstream oss;
-    oss << message << " (System error: " << getLastSystemError() << ")";
+    oss << message << " [" << code << ": " << sysText << "]";
     lastErrorMessage = oss.str();
 }
 
@@ -428,35 +532,32 @@ std::vector<NetworkInterface> SocketImpl::getLocalAddresses() {
     ULONG bufferSize = 15000;
     PIP_ADAPTER_ADDRESSES addresses = nullptr;
     ULONG result;
-    
+
     do {
         addresses = reinterpret_cast<PIP_ADAPTER_ADDRESSES>(malloc(bufferSize));
         if (!addresses) {
             break;
         }
-        
-        result = GetAdaptersAddresses(
-            AF_UNSPEC,
-            GAA_FLAG_INCLUDE_PREFIX,
-            nullptr,
-            addresses,
-            &bufferSize
-        );
-        
+
+        result = GetAdaptersAddresses(AF_UNSPEC, GAA_FLAG_INCLUDE_PREFIX,
+            nullptr, addresses, &bufferSize);
+
         if (result == ERROR_BUFFER_OVERFLOW) {
             free(addresses);
             addresses = nullptr;
         }
     } while (result == ERROR_BUFFER_OVERFLOW);
-    
+
     if (result == NO_ERROR && addresses) {
-        for (PIP_ADAPTER_ADDRESSES adapter = addresses; adapter != nullptr; adapter = adapter->Next) {
-            for (PIP_ADAPTER_UNICAST_ADDRESS unicast = adapter->FirstUnicastAddress; 
-                 unicast != nullptr; unicast = unicast->Next) {
-                
+        for (PIP_ADAPTER_ADDRESSES adapter = addresses; adapter != nullptr;
+            adapter = adapter->Next) {
+            for (PIP_ADAPTER_UNICAST_ADDRESS unicast
+                = adapter->FirstUnicastAddress;
+                unicast != nullptr; unicast = unicast->Next) {
+
                 NetworkInterface iface;
                 iface.name = std::string(adapter->AdapterName);
-                
+
                 // Convert address to string
                 sockaddr* sa = unicast->Address.lpSockaddr;
                 if (sa->sa_family == AF_INET) {
@@ -468,14 +569,16 @@ std::vector<NetworkInterface> SocketImpl::getLocalAddresses() {
                 } else if (sa->sa_family == AF_INET6) {
                     char buffer[INET6_ADDRSTRLEN];
                     sockaddr_in6* sin6 = reinterpret_cast<sockaddr_in6*>(sa);
-                    inet_ntop(AF_INET6, &sin6->sin6_addr, buffer, INET6_ADDRSTRLEN);
+                    inet_ntop(
+                        AF_INET6, &sin6->sin6_addr, buffer, INET6_ADDRSTRLEN);
                     iface.address = buffer;
                     iface.family = AddressFamily::IPv6;
                 } else {
                     continue;
                 }
-                
-                iface.isLoopback = (adapter->IfType == IF_TYPE_SOFTWARE_LOOPBACK);
+
+                iface.isLoopback
+                    = (adapter->IfType == IF_TYPE_SOFTWARE_LOOPBACK);
                 interfaces.push_back(iface);
             }
         }
@@ -485,37 +588,42 @@ std::vector<NetworkInterface> SocketImpl::getLocalAddresses() {
     // Unix/Linux implementation using getifaddrs
     struct ifaddrs* ifaddr = nullptr;
     if (getifaddrs(&ifaddr) == 0) {
-        for (struct ifaddrs* ifa = ifaddr; ifa != nullptr; ifa = ifa->ifa_next) {
+        for (struct ifaddrs* ifa = ifaddr; ifa != nullptr;
+            ifa = ifa->ifa_next) {
             if (!ifa->ifa_addr) {
                 continue;
             }
-            
+
             NetworkInterface iface;
             iface.name = ifa->ifa_name;
-            
+
             int family = ifa->ifa_addr->sa_family;
             if (family == AF_INET) {
                 char buffer[INET_ADDRSTRLEN];
-                sockaddr_in* sin = reinterpret_cast<sockaddr_in*>(ifa->ifa_addr);
+                sockaddr_in* sin
+                    = reinterpret_cast<sockaddr_in*>(ifa->ifa_addr);
                 inet_ntop(AF_INET, &sin->sin_addr, buffer, INET_ADDRSTRLEN);
                 iface.address = buffer;
                 iface.family = AddressFamily::IPv4;
-                iface.isLoopback = (iface.name == "lo" || iface.address == "127.0.0.1");
+                iface.isLoopback
+                    = (iface.name == "lo" || iface.address == "127.0.0.1");
                 interfaces.push_back(iface);
             } else if (family == AF_INET6) {
                 char buffer[INET6_ADDRSTRLEN];
-                sockaddr_in6* sin6 = reinterpret_cast<sockaddr_in6*>(ifa->ifa_addr);
+                sockaddr_in6* sin6
+                    = reinterpret_cast<sockaddr_in6*>(ifa->ifa_addr);
                 inet_ntop(AF_INET6, &sin6->sin6_addr, buffer, INET6_ADDRSTRLEN);
                 iface.address = buffer;
                 iface.family = AddressFamily::IPv6;
-                iface.isLoopback = (iface.name == "lo" || iface.address == "::1");
+                iface.isLoopback
+                    = (iface.name == "lo" || iface.address == "::1");
                 interfaces.push_back(iface);
             }
         }
         freeifaddrs(ifaddr);
     }
 #endif
-    
+
     return interfaces;
 }
 

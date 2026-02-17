@@ -5,6 +5,7 @@ set(TEST_SOURCES
     test_move_semantics
     test_loopback_tcp
     test_error_handling
+    test_construction
 )
 
 foreach(TEST_NAME ${TEST_SOURCES})
@@ -17,3 +18,6 @@ foreach(TEST_NAME ${TEST_SOURCES})
     add_test(NAME ${TEST_NAME} COMMAND ${TEST_NAME})
     set_tests_properties(${TEST_NAME} PROPERTIES TIMEOUT 30)
 endforeach()
+
+# test_construction spins up server threads; give it more room
+set_tests_properties(test_construction PROPERTIES TIMEOUT 60)
