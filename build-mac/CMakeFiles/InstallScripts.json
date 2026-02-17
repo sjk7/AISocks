@@ -1,8 +1,0 @@
-{
-	"InstallScripts" : 
-	[
-		"$HOME/Documents/AISocks/build-mac/cmake_install.cmake",
-		"$HOME/Documents/AISocks/build-mac/lib/cmake_install.cmake"
-	],
-	"Parallel" : false
-}
