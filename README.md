@@ -4,6 +4,8 @@ A modern C++ socket library that abstracts platform differences between Windows,
 
 ## Features
 
+Zero dependencies, other than a standard C++ compiler and CMake.
+
 - ✅ Cross-platform support (Windows, macOS, Linux)
 - ✅ Clean pimpl-based API hiding platform details
 - ✅ IPv4 and IPv6 support
@@ -192,3 +194,4 @@ enum class SocketError {
 ## License
 
 This is a demonstration library for educational purposes.
+
