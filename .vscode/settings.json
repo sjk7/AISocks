@@ -1,3 +1,6 @@
 {
-    "cmake.sourceDirectory": "$HOME/Documents/AISocks"
+    "cmake.sourceDirectory": "$HOME/Documents/AISocks",
+    "chat.tools.terminal.autoApprove": {
+        "git check-ignore": true
+    }
 }
