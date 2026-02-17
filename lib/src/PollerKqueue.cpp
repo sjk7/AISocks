@@ -117,10 +117,15 @@ std::vector<PollResult> Poller::wait(Milliseconds timeout) {
                 bits |= static_cast<uint8_t>(PollEvent::Error);
             } else if (ev.filter == EVFILT_READ) {
                 bits |= static_cast<uint8_t>(PollEvent::Readable);
-                // EV_EOF on a read event: signal readable so caller drains.
+                // EV_EOF (peer closed): still signal readable so caller drains.
                 if ((ev.flags & EV_EOF) != 0)
                     bits |= static_cast<uint8_t>(PollEvent::Readable);
             } else if (ev.filter == EVFILT_WRITE) {
+                // EV_EOF on a write filter: the peer has shut down their read
+                // side; flag as both Writable (buffer still available) and
+                // Error so callers detect the half-close.
+                if ((ev.flags & EV_EOF) != 0)
+                    bits |= static_cast<uint8_t>(PollEvent::Error);
                 bits |= static_cast<uint8_t>(PollEvent::Writable);
             }
             ready[fd] = static_cast<PollEvent>(bits);

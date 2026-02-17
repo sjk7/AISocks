@@ -181,7 +181,8 @@ static void test_send_all() {
 // Test 7: waitReadable / waitWritable basic checks.
 // ---------------------------------------------------------------------------
 static void test_wait_readable_writable() {
-    BEGIN_TEST("waitReadable/waitWritable: writable fires immediately on send buffer");
+    BEGIN_TEST(
+        "waitReadable/waitWritable: writable fires immediately on send buffer");
     Socket srv(SocketType::TCP, AddressFamily::IPv4);
     srv.setReuseAddress(true);
     REQUIRE(srv.bind("127.0.0.1", Port{BASE_PORT + 5}));
@@ -223,6 +224,74 @@ static void test_set_linger_abort() {
 }
 
 // ---------------------------------------------------------------------------
+// Test 9: Poller-driven async connect.
+//
+// Pattern:
+//   1. setBlocking(false) on the client socket
+//   2. connect() either:
+//        a) returns true immediately (loopback can complete synchronously), or
+//        b) returns false + WouldBlock (EINPROGRESS) — then Poller watches
+//           the client socket for Writable to detect handshake completion
+//   3. Accept → send → receive to confirm the connection is usable
+// ---------------------------------------------------------------------------
+static void test_poller_async_connect() {
+    BEGIN_TEST("Poller: async (non-blocking) connect via Writable event");
+
+    // Server side — accept in main thread after poller fires.
+    Socket srv(SocketType::TCP, AddressFamily::IPv4);
+    srv.setReuseAddress(true);
+    REQUIRE(srv.bind("127.0.0.1", Port{BASE_PORT + 7}));
+    REQUIRE(srv.listen(5));
+
+    // Client side — non-blocking connect.
+    Socket client(SocketType::TCP, AddressFamily::IPv4);
+    REQUIRE(client.setBlocking(false));
+
+    // connect() may return true immediately (loopback) or false + WouldBlock
+    // (EINPROGRESS on a real network or slower path).
+    bool immediateSuccess = client.connect("127.0.0.1", Port{BASE_PORT + 7});
+    if (!immediateSuccess) {
+        // Must be in-progress, not a hard failure.
+        REQUIRE(client.getLastError() == SocketError::WouldBlock);
+
+        // Watch the client for Writable = handshake complete.
+        Poller p;
+        REQUIRE(p.add(client, PollEvent::Writable));
+
+        auto results = p.wait(Milliseconds{500});
+        REQUIRE(!results.empty());
+        bool writable = false;
+        for (const auto& r : results) {
+            if (r.socket == &client && hasFlag(r.events, PollEvent::Writable))
+                writable = true;
+        }
+        REQUIRE(writable);
+        REQUIRE_MSG(true, "Poller fired Writable for in-progress connect");
+    } else {
+        REQUIRE_MSG(true,
+            "connect() completed immediately (loopback fast-path) — "
+            "no Poller poll needed");
+    }
+
+    // Restore blocking mode before using the socket normally.
+    REQUIRE(client.setBlocking(true));
+
+    // Accept the connection on the server side.
+    auto srvConn = srv.accept();
+    REQUIRE(srvConn != nullptr);
+
+    // Round-trip: server sends, client receives.
+    if (srvConn) {
+        const std::string msg = "async-connected";
+        REQUIRE(srvConn->sendAll(msg.data(), msg.size()));
+        char buf[64]{};
+        int n = client.receive(buf, sizeof(buf) - 1);
+        REQUIRE(n == static_cast<int>(msg.size()));
+        REQUIRE(std::string(buf, static_cast<size_t>(n)) == msg);
+    }
+}
+
+// ---------------------------------------------------------------------------
 // main
 // ---------------------------------------------------------------------------
 int main() {
@@ -236,6 +305,7 @@ int main() {
     test_send_all();
     test_wait_readable_writable();
     test_set_linger_abort();
+    test_poller_async_connect();
 
     return test_summary();
 }
