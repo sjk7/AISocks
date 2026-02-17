@@ -290,10 +290,9 @@ bool SocketImpl::connect(
         + std::chrono::milliseconds(timeoutMs);
 
     for (;;) {
-        auto remaining
-            = std::chrono::duration_cast<std::chrono::milliseconds>(
-                  deadline - std::chrono::steady_clock::now())
-                  .count();
+        auto remaining = std::chrono::duration_cast<std::chrono::milliseconds>(
+            deadline - std::chrono::steady_clock::now())
+                             .count();
         if (remaining <= 0) {
             setError(SocketError::Timeout,
                 "connect() timed out after " + std::to_string(timeoutMs)
@@ -303,10 +302,10 @@ bool SocketImpl::connect(
         }
 
         // Use the shorter of the poll interval and remaining time.
-        long long sliceMs = (remaining < POLL_INTERVAL_MS) ? remaining
-                                                           : POLL_INTERVAL_MS;
+        long long sliceMs
+            = (remaining < POLL_INTERVAL_MS) ? remaining : POLL_INTERVAL_MS;
         struct timeval tv;
-        tv.tv_sec  = static_cast<long>(sliceMs / 1000);
+        tv.tv_sec = static_cast<long>(sliceMs / 1000);
         tv.tv_usec = static_cast<long>((sliceMs % 1000) * 1000);
 
         fd_set writeSet, errSet;
@@ -315,9 +314,8 @@ bool SocketImpl::connect(
         FD_ZERO(&errSet);
         FD_SET(socketHandle, &errSet);
 
-        int sel = ::select(
-            static_cast<int>(socketHandle) + 1, nullptr, &writeSet, &errSet,
-            &tv);
+        int sel = ::select(static_cast<int>(socketHandle) + 1, nullptr,
+            &writeSet, &errSet, &tv);
 
         if (sel < 0) {
 #ifndef _WIN32
