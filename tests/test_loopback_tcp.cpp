@@ -14,8 +14,10 @@ using namespace aiSocks;
 
 static const uint16_t BASE_PORT = 19400;
 
-// Helper: spin up a server that accepts one connection, sends `payload`, then closes.
-static void server_send(uint16_t port, const std::string& payload, std::atomic<bool>& ready) {
+// Helper: spin up a server that accepts one connection, sends `payload`, then
+// closes.
+static void server_send(
+    uint16_t port, const std::string& payload, std::atomic<bool>& ready) {
     Socket srv(SocketType::TCP, AddressFamily::IPv4);
     srv.setReuseAddress(true);
     if (!srv.bind("127.0.0.1", port) || !srv.listen(1)) return;
@@ -52,7 +54,7 @@ int main() {
         REQUIRE(srv.bind("127.0.0.1", BASE_PORT));
         REQUIRE(srv.listen(1));
 
-        std::thread t([&](){
+        std::thread t([&]() {
             std::this_thread::sleep_for(std::chrono::milliseconds(50));
             Socket c(SocketType::TCP, AddressFamily::IPv4);
             c.connect("127.0.0.1", BASE_PORT);
@@ -71,12 +73,12 @@ int main() {
         const std::string message = "Hello, aiSocks!";
         std::atomic<bool> ready{false};
 
-        std::thread srvThread([&](){
-            server_send(BASE_PORT + 1, message, ready);
-        });
+        std::thread srvThread(
+            [&]() { server_send(BASE_PORT + 1, message, ready); });
 
         // Wait for server to be ready
-        auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(2);
+        auto deadline
+            = std::chrono::steady_clock::now() + std::chrono::seconds(2);
         while (!ready && std::chrono::steady_clock::now() < deadline)
             std::this_thread::sleep_for(std::chrono::milliseconds(5));
 
@@ -97,11 +99,11 @@ int main() {
         const std::string payload(1 * 1024 * 1024, 'Z'); // 1 MB
         std::atomic<bool> ready{false};
 
-        std::thread srvThread([&](){
-            server_send(BASE_PORT + 2, payload, ready);
-        });
+        std::thread srvThread(
+            [&]() { server_send(BASE_PORT + 2, payload, ready); });
 
-        auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(2);
+        auto deadline
+            = std::chrono::steady_clock::now() + std::chrono::seconds(2);
         while (!ready && std::chrono::steady_clock::now() < deadline)
             std::this_thread::sleep_for(std::chrono::milliseconds(5));
 
@@ -123,7 +125,7 @@ int main() {
         const std::string msg = "ping";
         std::atomic<bool> ready{false};
 
-        std::thread srvThread([&](){
+        std::thread srvThread([&]() {
             Socket srv(SocketType::TCP, AddressFamily::IPv4);
             srv.setReuseAddress(true);
             srv.bind("127.0.0.1", BASE_PORT + 3);
@@ -138,13 +140,15 @@ int main() {
             }
         });
 
-        auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(2);
+        auto deadline
+            = std::chrono::steady_clock::now() + std::chrono::seconds(2);
         while (!ready && std::chrono::steady_clock::now() < deadline)
             std::this_thread::sleep_for(std::chrono::milliseconds(5));
 
         Socket client(SocketType::TCP, AddressFamily::IPv4);
         REQUIRE(client.connect("127.0.0.1", BASE_PORT + 3));
-        REQUIRE(client.send(msg.data(), msg.size()) == static_cast<int>(msg.size()));
+        REQUIRE(client.send(msg.data(), msg.size())
+            == static_cast<int>(msg.size()));
 
         char buf[256] = {};
         int r = client.receive(buf, sizeof(buf) - 1);
@@ -181,7 +185,7 @@ int main() {
         const std::string message = "Hello IPv6!";
         std::atomic<bool> ready{false};
 
-        std::thread srvThread([&](){
+        std::thread srvThread([&]() {
             Socket srv(SocketType::TCP, AddressFamily::IPv6);
             srv.setReuseAddress(true);
             if (!srv.bind("::1", BASE_PORT + 5) || !srv.listen(1)) {
@@ -193,7 +197,8 @@ int main() {
             if (client) {
                 size_t sent = 0;
                 while (sent < message.size()) {
-                    int r = client->send(message.data() + sent, message.size() - sent);
+                    int r = client->send(
+                        message.data() + sent, message.size() - sent);
                     if (r <= 0) break;
                     sent += r;
                 }
@@ -201,7 +206,8 @@ int main() {
             }
         });
 
-        auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(2);
+        auto deadline
+            = std::chrono::steady_clock::now() + std::chrono::seconds(2);
         while (!ready && std::chrono::steady_clock::now() < deadline)
             std::this_thread::sleep_for(std::chrono::milliseconds(5));
 

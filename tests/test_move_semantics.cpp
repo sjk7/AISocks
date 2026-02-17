@@ -42,7 +42,8 @@ int main() {
         Socket b(SocketType::TCP, AddressFamily::IPv4);
         b = std::move(a);
         // No crash = the displaced socket was released cleanly
-        REQUIRE_MSG(true, "move assignment released old resource without crash");
+        REQUIRE_MSG(
+            true, "move assignment released old resource without crash");
     }
 
     BEGIN_TEST("Moved-from socket reports invalid");
@@ -65,7 +66,8 @@ int main() {
         char buf[8];
         REQUIRE(a.receive(buf, sizeof(buf)) <= 0);
         a.close(); // must be safe
-        REQUIRE_MSG(true, "all ops on moved-from socket complete without crash");
+        REQUIRE_MSG(
+            true, "all ops on moved-from socket complete without crash");
     }
 
     BEGIN_TEST("getLastError on moved-from socket does not crash");
@@ -82,7 +84,8 @@ int main() {
         Socket a(SocketType::TCP, AddressFamily::IPv4);
         Socket b(std::move(a));
         std::string msg = a.getErrorMessage();
-        REQUIRE_MSG(true, "getErrorMessage() on moved-from socket did not crash");
+        REQUIRE_MSG(
+            true, "getErrorMessage() on moved-from socket did not crash");
     }
 
     BEGIN_TEST("Self-move-assignment does not invalidate the socket");

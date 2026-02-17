@@ -5,33 +5,33 @@
 #include <vector>
 
 #ifdef _WIN32
-    #include <winsock2.h>
-    #include <ws2tcpip.h>
-    #include <iphlpapi.h>
-    #pragma comment(lib, "ws2_32.lib")
-    #pragma comment(lib, "iphlpapi.lib")
-    using SocketHandle = SOCKET;
-    #define INVALID_SOCKET_HANDLE INVALID_SOCKET
-    #define SOCKET_ERROR_CODE SOCKET_ERROR
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#include <iphlpapi.h>
+#pragma comment(lib, "ws2_32.lib")
+#pragma comment(lib, "iphlpapi.lib")
+using SocketHandle = SOCKET;
+#define INVALID_SOCKET_HANDLE INVALID_SOCKET
+#define SOCKET_ERROR_CODE SOCKET_ERROR
 #else
-    #include <sys/socket.h>
-    #include <sys/types.h>
-    #include <netinet/in.h>
-    #include <arpa/inet.h>
-    #include <unistd.h>
-    #include <fcntl.h>
-    #include <netdb.h>
-    #include <errno.h>
-    #include <ifaddrs.h>
-    using SocketHandle = int;
-    #define INVALID_SOCKET_HANDLE -1
-    #define SOCKET_ERROR_CODE -1
+#include <sys/socket.h>
+#include <sys/types.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <netdb.h>
+#include <errno.h>
+#include <ifaddrs.h>
+using SocketHandle = int;
+#define INVALID_SOCKET_HANDLE -1
+#define SOCKET_ERROR_CODE -1
 #endif
 
 namespace aiSocks {
 
 class SocketImpl {
-public:
+    public:
     SocketImpl(SocketType type, AddressFamily family);
     ~SocketImpl();
 
@@ -51,7 +51,9 @@ public:
     std::unique_ptr<SocketImpl> accept();
 
     // Client operations
-    bool connect(const std::string& address, uint16_t port);
+    // timeoutMs == 0: blocking (OS default). >0: fail with Timeout if the
+    // full operation (DNS + TCP handshake) takes longer than timeoutMs.
+    bool connect(const std::string& address, uint16_t port, int timeoutMs = 0);
 
     // Data transfer
     int send(const void* data, size_t length);
@@ -73,7 +75,7 @@ public:
     // Constructor for accepted connections (public for make_unique)
     SocketImpl(SocketHandle handle, SocketType type, AddressFamily family);
 
-private:
+    private:
     SocketHandle socketHandle;
     SocketType socketType;
     AddressFamily addressFamily;

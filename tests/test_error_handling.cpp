@@ -24,7 +24,8 @@ int main() {
         // listen without prior bind should fail
         bool result = s.listen(5);
         // Not guaranteed to fail on every OS, but getLastError must not be None
-        // when it does fail; if it succeeds that's also acceptable (OS behaviour)
+        // when it does fail; if it succeeds that's also acceptable (OS
+        // behaviour)
         REQUIRE_MSG(true, "listen() without bind completed without crash");
     }
 
@@ -37,7 +38,8 @@ int main() {
         REQUIRE(s.getLastError() != SocketError::None);
     }
 
-    BEGIN_TEST("getErrorMessage returns non-empty string after a failed operation");
+    BEGIN_TEST(
+        "getErrorMessage returns non-empty string after a failed operation");
     {
         Socket s(SocketType::TCP, AddressFamily::IPv4);
         s.connect("127.0.0.1", 1); // will fail
@@ -60,7 +62,8 @@ int main() {
         REQUIRE(r <= 0);
     }
 
-    BEGIN_TEST("bind() to the same address/port twice returns false on second call");
+    BEGIN_TEST(
+        "bind() to the same address/port twice returns false on second call");
     {
         Socket s1(SocketType::TCP, AddressFamily::IPv4);
         Socket s2(SocketType::TCP, AddressFamily::IPv4);

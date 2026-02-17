@@ -24,7 +24,7 @@ int main() {
     REQUIRE(!Socket::isValidIPv4("192.168.1"));
     REQUIRE(!Socket::isValidIPv4(""));
     REQUIRE(!Socket::isValidIPv4("abc.def.ghi.jkl"));
-    REQUIRE(!Socket::isValidIPv4("::1"));               // IPv6, not v4
+    REQUIRE(!Socket::isValidIPv4("::1")); // IPv6, not v4
     REQUIRE(!Socket::isValidIPv4("1.2.3.4.5"));
     REQUIRE(!Socket::isValidIPv4("1.2.3.-1"));
 
@@ -35,12 +35,12 @@ int main() {
     REQUIRE(Socket::isValidIPv6("fe80::1"));
     REQUIRE(Socket::isValidIPv6("2001:db8::1"));
     REQUIRE(Socket::isValidIPv6("2001:0db8:85a3:0000:0000:8a2e:0370:7334"));
-    REQUIRE(Socket::isValidIPv6("::ffff:192.168.1.1"));  // IPv4-mapped
+    REQUIRE(Socket::isValidIPv6("::ffff:192.168.1.1")); // IPv4-mapped
 
     BEGIN_TEST("isValidIPv6 - invalid addresses");
     REQUIRE(!Socket::isValidIPv6(""));
     REQUIRE(!Socket::isValidIPv6("gggg::1"));
-    REQUIRE(!Socket::isValidIPv6("127.0.0.1"));           // IPv4, not v6
+    REQUIRE(!Socket::isValidIPv6("127.0.0.1")); // IPv4, not v6
     REQUIRE(!Socket::isValidIPv6("not:an:address"));
 
     // ---- ipToString ----
@@ -74,7 +74,8 @@ int main() {
         REQUIRE(!ifaces.empty());
     }
 
-    BEGIN_TEST("getLocalAddresses - every entry has a non-empty address and name");
+    BEGIN_TEST(
+        "getLocalAddresses - every entry has a non-empty address and name");
     {
         auto ifaces = Socket::getLocalAddresses();
         bool allValid = true;
@@ -91,19 +92,25 @@ int main() {
         auto ifaces = Socket::getLocalAddresses();
         bool hasLoopback = false;
         for (const auto& iface : ifaces) {
-            if (iface.isLoopback) { hasLoopback = true; break; }
+            if (iface.isLoopback) {
+                hasLoopback = true;
+                break;
+            }
         }
         REQUIRE(hasLoopback);
     }
 
-    BEGIN_TEST("getLocalAddresses - address family field matches address format");
+    BEGIN_TEST(
+        "getLocalAddresses - address family field matches address format");
     {
         auto ifaces = Socket::getLocalAddresses();
         bool allMatch = true;
         for (const auto& iface : ifaces) {
-            if (iface.family == AddressFamily::IPv4 && !Socket::isValidIPv4(iface.address))
+            if (iface.family == AddressFamily::IPv4
+                && !Socket::isValidIPv4(iface.address))
                 allMatch = false;
-            if (iface.family == AddressFamily::IPv6 && !Socket::isValidIPv6(iface.address))
+            if (iface.family == AddressFamily::IPv6
+                && !Socket::isValidIPv6(iface.address))
                 allMatch = false;
         }
         REQUIRE(allMatch);
