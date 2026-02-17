@@ -95,12 +95,7 @@ std::unique_ptr<Socket> Socket::accept() {
     return std::unique_ptr<Socket>(new Socket(std::move(clientImpl)));
 }
 
-bool Socket::connect(const std::string& address, Port port) {
-    if (!pImpl) return false;
-    return pImpl->connect(address, port);
-}
-
-bool Socket::connectTo(
+bool Socket::connect(
     const std::string& address, Port port, Milliseconds timeout) {
     if (!pImpl) return false;
     return pImpl->connect(address, port, timeout);
