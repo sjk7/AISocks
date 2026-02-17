@@ -1,5 +1,6 @@
 // This is a personal academic project. Dear PVS-Studio, please check it.
-// PVS-Studio Static Code Analyzer for C, C++, C#, and Java: https://pvs-studio.com
+// PVS-Studio Static Code Analyzer for C, C++, C#, and Java:
+// https://pvs-studio.com
 #include "Socket.h"
 #include "SocketImpl.h"
 #include <string>
@@ -8,13 +9,25 @@ namespace aiSocks {
 
 // Helper used only inside constructors: if ok is false, extract the error
 // from pImpl and throw with the failing step name prepended.
+// Lazy what() for SocketException — built once on first call.
+const char* SocketException::what() const noexcept {
+    if (!whatCache_.empty()) return whatCache_.c_str();
+    try {
+        whatCache_ = step_ + ": "
+            + formatErrorContext({description_, sysCode_, isDns_});
+    } catch (...) {
+        return "SocketException (error formatting failed)";
+    }
+    return whatCache_.c_str();
+}
+
 namespace {
     void throwIfFailed(bool ok, const std::string& step,
         const std::unique_ptr<SocketImpl>& impl) {
         if (!ok) {
-            SocketError err = impl->getLastError();
-            std::string msg = step + ": " + impl->getErrorMessage();
-            throw SocketException(err, msg);
+            auto ctx = impl->getErrorContext();
+            throw SocketException(impl->getLastError(), step, ctx.description,
+                ctx.sysCode, ctx.isDns);
         }
     }
 } // namespace
@@ -97,6 +110,15 @@ int Socket::receive(void* buffer, size_t length) {
     return pImpl->receive(buffer, length);
 }
 
+// Span overloads — delegate to the raw-pointer implementations.
+int Socket::send(Span<const std::byte> data) {
+    return send(data.data(), data.size());
+}
+
+int Socket::receive(Span<std::byte> buffer) {
+    return receive(buffer.data(), buffer.size());
+}
+
 int Socket::sendTo(const void* data, size_t length, const Endpoint& remote) {
     if (!pImpl) return -1;
     return pImpl->sendTo(data, length, remote);
@@ -105,6 +127,15 @@ int Socket::sendTo(const void* data, size_t length, const Endpoint& remote) {
 int Socket::receiveFrom(void* buffer, size_t length, Endpoint& remote) {
     if (!pImpl) return -1;
     return pImpl->receiveFrom(buffer, length, remote);
+}
+
+// Span overloads for UDP sendTo / receiveFrom.
+int Socket::sendTo(Span<const std::byte> data, const Endpoint& remote) {
+    return sendTo(data.data(), data.size(), remote);
+}
+
+int Socket::receiveFrom(Span<std::byte> buffer, Endpoint& remote) {
+    return receiveFrom(buffer.data(), buffer.size(), remote);
 }
 
 bool Socket::setBlocking(bool blocking) {
@@ -135,6 +166,16 @@ bool Socket::setSendTimeout(Milliseconds timeout) {
 bool Socket::setNoDelay(bool noDelay) {
     if (!pImpl) return false;
     return pImpl->setNoDelay(noDelay);
+}
+
+bool Socket::setReceiveBufferSize(int bytes) {
+    if (!pImpl) return false;
+    return pImpl->setReceiveBufferSize(bytes);
+}
+
+bool Socket::setSendBufferSize(int bytes) {
+    if (!pImpl) return false;
+    return pImpl->setSendBufferSize(bytes);
 }
 
 bool Socket::setKeepAlive(bool enable) {

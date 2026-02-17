@@ -1,5 +1,6 @@
 // This is a personal academic project. Dear PVS-Studio, please check it.
-// PVS-Studio Static Code Analyzer for C, C++, C#, and Java: https://pvs-studio.com
+// PVS-Studio Static Code Analyzer for C, C++, C#, and Java:
+// https://pvs-studio.com
 #include "SocketImpl.h"
 #include <chrono>
 #include <cstring>
@@ -56,7 +57,16 @@ SocketImpl::SocketImpl(SocketType type, AddressFamily family)
 
     if (socketHandle == INVALID_SOCKET_HANDLE) {
         setError(SocketError::CreateFailed, "Failed to create socket");
+        return;
     }
+
+#ifdef SO_NOSIGPIPE
+    // macOS: prevent send/write to a half-closed socket from raising SIGPIPE.
+    // Linux uses MSG_NOSIGNAL per-call instead; Windows has no SIGPIPE concept.
+    int noSigPipe = 1;
+    ::setsockopt(
+        socketHandle, SOL_SOCKET, SO_NOSIGPIPE, &noSigPipe, sizeof(noSigPipe));
+#endif
 }
 
 SocketImpl::SocketImpl(
@@ -65,7 +75,15 @@ SocketImpl::SocketImpl(
     , socketType(type)
     , addressFamily(family)
     , lastError(SocketError::None)
-    , blockingMode(true) {}
+    , blockingMode(true) {
+#ifdef SO_NOSIGPIPE
+    if (socketHandle != INVALID_SOCKET_HANDLE) {
+        int noSigPipe = 1;
+        ::setsockopt(socketHandle, SOL_SOCKET, SO_NOSIGPIPE, &noSigPipe,
+            sizeof(noSigPipe));
+    }
+#endif
+}
 
 SocketImpl::~SocketImpl() {
     if (isValid()) {
@@ -194,9 +212,16 @@ bool SocketImpl::connect(
             hints.ai_family = AF_INET6;
             hints.ai_socktype
                 = (socketType == SocketType::TCP) ? SOCK_STREAM : SOCK_DGRAM;
-            if (getaddrinfo(address.c_str(), nullptr, &hints, &res) != 0) {
-                setError(
-                    SocketError::ConnectFailed, "Failed to resolve hostname");
+            int gaiErr6 = getaddrinfo(address.c_str(), nullptr, &hints, &res);
+            if (gaiErr6 != 0) {
+#ifdef _WIN32
+                // getaddrinfo sets WSAGetLastError() on Windows
+                setError(SocketError::ConnectFailed,
+                    "Failed to resolve '" + address + "'");
+#else
+                setErrorDns(SocketError::ConnectFailed,
+                    "Failed to resolve '" + address + "'", gaiErr6);
+#endif
                 return false;
             }
             *a6 = *reinterpret_cast<sockaddr_in6*>(res->ai_addr);
@@ -213,9 +238,15 @@ bool SocketImpl::connect(
             hints.ai_family = AF_INET;
             hints.ai_socktype
                 = (socketType == SocketType::TCP) ? SOCK_STREAM : SOCK_DGRAM;
-            if (getaddrinfo(address.c_str(), nullptr, &hints, &res) != 0) {
-                setError(
-                    SocketError::ConnectFailed, "Failed to resolve hostname");
+            int gaiErr4 = getaddrinfo(address.c_str(), nullptr, &hints, &res);
+            if (gaiErr4 != 0) {
+#ifdef _WIN32
+                setError(SocketError::ConnectFailed,
+                    "Failed to resolve '" + address + "'");
+#else
+                setErrorDns(SocketError::ConnectFailed,
+                    "Failed to resolve '" + address + "'", gaiErr4);
+#endif
                 return false;
             }
             *a4 = *reinterpret_cast<sockaddr_in*>(res->ai_addr);
@@ -364,6 +395,9 @@ int SocketImpl::send(const void* data, size_t length) {
 #ifdef _WIN32
     int bytesSent = ::send(socketHandle, static_cast<const char*>(data),
         static_cast<int>(length), 0);
+#elif defined(MSG_NOSIGNAL)
+    // Linux: return EPIPE instead of raising SIGPIPE on a broken connection.
+    ssize_t bytesSent = ::send(socketHandle, data, length, MSG_NOSIGNAL);
 #else
     ssize_t bytesSent = ::send(socketHandle, data, length, 0);
 #endif
@@ -529,29 +563,55 @@ SocketError SocketImpl::getLastError() const {
     return lastError;
 }
 
-std::string SocketImpl::getErrorMessage() const {
-    return lastErrorMessage;
-}
-
-void SocketImpl::setError(SocketError error, const std::string& message) {
-    lastError = error;
-    int code = getLastSystemError();
+std::string formatErrorContext(const ErrorContext& ctx) {
     std::string sysText;
 #ifdef _WIN32
+    (void)ctx.isDns; // Windows: FormatMessage handles all codes (errno + EAI_*)
     char buf[512] = {};
     DWORD len = FormatMessageA(
         FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, nullptr,
-        static_cast<DWORD>(code), 0, buf, sizeof(buf), nullptr);
-    // Strip trailing CR/LF from FormatMessage output
+        static_cast<DWORD>(ctx.sysCode), 0, buf, sizeof(buf), nullptr);
     while (len > 0 && (buf[len - 1] == '\r' || buf[len - 1] == '\n'))
         buf[--len] = '\0';
     sysText = buf;
 #else
-    sysText = ::strerror(code);
+    sysText = ctx.isDns ? ::gai_strerror(ctx.sysCode) : ::strerror(ctx.sysCode);
 #endif
     std::ostringstream oss;
-    oss << message << " [" << code << ": " << sysText << "]";
-    lastErrorMessage = oss.str();
+    oss << ctx.description << " [" << ctx.sysCode << ": " << sysText << "]";
+    return oss.str();
+}
+
+std::string SocketImpl::getErrorMessage() const {
+    if (lastError == SocketError::None) return {};
+    if (!errorMessageDirty) return lastErrorMessage;
+    lastErrorMessage
+        = formatErrorContext({lastErrorDesc, lastSysCode, lastErrorIsDns});
+    errorMessageDirty = false;
+    return lastErrorMessage;
+}
+
+void SocketImpl::setError(SocketError error, const std::string& description) {
+    lastError = error;
+    lastErrorDesc = description;
+    lastSysCode = getLastSystemError(); // capture before next syscall
+    lastErrorIsDns = false;
+    errorMessageDirty = true;
+}
+
+void SocketImpl::setErrorDns(
+    SocketError error, const std::string& description, int gaiCode) {
+    // EAI_* codes are not errno values; flag so getErrorMessage() uses
+    // gai_strerror() instead of strerror() / FormatMessage.
+    lastError = error;
+    lastErrorDesc = description;
+    lastSysCode = gaiCode;
+    lastErrorIsDns = true;
+    errorMessageDirty = true;
+}
+
+ErrorContext SocketImpl::getErrorContext() const {
+    return {lastErrorDesc, lastSysCode, lastErrorIsDns};
 }
 
 int SocketImpl::getLastSystemError() const {
@@ -593,6 +653,9 @@ int SocketImpl::sendTo(
     int sent = ::sendto(socketHandle, static_cast<const char*>(data),
         static_cast<int>(length), 0, reinterpret_cast<sockaddr*>(&addr),
         addrLen);
+#elif defined(MSG_NOSIGNAL)
+    ssize_t sent = ::sendto(socketHandle, data, length, MSG_NOSIGNAL,
+        reinterpret_cast<sockaddr*>(&addr), addrLen);
 #else
     ssize_t sent = ::sendto(socketHandle, data, length, 0,
         reinterpret_cast<sockaddr*>(&addr), addrLen);
@@ -705,6 +768,39 @@ bool SocketImpl::setKeepAlive(bool enable) {
             reinterpret_cast<const char*>(&optval), sizeof(optval))
         == SOCKET_ERROR_CODE) {
         setError(SocketError::SetOptionFailed, "Failed to set SO_KEEPALIVE");
+        return false;
+    }
+    lastError = SocketError::None;
+    return true;
+}
+
+// -----------------------------------------------------------------------
+// setReceiveBufferSize / setSendBufferSize (SO_RCVBUF / SO_SNDBUF)
+// -----------------------------------------------------------------------
+bool SocketImpl::setReceiveBufferSize(int bytes) {
+    if (!isValid()) {
+        setError(SocketError::InvalidSocket, "Socket is not valid");
+        return false;
+    }
+    if (setsockopt(socketHandle, SOL_SOCKET, SO_RCVBUF,
+            reinterpret_cast<const char*>(&bytes), sizeof(bytes))
+        == SOCKET_ERROR_CODE) {
+        setError(SocketError::SetOptionFailed, "Failed to set SO_RCVBUF");
+        return false;
+    }
+    lastError = SocketError::None;
+    return true;
+}
+
+bool SocketImpl::setSendBufferSize(int bytes) {
+    if (!isValid()) {
+        setError(SocketError::InvalidSocket, "Socket is not valid");
+        return false;
+    }
+    if (setsockopt(socketHandle, SOL_SOCKET, SO_SNDBUF,
+            reinterpret_cast<const char*>(&bytes), sizeof(bytes))
+        == SOCKET_ERROR_CODE) {
+        setError(SocketError::SetOptionFailed, "Failed to set SO_SNDBUF");
         return false;
     }
     lastError = SocketError::None;
