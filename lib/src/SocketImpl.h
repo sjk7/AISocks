@@ -39,7 +39,7 @@ namespace aiSocks {
 // Internal: raw ingredients captured at the point of failure.
 // The human-readable string is produced lazily via formatErrorContext().
 struct ErrorContext {
-    std::string description; // step description from SocketImpl
+    const char* description{nullptr}; // string literal or c_str() — never owned
     int sysCode{0}; // errno / WSAGetLastError / EAI_*
     bool isDns{false}; // true → translate with gai_strerror
 };
@@ -118,7 +118,13 @@ class SocketImpl {
     // thread-local overwritten by the next syscall).  The string translation
     // (strerror / gai_strerror / FormatMessage) is a pure int→string lookup
     // that is stable over time, so it is deferred to getErrorMessage().
-    std::string lastErrorDesc; // step description
+    //
+    // Hot-path errors (WouldBlock, etc.) store a pointer to a string literal
+    // so setError() does zero allocation.  Cold-path errors (DNS, dynamic
+    // messages) use lastErrorDynamic.  Exactly one is active at any time.
+    const char* lastErrorLiteral{
+        nullptr}; // points to static storage; not owned
+    std::string lastErrorDynamic; // for runtime-constructed messages
     int lastSysCode{0}; // errno / WSAGetLastError / EAI_*
     bool lastErrorIsDns{false}; // true -> translate with gai_strerror
 
@@ -130,8 +136,12 @@ class SocketImpl {
     bool shutdownCalled_{false}; // true after user calls shutdown(); close()
                                  // skips redundant ::shutdown()
 
-    // Standard setter: reads errno / WSAGetLastError() immediately.
-    void setError(SocketError error, const std::string& description);
+    // Hot-path setter: stores a pointer to a string literal — zero allocation.
+    void setError(SocketError error, const char* description) noexcept;
+
+    // Cold-path setter: accepts a runtime-constructed std::string (e.g. DNS
+    // errors where the address is embedded).  Moves into lastErrorDynamic.
+    void setError(SocketError error, std::string description);
 
     // DNS variant: stores a getaddrinfo EAI_* code; getErrorMessage() will
     // translate it with gai_strerror (POSIX) rather than
@@ -140,6 +150,13 @@ class SocketImpl {
         SocketError error, const std::string& description, int gaiCode);
 
     int getLastSystemError() const;
+
+    // Private helpers that consolidate repeated setsockopt / select patterns.
+    bool setBoolOpt(int level, int optname, bool val, const char* errMsg);
+    bool setTimeoutOpt(
+        int optname, std::chrono::milliseconds ms, const char* errMsg);
+    bool setBufSizeOpt(int optname, int bytes, const char* errMsg);
+    bool waitReady(bool forRead, std::chrono::milliseconds timeout);
     static Endpoint endpointFromSockaddr(const sockaddr_storage& addr);
 };
 
