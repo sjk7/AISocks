@@ -4,6 +4,7 @@
 #include <string>
 #include <memory>
 #include <cstdint>
+#include <vector>
 
 namespace aiSocks {
 
@@ -17,6 +18,13 @@ enum class SocketType {
 enum class AddressFamily {
     IPv4,
     IPv6
+};
+
+struct NetworkInterface {
+    std::string name;              // Interface name (e.g., "eth0", "Ethernet")
+    std::string address;           // IP address as string
+    AddressFamily family;          // IPv4 or IPv6
+    bool isLoopback;              // True if loopback interface
 };
 
 enum class SocketError {
@@ -73,6 +81,12 @@ public:
     AddressFamily getAddressFamily() const;
     SocketError getLastError() const;
     std::string getErrorMessage() const;
+
+    // Static utility methods
+    static std::vector<NetworkInterface> getLocalAddresses();
+    static bool isValidIPv4(const std::string& address);
+    static bool isValidIPv6(const std::string& address);
+    static std::string ipToString(const void* addr, AddressFamily family);
 
 private:
     // Private constructor for accepted connections
