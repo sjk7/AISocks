@@ -5,6 +5,9 @@
 #include <chrono>
 #include <cstring>
 #include <sstream>
+#ifndef _WIN32
+#include <signal.h>
+#endif
 
 namespace aiSocks {
 
@@ -32,7 +35,11 @@ void SocketImpl::platformCleanup() {
 }
 #else
 bool SocketImpl::platformInit() {
-    // Unix systems don't need initialization
+    // Suppress SIGPIPE process-wide.  Belt-and-suspenders with SO_NOSIGPIPE
+    // (macOS, set per-socket) and MSG_NOSIGNAL (Linux, set per-call): this
+    // catches any remaining path that bypasses those per-socket/per-call
+    // guards.
+    ::signal(SIGPIPE, SIG_IGN);
     return true;
 }
 
@@ -392,32 +399,46 @@ int SocketImpl::send(const void* data, size_t length) {
         return -1;
     }
 
+    for (;;) {
 #ifdef _WIN32
-    int bytesSent = ::send(socketHandle, static_cast<const char*>(data),
-        static_cast<int>(length), 0);
+        int bytesSent = ::send(socketHandle, static_cast<const char*>(data),
+            static_cast<int>(length), 0);
 #elif defined(MSG_NOSIGNAL)
-    // Linux: return EPIPE instead of raising SIGPIPE on a broken connection.
-    ssize_t bytesSent = ::send(socketHandle, data, length, MSG_NOSIGNAL);
+        // Linux: return EPIPE instead of raising SIGPIPE on broken connection.
+        ssize_t bytesSent = ::send(socketHandle, data, length, MSG_NOSIGNAL);
 #else
-    ssize_t bytesSent = ::send(socketHandle, data, length, 0);
+        ssize_t bytesSent = ::send(socketHandle, data, length, 0);
 #endif
-
-    if (bytesSent == SOCKET_ERROR_CODE) {
-        int error = getLastSystemError();
-#ifdef _WIN32
-        if (error == WSAEWOULDBLOCK) {
-#else
-        if (error == EWOULDBLOCK || error == EAGAIN) {
-#endif
-            setError(SocketError::WouldBlock, "Operation would block");
-        } else {
-            setError(SocketError::SendFailed, "Failed to send data");
+        if (bytesSent != SOCKET_ERROR_CODE) {
+            lastError = SocketError::None;
+            return static_cast<int>(bytesSent);
         }
+
+        int error = getLastSystemError();
+#ifndef _WIN32
+        if (error == EINTR) continue; // signal interrupted; retry transparently
+#endif
+#ifdef _WIN32
+        if (error == WSAEWOULDBLOCK)
+#else
+        if (error == EWOULDBLOCK || error == EAGAIN)
+#endif
+        {
+            setError(SocketError::WouldBlock, "Operation would block");
+            return -1;
+        }
+#ifdef _WIN32
+        if (error == WSAETIMEDOUT)
+#else
+        if (error == ETIMEDOUT)
+#endif
+        {
+            setError(SocketError::Timeout, "send() timed out");
+            return -1;
+        }
+        setError(SocketError::SendFailed, "Failed to send data");
         return -1;
     }
-
-    lastError = SocketError::None;
-    return static_cast<int>(bytesSent);
 }
 
 int SocketImpl::receive(void* buffer, size_t length) {
@@ -426,29 +447,43 @@ int SocketImpl::receive(void* buffer, size_t length) {
         return -1;
     }
 
+    for (;;) {
 #ifdef _WIN32
-    int bytesReceived = ::recv(
-        socketHandle, static_cast<char*>(buffer), static_cast<int>(length), 0);
+        int bytesReceived = ::recv(socketHandle, static_cast<char*>(buffer),
+            static_cast<int>(length), 0);
 #else
-    ssize_t bytesReceived = ::recv(socketHandle, buffer, length, 0);
+        ssize_t bytesReceived = ::recv(socketHandle, buffer, length, 0);
 #endif
-
-    if (bytesReceived == SOCKET_ERROR_CODE) {
-        int error = getLastSystemError();
-#ifdef _WIN32
-        if (error == WSAEWOULDBLOCK) {
-#else
-        if (error == EWOULDBLOCK || error == EAGAIN) {
-#endif
-            setError(SocketError::WouldBlock, "Operation would block");
-        } else {
-            setError(SocketError::ReceiveFailed, "Failed to receive data");
+        if (bytesReceived != SOCKET_ERROR_CODE) {
+            lastError = SocketError::None;
+            return static_cast<int>(bytesReceived);
         }
+
+        int error = getLastSystemError();
+#ifndef _WIN32
+        if (error == EINTR) continue; // signal interrupted; retry transparently
+#endif
+#ifdef _WIN32
+        if (error == WSAEWOULDBLOCK)
+#else
+        if (error == EWOULDBLOCK || error == EAGAIN)
+#endif
+        {
+            setError(SocketError::WouldBlock, "Operation would block");
+            return -1;
+        }
+#ifdef _WIN32
+        if (error == WSAETIMEDOUT)
+#else
+        if (error == ETIMEDOUT)
+#endif
+        {
+            setError(SocketError::Timeout, "recv() timed out");
+            return -1;
+        }
+        setError(SocketError::ReceiveFailed, "Failed to receive data");
         return -1;
     }
-
-    lastError = SocketError::None;
-    return static_cast<int>(bytesReceived);
 }
 
 bool SocketImpl::setBlocking(bool blocking) {
@@ -649,24 +684,48 @@ int SocketImpl::sendTo(
         addrLen = sizeof(sockaddr_in);
     }
 
+    for (;;) {
 #ifdef _WIN32
-    int sent = ::sendto(socketHandle, static_cast<const char*>(data),
-        static_cast<int>(length), 0, reinterpret_cast<sockaddr*>(&addr),
-        addrLen);
+        int sent = ::sendto(socketHandle, static_cast<const char*>(data),
+            static_cast<int>(length), 0, reinterpret_cast<sockaddr*>(&addr),
+            addrLen);
 #elif defined(MSG_NOSIGNAL)
-    ssize_t sent = ::sendto(socketHandle, data, length, MSG_NOSIGNAL,
-        reinterpret_cast<sockaddr*>(&addr), addrLen);
+        ssize_t sent = ::sendto(socketHandle, data, length, MSG_NOSIGNAL,
+            reinterpret_cast<sockaddr*>(&addr), addrLen);
 #else
-    ssize_t sent = ::sendto(socketHandle, data, length, 0,
-        reinterpret_cast<sockaddr*>(&addr), addrLen);
+        ssize_t sent = ::sendto(socketHandle, data, length, 0,
+            reinterpret_cast<sockaddr*>(&addr), addrLen);
 #endif
+        if (sent != SOCKET_ERROR_CODE) {
+            lastError = SocketError::None;
+            return static_cast<int>(sent);
+        }
 
-    if (sent == SOCKET_ERROR_CODE) {
+        int error = getLastSystemError();
+#ifndef _WIN32
+        if (error == EINTR) continue; // signal interrupted; retry transparently
+#endif
+#ifdef _WIN32
+        if (error == WSAEWOULDBLOCK)
+#else
+        if (error == EWOULDBLOCK || error == EAGAIN)
+#endif
+        {
+            setError(SocketError::WouldBlock, "Operation would block");
+            return -1;
+        }
+#ifdef _WIN32
+        if (error == WSAETIMEDOUT)
+#else
+        if (error == ETIMEDOUT)
+#endif
+        {
+            setError(SocketError::Timeout, "sendTo() timed out");
+            return -1;
+        }
         setError(SocketError::SendFailed, "sendTo() failed");
         return -1;
     }
-    lastError = SocketError::None;
-    return static_cast<int>(sent);
 }
 
 int SocketImpl::receiveFrom(void* buffer, size_t length, Endpoint& remote) {
@@ -678,31 +737,46 @@ int SocketImpl::receiveFrom(void* buffer, size_t length, Endpoint& remote) {
     sockaddr_storage addr{};
     socklen_t addrLen = sizeof(addr);
 
+    for (;;) {
 #ifdef _WIN32
-    int recvd = ::recvfrom(socketHandle, static_cast<char*>(buffer),
-        static_cast<int>(length), 0, reinterpret_cast<sockaddr*>(&addr),
-        &addrLen);
+        int recvd = ::recvfrom(socketHandle, static_cast<char*>(buffer),
+            static_cast<int>(length), 0, reinterpret_cast<sockaddr*>(&addr),
+            &addrLen);
 #else
-    ssize_t recvd = ::recvfrom(socketHandle, buffer, length, 0,
-        reinterpret_cast<sockaddr*>(&addr), &addrLen);
+        ssize_t recvd = ::recvfrom(socketHandle, buffer, length, 0,
+            reinterpret_cast<sockaddr*>(&addr), &addrLen);
 #endif
+        if (recvd != SOCKET_ERROR_CODE) {
+            remote = endpointFromSockaddr(addr);
+            lastError = SocketError::None;
+            return static_cast<int>(recvd);
+        }
 
-    if (recvd == SOCKET_ERROR_CODE) {
         int err = getLastSystemError();
+#ifndef _WIN32
+        if (err == EINTR) continue; // signal interrupted; retry transparently
+#endif
 #ifdef _WIN32
         if (err == WSAEWOULDBLOCK)
 #else
         if (err == EWOULDBLOCK || err == EAGAIN)
 #endif
+        {
             setError(SocketError::WouldBlock, "Operation would block");
-        else
-            setError(SocketError::ReceiveFailed, "receiveFrom() failed");
+            return -1;
+        }
+#ifdef _WIN32
+        if (err == WSAETIMEDOUT)
+#else
+        if (err == ETIMEDOUT)
+#endif
+        {
+            setError(SocketError::Timeout, "recvfrom() timed out");
+            return -1;
+        }
+        setError(SocketError::ReceiveFailed, "receiveFrom() failed");
         return -1;
     }
-
-    remote = endpointFromSockaddr(addr);
-    lastError = SocketError::None;
-    return static_cast<int>(recvd);
 }
 
 // -----------------------------------------------------------------------
