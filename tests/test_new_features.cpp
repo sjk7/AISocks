@@ -35,7 +35,8 @@ static void test_endpoints() {
         REQUIRE(ep->family == AddressFamily::IPv4);
     }
 
-    BEGIN_TEST("getLocalEndpoint: ephemeral port non-zero after bind on port 0");
+    BEGIN_TEST(
+        "getLocalEndpoint: ephemeral port non-zero after bind on port 0");
     {
         Socket s(SocketType::TCP, AddressFamily::IPv4);
         REQUIRE(s.bind("127.0.0.1", Port{0}));
