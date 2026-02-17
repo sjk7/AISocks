@@ -1,8 +1,8 @@
 // This is a personal academic project. Dear PVS-Studio, please check it.
-// PVS-Studio Static Code Analyzer for C, C++, C#, and Java: https://pvs-studio.com
-// Tests: correct-by-construction Socket API.
-// Verifies that constructors throw SocketException on failure and
-// produce a fully usable socket on success.
+// PVS-Studio Static Code Analyzer for C, C++, C#, and Java:
+// https://pvs-studio.com Tests: correct-by-construction Socket API. Verifies
+// that constructors throw SocketException on failure and produce a fully usable
+// socket on success.
 
 #include "Socket.h"
 #include "test_helpers.h"
@@ -64,7 +64,7 @@ static void test_server_bind_happy() {
         REQUIRE(!threw);
     }
 
-    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
 
     BEGIN_TEST("ServerBind ctor: can immediately accept a connection");
     {
@@ -97,7 +97,7 @@ static void test_server_bind_happy() {
         REQUIRE(!threw);
     }
 
-    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
 
     BEGIN_TEST("ServerBind ctor: reuseAddr=false still works on a fresh port");
     {
@@ -118,7 +118,7 @@ static void test_server_bind_happy() {
 // Happy paths – ConnectTo constructor
 // -----------------------------------------------------------------------
 static void test_connect_to_happy() {
-    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
 
     BEGIN_TEST("ConnectTo ctor: creates a connected socket");
     {
@@ -158,7 +158,7 @@ static void test_connect_to_happy() {
         REQUIRE(!threw);
     }
 
-    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
 
     BEGIN_TEST(
         "ConnectTo ctor: send/receive works immediately after construction");
@@ -208,7 +208,7 @@ static void test_connect_to_happy() {
 // Unhappy paths – exceptions on construction failure
 // -----------------------------------------------------------------------
 static void test_server_bind_failures() {
-    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
 
     BEGIN_TEST("ServerBind ctor: throws SocketException on port-in-use (same "
                "port, no reuseAddr)");
@@ -237,7 +237,7 @@ static void test_server_bind_failures() {
         std::cout << "  exception message: " << what << "\n";
     }
 
-    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
 
     BEGIN_TEST(
         "ServerBind ctor: throws SocketException on invalid bind address");
@@ -280,7 +280,7 @@ static void test_server_bind_failures() {
 }
 
 static void test_connect_to_failures() {
-    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
 
     BEGIN_TEST(
         "ConnectTo ctor: throws SocketException when nothing is listening");
@@ -350,7 +350,7 @@ static void test_connect_to_failures() {
     BEGIN_TEST("ConnectTo ctor: connectTimeout fires for non-routable address");
     {
         using clock = std::chrono::steady_clock;
-        constexpr int TIMEOUT_MS = 500;
+        constexpr int TIMEOUT_MS = 50;
 
         auto t0 = clock::now();
         bool threw = false;
@@ -418,7 +418,7 @@ static void test_exception_is_std_exception() {
 // Move semantics still work with throwing constructors
 // -----------------------------------------------------------------------
 static void test_move_after_server_bind() {
-    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
 
     BEGIN_TEST("ServerBind socket can be move-constructed");
     {

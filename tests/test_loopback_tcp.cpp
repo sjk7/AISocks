@@ -1,7 +1,7 @@
 // This is a personal academic project. Dear PVS-Studio, please check it.
-// PVS-Studio Static Code Analyzer for C, C++, C#, and Java: https://pvs-studio.com
-// Tests: End-to-end TCP send/receive over the loopback interface.
-// Checks observable behaviour only.
+// PVS-Studio Static Code Analyzer for C, C++, C#, and Java:
+// https://pvs-studio.com Tests: End-to-end TCP send/receive over the loopback
+// interface. Checks observable behaviour only.
 
 #include "Socket.h"
 #include "test_helpers.h"
@@ -57,10 +57,10 @@ int main() {
         REQUIRE(srv.listen(1));
 
         std::thread t([&]() {
-            std::this_thread::sleep_for(std::chrono::milliseconds(50));
+            std::this_thread::sleep_for(std::chrono::milliseconds(5));
             Socket c(SocketType::TCP, AddressFamily::IPv4);
             c.connect("127.0.0.1", Port{BASE_PORT});
-            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
         });
 
         auto accepted = srv.accept();
@@ -68,7 +68,7 @@ int main() {
         REQUIRE(accepted != nullptr);
     }
 
-    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
 
     BEGIN_TEST("Server can send data, client receives it exactly");
     {
@@ -94,7 +94,7 @@ int main() {
         REQUIRE(received == message);
     }
 
-    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
 
     BEGIN_TEST("Large payload is transferred completely");
     {
@@ -120,7 +120,7 @@ int main() {
         REQUIRE(received == payload);
     }
 
-    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
 
     BEGIN_TEST("Client can send to server and server echoes back");
     {
@@ -160,7 +160,7 @@ int main() {
         REQUIRE(std::string(buf, r) == msg);
     }
 
-    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
 
     BEGIN_TEST("setReuseAddress allows rapid re-bind on same port");
     {
@@ -173,14 +173,14 @@ int main() {
             srv.close();
         }
         // Short wait for OS to release
-        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
         // Second server: should be able to re-bind
         Socket srv2(SocketType::TCP, AddressFamily::IPv4);
         srv2.setReuseAddress(true);
         REQUIRE(srv2.bind("127.0.0.1", Port{BASE_PORT + 4}));
     }
 
-    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
 
     BEGIN_TEST("IPv6 loopback send/receive works");
     {
