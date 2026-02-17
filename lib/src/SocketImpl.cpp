@@ -171,8 +171,8 @@ std::unique_ptr<SocketImpl> SocketImpl::accept() {
     return std::make_unique<SocketImpl>(clientSocket, socketType, clientFamily);
 }
 
-bool SocketImpl::connect(
-    const std::string& address, uint16_t port, int timeoutMs) {
+bool SocketImpl::connect(const std::string& address, uint16_t port,
+    std::chrono::milliseconds timeout) {
     if (!isValid()) {
         setError(SocketError::InvalidSocket, "Socket is not valid");
         return false;
@@ -224,7 +224,7 @@ bool SocketImpl::connect(
     }
 
     // --- Phase 2: connect (with optional select()-based timeout) ------------
-    if (timeoutMs <= 0) {
+    if (timeout.count() <= 0) {
         // Blocking connect.
         if (::connect(
                 socketHandle, reinterpret_cast<sockaddr*>(&serverAddr), addrLen)
@@ -286,8 +286,7 @@ bool SocketImpl::connect(
     // immune to wall-clock adjustments and EINTR restarts cost only the
     // remaining slice, not the full timeout.
     static constexpr int POLL_INTERVAL_MS = 10;
-    auto deadline = std::chrono::steady_clock::now()
-        + std::chrono::milliseconds(timeoutMs);
+    auto deadline = std::chrono::steady_clock::now() + timeout;
 
     for (;;) {
         auto remaining = std::chrono::duration_cast<std::chrono::milliseconds>(
@@ -295,7 +294,7 @@ bool SocketImpl::connect(
                              .count();
         if (remaining <= 0) {
             setError(SocketError::Timeout,
-                "connect() timed out after " + std::to_string(timeoutMs)
+                "connect() timed out after " + std::to_string(timeout.count())
                     + " ms");
             restoreBlocking();
             return false;
@@ -470,24 +469,26 @@ bool SocketImpl::setReuseAddress(bool reuse) {
     return true;
 }
 
-bool SocketImpl::setTimeout(int seconds) {
+bool SocketImpl::setTimeout(std::chrono::milliseconds timeout) {
     if (!isValid()) {
         setError(SocketError::InvalidSocket, "Socket is not valid");
         return false;
     }
 
+    const long long ms = timeout.count();
+
 #ifdef _WIN32
-    DWORD timeout = seconds * 1000;
+    DWORD tv = static_cast<DWORD>(ms);
     if (setsockopt(socketHandle, SOL_SOCKET, SO_RCVTIMEO,
-            reinterpret_cast<const char*>(&timeout), sizeof(timeout))
+            reinterpret_cast<const char*>(&tv), sizeof(tv))
         == SOCKET_ERROR_CODE) {
         setError(SocketError::SetOptionFailed, "Failed to set timeout");
         return false;
     }
 #else
     struct timeval tv;
-    tv.tv_sec = seconds;
-    tv.tv_usec = 0;
+    tv.tv_sec = static_cast<long>(ms / 1000);
+    tv.tv_usec = static_cast<long>((ms % 1000) * 1000);
     if (setsockopt(socketHandle, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv))
         == SOCKET_ERROR_CODE) {
         setError(SocketError::SetOptionFailed, "Failed to set timeout");
