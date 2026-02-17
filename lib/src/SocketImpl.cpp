@@ -272,10 +272,28 @@ bool SocketImpl::connect(
 
     // --- Phase 2: connect (with optional select()-based timeout) ------------
     if (timeout.count() <= 0) {
-        // Blocking connect.
+        // Blocking connect — or non-blocking initiate if the socket is already
+        // in non-blocking mode (blockingMode == false).  In the non-blocking
+        // case ::connect() returns immediately with EINPROGRESS / EWOULDBLOCK,
+        // which we translate to WouldBlock so callers can use Poller::wait()
+        // with PollEvent::Writable to detect completion.
         if (::connect(
                 socketHandle, reinterpret_cast<sockaddr*>(&serverAddr), addrLen)
             == SOCKET_ERROR_CODE) {
+            int sysErr0 = getLastSystemError();
+            bool inProg0 =
+#ifdef _WIN32
+                (sysErr0 == WSAEWOULDBLOCK) || (sysErr0 == WSAEINPROGRESS);
+#else
+                (sysErr0 == EINPROGRESS) || (sysErr0 == EWOULDBLOCK);
+#endif
+            if (inProg0) {
+                // Non-blocking socket: connect initiated; caller polls for
+                // completion via Poller (Writable) or waitWritable().
+                setError(SocketError::WouldBlock,
+                    "connect() in progress (non-blocking socket)");
+                return false;
+            }
             setError(SocketError::ConnectFailed, "Failed to connect to server");
             return false;
         }
