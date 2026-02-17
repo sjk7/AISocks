@@ -61,7 +61,7 @@ Socket& Socket::operator=(Socket&& other) noexcept {
     return *this;
 }
 
-bool Socket::bind(const std::string& address, uint16_t port) {
+bool Socket::bind(const std::string& address, Port port) {
     if (!pImpl) return false;
     return pImpl->bind(address, port);
 }
@@ -80,7 +80,7 @@ std::unique_ptr<Socket> Socket::accept() {
     return std::unique_ptr<Socket>(new Socket(std::move(clientImpl)));
 }
 
-bool Socket::connect(const std::string& address, uint16_t port) {
+bool Socket::connect(const std::string& address, Port port) {
     if (!pImpl) return false;
     return pImpl->connect(address, port);
 }

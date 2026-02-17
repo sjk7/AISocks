@@ -21,6 +21,51 @@ using Milliseconds = std::chrono::milliseconds;
 // gives up, which can be several minutes on a dropped-SYN connection).
 inline constexpr Milliseconds defaultTimeout{std::chrono::seconds{30}};
 
+// Strong port-number type.  Accepts integer literals and named well-known
+// ports interchangeably and converts back to uint16_t implicitly so all
+// platform socket API calls (htons, etc.) require no casts.
+//
+// Usage:
+//   Port p{8080};                    // from integer literal
+//   Port p = Port::Known::HTTPS;     // named constant
+//   ServerBind{ .port = Port::Known::HTTP };   // in config structs
+struct Port {
+    enum class Known : uint16_t {
+        FTP_DATA = 20,
+        FTP = 21,
+        SSH = 22,
+        TELNET = 23,
+        SMTP = 25,
+        DNS = 53,
+        HTTP = 80,
+        POP3 = 110,
+        IMAP = 143,
+        HTTPS = 443,
+        SMTPS = 465,
+        IMAPS = 993,
+        POP3S = 995,
+        MQTT = 1883,
+        HTTP_ALT = 8080,
+        MQTTS = 8883,
+    };
+
+    uint16_t value{0};
+
+    constexpr Port() noexcept = default;
+    constexpr explicit Port(uint16_t v) noexcept : value(v) {}
+    constexpr explicit Port(int v) noexcept : value(static_cast<uint16_t>(v)) {}
+    constexpr Port(Known k) noexcept : value(static_cast<uint16_t>(k)) {}
+
+    constexpr operator uint16_t() const noexcept { return value; }
+
+    constexpr bool operator==(Port other) const noexcept {
+        return value == other.value;
+    }
+    constexpr bool operator!=(Port other) const noexcept {
+        return value != other.value;
+    }
+};
+
 class SocketImpl;
 
 enum class SocketType { TCP, UDP };
@@ -75,7 +120,7 @@ class SocketException : public std::runtime_error {
 // Throws SocketException with context if any step fails.
 struct ServerBind {
     std::string address; // e.g. "0.0.0.0", "127.0.0.1", "::1"
-    uint16_t port = 0;
+    Port port{0};
     int backlog = 10;
     bool reuseAddr = true;
 };
@@ -93,7 +138,7 @@ struct ServerBind {
 // Note: DNS resolution is synchronous and not covered by this timeout.
 struct ConnectTo {
     std::string address; // Remote address or hostname
-    uint16_t port = 0;
+    Port port{0};
     Milliseconds connectTimeout{defaultTimeout}; // see above
 };
 
@@ -113,7 +158,7 @@ class Socket {
     // Throws SocketException (with the failing step prepended) on any failure.
     Socket(SocketType type, AddressFamily family, const ConnectTo& config);
 
-    ~Socket();
+    virtual ~Socket();
 
     // Prevent copying
     Socket(const Socket&) = delete;
@@ -124,12 +169,12 @@ class Socket {
     Socket& operator=(Socket&& other) noexcept;
 
     // Server operations
-    bool bind(const std::string& address, uint16_t port);
+    bool bind(const std::string& address, Port port);
     bool listen(int backlog = 10);
     std::unique_ptr<Socket> accept();
 
     // Client operations
-    bool connect(const std::string& address, uint16_t port);
+    bool connect(const std::string& address, Port port);
 
     // Data transfer
     int send(const void* data, size_t length);

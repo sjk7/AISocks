@@ -15,7 +15,7 @@ int main() {
     {
         Socket s(SocketType::TCP, AddressFamily::IPv4);
         s.close(); // invalidate
-        REQUIRE(!s.bind("127.0.0.1", 19700));
+        REQUIRE(!s.bind("127.0.0.1", Port{19700}));
     }
 
     BEGIN_TEST("listen() without bind returns false");
@@ -33,7 +33,7 @@ int main() {
     {
         Socket s(SocketType::TCP, AddressFamily::IPv4);
         // Port 1 is almost certainly not listening
-        bool r = s.connect("127.0.0.1", 1);
+        bool r = s.connect("127.0.0.1", Port{1});
         REQUIRE(!r);
         REQUIRE(s.getLastError() != SocketError::None);
     }
@@ -42,7 +42,7 @@ int main() {
         "getErrorMessage returns non-empty string after a failed operation");
     {
         Socket s(SocketType::TCP, AddressFamily::IPv4);
-        s.connect("127.0.0.1", 1); // will fail
+        s.connect("127.0.0.1", Port{1}); // will fail
         std::string msg = s.getErrorMessage();
         REQUIRE(!msg.empty());
     }
@@ -70,13 +70,13 @@ int main() {
         s1.setReuseAddress(false);
         s2.setReuseAddress(false);
 
-        bool first = s1.bind("127.0.0.1", 19701);
+        bool first = s1.bind("127.0.0.1", Port{19701});
         if (!first) {
             // Port may already be in use; skip gracefully
             REQUIRE_MSG(true, "SKIP - port 19701 unavailable");
         } else {
             s1.listen(1);
-            bool second = s2.bind("127.0.0.1", 19701);
+            bool second = s2.bind("127.0.0.1", Port{19701});
             REQUIRE(!second);
         }
     }
@@ -85,7 +85,7 @@ int main() {
     {
         Socket s(SocketType::TCP, AddressFamily::IPv4);
         s.close();
-        bool r = s.connect("127.0.0.1", 19702);
+        bool r = s.connect("127.0.0.1", Port{19702});
         REQUIRE(!r);
     }
 
@@ -111,7 +111,7 @@ int main() {
     {
         Socket s(SocketType::TCP, AddressFamily::IPv4);
         REQUIRE(s.getLastError() == SocketError::None);
-        s.connect("127.0.0.1", 1); // forced failure
+        s.connect("127.0.0.1", Port{1}); // forced failure
         REQUIRE(s.getLastError() != SocketError::None);
     }
 

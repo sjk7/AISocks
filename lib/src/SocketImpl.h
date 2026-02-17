@@ -47,14 +47,14 @@ class SocketImpl {
     static std::string ipToString(const void* addr, AddressFamily family);
 
     // Server operations
-    bool bind(const std::string& address, uint16_t port);
+    bool bind(const std::string& address, Port port);
     bool listen(int backlog);
     std::unique_ptr<SocketImpl> accept();
 
     // Client operations
     // timeout == 0: blocking (OS default). >0: fail with Timeout if the
     // TCP handshake takes longer than timeout (DNS resolution is not covered).
-    bool connect(const std::string& address, uint16_t port,
+    bool connect(const std::string& address, Port port,
         std::chrono::milliseconds timeout = defaultTimeout);
 
     // Data transfer
