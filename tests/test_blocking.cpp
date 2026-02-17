@@ -1,7 +1,7 @@
 // This is a personal academic project. Dear PVS-Studio, please check it.
-// PVS-Studio Static Code Analyzer for C, C++, C#, and Java: https://pvs-studio.com
-// Tests: Blocking/non-blocking mode transitions.
-// Checks observable behaviour only.
+// PVS-Studio Static Code Analyzer for C, C++, C#, and Java:
+// https://pvs-studio.com Tests: Blocking/non-blocking mode transitions. Checks
+// observable behaviour only.
 
 #include "Socket.h"
 #include "test_helpers.h"
@@ -82,10 +82,10 @@ int main() {
             REQUIRE_MSG(true, "SKIP - port 19300 unavailable");
         } else {
             std::thread connector([]() {
-                std::this_thread::sleep_for(std::chrono::milliseconds(50));
+                std::this_thread::sleep_for(std::chrono::milliseconds(5));
                 Socket c(SocketType::TCP, AddressFamily::IPv4);
                 c.connect("127.0.0.1", Port{19300});
-                std::this_thread::sleep_for(std::chrono::milliseconds(200));
+                std::this_thread::sleep_for(std::chrono::milliseconds(10));
             });
             auto accepted = server.accept();
             connector.join();
