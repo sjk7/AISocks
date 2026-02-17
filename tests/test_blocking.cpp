@@ -75,14 +75,14 @@ int main() {
         Socket server(SocketType::TCP, AddressFamily::IPv4);
         server.setReuseAddress(true);
         // Use a fixed port; if in use the test is skipped gracefully
-        bool bound = server.bind("127.0.0.1", 19300) && server.listen(1);
+        bool bound = server.bind("127.0.0.1", Port{19300}) && server.listen(1);
         if (!bound) {
             REQUIRE_MSG(true, "SKIP - port 19300 unavailable");
         } else {
             std::thread connector([]() {
                 std::this_thread::sleep_for(std::chrono::milliseconds(50));
                 Socket c(SocketType::TCP, AddressFamily::IPv4);
-                c.connect("127.0.0.1", 19300);
+                c.connect("127.0.0.1", Port{19300});
                 std::this_thread::sleep_for(std::chrono::milliseconds(200));
             });
             auto accepted = server.accept();
