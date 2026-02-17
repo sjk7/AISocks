@@ -1,23 +1,55 @@
 #include "Socket.h"
 #include "SocketImpl.h"
+#include <string>
 
 namespace aiSocks {
 
+// Helper used only inside constructors: if ok is false, extract the error
+// from pImpl and throw with the failing step name prepended.
+namespace {
+    void throwIfFailed(bool ok, const std::string& step,
+        const std::unique_ptr<SocketImpl>& impl) {
+        if (!ok) {
+            SocketError err = impl->getLastError();
+            std::string msg = step + ": " + impl->getErrorMessage();
+            throw SocketException(err, msg);
+        }
+    }
+} // namespace
+
 Socket::Socket(SocketType type, AddressFamily family)
-    : pImpl(std::make_unique<SocketImpl>(type, family))
-{
+    : pImpl(std::make_unique<SocketImpl>(type, family)) {
+    throwIfFailed(pImpl->isValid(), "socket()", pImpl);
 }
 
-Socket::Socket(std::unique_ptr<SocketImpl> impl)
-    : pImpl(std::move(impl))
-{
+Socket::Socket(SocketType type, AddressFamily family, const ServerBind& cfg)
+    : pImpl(std::make_unique<SocketImpl>(type, family)) {
+    throwIfFailed(pImpl->isValid(), "socket()", pImpl);
+
+    if (cfg.reuseAddr)
+        throwIfFailed(
+            pImpl->setReuseAddress(true), "setsockopt(SO_REUSEADDR)", pImpl);
+
+    throwIfFailed(pImpl->bind(cfg.address, cfg.port),
+        "bind(" + cfg.address + ":" + std::to_string(cfg.port) + ")", pImpl);
+
+    throwIfFailed(pImpl->listen(cfg.backlog),
+        "listen(backlog=" + std::to_string(cfg.backlog) + ")", pImpl);
 }
+
+Socket::Socket(SocketType type, AddressFamily family, const ConnectTo& cfg)
+    : pImpl(std::make_unique<SocketImpl>(type, family)) {
+    throwIfFailed(pImpl->isValid(), "socket()", pImpl);
+
+    throwIfFailed(pImpl->connect(cfg.address, cfg.port, cfg.connectTimeoutMs),
+        "connect(" + cfg.address + ":" + std::to_string(cfg.port) + ")", pImpl);
+}
+
+Socket::Socket(std::unique_ptr<SocketImpl> impl) : pImpl(std::move(impl)) {}
 
 Socket::~Socket() = default;
 
-Socket::Socket(Socket&& other) noexcept 
-    : pImpl(std::move(other.pImpl))
-{
+Socket::Socket(Socket&& other) noexcept : pImpl(std::move(other.pImpl)) {
     // other.pImpl is now nullptr (moved-from state)
 }
 
@@ -69,7 +101,7 @@ bool Socket::setBlocking(bool blocking) {
 }
 
 bool Socket::isBlocking() const {
-    if (!pImpl) return true;  // Default to blocking for moved-from state
+    if (!pImpl) return true; // Default to blocking for moved-from state
     return pImpl->isBlocking();
 }
 
@@ -94,7 +126,7 @@ bool Socket::isValid() const {
 }
 
 AddressFamily Socket::getAddressFamily() const {
-    if (!pImpl) return AddressFamily::IPv4;  // Default for moved-from state
+    if (!pImpl) return AddressFamily::IPv4; // Default for moved-from state
     return pImpl->getAddressFamily();
 }
 
