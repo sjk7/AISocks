@@ -1,5 +1,6 @@
 // This is a personal academic project. Dear PVS-Studio, please check it.
-// PVS-Studio Static Code Analyzer for C, C++, C#, and Java: https://pvs-studio.com
+// PVS-Studio Static Code Analyzer for C, C++, C#, and Java:
+// https://pvs-studio.com
 #ifndef AISOCKS_SOCKET_IMPL_H
 #define AISOCKS_SOCKET_IMPL_H
 
@@ -34,6 +35,14 @@ using SocketHandle = int;
 #endif
 
 namespace aiSocks {
+
+// Internal: raw ingredients captured at the point of failure.
+// The human-readable string is produced lazily via formatErrorContext().
+struct ErrorContext {
+    std::string description; // step description from SocketImpl
+    int sysCode{0}; // errno / WSAGetLastError / EAI_*
+    bool isDns{false}; // true → translate with gai_strerror
+};
 
 class SocketImpl {
     public:
@@ -75,6 +84,8 @@ class SocketImpl {
     bool setSendTimeout(std::chrono::milliseconds timeout);
     bool setNoDelay(bool noDelay);
     bool setKeepAlive(bool enable);
+    bool setReceiveBufferSize(int bytes);
+    bool setSendBufferSize(int bytes);
     bool shutdown(ShutdownHow how);
 
     // Utility
@@ -83,6 +94,7 @@ class SocketImpl {
     AddressFamily getAddressFamily() const;
     SocketError getLastError() const;
     std::string getErrorMessage() const;
+    ErrorContext getErrorContext() const;
     std::optional<Endpoint> getLocalEndpoint() const;
     std::optional<Endpoint> getPeerEndpoint() const;
 
@@ -93,14 +105,41 @@ class SocketImpl {
     SocketHandle socketHandle;
     SocketType socketType;
     AddressFamily addressFamily;
-    SocketError lastError;
-    std::string lastErrorMessage;
-    bool blockingMode;
+    SocketError lastError{SocketError::None};
 
-    void setError(SocketError error, const std::string& message);
+    // Error-state components.
+    // lastSysCode is captured eagerly (errno / WSAGetLastError() is a
+    // thread-local overwritten by the next syscall).  The string translation
+    // (strerror / gai_strerror / FormatMessage) is a pure int→string lookup
+    // that is stable over time, so it is deferred to getErrorMessage().
+    std::string lastErrorDesc; // step description
+    int lastSysCode{0}; // errno / WSAGetLastError / EAI_*
+    bool lastErrorIsDns{false}; // true -> translate with gai_strerror
+
+    // Lazy cache: built on first call to getErrorMessage() after each error.
+    mutable std::string lastErrorMessage;
+    mutable bool errorMessageDirty{false};
+
+    bool blockingMode{true};
+
+    // Standard setter: reads errno / WSAGetLastError() immediately.
+    void setError(SocketError error, const std::string& description);
+
+    // DNS variant: stores a getaddrinfo EAI_* code; getErrorMessage() will
+    // translate it with gai_strerror (POSIX) rather than
+    // strerror/FormatMessage.
+    void setErrorDns(
+        SocketError error, const std::string& description, int gaiCode);
+
     int getLastSystemError() const;
     static Endpoint endpointFromSockaddr(const sockaddr_storage& addr);
 };
+
+// Free function: translate an ErrorContext into a human-readable string.
+// Format: "<description> [<sysCode>: <system text>]"
+// Both SocketImpl::getErrorMessage() and SocketException::what() call this;
+// keeping the platform-specific translation in one place.
+std::string formatErrorContext(const ErrorContext& ctx);
 
 } // namespace aiSocks
 

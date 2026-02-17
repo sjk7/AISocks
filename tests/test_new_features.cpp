@@ -1,6 +1,6 @@
 // This is a personal academic project. Dear PVS-Studio, please check it.
-// PVS-Studio Static Code Analyzer for C, C++, C#, and Java: https://pvs-studio.com
-// Tests for features added in the second pass:
+// PVS-Studio Static Code Analyzer for C, C++, C#, and Java:
+// https://pvs-studio.com Tests for features added in the second pass:
 //   Endpoint / getLocalEndpoint / getPeerEndpoint
 //   setSendTimeout
 //   setNoDelay (TCP_NODELAY)
@@ -196,7 +196,170 @@ static void test_udp() {
 }
 
 // -----------------------------------------------------------------------
-// 5. shutdown(ShutdownHow)
+// 4b. Connected-mode UDP (connect() + send/receive)
+// -----------------------------------------------------------------------
+// UDP sockets support connect() to record a default peer address in the
+// kernel.  After connect(), send() / receive() work without per-call
+// endpoint parameters, and only datagrams from the connected peer are
+// delivered to receive().  This is sometimes called "connected UDP".
+static void test_udp_connected() {
+    BEGIN_TEST("connected-mode UDP: connect() then send() / receive()");
+    {
+        Socket server(SocketType::UDP, AddressFamily::IPv4);
+        server.setReuseAddress(true);
+        REQUIRE(server.bind("127.0.0.1", Port{BASE + 30}));
+
+        Socket client(SocketType::UDP, AddressFamily::IPv4);
+        // Connect the client to the server so send()/receive() need no
+        // per-call endpoint.
+        REQUIRE(client.connect("127.0.0.1", Port{BASE + 30}));
+
+        // After connect(), getPeerEndpoint() is populated on UDP too.
+        auto peer = client.getPeerEndpoint();
+        REQUIRE(peer.has_value());
+        REQUIRE(peer->port == Port{BASE + 30});
+
+        // Send via the connected path (no Endpoint argument).
+        const char msg[] = "connected-udp";
+        int sent = client.send(msg, sizeof(msg) - 1);
+        REQUIRE(sent == static_cast<int>(sizeof(msg) - 1));
+
+        // Server receives it via recvfrom so we can inspect the origin.
+        char buf[64] = {};
+        Endpoint from;
+        int recvd = server.receiveFrom(buf, sizeof(buf), from);
+        REQUIRE(recvd == static_cast<int>(sizeof(msg) - 1));
+        REQUIRE(
+            std::string(buf, static_cast<size_t>(recvd)) == "connected-udp");
+        REQUIRE(from.address == "127.0.0.1");
+        std::cout << "  datagram arrived from: " << from.toString() << "\n";
+    }
+}
+
+// -----------------------------------------------------------------------
+// 5. Span-based send / receive overloads
+// -----------------------------------------------------------------------
+static void test_span_overloads() {
+    BEGIN_TEST("Span send/receive: TCP loopback echo via std::byte spans");
+    {
+        Socket srv(SocketType::TCP, AddressFamily::IPv4);
+        srv.setReuseAddress(true);
+        REQUIRE(srv.bind("127.0.0.1", Port{BASE + 40}));
+        REQUIRE(srv.listen(1));
+
+        std::thread t([&]() {
+            auto conn = srv.accept();
+            if (!conn) return;
+            std::vector<std::byte> echoBuf(64);
+            int r = conn->receive(
+                Span<std::byte>{echoBuf.data(), echoBuf.size()});
+            if (r > 0) {
+                conn->send(Span<const std::byte>{
+                    echoBuf.data(), static_cast<size_t>(r)});
+            }
+        });
+
+        Socket cli(SocketType::TCP, AddressFamily::IPv4);
+        REQUIRE(cli.connect("127.0.0.1", Port{BASE + 40}));
+
+        std::string payload = "span-hello";
+        std::vector<std::byte> sendBuf(payload.size());
+        for (size_t i = 0; i < payload.size(); ++i)
+            sendBuf[i] = static_cast<std::byte>(payload[i]);
+
+        int sent
+            = cli.send(Span<const std::byte>{sendBuf.data(), sendBuf.size()});
+        REQUIRE(sent == static_cast<int>(payload.size()));
+
+        std::vector<std::byte> recvBuf(64);
+        int recvd
+            = cli.receive(Span<std::byte>{recvBuf.data(), recvBuf.size()});
+        REQUIRE(recvd == static_cast<int>(payload.size()));
+
+        std::string echoed(recvd, '\0');
+        for (int i = 0; i < recvd; ++i)
+            echoed[static_cast<size_t>(i)]
+                = static_cast<char>(recvBuf[static_cast<size_t>(i)]);
+        REQUIRE(echoed == payload);
+
+        t.join();
+    }
+
+    BEGIN_TEST("Span sendTo/receiveFrom: UDP datagram with byte spans");
+    {
+        Socket receiver(SocketType::UDP, AddressFamily::IPv4);
+        receiver.setReuseAddress(true);
+        REQUIRE(receiver.bind("127.0.0.1", Port{BASE + 41}));
+
+        Socket sender(SocketType::UDP, AddressFamily::IPv4);
+        Endpoint dest{"127.0.0.1", Port{BASE + 41}, AddressFamily::IPv4};
+
+        std::string msg = "span-udp";
+        std::vector<std::byte> txBuf(msg.size());
+        for (size_t i = 0; i < msg.size(); ++i)
+            txBuf[i] = static_cast<std::byte>(msg[i]);
+
+        int sent = sender.sendTo(
+            Span<const std::byte>{txBuf.data(), txBuf.size()}, dest);
+        REQUIRE(sent == static_cast<int>(msg.size()));
+
+        std::vector<std::byte> rxBuf(64);
+        Endpoint from;
+        int recvd = receiver.receiveFrom(
+            Span<std::byte>{rxBuf.data(), rxBuf.size()}, from);
+        REQUIRE(recvd == static_cast<int>(msg.size()));
+
+        std::string got(recvd, '\0');
+        for (int i = 0; i < recvd; ++i)
+            got[static_cast<size_t>(i)]
+                = static_cast<char>(rxBuf[static_cast<size_t>(i)]);
+        REQUIRE(got == msg);
+    }
+}
+
+// -----------------------------------------------------------------------
+// 6. Socket buffer sizes (SO_RCVBUF / SO_SNDBUF)
+// -----------------------------------------------------------------------
+static void test_buffer_sizes() {
+    BEGIN_TEST("setReceiveBufferSize: succeeds on valid socket");
+    {
+        Socket s(SocketType::TCP, AddressFamily::IPv4);
+        // 64 KiB is a commonly accepted value on all platforms.
+        REQUIRE(s.setReceiveBufferSize(64 * 1024));
+        REQUIRE(s.getLastError() == SocketError::None);
+    }
+
+    BEGIN_TEST("setSendBufferSize: succeeds on valid socket");
+    {
+        Socket s(SocketType::TCP, AddressFamily::IPv4);
+        REQUIRE(s.setSendBufferSize(64 * 1024));
+        REQUIRE(s.getLastError() == SocketError::None);
+    }
+
+    BEGIN_TEST("setReceiveBufferSize: succeeds for UDP socket");
+    {
+        Socket s(SocketType::UDP, AddressFamily::IPv4);
+        REQUIRE(s.setReceiveBufferSize(128 * 1024));
+        REQUIRE(s.getLastError() == SocketError::None);
+    }
+
+    BEGIN_TEST("setReceiveBufferSize: fails on closed socket");
+    {
+        Socket s(SocketType::TCP, AddressFamily::IPv4);
+        s.close();
+        REQUIRE(!s.setReceiveBufferSize(64 * 1024));
+    }
+
+    BEGIN_TEST("setSendBufferSize: fails on closed socket");
+    {
+        Socket s(SocketType::TCP, AddressFamily::IPv4);
+        s.close();
+        REQUIRE(!s.setSendBufferSize(64 * 1024));
+    }
+}
+
+// -----------------------------------------------------------------------
+// 7. shutdown(ShutdownHow)
 // -----------------------------------------------------------------------
 static void test_shutdown() {
     BEGIN_TEST("shutdown(Write): peer recv sees EOF (returns 0)");
@@ -250,7 +413,7 @@ static void test_shutdown() {
 }
 
 // -----------------------------------------------------------------------
-// 6. setKeepAlive
+// 8. setKeepAlive
 // -----------------------------------------------------------------------
 static void test_keepalive() {
     BEGIN_TEST("setKeepAlive(true): enables SO_KEEPALIVE");
@@ -282,6 +445,9 @@ int main() {
     test_send_timeout();
     test_no_delay();
     test_udp();
+    test_udp_connected();
+    test_span_overloads();
+    test_buffer_sizes();
     test_shutdown();
     test_keepalive();
     return test_summary();

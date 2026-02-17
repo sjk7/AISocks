@@ -1,0 +1,192 @@
+name: CI
+
+on:
+  push:
+    branches: ["main", "master"]
+  pull_request:
+    branches: ["main", "master"]
+
+# Cancel superseded runs on the same branch/PR to save runner minutes.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    name: ${{ matrix.os }} / ${{ matrix.compiler }}
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false          # run all matrix legs even if one fails
+      matrix:
+        include:
+          # ---------------------------------------------------------------
+          # Linux — GCC
+          # ---------------------------------------------------------------
+          - os: ubuntu-latest
+            compiler: gcc
+            cc: gcc
+            cxx: g++
+            cmake_generator: Ninja
+            build_type: Debug
+
+          # Linux — Clang
+          - os: ubuntu-latest
+            compiler: clang
+            cc: clang
+            cxx: clang++
+            cmake_generator: Ninja
+            build_type: Debug
+
+          # ---------------------------------------------------------------
+          # macOS — Apple Clang (Xcode toolchain)
+          # ---------------------------------------------------------------
+          - os: macos-latest
+            compiler: apple-clang
+            cc: clang
+            cxx: clang++
+            cmake_generator: Ninja
+            build_type: Debug
+
+          # ---------------------------------------------------------------
+          # Windows — MSVC
+          # ---------------------------------------------------------------
+          - os: windows-latest
+            compiler: msvc
+            cmake_generator: "Visual Studio 17 2022"
+            cmake_arch: x64
+            build_type: Debug
+
+          # Windows — Clang-cl (LLVM toolchain on Windows)
+          - os: windows-latest
+            compiler: clang-cl
+            cmake_generator: Ninja
+            build_type: Debug
+            env:
+              CC: clang-cl
+              CXX: clang-cl
+
+    steps:
+      # ------------------------------------------------------------------ #
+      # 1. Checkout                                                         #
+      # ------------------------------------------------------------------ #
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ------------------------------------------------------------------ #
+      # 2. Install system dependencies                                      #
+      # ------------------------------------------------------------------ #
+      - name: Install Ninja (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get install -y ninja-build
+
+      - name: Install Ninja (macOS)
+        if: runner.os == 'macOS'
+        run: brew install ninja
+
+      - name: Install Ninja + LLVM (Windows / clang-cl)
+        if: matrix.os == 'windows-latest' && matrix.compiler == 'clang-cl'
+        uses: crazy-max/ghaction-chocolatey@v3
+        with:
+          args: install ninja llvm -y
+
+      # ------------------------------------------------------------------ #
+      # 3. Configure CMake                                                  #
+      # ------------------------------------------------------------------ #
+      - name: Configure (MSVC multi-config)
+        if: matrix.compiler == 'msvc'
+        shell: pwsh
+        run: |
+          cmake -S . -B build `
+            -G "${{ matrix.cmake_generator }}" `
+            -A ${{ matrix.cmake_arch }} `
+            -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} `
+            -DBUILD_TESTS=ON `
+            -DBUILD_EXAMPLES=ON
+
+      - name: Configure (single-config generators)
+        if: matrix.compiler != 'msvc'
+        env:
+          CC: ${{ matrix.cc }}
+          CXX: ${{ matrix.cxx }}
+        run: |
+          cmake -S . -B build \
+            -G "${{ matrix.cmake_generator }}" \
+            -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
+            -DBUILD_TESTS=ON \
+            -DBUILD_EXAMPLES=ON
+
+      # ------------------------------------------------------------------ #
+      # 4. Build                                                            #
+      # ------------------------------------------------------------------ #
+      # We build only the library + tests + examples; the run_all_tests
+      # custom target is skipped here—CTest is called explicitly below so
+      # that GitHub Actions can parse the results properly.
+      - name: Build (MSVC)
+        if: matrix.compiler == 'msvc'
+        shell: pwsh
+        run: |
+          cmake --build build --config ${{ matrix.build_type }} `
+            --target aiSocksLib `
+                    test_socket_basics `
+                    test_ip_utils `
+                    test_blocking `
+                    test_move_semantics `
+                    test_loopback_tcp `
+                    test_error_handling `
+                    test_construction `
+                    test_new_features `
+                    test_error_messages `
+                    aiSocksPeerLogger `
+            --parallel
+
+      - name: Build (single-config)
+        if: matrix.compiler != 'msvc'
+        run: |
+          cmake --build build \
+            --target aiSocksLib \
+                    test_socket_basics \
+                    test_ip_utils \
+                    test_blocking \
+                    test_move_semantics \
+                    test_loopback_tcp \
+                    test_error_handling \
+                    test_construction \
+                    test_new_features \
+                    test_error_messages \
+                    aiSocksPeerLogger \
+            --parallel $(nproc 2>/dev/null || sysctl -n hw.logicalcpu 2>/dev/null || echo 2)
+
+      # ------------------------------------------------------------------ #
+      # 5. Test                                                             #
+      # ------------------------------------------------------------------ #
+      - name: Run tests (MSVC)
+        if: matrix.compiler == 'msvc'
+        working-directory: build
+        shell: pwsh
+        run: |
+          ctest --build-config ${{ matrix.build_type }} `
+                --output-on-failure `
+                --no-compress-output `
+                --timeout 60 `
+                --parallel 1
+
+      - name: Run tests (single-config)
+        if: matrix.compiler != 'msvc'
+        working-directory: build
+        run: |
+          ctest --output-on-failure \
+                --no-compress-output \
+                --timeout 60 \
+                --parallel 1
+
+      # ------------------------------------------------------------------ #
+      # 6. Upload test results on failure                                   #
+      # ------------------------------------------------------------------ #
+      - name: Upload CTest XML results
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ctest-results-${{ matrix.os }}-${{ matrix.compiler }}
+          path: build/Testing/
+          retention-days: 7

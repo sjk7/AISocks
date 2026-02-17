@@ -1,15 +1,53 @@
 // This is a personal academic project. Dear PVS-Studio, please check it.
-// PVS-Studio Static Code Analyzer for C, C++, C#, and Java: https://pvs-studio.com
+// PVS-Studio Static Code Analyzer for C, C++, C#, and Java:
+// https://pvs-studio.com
 #ifndef AISOCKS_SOCKET_H
 #define AISOCKS_SOCKET_H
 
 #include <chrono>
+#include <cstddef>
 #include <cstdint>
+#include <exception>
 #include <memory>
 #include <optional>
-#include <stdexcept>
 #include <string>
 #include <vector>
+
+// ---------------------------------------------------------------------------
+// Span<T> — resolves to std::span on C++20; a minimal shim on C++17.
+//
+// Usage (same on both standards):
+//   std::vector<std::byte> buf(1024);
+//   socket.send(aiSocks::Span<const std::byte>{buf.data(), buf.size()});
+//
+// On C++20 you can also pass std::span<const std::byte> directly because the
+// alias makes them the same type.
+// ---------------------------------------------------------------------------
+#if defined(__cpp_lib_span)
+#include <span>
+namespace aiSocks {
+template <typename T> using Span = std::span<T>;
+}
+#else
+namespace aiSocks {
+/// Minimal contiguous-range view.  API subset of std::span<T>.
+template <typename T> struct Span {
+    T* ptr;
+    std::size_t len;
+
+    constexpr Span() noexcept : ptr(nullptr), len(0) {}
+    constexpr Span(T* p, std::size_t n) noexcept : ptr(p), len(n) {}
+
+    constexpr T* data() const noexcept { return ptr; }
+    constexpr std::size_t size() const noexcept { return len; }
+    constexpr bool empty() const noexcept { return len == 0; }
+
+    constexpr T* begin() const noexcept { return ptr; }
+    constexpr T* end() const noexcept { return ptr + len; }
+    constexpr T& operator[](std::size_t i) const noexcept { return ptr[i]; }
+};
+} // namespace aiSocks
+#endif
 
 namespace aiSocks {
 
@@ -120,17 +158,29 @@ enum class SocketError {
 };
 
 // Thrown only from constructors when socket setup cannot be completed.
-// what() returns the full context string prepended to the system error
-// description.
-class SocketException : public std::runtime_error {
+// Ingredients are captured eagerly at throw time; the formatted string is
+// built once, on the first call to what(), and cached.
+// Format: "<step>: <description> [<sysCode>: <system text>]"
+class SocketException : public std::exception {
     public:
-    SocketException(SocketError code, const std::string& message)
-        : std::runtime_error(message), errorCode_(code) {}
+    SocketException(SocketError code, std::string step, std::string description,
+        int sysCode, bool isDns)
+        : errorCode_(code)
+        , step_(std::move(step))
+        , description_(std::move(description))
+        , sysCode_(sysCode)
+        , isDns_(isDns) {}
 
     SocketError errorCode() const noexcept { return errorCode_; }
+    const char* what() const noexcept override; // defined in Socket.cpp
 
     private:
     SocketError errorCode_;
+    std::string step_;
+    std::string description_; // SocketImpl step description
+    int sysCode_{0}; // errno / WSAGetLastError / EAI_*
+    bool isDns_{false}; // true → translate with gai_strerror
+    mutable std::string whatCache_;
 };
 
 // -----------------------------------------------------------------------
@@ -199,15 +249,26 @@ class Socket {
     // Client operations
     bool connect(const std::string& address, Port port);
 
-    // Data transfer
+    // Data transfer (raw pointer overloads)
     int send(const void* data, size_t length);
     int receive(void* buffer, size_t length);
 
+    // Span-based overloads — delegates to the raw-pointer overloads.
+    // On C++20 these accept std::span<const std::byte> / std::span<std::byte>
+    // directly; on C++17 use aiSocks::Span<> or supply {ptr, size} directly.
+    int send(Span<const std::byte> data);
+    int receive(Span<std::byte> buffer);
+
     // UDP-only data transfer (connected or connectionless)
     // sendTo: sends a datagram to the specified remote endpoint.
+    //   Connected-mode UDP: call connect() first, then use send() / receive()
+    //   directly — the kernel fills in the peer address automatically.  The
+    //   sendTo/receiveFrom overloads are available for connectionless mode.
     // receiveFrom: receives a datagram and fills `remote` with the sender.
     int sendTo(const void* data, size_t length, const Endpoint& remote);
     int receiveFrom(void* buffer, size_t length, Endpoint& remote);
+    int sendTo(Span<const std::byte> data, const Endpoint& remote);
+    int receiveFrom(Span<std::byte> buffer, Endpoint& remote);
 
     // Socket options
     bool setBlocking(bool blocking);
@@ -229,6 +290,14 @@ class Socket {
     // setNoDelay(true) reduces latency for small writes at the cost of
     // increased packet count.
     bool setNoDelay(bool noDelay);
+
+    // Set the kernel receive / send socket buffer sizes (SO_RCVBUF /
+    // SO_SNDBUF). `bytes` is the requested buffer size in bytes; the kernel may
+    // round it up to its own alignment or clamp it to a system maximum (see
+    // rmem_max / wmem_max on Linux).  Returns false and records SetOptionFailed
+    // if the setsockopt() call fails.
+    bool setReceiveBufferSize(int bytes);
+    bool setSendBufferSize(int bytes);
 
     // Enable/disable SO_KEEPALIVE.  Requires OS idle/interval/count tuning
     // for meaningful control; enabling the option is still useful to detect
