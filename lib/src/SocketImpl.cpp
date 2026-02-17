@@ -12,6 +12,92 @@
 
 namespace aiSocks {
 
+// -----------------------------------------------------------------------
+// Static helpers (file-scope)
+// -----------------------------------------------------------------------
+
+// Classify the errno / WSAError from a send/recv syscall into a SocketError
+// value.  Does NO string work \u2014 descriptions are provided by the caller so
+// zero allocation occurs even in the WouldBlock fast path.
+static SocketError classifyTransferSysError(int sysErr) noexcept {
+#ifdef _WIN32
+    if (sysErr == WSAEWOULDBLOCK) return SocketError::WouldBlock;
+    if (sysErr == WSAETIMEDOUT) return SocketError::Timeout;
+    if (sysErr == WSAECONNRESET || sysErr == WSAECONNABORTED)
+        return SocketError::ConnectionReset;
+#else
+    if (sysErr == EWOULDBLOCK || sysErr == EAGAIN)
+        return SocketError::WouldBlock;
+    if (sysErr == ETIMEDOUT) return SocketError::Timeout;
+    if (sysErr == ECONNRESET || sysErr == EPIPE)
+        return SocketError::ConnectionReset;
+#endif
+    return SocketError::Unknown;
+}
+
+// Fill `out`/`outLen` from a literal address string or (when doDns=true) a
+// DNS lookup.  Wildcards ("", "0.0.0.0", "::") map to INADDR_ANY/in6addr_any.
+// Returns SocketError::None on success.  On DNS failure *gaiErr is set to the
+// EAI_* code and ConnectFailed is returned.  On literal-parse failure with
+// doDns=false, BindFailed is returned.
+static SocketError resolveToSockaddr(const std::string& address, Port port,
+    AddressFamily family, SocketType sockType, bool doDns,
+    sockaddr_storage& out, socklen_t& outLen, int* gaiErr = nullptr) {
+    std::memset(&out, 0, sizeof(out));
+    if (family == AddressFamily::IPv6) {
+        auto* a6 = reinterpret_cast<sockaddr_in6*>(&out);
+        a6->sin6_family = AF_INET6;
+        a6->sin6_port = htons(port);
+        if (address.empty() || address == "::" || address == "0.0.0.0") {
+            a6->sin6_addr = in6addr_any;
+        } else if (inet_pton(AF_INET6, address.c_str(), &a6->sin6_addr) > 0) {
+            // literal parsed OK
+        } else if (doDns) {
+            struct addrinfo hints{}, *res = nullptr;
+            hints.ai_family = AF_INET6;
+            hints.ai_socktype
+                = (sockType == SocketType::TCP) ? SOCK_STREAM : SOCK_DGRAM;
+            int gai = getaddrinfo(address.c_str(), nullptr, &hints, &res);
+            if (gai != 0) {
+                if (gaiErr) *gaiErr = gai;
+                return SocketError::ConnectFailed;
+            }
+            *a6 = *reinterpret_cast<sockaddr_in6*>(res->ai_addr);
+            a6->sin6_port = htons(port);
+            freeaddrinfo(res);
+        } else {
+            return SocketError::BindFailed;
+        }
+        outLen = sizeof(sockaddr_in6);
+    } else {
+        auto* a4 = reinterpret_cast<sockaddr_in*>(&out);
+        a4->sin_family = AF_INET;
+        a4->sin_port = htons(port);
+        if (address.empty() || address == "0.0.0.0") {
+            a4->sin_addr.s_addr = INADDR_ANY;
+        } else if (inet_pton(AF_INET, address.c_str(), &a4->sin_addr) > 0) {
+            // literal parsed OK
+        } else if (doDns) {
+            struct addrinfo hints{}, *res = nullptr;
+            hints.ai_family = AF_INET;
+            hints.ai_socktype
+                = (sockType == SocketType::TCP) ? SOCK_STREAM : SOCK_DGRAM;
+            int gai = getaddrinfo(address.c_str(), nullptr, &hints, &res);
+            if (gai != 0) {
+                if (gaiErr) *gaiErr = gai;
+                return SocketError::ConnectFailed;
+            }
+            *a4 = *reinterpret_cast<sockaddr_in*>(res->ai_addr);
+            a4->sin_port = htons(port);
+            freeaddrinfo(res);
+        } else {
+            return SocketError::BindFailed;
+        }
+        outLen = sizeof(sockaddr_in);
+    }
+    return SocketError::None;
+}
+
 // Platform-specific initialization
 #ifdef _WIN32
 static std::once_flag sWsaInitFlag;
@@ -102,46 +188,21 @@ bool SocketImpl::bind(const std::string& address, Port port) {
         return false;
     }
 
-    if (addressFamily == AddressFamily::IPv6) {
-        sockaddr_in6 addr{};
-        addr.sin6_family = AF_INET6;
-        addr.sin6_port = htons(port);
+    sockaddr_storage addr{};
+    socklen_t addrLen = 0;
+    auto res = resolveToSockaddr(address, port, addressFamily, socketType,
+        /*doDns=*/false, addr, addrLen);
+    if (res != SocketError::None) {
+        setError(SocketError::BindFailed,
+            addressFamily == AddressFamily::IPv6 ? "Invalid IPv6 address"
+                                                 : "Invalid IPv4 address");
+        return false;
+    }
 
-        if (address.empty() || address == "::" || address == "0.0.0.0") {
-            addr.sin6_addr = in6addr_any;
-        } else {
-            if (inet_pton(AF_INET6, address.c_str(), &addr.sin6_addr) <= 0) {
-                setError(SocketError::BindFailed, "Invalid IPv6 address");
-                return false;
-            }
-        }
-
-        if (::bind(
-                socketHandle, reinterpret_cast<sockaddr*>(&addr), sizeof(addr))
-            == SOCKET_ERROR_CODE) {
-            setError(SocketError::BindFailed, "Failed to bind socket");
-            return false;
-        }
-    } else {
-        sockaddr_in addr{};
-        addr.sin_family = AF_INET;
-        addr.sin_port = htons(port);
-
-        if (address.empty() || address == "0.0.0.0") {
-            addr.sin_addr.s_addr = INADDR_ANY;
-        } else {
-            if (inet_pton(AF_INET, address.c_str(), &addr.sin_addr) <= 0) {
-                setError(SocketError::BindFailed, "Invalid IPv4 address");
-                return false;
-            }
-        }
-
-        if (::bind(
-                socketHandle, reinterpret_cast<sockaddr*>(&addr), sizeof(addr))
-            == SOCKET_ERROR_CODE) {
-            setError(SocketError::BindFailed, "Failed to bind socket");
-            return false;
-        }
+    if (::bind(socketHandle, reinterpret_cast<sockaddr*>(&addr), addrLen)
+        == SOCKET_ERROR_CODE) {
+        setError(SocketError::BindFailed, "Failed to bind socket");
+        return false;
     }
 
     lastError = SocketError::None;
@@ -216,58 +277,20 @@ bool SocketImpl::connect(
     //     of this single-threaded library --- no timeout applies here) -------
     sockaddr_storage serverAddr{};
     socklen_t addrLen = 0;
-
-    if (addressFamily == AddressFamily::IPv6) {
-        auto* a6 = reinterpret_cast<sockaddr_in6*>(&serverAddr);
-        a6->sin6_family = AF_INET6;
-        a6->sin6_port = htons(port);
-        if (inet_pton(AF_INET6, address.c_str(), &a6->sin6_addr) <= 0) {
-            struct addrinfo hints{}, *res = nullptr;
-            hints.ai_family = AF_INET6;
-            hints.ai_socktype
-                = (socketType == SocketType::TCP) ? SOCK_STREAM : SOCK_DGRAM;
-            int gaiErr6 = getaddrinfo(address.c_str(), nullptr, &hints, &res);
-            if (gaiErr6 != 0) {
+    {
+        int gaiErr = 0;
+        auto r = resolveToSockaddr(address, port, addressFamily, socketType,
+            /*doDns=*/true, serverAddr, addrLen, &gaiErr);
+        if (r != SocketError::None) {
 #ifdef _WIN32
-                // getaddrinfo sets WSAGetLastError() on Windows
-                setError(SocketError::ConnectFailed,
-                    "Failed to resolve '" + address + "'");
+            setError(SocketError::ConnectFailed,
+                "Failed to resolve '" + address + "'");
 #else
-                setErrorDns(SocketError::ConnectFailed,
-                    "Failed to resolve '" + address + "'", gaiErr6);
+            setErrorDns(SocketError::ConnectFailed,
+                "Failed to resolve '" + address + "'", gaiErr);
 #endif
-                return false;
-            }
-            *a6 = *reinterpret_cast<sockaddr_in6*>(res->ai_addr);
-            a6->sin6_port = htons(port);
-            freeaddrinfo(res);
+            return false;
         }
-        addrLen = sizeof(sockaddr_in6);
-    } else {
-        auto* a4 = reinterpret_cast<sockaddr_in*>(&serverAddr);
-        a4->sin_family = AF_INET;
-        a4->sin_port = htons(port);
-        if (inet_pton(AF_INET, address.c_str(), &a4->sin_addr) <= 0) {
-            struct addrinfo hints{}, *res = nullptr;
-            hints.ai_family = AF_INET;
-            hints.ai_socktype
-                = (socketType == SocketType::TCP) ? SOCK_STREAM : SOCK_DGRAM;
-            int gaiErr4 = getaddrinfo(address.c_str(), nullptr, &hints, &res);
-            if (gaiErr4 != 0) {
-#ifdef _WIN32
-                setError(SocketError::ConnectFailed,
-                    "Failed to resolve '" + address + "'");
-#else
-                setErrorDns(SocketError::ConnectFailed,
-                    "Failed to resolve '" + address + "'", gaiErr4);
-#endif
-                return false;
-            }
-            *a4 = *reinterpret_cast<sockaddr_in*>(res->ai_addr);
-            a4->sin_port = htons(port);
-            freeaddrinfo(res);
-        }
-        addrLen = sizeof(sockaddr_in);
     }
 
     // --- Phase 2: connect (with optional select()-based timeout) ------------
@@ -439,39 +462,26 @@ int SocketImpl::send(const void* data, size_t length) {
             return static_cast<int>(bytesSent);
         }
 
-        int error = getLastSystemError();
+        int sysErr = getLastSystemError();
 #ifndef _WIN32
-        if (error == EINTR) continue; // signal interrupted; retry transparently
+        if (sysErr == EINTR)
+            continue; // signal interrupted; retry transparently
 #endif
-#ifdef _WIN32
-        if (error == WSAEWOULDBLOCK)
-#else
-        if (error == EWOULDBLOCK || error == EAGAIN)
-#endif
-        {
-            setError(SocketError::WouldBlock, "Operation would block");
-            return -1;
+        switch (classifyTransferSysError(sysErr)) {
+            case SocketError::WouldBlock:
+                setError(SocketError::WouldBlock, "Operation would block");
+                return -1;
+            case SocketError::Timeout:
+                setError(SocketError::Timeout, "send() timed out");
+                return -1;
+            case SocketError::ConnectionReset:
+                setError(
+                    SocketError::ConnectionReset, "Connection reset by peer");
+                return -1;
+            default:
+                setError(SocketError::SendFailed, "Failed to send data");
+                return -1;
         }
-#ifdef _WIN32
-        if (error == WSAETIMEDOUT)
-#else
-        if (error == ETIMEDOUT)
-#endif
-        {
-            setError(SocketError::Timeout, "send() timed out");
-            return -1;
-        }
-#ifdef _WIN32
-        if (error == WSAECONNRESET || error == WSAECONNABORTED)
-#else
-        if (error == ECONNRESET || error == EPIPE)
-#endif
-        {
-            setError(SocketError::ConnectionReset, "Connection reset by peer");
-            return -1;
-        }
-        setError(SocketError::SendFailed, "Failed to send data");
-        return -1;
     }
 }
 
@@ -493,39 +503,26 @@ int SocketImpl::receive(void* buffer, size_t length) {
             return static_cast<int>(bytesReceived);
         }
 
-        int error = getLastSystemError();
+        int sysErr = getLastSystemError();
 #ifndef _WIN32
-        if (error == EINTR) continue; // signal interrupted; retry transparently
+        if (sysErr == EINTR)
+            continue; // signal interrupted; retry transparently
 #endif
-#ifdef _WIN32
-        if (error == WSAEWOULDBLOCK)
-#else
-        if (error == EWOULDBLOCK || error == EAGAIN)
-#endif
-        {
-            setError(SocketError::WouldBlock, "Operation would block");
-            return -1;
+        switch (classifyTransferSysError(sysErr)) {
+            case SocketError::WouldBlock:
+                setError(SocketError::WouldBlock, "Operation would block");
+                return -1;
+            case SocketError::Timeout:
+                setError(SocketError::Timeout, "recv() timed out");
+                return -1;
+            case SocketError::ConnectionReset:
+                setError(
+                    SocketError::ConnectionReset, "Connection reset by peer");
+                return -1;
+            default:
+                setError(SocketError::ReceiveFailed, "Failed to receive data");
+                return -1;
         }
-#ifdef _WIN32
-        if (error == WSAETIMEDOUT)
-#else
-        if (error == ETIMEDOUT)
-#endif
-        {
-            setError(SocketError::Timeout, "recv() timed out");
-            return -1;
-        }
-#ifdef _WIN32
-        if (error == WSAECONNRESET || error == WSAECONNABORTED)
-#else
-        if (error == ECONNRESET)
-#endif
-        {
-            setError(SocketError::ConnectionReset, "Connection reset by peer");
-            return -1;
-        }
-        setError(SocketError::ReceiveFailed, "Failed to receive data");
-        return -1;
     }
 }
 
@@ -564,23 +561,66 @@ bool SocketImpl::isBlocking() const {
     return blockingMode;
 }
 
+// -----------------------------------------------------------------------
+// Private setsockopt helpers
+// -----------------------------------------------------------------------
+
+bool SocketImpl::setBoolOpt(
+    int level, int optname, bool val, const char* errMsg) {
+    int optval = val ? 1 : 0;
+    if (setsockopt(socketHandle, level, optname,
+            reinterpret_cast<const char*>(&optval), sizeof(optval))
+        == SOCKET_ERROR_CODE) {
+        setError(SocketError::SetOptionFailed, errMsg);
+        return false;
+    }
+    lastError = SocketError::None;
+    return true;
+}
+
+bool SocketImpl::setTimeoutOpt(
+    int optname, std::chrono::milliseconds timeout, const char* errMsg) {
+    const long long ms = timeout.count();
+#ifdef _WIN32
+    DWORD tv = static_cast<DWORD>(ms);
+    if (setsockopt(socketHandle, SOL_SOCKET, optname,
+            reinterpret_cast<const char*>(&tv), sizeof(tv))
+        == SOCKET_ERROR_CODE) {
+        setError(SocketError::SetOptionFailed, errMsg);
+        return false;
+    }
+#else
+    struct timeval tv;
+    tv.tv_sec = static_cast<long>(ms / 1000);
+    tv.tv_usec = static_cast<long>((ms % 1000) * 1000);
+    if (setsockopt(socketHandle, SOL_SOCKET, optname, &tv, sizeof(tv))
+        == SOCKET_ERROR_CODE) {
+        setError(SocketError::SetOptionFailed, errMsg);
+        return false;
+    }
+#endif
+    lastError = SocketError::None;
+    return true;
+}
+
+bool SocketImpl::setBufSizeOpt(int optname, int bytes, const char* errMsg) {
+    if (setsockopt(socketHandle, SOL_SOCKET, optname,
+            reinterpret_cast<const char*>(&bytes), sizeof(bytes))
+        == SOCKET_ERROR_CODE) {
+        setError(SocketError::SetOptionFailed, errMsg);
+        return false;
+    }
+    lastError = SocketError::None;
+    return true;
+}
+
 bool SocketImpl::setReuseAddress(bool reuse) {
     if (!isValid()) {
         setError(SocketError::InvalidSocket, "Socket is not valid");
         return false;
     }
-
-    int optval = reuse ? 1 : 0;
-    if (setsockopt(socketHandle, SOL_SOCKET, SO_REUSEADDR,
-            reinterpret_cast<const char*>(&optval), sizeof(optval))
-        == SOCKET_ERROR_CODE) {
-        setError(
-            SocketError::SetOptionFailed, "Failed to set reuse address option");
-        return false;
-    }
-
-    lastError = SocketError::None;
-    return true;
+    return setBoolOpt(
+        SOL_SOCKET, SO_REUSEADDR, reuse, "Failed to set reuse address option");
 }
 
 bool SocketImpl::setTimeout(std::chrono::milliseconds timeout) {
@@ -588,30 +628,7 @@ bool SocketImpl::setTimeout(std::chrono::milliseconds timeout) {
         setError(SocketError::InvalidSocket, "Socket is not valid");
         return false;
     }
-
-    const long long ms = timeout.count();
-
-#ifdef _WIN32
-    DWORD tv = static_cast<DWORD>(ms);
-    if (setsockopt(socketHandle, SOL_SOCKET, SO_RCVTIMEO,
-            reinterpret_cast<const char*>(&tv), sizeof(tv))
-        == SOCKET_ERROR_CODE) {
-        setError(SocketError::SetOptionFailed, "Failed to set timeout");
-        return false;
-    }
-#else
-    struct timeval tv;
-    tv.tv_sec = static_cast<long>(ms / 1000);
-    tv.tv_usec = static_cast<long>((ms % 1000) * 1000);
-    if (setsockopt(socketHandle, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv))
-        == SOCKET_ERROR_CODE) {
-        setError(SocketError::SetOptionFailed, "Failed to set timeout");
-        return false;
-    }
-#endif
-
-    lastError = SocketError::None;
-    return true;
+    return setTimeoutOpt(SO_RCVTIMEO, timeout, "Failed to set receive timeout");
 }
 
 void SocketImpl::close() {
@@ -664,23 +681,38 @@ std::string formatErrorContext(const ErrorContext& ctx) {
     sysText = ctx.isDns ? ::gai_strerror(ctx.sysCode) : ::strerror(ctx.sysCode);
 #endif
     std::ostringstream oss;
-    oss << ctx.description << " [" << ctx.sysCode << ": " << sysText << "]";
+    oss << (ctx.description ? ctx.description : "") << " [" << ctx.sysCode
+        << ": " << sysText << "]";
     return oss.str();
 }
 
 std::string SocketImpl::getErrorMessage() const {
     if (lastError == SocketError::None) return {};
     if (!errorMessageDirty) return lastErrorMessage;
-    lastErrorMessage
-        = formatErrorContext({lastErrorDesc, lastSysCode, lastErrorIsDns});
+    const char* desc
+        = lastErrorLiteral ? lastErrorLiteral : lastErrorDynamic.c_str();
+    lastErrorMessage = formatErrorContext({desc, lastSysCode, lastErrorIsDns});
     errorMessageDirty = false;
     return lastErrorMessage;
 }
 
-void SocketImpl::setError(SocketError error, const std::string& description) {
+// Hot-path: pointer store only — no heap allocation.
+void SocketImpl::setError(SocketError error, const char* description) noexcept {
     lastError = error;
-    lastErrorDesc = description;
+    lastErrorLiteral = description;
+    lastErrorDynamic.clear();
     lastSysCode = getLastSystemError(); // capture before next syscall
+    lastErrorIsDns = false;
+    errorMessageDirty = true;
+}
+
+// Cold-path: runtime-constructed message (e.g. DNS errors with address
+// embedded).
+void SocketImpl::setError(SocketError error, std::string description) {
+    lastError = error;
+    lastErrorLiteral = nullptr;
+    lastErrorDynamic = std::move(description);
+    lastSysCode = getLastSystemError();
     lastErrorIsDns = false;
     errorMessageDirty = true;
 }
@@ -690,14 +722,16 @@ void SocketImpl::setErrorDns(
     // EAI_* codes are not errno values; flag so getErrorMessage() uses
     // gai_strerror() instead of strerror() / FormatMessage.
     lastError = error;
-    lastErrorDesc = description;
+    lastErrorLiteral = nullptr;
+    lastErrorDynamic = description;
     lastSysCode = gaiCode;
     lastErrorIsDns = true;
     errorMessageDirty = true;
 }
 
 ErrorContext SocketImpl::getErrorContext() const {
-    return {lastErrorDesc, lastSysCode, lastErrorIsDns};
+    return {lastErrorLiteral ? lastErrorLiteral : lastErrorDynamic.c_str(),
+        lastSysCode, lastErrorIsDns};
 }
 
 int SocketImpl::getLastSystemError() const {
@@ -720,20 +754,8 @@ int SocketImpl::sendTo(
 
     sockaddr_storage addr{};
     socklen_t addrLen = 0;
-
-    if (remote.family == AddressFamily::IPv6) {
-        auto* a6 = reinterpret_cast<sockaddr_in6*>(&addr);
-        a6->sin6_family = AF_INET6;
-        a6->sin6_port = htons(remote.port);
-        inet_pton(AF_INET6, remote.address.c_str(), &a6->sin6_addr);
-        addrLen = sizeof(sockaddr_in6);
-    } else {
-        auto* a4 = reinterpret_cast<sockaddr_in*>(&addr);
-        a4->sin_family = AF_INET;
-        a4->sin_port = htons(remote.port);
-        inet_pton(AF_INET, remote.address.c_str(), &a4->sin_addr);
-        addrLen = sizeof(sockaddr_in);
-    }
+    resolveToSockaddr(remote.address, remote.port, remote.family, socketType,
+        /*doDns=*/false, addr, addrLen);
 
     for (;;) {
 #ifdef _WIN32
@@ -752,39 +774,26 @@ int SocketImpl::sendTo(
             return static_cast<int>(sent);
         }
 
-        int error = getLastSystemError();
+        int sysErr = getLastSystemError();
 #ifndef _WIN32
-        if (error == EINTR) continue; // signal interrupted; retry transparently
+        if (sysErr == EINTR)
+            continue; // signal interrupted; retry transparently
 #endif
-#ifdef _WIN32
-        if (error == WSAEWOULDBLOCK)
-#else
-        if (error == EWOULDBLOCK || error == EAGAIN)
-#endif
-        {
-            setError(SocketError::WouldBlock, "Operation would block");
-            return -1;
+        switch (classifyTransferSysError(sysErr)) {
+            case SocketError::WouldBlock:
+                setError(SocketError::WouldBlock, "Operation would block");
+                return -1;
+            case SocketError::Timeout:
+                setError(SocketError::Timeout, "sendTo() timed out");
+                return -1;
+            case SocketError::ConnectionReset:
+                setError(
+                    SocketError::ConnectionReset, "Connection reset by peer");
+                return -1;
+            default:
+                setError(SocketError::SendFailed, "sendTo() failed");
+                return -1;
         }
-#ifdef _WIN32
-        if (error == WSAETIMEDOUT)
-#else
-        if (error == ETIMEDOUT)
-#endif
-        {
-            setError(SocketError::Timeout, "sendTo() timed out");
-            return -1;
-        }
-#ifdef _WIN32
-        if (error == WSAECONNRESET || error == WSAECONNABORTED)
-#else
-        if (error == ECONNRESET || error == EPIPE)
-#endif
-        {
-            setError(SocketError::ConnectionReset, "Connection reset by peer");
-            return -1;
-        }
-        setError(SocketError::SendFailed, "sendTo() failed");
-        return -1;
     }
 }
 
@@ -812,109 +821,56 @@ int SocketImpl::receiveFrom(void* buffer, size_t length, Endpoint& remote) {
             return static_cast<int>(recvd);
         }
 
-        int err = getLastSystemError();
+        int sysErr = getLastSystemError();
 #ifndef _WIN32
-        if (err == EINTR) continue; // signal interrupted; retry transparently
+        if (sysErr == EINTR)
+            continue; // signal interrupted; retry transparently
 #endif
-#ifdef _WIN32
-        if (err == WSAEWOULDBLOCK)
-#else
-        if (err == EWOULDBLOCK || err == EAGAIN)
-#endif
-        {
-            setError(SocketError::WouldBlock, "Operation would block");
-            return -1;
+        switch (classifyTransferSysError(sysErr)) {
+            case SocketError::WouldBlock:
+                setError(SocketError::WouldBlock, "Operation would block");
+                return -1;
+            case SocketError::Timeout:
+                setError(SocketError::Timeout, "recvfrom() timed out");
+                return -1;
+            case SocketError::ConnectionReset:
+                setError(
+                    SocketError::ConnectionReset, "Connection reset by peer");
+                return -1;
+            default:
+                setError(SocketError::ReceiveFailed, "receiveFrom() failed");
+                return -1;
         }
-#ifdef _WIN32
-        if (err == WSAETIMEDOUT)
-#else
-        if (err == ETIMEDOUT)
-#endif
-        {
-            setError(SocketError::Timeout, "recvfrom() timed out");
-            return -1;
-        }
-#ifdef _WIN32
-        if (err == WSAECONNRESET || err == WSAECONNABORTED)
-#else
-        if (err == ECONNRESET)
-#endif
-        {
-            setError(SocketError::ConnectionReset, "Connection reset by peer");
-            return -1;
-        }
-        setError(SocketError::ReceiveFailed, "receiveFrom() failed");
-        return -1;
     }
 }
 
 // -----------------------------------------------------------------------
-// setSendTimeout
+// setSendTimeout / setNoDelay / setKeepAlive / setLingerAbort / setReusePort
 // -----------------------------------------------------------------------
 bool SocketImpl::setSendTimeout(std::chrono::milliseconds timeout) {
     if (!isValid()) {
         setError(SocketError::InvalidSocket, "Socket is not valid");
         return false;
     }
-    const long long ms = timeout.count();
-#ifdef _WIN32
-    DWORD tv = static_cast<DWORD>(ms);
-    if (setsockopt(socketHandle, SOL_SOCKET, SO_SNDTIMEO,
-            reinterpret_cast<const char*>(&tv), sizeof(tv))
-        == SOCKET_ERROR_CODE) {
-        setError(SocketError::SetOptionFailed, "Failed to set send timeout");
-        return false;
-    }
-#else
-    struct timeval tv;
-    tv.tv_sec = static_cast<long>(ms / 1000);
-    tv.tv_usec = static_cast<long>((ms % 1000) * 1000);
-    if (setsockopt(socketHandle, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv))
-        == SOCKET_ERROR_CODE) {
-        setError(SocketError::SetOptionFailed, "Failed to set send timeout");
-        return false;
-    }
-#endif
-    lastError = SocketError::None;
-    return true;
+    return setTimeoutOpt(SO_SNDTIMEO, timeout, "Failed to set send timeout");
 }
 
-// -----------------------------------------------------------------------
-// setNoDelay (TCP_NODELAY)
-// -----------------------------------------------------------------------
 bool SocketImpl::setNoDelay(bool noDelay) {
     if (!isValid()) {
         setError(SocketError::InvalidSocket, "Socket is not valid");
         return false;
     }
-    int optval = noDelay ? 1 : 0;
-    if (setsockopt(socketHandle, IPPROTO_TCP, TCP_NODELAY,
-            reinterpret_cast<const char*>(&optval), sizeof(optval))
-        == SOCKET_ERROR_CODE) {
-        setError(SocketError::SetOptionFailed, "Failed to set TCP_NODELAY");
-        return false;
-    }
-    lastError = SocketError::None;
-    return true;
+    return setBoolOpt(
+        IPPROTO_TCP, TCP_NODELAY, noDelay, "Failed to set TCP_NODELAY");
 }
 
-// -----------------------------------------------------------------------
-// setKeepAlive (SO_KEEPALIVE)
-// -----------------------------------------------------------------------
 bool SocketImpl::setKeepAlive(bool enable) {
     if (!isValid()) {
         setError(SocketError::InvalidSocket, "Socket is not valid");
         return false;
     }
-    int optval = enable ? 1 : 0;
-    if (setsockopt(socketHandle, SOL_SOCKET, SO_KEEPALIVE,
-            reinterpret_cast<const char*>(&optval), sizeof(optval))
-        == SOCKET_ERROR_CODE) {
-        setError(SocketError::SetOptionFailed, "Failed to set SO_KEEPALIVE");
-        return false;
-    }
-    lastError = SocketError::None;
-    return true;
+    return setBoolOpt(
+        SOL_SOCKET, SO_KEEPALIVE, enable, "Failed to set SO_KEEPALIVE");
 }
 
 // -----------------------------------------------------------------------
@@ -938,24 +894,14 @@ bool SocketImpl::setLingerAbort(bool enable) {
     return true;
 }
 
-// -----------------------------------------------------------------------
-// setReusePort (SO_REUSEPORT)
-// -----------------------------------------------------------------------
 bool SocketImpl::setReusePort(bool enable) {
     if (!isValid()) {
         setError(SocketError::InvalidSocket, "Socket is not valid");
         return false;
     }
 #ifdef SO_REUSEPORT
-    int optval = enable ? 1 : 0;
-    if (setsockopt(socketHandle, SOL_SOCKET, SO_REUSEPORT,
-            reinterpret_cast<const char*>(&optval), sizeof(optval))
-        == SOCKET_ERROR_CODE) {
-        setError(SocketError::SetOptionFailed, "Failed to set SO_REUSEPORT");
-        return false;
-    }
-    lastError = SocketError::None;
-    return true;
+    return setBoolOpt(
+        SOL_SOCKET, SO_REUSEPORT, enable, "Failed to set SO_REUSEPORT");
 #else
     (void)enable;
     setError(SocketError::SetOptionFailed,
@@ -985,7 +931,7 @@ bool SocketImpl::sendAll(const void* data, size_t length) {
 // -----------------------------------------------------------------------
 // waitReadable / waitWritable — single-fd select convenience
 // -----------------------------------------------------------------------
-bool SocketImpl::waitReadable(std::chrono::milliseconds timeout) {
+bool SocketImpl::waitReady(bool forRead, std::chrono::milliseconds timeout) {
     if (!isValid()) {
         setError(SocketError::InvalidSocket, "Socket is not valid");
         return false;
@@ -1002,21 +948,27 @@ bool SocketImpl::waitReadable(std::chrono::milliseconds timeout) {
         tv.tv_sec = static_cast<long>(rem / 1000);
         tv.tv_usec = static_cast<long>((rem % 1000) * 1000);
 
-        fd_set readSet;
-        FD_ZERO(&readSet);
-        FD_SET(socketHandle, &readSet);
+        fd_set fdSet;
+        FD_ZERO(&fdSet);
+        FD_SET(socketHandle, &fdSet);
+        fd_set* rd = forRead ? &fdSet : nullptr;
+        fd_set* wr = !forRead ? &fdSet : nullptr;
 
-        int sel = ::select(static_cast<int>(socketHandle) + 1, &readSet,
-            nullptr, nullptr, &tv);
+        int sel = ::select(
+            static_cast<int>(socketHandle) + 1, rd, wr, nullptr, &tv);
         if (sel < 0) {
 #ifndef _WIN32
             if (errno == EINTR) continue;
 #endif
-            setError(SocketError::Unknown, "select() failed in waitReadable");
+            setError(SocketError::Unknown,
+                forRead ? "select() failed in waitReadable"
+                        : "select() failed in waitWritable");
             return false;
         }
         if (sel == 0) {
-            setError(SocketError::Timeout, "waitReadable() timed out");
+            setError(SocketError::Timeout,
+                forRead ? "waitReadable() timed out"
+                        : "waitWritable() timed out");
             return false;
         }
         lastError = SocketError::None;
@@ -1024,43 +976,12 @@ bool SocketImpl::waitReadable(std::chrono::milliseconds timeout) {
     }
 }
 
+bool SocketImpl::waitReadable(std::chrono::milliseconds timeout) {
+    return waitReady(true, timeout);
+}
+
 bool SocketImpl::waitWritable(std::chrono::milliseconds timeout) {
-    if (!isValid()) {
-        setError(SocketError::InvalidSocket, "Socket is not valid");
-        return false;
-    }
-    auto deadline = std::chrono::steady_clock::now() + timeout;
-
-    for (;;) {
-        auto rem = std::chrono::duration_cast<std::chrono::milliseconds>(
-            deadline - std::chrono::steady_clock::now())
-                       .count();
-        if (rem < 0) rem = 0;
-
-        struct timeval tv;
-        tv.tv_sec = static_cast<long>(rem / 1000);
-        tv.tv_usec = static_cast<long>((rem % 1000) * 1000);
-
-        fd_set writeSet;
-        FD_ZERO(&writeSet);
-        FD_SET(socketHandle, &writeSet);
-
-        int sel = ::select(static_cast<int>(socketHandle) + 1, nullptr,
-            &writeSet, nullptr, &tv);
-        if (sel < 0) {
-#ifndef _WIN32
-            if (errno == EINTR) continue;
-#endif
-            setError(SocketError::Unknown, "select() failed in waitWritable");
-            return false;
-        }
-        if (sel == 0) {
-            setError(SocketError::Timeout, "waitWritable() timed out");
-            return false;
-        }
-        lastError = SocketError::None;
-        return true;
-    }
+    return waitReady(false, timeout);
 }
 
 // -----------------------------------------------------------------------
@@ -1071,14 +992,7 @@ bool SocketImpl::setReceiveBufferSize(int bytes) {
         setError(SocketError::InvalidSocket, "Socket is not valid");
         return false;
     }
-    if (setsockopt(socketHandle, SOL_SOCKET, SO_RCVBUF,
-            reinterpret_cast<const char*>(&bytes), sizeof(bytes))
-        == SOCKET_ERROR_CODE) {
-        setError(SocketError::SetOptionFailed, "Failed to set SO_RCVBUF");
-        return false;
-    }
-    lastError = SocketError::None;
-    return true;
+    return setBufSizeOpt(SO_RCVBUF, bytes, "Failed to set SO_RCVBUF");
 }
 
 bool SocketImpl::setSendBufferSize(int bytes) {
@@ -1086,14 +1000,7 @@ bool SocketImpl::setSendBufferSize(int bytes) {
         setError(SocketError::InvalidSocket, "Socket is not valid");
         return false;
     }
-    if (setsockopt(socketHandle, SOL_SOCKET, SO_SNDBUF,
-            reinterpret_cast<const char*>(&bytes), sizeof(bytes))
-        == SOCKET_ERROR_CODE) {
-        setError(SocketError::SetOptionFailed, "Failed to set SO_SNDBUF");
-        return false;
-    }
-    lastError = SocketError::None;
-    return true;
+    return setBufSizeOpt(SO_SNDBUF, bytes, "Failed to set SO_SNDBUF");
 }
 
 // -----------------------------------------------------------------------

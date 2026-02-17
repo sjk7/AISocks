@@ -14,7 +14,7 @@ const char* SocketException::what() const noexcept {
     if (!whatCache_.empty()) return whatCache_.c_str();
     try {
         whatCache_ = step_ + ": "
-            + formatErrorContext({description_, sysCode_, isDns_});
+            + formatErrorContext({description_.c_str(), sysCode_, isDns_});
     } catch (...) {
         return "SocketException (error formatting failed)";
     }
