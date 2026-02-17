@@ -7,6 +7,7 @@ set(TEST_SOURCES
     test_error_handling
     test_construction
     test_new_features
+    test_error_messages
 )
 
 foreach(TEST_NAME ${TEST_SOURCES})
