@@ -29,6 +29,9 @@ if(BUILD_EXAMPLES)
     add_executable(aiSocksTestIPUtils examples/test_ip_utils.cpp)
     target_link_libraries(aiSocksTestIPUtils PRIVATE aiSocksLib)
     
+    add_executable(aiSocksTestMove examples/test_move_semantics.cpp)
+    target_link_libraries(aiSocksTestMove PRIVATE aiSocksLib)
+    
     # Set the startup project for Visual Studio
     set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT aiSocksExample)
 endif()
