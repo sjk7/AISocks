@@ -1,11 +1,12 @@
 #include "Socket.h"
 #include <iostream>
 #include <iomanip>
-#
+
 
 #ifdef SOMAXCONN
-error "SOMAXCONN is defined as a macro, which may cause issues with our "
-      "SocketImpl::listen() method. Compiler firewall broken!"
+error ("SOMAXCONN is defined, which may cause issues with our "
+       "SocketImpl::listen() method. Compiler firewall broken!");
+       
 #endif
 
     using namespace aiSocks;
