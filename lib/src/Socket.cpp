@@ -41,7 +41,7 @@ Socket::Socket(SocketType type, AddressFamily family, const ConnectTo& cfg)
     : pImpl(std::make_unique<SocketImpl>(type, family)) {
     throwIfFailed(pImpl->isValid(), "socket()", pImpl);
 
-    throwIfFailed(pImpl->connect(cfg.address, cfg.port, cfg.connectTimeoutMs),
+    throwIfFailed(pImpl->connect(cfg.address, cfg.port, cfg.connectTimeout),
         "connect(" + cfg.address + ":" + std::to_string(cfg.port) + ")", pImpl);
 }
 
@@ -110,9 +110,9 @@ bool Socket::setReuseAddress(bool reuse) {
     return pImpl->setReuseAddress(reuse);
 }
 
-bool Socket::setTimeout(int seconds) {
+bool Socket::setTimeout(Milliseconds timeout) {
     if (!pImpl) return false;
-    return pImpl->setTimeout(seconds);
+    return pImpl->setTimeout(timeout);
 }
 
 void Socket::close() {

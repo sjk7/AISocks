@@ -102,7 +102,7 @@ int main() {
     BEGIN_TEST("setTimeout does not crash and returns bool");
     {
         Socket s(SocketType::TCP, AddressFamily::IPv4);
-        bool r = s.setTimeout(1);
+        bool r = s.setTimeout(std::chrono::seconds{1});
         (void)r;
         REQUIRE_MSG(true, "setTimeout() returned without crash");
     }

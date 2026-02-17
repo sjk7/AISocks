@@ -1,13 +1,25 @@
 #ifndef AISOCKS_SOCKET_H
 #define AISOCKS_SOCKET_H
 
-#include <string>
-#include <memory>
+#include <chrono>
 #include <cstdint>
-#include <vector>
+#include <memory>
 #include <stdexcept>
+#include <string>
+#include <vector>
 
 namespace aiSocks {
+
+// Convenience alias for all timeout parameters in the public API.
+// Any std::chrono::duration that converts to milliseconds (e.g.
+// std::chrono::seconds, std::chrono::milliseconds) is accepted implicitly.
+using Milliseconds = std::chrono::milliseconds;
+
+// Default timeout applied to all optional timeout parameters.
+// Passing Milliseconds{0} explicitly to any timeout parameter overrides this
+// and tells the library to defer entirely to the OS (blocking until the kernel
+// gives up, which can be several minutes on a dropped-SYN connection).
+inline constexpr Milliseconds defaultTimeout{std::chrono::seconds{30}};
 
 class SocketImpl;
 
@@ -70,13 +82,19 @@ struct ServerBind {
 
 // Creates a connected client socket: socket() → connect()
 // Throws SocketException with context if any step fails.
-// connectTimeoutMs: 0 = OS default (blocks until kernel gives up).
-//                  >0 = throw SocketException(Timeout) if not connected within
-//                       this many milliseconds (covers DNS + TCP handshake).
+//
+// connectTimeout controls how long to wait for the TCP handshake:
+//   defaultTimeout (30 s) — used when not specified.
+//   Milliseconds{0}       — defer to the OS; blocks until the kernel gives up
+//                           (can be several minutes on a silent SYN-drop).
+//   any positive duration — throw SocketException(Timeout) if not connected
+//                           within that duration.
+//
+// Note: DNS resolution is synchronous and not covered by this timeout.
 struct ConnectTo {
     std::string address; // Remote address or hostname
     uint16_t port = 0;
-    int connectTimeoutMs = 0;
+    Milliseconds connectTimeout{defaultTimeout}; // see above
 };
 
 class Socket {
@@ -121,7 +139,13 @@ class Socket {
     bool setBlocking(bool blocking);
     bool isBlocking() const;
     bool setReuseAddress(bool reuse);
-    bool setTimeout(int seconds);
+    // Set SO_RCVTIMEO on the socket.
+    //   defaultTimeout (30 s) — used when not specified.
+    //   Milliseconds{0}       — disables the timeout; recv() blocks
+    //                           indefinitely until data arrives.
+    //   any positive duration — recv() returns SocketError::Timeout after
+    //                           waiting this long with no data.
+    bool setTimeout(Milliseconds timeout);
 
     // Utility
     void close();

@@ -2,6 +2,7 @@
 #define AISOCKS_SOCKET_IMPL_H
 
 #include "Socket.h"
+#include <chrono>
 #include <vector>
 
 #ifdef _WIN32
@@ -51,9 +52,10 @@ class SocketImpl {
     std::unique_ptr<SocketImpl> accept();
 
     // Client operations
-    // timeoutMs == 0: blocking (OS default). >0: fail with Timeout if the
-    // full operation (DNS + TCP handshake) takes longer than timeoutMs.
-    bool connect(const std::string& address, uint16_t port, int timeoutMs = 0);
+    // timeout == 0: blocking (OS default). >0: fail with Timeout if the
+    // TCP handshake takes longer than timeout (DNS resolution is not covered).
+    bool connect(const std::string& address, uint16_t port,
+        std::chrono::milliseconds timeout = defaultTimeout);
 
     // Data transfer
     int send(const void* data, size_t length);
@@ -63,7 +65,7 @@ class SocketImpl {
     bool setBlocking(bool blocking);
     bool isBlocking() const;
     bool setReuseAddress(bool reuse);
-    bool setTimeout(int seconds);
+    bool setTimeout(std::chrono::milliseconds timeout);
 
     // Utility
     void close();
