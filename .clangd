@@ -19,6 +19,8 @@ Index:
 
 Diagnostics:
   UnusedIncludes: None
+  Suppress:
+    - unused-includes
 
 # ------------------------------------------------------------------
 # Per-path overrides: silence diagnostics and skip background
