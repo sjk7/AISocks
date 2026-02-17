@@ -1,0 +1,6 @@
+CompileFlags:
+  Add:
+    - "-Ic:/Users/cool/Desktop/AISOcks/lib/include"
+    - "-std=c++17"
+    - "-D_WIN32"
+  CompilationDatabase: build/
