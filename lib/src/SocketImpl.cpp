@@ -37,27 +37,30 @@ void SocketImpl::platformCleanup() {
 }
 #endif
 
-SocketImpl::SocketImpl(SocketType type)
+SocketImpl::SocketImpl(SocketType type, AddressFamily family)
     : socketHandle(INVALID_SOCKET_HANDLE)
     , socketType(type)
+    , addressFamily(family)
     , lastError(SocketError::None)
     , blockingMode(true)
 {
     platformInit();
 
+    int af = (family == AddressFamily::IPv6) ? AF_INET6 : AF_INET;
     int sockType = (type == SocketType::TCP) ? SOCK_STREAM : SOCK_DGRAM;
     int protocol = (type == SocketType::TCP) ? IPPROTO_TCP : IPPROTO_UDP;
 
-    socketHandle = socket(AF_INET, sockType, protocol);
+    socketHandle = socket(af, sockType, protocol);
 
     if (socketHandle == INVALID_SOCKET_HANDLE) {
         setError(SocketError::CreateFailed, "Failed to create socket");
     }
 }
 
-SocketImpl::SocketImpl(SocketHandle handle, SocketType type)
+SocketImpl::SocketImpl(SocketHandle handle, SocketType type, AddressFamily family)
     : socketHandle(handle)
     , socketType(type)
+    , addressFamily(family)
     , lastError(SocketError::None)
     , blockingMode(true)
 {
@@ -73,19 +76,42 @@ bool SocketImpl::bind(const std::string& address, uint16_t port) {
         return false;
     }
 
-    sockaddr_in addr{};
-    addr.sin_family = AF_INET;
-    addr.sin_port = htons(port);
+    if (addressFamily == AddressFamily::IPv6) {
+        sockaddr_in6 addr{};
+        addr.sin6_family = AF_INET6;
+        addr.sin6_port = htons(port);
 
-    if (address.empty() || address == "0.0.0.0") {
-        addr.sin_addr.s_addr = INADDR_ANY;
+        if (address.empty() || address == "::" || address == "0.0.0.0") {
+            addr.sin6_addr = in6addr_any;
+        } else {
+            if (inet_pton(AF_INET6, address.c_str(), &addr.sin6_addr) <= 0) {
+                setError(SocketError::BindFailed, "Invalid IPv6 address");
+                return false;
+            }
+        }
+
+        if (::bind(socketHandle, reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) == SOCKET_ERROR_CODE) {
+            setError(SocketError::BindFailed, "Failed to bind socket");
+            return false;
+        }
     } else {
-        inet_pton(AF_INET, address.c_str(), &addr.sin_addr);
-    }
+        sockaddr_in addr{};
+        addr.sin_family = AF_INET;
+        addr.sin_port = htons(port);
 
-    if (::bind(socketHandle, reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) == SOCKET_ERROR_CODE) {
-        setError(SocketError::BindFailed, "Failed to bind socket");
-        return false;
+        if (address.empty() || address == "0.0.0.0") {
+            addr.sin_addr.s_addr = INADDR_ANY;
+        } else {
+            if (inet_pton(AF_INET, address.c_str(), &addr.sin_addr) <= 0) {
+                setError(SocketError::BindFailed, "Invalid IPv4 address");
+                return false;
+            }
+        }
+
+        if (::bind(socketHandle, reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) == SOCKET_ERROR_CODE) {
+            setError(SocketError::BindFailed, "Failed to bind socket");
+            return false;
+        }
     }
 
     lastError = SocketError::None;
@@ -113,7 +139,7 @@ std::unique_ptr<SocketImpl> SocketImpl::accept() {
         return nullptr;
     }
 
-    sockaddr_in clientAddr{};
+    sockaddr_storage clientAddr{};
     socklen_t clientAddrLen = sizeof(clientAddr);
 
     SocketHandle clientSocket = ::accept(socketHandle, 
@@ -125,8 +151,12 @@ std::unique_ptr<SocketImpl> SocketImpl::accept() {
         return nullptr;
     }
 
+    // Determine address family from accepted connection
+    AddressFamily clientFamily = (reinterpret_cast<sockaddr*>(&clientAddr)->sa_family == AF_INET6) 
+                                 ? AddressFamily::IPv6 : AddressFamily::IPv4;
+
     lastError = SocketError::None;
-    return std::make_unique<SocketImpl>(clientSocket, socketType);
+    return std::make_unique<SocketImpl>(clientSocket, socketType, clientFamily);
 }
 
 bool SocketImpl::connect(const std::string& address, uint16_t port) {
@@ -135,30 +165,58 @@ bool SocketImpl::connect(const std::string& address, uint16_t port) {
         return false;
     }
 
-    sockaddr_in serverAddr{};
-    serverAddr.sin_family = AF_INET;
-    serverAddr.sin_port = htons(port);
-    
-    if (inet_pton(AF_INET, address.c_str(), &serverAddr.sin_addr) <= 0) {
-        // Try to resolve hostname
-        struct addrinfo hints{}, *result = nullptr;
-        hints.ai_family = AF_INET;
-        hints.ai_socktype = (socketType == SocketType::TCP) ? SOCK_STREAM : SOCK_DGRAM;
+    if (addressFamily == AddressFamily::IPv6) {
+        sockaddr_in6 serverAddr{};
+        serverAddr.sin6_family = AF_INET6;
+        serverAddr.sin6_port = htons(port);
+        
+        if (inet_pton(AF_INET6, address.c_str(), &serverAddr.sin6_addr) <= 0) {
+            // Try to resolve hostname
+            struct addrinfo hints{}, *result = nullptr;
+            hints.ai_family = AF_INET6;
+            hints.ai_socktype = (socketType == SocketType::TCP) ? SOCK_STREAM : SOCK_DGRAM;
 
-        if (getaddrinfo(address.c_str(), nullptr, &hints, &result) != 0) {
-            setError(SocketError::ConnectFailed, "Failed to resolve hostname");
-            return false;
+            if (getaddrinfo(address.c_str(), nullptr, &hints, &result) != 0) {
+                setError(SocketError::ConnectFailed, "Failed to resolve hostname");
+                return false;
+            }
+
+            serverAddr = *reinterpret_cast<sockaddr_in6*>(result->ai_addr);
+            serverAddr.sin6_port = htons(port);
+            freeaddrinfo(result);
         }
 
-        serverAddr = *reinterpret_cast<sockaddr_in*>(result->ai_addr);
+        if (::connect(socketHandle, reinterpret_cast<sockaddr*>(&serverAddr), 
+                      sizeof(serverAddr)) == SOCKET_ERROR_CODE) {
+            setError(SocketError::ConnectFailed, "Failed to connect to server");
+            return false;
+        }
+    } else {
+        sockaddr_in serverAddr{};
+        serverAddr.sin_family = AF_INET;
         serverAddr.sin_port = htons(port);
-        freeaddrinfo(result);
-    }
+        
+        if (inet_pton(AF_INET, address.c_str(), &serverAddr.sin_addr) <= 0) {
+            // Try to resolve hostname
+            struct addrinfo hints{}, *result = nullptr;
+            hints.ai_family = AF_INET;
+            hints.ai_socktype = (socketType == SocketType::TCP) ? SOCK_STREAM : SOCK_DGRAM;
 
-    if (::connect(socketHandle, reinterpret_cast<sockaddr*>(&serverAddr), 
-                  sizeof(serverAddr)) == SOCKET_ERROR_CODE) {
-        setError(SocketError::ConnectFailed, "Failed to connect to server");
-        return false;
+            if (getaddrinfo(address.c_str(), nullptr, &hints, &result) != 0) {
+                setError(SocketError::ConnectFailed, "Failed to resolve hostname");
+                return false;
+            }
+
+            serverAddr = *reinterpret_cast<sockaddr_in*>(result->ai_addr);
+            serverAddr.sin_port = htons(port);
+            freeaddrinfo(result);
+        }
+
+        if (::connect(socketHandle, reinterpret_cast<sockaddr*>(&serverAddr), 
+                      sizeof(serverAddr)) == SOCKET_ERROR_CODE) {
+            setError(SocketError::ConnectFailed, "Failed to connect to server");
+            return false;
+        }
     }
 
     lastError = SocketError::None;
@@ -320,6 +378,10 @@ void SocketImpl::close() {
 
 bool SocketImpl::isValid() const {
     return socketHandle != INVALID_SOCKET_HANDLE;
+}
+
+AddressFamily SocketImpl::getAddressFamily() const {
+    return addressFamily;
 }
 
 SocketError SocketImpl::getLastError() const {
