@@ -60,8 +60,7 @@ static void test_connect_exception_message() {
     {
         std::string what;
         try {
-            TcpSocket c(AddressFamily::IPv4,
-                ConnectTo{"127.0.0.1", Port{1}});
+            TcpSocket c(AddressFamily::IPv4, ConnectTo{"127.0.0.1", Port{1}});
         } catch (const SocketException& e) {
             what = e.what();
         }
@@ -79,8 +78,7 @@ static void test_connect_exception_message() {
     {
         SocketError code = SocketError::None;
         try {
-            TcpSocket c(AddressFamily::IPv4,
-                ConnectTo{"127.0.0.1", Port{1}});
+            TcpSocket c(AddressFamily::IPv4, ConnectTo{"127.0.0.1", Port{1}});
         } catch (const SocketException& e) {
             code = e.errorCode();
         }
@@ -91,8 +89,7 @@ static void test_connect_exception_message() {
     {
         std::string what;
         try {
-            TcpSocket c(AddressFamily::IPv4,
-                ConnectTo{"127.0.0.1", Port{2}});
+            TcpSocket c(AddressFamily::IPv4, ConnectTo{"127.0.0.1", Port{2}});
         } catch (const SocketException& e) {
             what = e.what();
         }
@@ -108,8 +105,8 @@ static void test_bind_exception_message() {
     BEGIN_TEST(
         "ServerBind exception: what() contains step, address, and OS bracket");
     {
-        TcpSocket occupant(AddressFamily::IPv4,
-            ServerBind{"127.0.0.1", Port{BASE}, 5, false});
+        TcpSocket occupant(
+            AddressFamily::IPv4, ServerBind{"127.0.0.1", Port{BASE}, 5, false});
         std::string what;
         try {
             TcpSocket s(AddressFamily::IPv4,
@@ -154,8 +151,8 @@ static void test_dns_error_message() {
     {
         std::string what;
         try {
-            TcpSocket c(AddressFamily::IPv4,
-                ConnectTo{BAD_HOST, Port{BASE + 10}});
+            TcpSocket c(
+                AddressFamily::IPv4, ConnectTo{BAD_HOST, Port{BASE + 10}});
         } catch (const SocketException& e) {
             what = e.what();
         }
@@ -170,8 +167,8 @@ static void test_dns_error_message() {
     {
         std::string what;
         try {
-            TcpSocket c(AddressFamily::IPv4,
-                ConnectTo{BAD_HOST, Port{BASE + 10}});
+            TcpSocket c(
+                AddressFamily::IPv4, ConnectTo{BAD_HOST, Port{BASE + 10}});
         } catch (const SocketException& e) {
             what = e.what();
         }
@@ -185,8 +182,8 @@ static void test_dns_error_message() {
     {
         std::string what;
         try {
-            TcpSocket c(AddressFamily::IPv4,
-                ConnectTo{BAD_HOST, Port{BASE + 10}});
+            TcpSocket c(
+                AddressFamily::IPv4, ConnectTo{BAD_HOST, Port{BASE + 10}});
         } catch (const SocketException& e) {
             what = e.what();
         }
@@ -199,7 +196,7 @@ static void test_dns_error_message() {
     {
         auto s = TcpSocket::createRaw();
         // connect() non-throwing path
-        s.connect(BAD_HOST, Port{BASE + 10});
+        (void)s.connect(BAD_HOST, Port{BASE + 10});
         std::string msg = s.getErrorMessage();
         std::cout << "  getErrorMessage(): " << msg << "\n";
         REQUIRE_MSG(msg.find(BAD_HOST) != std::string::npos,
@@ -243,7 +240,7 @@ static void test_invalid_socket_code() {
     {
         auto s = TcpSocket::createRaw();
         s.close();
-        s.connect("127.0.0.1", Port{BASE + 20});
+        (void)s.connect("127.0.0.1", Port{BASE + 20});
         REQUIRE(s.getLastError() == SocketError::InvalidSocket);
     }
 
@@ -352,7 +349,7 @@ static void test_error_clears_on_success() {
 
         auto c = TcpSocket::createRaw();
         // Trigger a failure first.
-        c.connect("127.0.0.1", Port{1}); // refused
+        (void)c.connect("127.0.0.1", Port{1}); // refused
         REQUIRE(c.getLastError() != SocketError::None);
         REQUIRE(!c.getErrorMessage().empty());
 
@@ -379,7 +376,7 @@ static void test_post_shutdown_errors() {
         REQUIRE(srv.bind("127.0.0.1", Port{BASE + 50}));
         REQUIRE(srv.listen(1));
 
-        std::thread t([&]() { srv.accept(); });
+        std::thread t([&]() { (void)srv.accept(); });
 
         auto c = TcpSocket::createRaw();
         REQUIRE(c.connect("127.0.0.1", Port{BASE + 50}));

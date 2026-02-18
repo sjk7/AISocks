@@ -61,7 +61,7 @@ int main() {
         std::thread t([&]() {
             std::this_thread::sleep_for(std::chrono::milliseconds(5));
             auto c = TcpSocket::createRaw();
-            c.connect("127.0.0.1", Port{BASE_PORT});
+            (void)c.connect("127.0.0.1", Port{BASE_PORT});
             std::this_thread::sleep_for(std::chrono::milliseconds(2));
         });
 
