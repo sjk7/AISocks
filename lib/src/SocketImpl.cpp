@@ -69,7 +69,7 @@ static SocketError resolveToSockaddr(const std::string& address, Port port,
         }
         std::memset(&out, 0, sizeof(out));
         std::memcpy(&out, &a6, sizeof(a6));
-        outLen = sizeof(sockaddr_in6);
+        outLen = static_cast<socklen_t>(sizeof(sockaddr_in6));
     } else {
         sockaddr_in a4{};
         a4.sin_family = AF_INET;
@@ -96,7 +96,7 @@ static SocketError resolveToSockaddr(const std::string& address, Port port,
         }
         std::memset(&out, 0, sizeof(out));
         std::memcpy(&out, &a4, sizeof(a4));
-        outLen = sizeof(sockaddr_in);
+        outLen = static_cast<socklen_t>(sizeof(sockaddr_in));
     }
     return SocketError::None;
 }
@@ -159,8 +159,8 @@ SocketImpl::SocketImpl(SocketType type, AddressFamily family)
     // macOS: prevent send/write to a half-closed socket from raising SIGPIPE.
     // Linux uses MSG_NOSIGNAL per-call instead; Windows has no SIGPIPE concept.
     int noSigPipe = 1;
-    ::setsockopt(
-        socketHandle, SOL_SOCKET, SO_NOSIGPIPE, &noSigPipe, static_cast<socklen_t>(sizeof(noSigPipe)));
+    ::setsockopt(socketHandle, SOL_SOCKET, SO_NOSIGPIPE, &noSigPipe,
+        static_cast<socklen_t>(sizeof(noSigPipe)));
 #endif
 }
 
@@ -572,7 +572,8 @@ bool SocketImpl::setBoolOpt(
     int level, int optname, bool val, const char* errMsg) {
     int optval = val ? 1 : 0;
     if (setsockopt(socketHandle, level, optname,
-            reinterpret_cast<const char*>(&optval), static_cast<socklen_t>(sizeof(optval)))
+            reinterpret_cast<const char*>(&optval),
+            static_cast<socklen_t>(sizeof(optval)))
         == SOCKET_ERROR_CODE) {
         setError(SocketError::SetOptionFailed, errMsg);
         return false;
@@ -587,7 +588,8 @@ bool SocketImpl::setTimeoutOpt(
 #ifdef _WIN32
     DWORD tv = static_cast<DWORD>(ms);
     if (setsockopt(socketHandle, SOL_SOCKET, optname,
-            reinterpret_cast<const char*>(&tv), static_cast<socklen_t>(sizeof(tv)))
+            reinterpret_cast<const char*>(&tv),
+            static_cast<socklen_t>(sizeof(tv)))
         == SOCKET_ERROR_CODE) {
         setError(SocketError::SetOptionFailed, errMsg);
         return false;
@@ -596,7 +598,8 @@ bool SocketImpl::setTimeoutOpt(
     struct timeval tv;
     tv.tv_sec = static_cast<long>(ms / 1000);
     tv.tv_usec = static_cast<long>((ms % 1000) * 1000);
-    if (setsockopt(socketHandle, SOL_SOCKET, optname, &tv, static_cast<socklen_t>(sizeof(tv)))
+    if (setsockopt(socketHandle, SOL_SOCKET, optname, &tv,
+            static_cast<socklen_t>(sizeof(tv)))
         == SOCKET_ERROR_CODE) {
         setError(SocketError::SetOptionFailed, errMsg);
         return false;
@@ -608,7 +611,8 @@ bool SocketImpl::setTimeoutOpt(
 
 bool SocketImpl::setBufSizeOpt(int optname, int bytes, const char* errMsg) {
     if (setsockopt(socketHandle, SOL_SOCKET, optname,
-            reinterpret_cast<const char*>(&bytes), static_cast<socklen_t>(sizeof(bytes)))
+            reinterpret_cast<const char*>(&bytes),
+            static_cast<socklen_t>(sizeof(bytes)))
         == SOCKET_ERROR_CODE) {
         setError(SocketError::SetOptionFailed, errMsg);
         return false;
@@ -676,7 +680,7 @@ std::string formatErrorContext(const ErrorContext& ctx) {
     char buf[512] = {};
     DWORD len = FormatMessageA(
         FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, nullptr,
-        static_cast<DWORD>(ctx.sysCode), 0, buf, sizeof(buf), nullptr);
+        static_cast<DWORD>(ctx.sysCode), 0, buf, static_cast<DWORD>(sizeof(buf)), nullptr);
     while (len > 0 && (buf[len - 1] == '\r' || buf[len - 1] == '\n'))
         buf[--len] = '\0';
     sysText = buf;
@@ -807,7 +811,7 @@ int SocketImpl::receiveFrom(void* buffer, size_t length, Endpoint& remote) {
     }
 
     sockaddr_storage addr{};
-    socklen_t addrLen = sizeof(addr);
+    socklen_t addrLen = static_cast<socklen_t>(sizeof(addr));
 
     for (;;) {
 #ifdef _WIN32
@@ -888,7 +892,8 @@ bool SocketImpl::setLingerAbort(bool enable) {
     lg.l_onoff = enable ? 1 : 0;
     lg.l_linger = 0; // l_linger=0 → RST on close
     if (setsockopt(socketHandle, SOL_SOCKET, SO_LINGER,
-            reinterpret_cast<const char*>(&lg), static_cast<socklen_t>(sizeof(lg)))
+            reinterpret_cast<const char*>(&lg),
+            static_cast<socklen_t>(sizeof(lg)))
         == SOCKET_ERROR_CODE) {
         setError(SocketError::SetOptionFailed, "Failed to set SO_LINGER");
         return false;
@@ -1043,7 +1048,8 @@ Endpoint SocketImpl::endpointFromSockaddr(const sockaddr_storage& addr) {
             = static_cast<const sockaddr_in6*>(static_cast<const void*>(&addr));
         ep.port = Port{ntohs(a6->sin6_port)};
         char buf[INET6_ADDRSTRLEN];
-        inet_ntop(AF_INET6, &a6->sin6_addr, buf, static_cast<socklen_t>(sizeof(buf)));
+        inet_ntop(
+            AF_INET6, &a6->sin6_addr, buf, static_cast<socklen_t>(sizeof(buf)));
         ep.address = buf;
     } else {
         ep.family = AddressFamily::IPv4;
@@ -1051,7 +1057,8 @@ Endpoint SocketImpl::endpointFromSockaddr(const sockaddr_storage& addr) {
             = static_cast<const sockaddr_in*>(static_cast<const void*>(&addr));
         ep.port = Port{ntohs(a4->sin_port)};
         char buf[INET_ADDRSTRLEN];
-        inet_ntop(AF_INET, &a4->sin_addr, buf, static_cast<socklen_t>(sizeof(buf)));
+        inet_ntop(
+            AF_INET, &a4->sin_addr, buf, static_cast<socklen_t>(sizeof(buf)));
         ep.address = buf;
     }
     return ep;
