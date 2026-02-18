@@ -66,7 +66,7 @@ static void test_happy_construction() {
                 TcpSocket srv(AddressFamily::IPv4,
                     ServerBind{"127.0.0.1", Port{BASE + 1}});
                 ready = true;
-                srv.accept(); // accepts and discards immediately
+                (void)srv.accept(); // accepts and discards immediately
             } catch (...) {
                 ready = true;
             }
@@ -109,7 +109,7 @@ static void test_happy_accept() {
         std::thread clt([] {
             try {
                 auto c = TcpSocket::createRaw();
-                c.connect("127.0.0.1", Port{BASE + 2});
+                (void)c.connect("127.0.0.1", Port{BASE + 2});
             } catch (...) {
             }
         });
@@ -527,7 +527,7 @@ static void test_happy_endpoints() {
                 return;
             }
             ready = true;
-            srv.accept(); // accept and discard
+            (void)srv.accept(); // accept and discard
         });
 
         auto deadline

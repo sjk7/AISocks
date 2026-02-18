@@ -134,7 +134,7 @@ static void test_poller_remove_stops_events() {
     std::thread clientThread([&]() {
         std::this_thread::sleep_for(std::chrono::milliseconds(5));
         auto c = TcpSocket::createRaw();
-        c.connect("127.0.0.1", Port{BASE_PORT + 3}, Milliseconds{200});
+        (void)c.connect("127.0.0.1", Port{BASE_PORT + 3}, Milliseconds{200});
     });
 
     auto results = p.wait(Milliseconds{10}); // short wait — no events expected
@@ -142,7 +142,7 @@ static void test_poller_remove_stops_events() {
     REQUIRE(results.empty());
 
     // Clean up the pending connection.
-    srv.accept();
+    (void)srv.accept();
 }
 
 // ---------------------------------------------------------------------------
@@ -192,7 +192,7 @@ static void test_wait_readable_writable() {
     std::thread clientThread([&]() {
         std::this_thread::sleep_for(std::chrono::milliseconds(5));
         auto c = TcpSocket::createRaw();
-        c.connect("127.0.0.1", Port{BASE_PORT + 5}, Milliseconds{500});
+        (void)c.connect("127.0.0.1", Port{BASE_PORT + 5}, Milliseconds{500});
         std::this_thread::sleep_for(std::chrono::milliseconds(5));
     });
 

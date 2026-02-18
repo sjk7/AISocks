@@ -19,7 +19,7 @@ constexpr int POLL_DELAY_MS = 1; // Polling delay
 void runServerNonBlocking() {
     std::cout << "Starting non-blocking server on port 8080..." << std::endl;
 
-    TcpSocket serverSocket;
+    auto serverSocket = TcpSocket::createRaw();
 
     if (!serverSocket.isValid()) {
         std::cerr << "Failed to create server socket: "
@@ -131,7 +131,7 @@ void runClientNonBlocking() {
 
     std::cout << "Connecting to server..." << std::endl;
 
-    TcpSocket clientSocket;
+    auto clientSocket = TcpSocket::createRaw();
 
     if (!clientSocket.isValid()) {
         std::cerr << "Failed to create client socket: "

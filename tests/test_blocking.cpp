@@ -32,7 +32,7 @@ int main() {
     BEGIN_TEST("setBlocking(true) restores blocking mode");
     {
         auto s = TcpSocket::createRaw();
-        s.setBlocking(false);
+        (void)s.setBlocking(false);
         REQUIRE(s.setBlocking(true));
         REQUIRE(s.isBlocking());
     }
@@ -43,7 +43,7 @@ int main() {
         bool ok = true;
         for (int i = 0; i < 6; ++i) {
             bool target = (i % 2 == 0) ? false : true;
-            s.setBlocking(target);
+            (void)s.setBlocking(target);
             if (s.isBlocking() != target) {
                 ok = false;
                 break;
@@ -66,7 +66,7 @@ int main() {
                "error instantly");
     {
         auto s = TcpSocket::createRaw();
-        s.setBlocking(false);
+        (void)s.setBlocking(false);
         char buf[64];
         int r = s.receive(buf, sizeof(buf));
         // Must return quickly (non-blocking) - either WouldBlock or an error
@@ -87,7 +87,7 @@ int main() {
             std::thread connector([]() {
                 std::this_thread::sleep_for(std::chrono::milliseconds(5));
                 auto c = TcpSocket::createRaw();
-                c.connect("127.0.0.1", Port{19300});
+                (void)c.connect("127.0.0.1", Port{19300});
                 std::this_thread::sleep_for(std::chrono::milliseconds(10));
             });
             auto accepted = server.accept();
