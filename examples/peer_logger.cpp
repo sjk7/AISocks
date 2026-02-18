@@ -2,14 +2,14 @@
 // PVS-Studio Static Code Analyzer for C, C++, C#, and Java:
 // https://pvs-studio.com
 //
-// peer_logger.cpp — demonstrates getPeerEndpoint() /
+// peer_logger.cpp  demonstrates getPeerEndpoint() /
 // getLocalEndpoint() as a lightweight logging helper for accepted and connected
 // sockets.
 //
 // The pattern shown here is idiomatic for production logging:
-//   1. After accept()  — log what peer connected and on which local address.
-//   2. After connect() — confirm the remote end and local ephemeral port.
-//   3. On error        — include endpoint context in the error message.
+//   1. After accept()   log what peer connected and on which local address.
+//   2. After connect()  confirm the remote end and local ephemeral port.
+//   3. On error         include endpoint context in the error message.
 //
 // Both functions delegate to getpeername(2) / getsockname(2) internally and
 // return std::nullopt if the socket is invalid or not yet connected.
@@ -24,7 +24,7 @@
 using namespace aiSocks;
 
 // ---------------------------------------------------------------------------
-// logPeerInfo — call immediately after accept() or connect().
+// logPeerInfo  call immediately after accept() or connect().
 // Prints a one-liner with the full four-tuple useful for connection tracking.
 // ---------------------------------------------------------------------------
 static void logPeerInfo(const Socket& s, const std::string& role) {
@@ -49,7 +49,7 @@ static void logPeerInfo(const Socket& s, const std::string& role) {
 }
 
 // ---------------------------------------------------------------------------
-// logAcceptedPeer — server side: log each inbound connection.
+// logAcceptedPeer  server side: log each inbound connection.
 // ---------------------------------------------------------------------------
 static void logAcceptedPeer(const TcpSocket& accepted) {
     logPeerInfo(accepted, "server-side accepted");
@@ -74,7 +74,7 @@ static void runEchoServer(Port port) {
         return;
     }
 
-    // Log the four-tuple immediately — this is the central pattern.
+    // Log the four-tuple immediately  this is the central pattern.
     logAcceptedPeer(*conn);
 
     // Echo loop: read once, write back, done.
@@ -95,7 +95,7 @@ static void runEchoClient(Port port) {
     TcpSocket client(
         AddressFamily::IPv4, ConnectTo{.address = "127.0.0.1", .port = port});
 
-    // Log immediately after connect — shows the kernel-assigned ephemeral port.
+    // Log immediately after connect  shows the kernel-assigned ephemeral port.
     logPeerInfo(client, "client-side connected");
 
     const std::string msg = "hello from peer_logger";

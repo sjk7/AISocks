@@ -42,9 +42,9 @@ namespace aiSocks {
 // Internal: raw ingredients captured at the point of failure.
 // The human-readable string is produced lazily via formatErrorContext().
 struct ErrorContext {
-    const char* description{nullptr}; // string literal or c_str() — never owned
+    const char* description{nullptr}; // string literal or c_str()  never owned
     int sysCode{0}; // errno / WSAGetLastError / EAI_*
-    bool isDns{false}; // true → translate with gai_strerror
+    bool isDns{false}; // true  translate with gai_strerror
 };
 
 class SocketImpl {
@@ -122,7 +122,7 @@ class SocketImpl {
     // Error-state components.
     // lastSysCode is captured eagerly (errno / WSAGetLastError() is a
     // thread-local overwritten by the next syscall).  The string translation
-    // (strerror / gai_strerror / FormatMessage) is a pure int→string lookup
+    // (strerror / gai_strerror / FormatMessage) is a pure intstring lookup
     // that is stable over time, so it is deferred to getErrorMessage().
     //
     // Hot-path errors (WouldBlock, etc.) store a pointer to a string literal
@@ -142,7 +142,7 @@ class SocketImpl {
     // true after user calls shutdown(); close() skips redundant ::shutdown()
     bool shutdownCalled_{false};
 
-    // Hot-path setter: stores a pointer to a string literal — zero allocation.
+    // Hot-path setter: stores a pointer to a string literal  zero allocation.
     void setError(SocketError error, const char* description) noexcept;
 
     // Cold-path setter: accepts a runtime-constructed std::string (e.g. DNS

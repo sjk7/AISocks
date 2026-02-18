@@ -2,7 +2,7 @@
 // PVS-Studio Static Code Analyzer for C, C++, C#, and Java:
 // https://pvs-studio.com
 
-// PollerEpoll.cpp — epoll backend for Linux.
+// PollerEpoll.cpp  epoll backend for Linux.
 // Compiled only when CMAKE detects Linux.
 
 #include "Poller.h"

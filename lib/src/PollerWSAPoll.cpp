@@ -2,7 +2,7 @@
 // PVS-Studio Static Code Analyzer for C, C++, C#, and Java:
 // https://pvs-studio.com
 
-// PollerWSAPoll.cpp — WSAPoll backend for Windows.
+// PollerWSAPoll.cpp  WSAPoll backend for Windows.
 // Compiled only when CMAKE detects WIN32.
 
 #include "Poller.h"
@@ -72,7 +72,7 @@ bool Poller::remove(const Socket& s) {
             return true;
         }
     }
-    return true; // not found — benign
+    return true; // not found  benign
 }
 
 std::vector<PollResult> Poller::wait(Milliseconds timeout) {

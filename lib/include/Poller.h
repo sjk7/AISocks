@@ -28,10 +28,10 @@ inline bool hasFlag(PollEvent set, PollEvent flag) noexcept {
 }
 
 // Describes a single ready socket returned by Poller::wait().
-// `socket` is a borrowed pointer — the Socket must outlive its Poller
+// `socket` is a borrowed pointer  the Socket must outlive its Poller
 // registration.
 struct PollResult {
-    const Socket* socket; // borrowed — do not store
+    const Socket* socket; // borrowed  do not store
     PollEvent events;
 };
 
@@ -40,13 +40,13 @@ struct PollResult {
 // Ownership rule: Poller borrows Socket references.  If a Socket is
 // destroyed while still registered, call remove() first.
 //
-// Thread-safety: none — do not share a Poller across threads without
+// Thread-safety: none  do not share a Poller across threads without
 // external synchronisation.
 //
 // Backend selection (compile-time):
-//   macOS / BSD   → kqueue
-//   Linux          → epoll
-//   Windows        → WSAPoll
+//   macOS / BSD    kqueue
+//   Linux           epoll
+//   Windows         WSAPoll
 class Poller {
     public:
     // Throws SocketException(CreateFailed) if the OS event queue cannot
@@ -70,8 +70,8 @@ class Poller {
     // Block until at least one registered socket becomes ready, or until
     // `timeout` elapses.
     //
-    //   timeout >= Milliseconds{0} — wait at most that long.
-    //   timeout == Milliseconds{-1} — wait forever (until an event arrives).
+    //   timeout >= Milliseconds{0}  wait at most that long.
+    //   timeout == Milliseconds{-1}  wait forever (until an event arrives).
     //
     // Returns the ready set (may be empty on timeout).
     // Throws SocketException on a hard system error.

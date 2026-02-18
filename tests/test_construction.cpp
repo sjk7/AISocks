@@ -20,7 +20,7 @@ using namespace aiSocks;
 static const uint16_t BASE = 19900;
 
 // -----------------------------------------------------------------------
-// Happy paths – basic constructor
+// Happy paths  basic constructor
 // -----------------------------------------------------------------------
 static void test_basic_constructor() {
     BEGIN_TEST("Basic ctor: TCP/IPv4 does not throw");
@@ -50,7 +50,7 @@ static void test_basic_constructor() {
 }
 
 // -----------------------------------------------------------------------
-// Happy paths – ServerBind constructor
+// Happy paths  ServerBind constructor
 // -----------------------------------------------------------------------
 static void test_server_bind_happy() {
     BEGIN_TEST("ServerBind ctor: socket is valid and ready to accept");
@@ -85,7 +85,7 @@ static void test_server_bind_happy() {
                 try {
                     TcpSocket c(AddressFamily::IPv4,
                         ConnectTo{"127.0.0.1", Port{BASE + 1}});
-                    // peer closes on scope exit — accept() on server side has
+                    // peer closes on scope exit  accept() on server side has
                     // already returned by the time connect() completes
                 } catch (const std::exception& e) {
                     cltError = e.what();
@@ -121,7 +121,7 @@ static void test_server_bind_happy() {
 }
 
 // -----------------------------------------------------------------------
-// Happy paths – ConnectTo constructor
+// Happy paths  ConnectTo constructor
 // -----------------------------------------------------------------------
 static void test_connect_to_happy() {
     std::this_thread::sleep_for(std::chrono::milliseconds(1));
@@ -209,7 +209,7 @@ static void test_connect_to_happy() {
 }
 
 // -----------------------------------------------------------------------
-// Unhappy paths – exceptions on construction failure
+// Unhappy paths  exceptions on construction failure
 // -----------------------------------------------------------------------
 static void test_server_bind_failures() {
     std::this_thread::sleep_for(std::chrono::milliseconds(1));
@@ -347,7 +347,7 @@ static void test_connect_to_failures() {
     }
 
     // 10.255.255.1 is an unassigned address in the private 10/8 range that
-    // is not reachable on this network — SYNs are silently dropped,
+    // is not reachable on this network  SYNs are silently dropped,
     // so a blocking connect would hang indefinitely without a timeout.
     // (192.0.2.0/24 RFC 5737 TEST-NET is routable on this host via VPN.)
     static constexpr const char* nonRouteableIP = "10.255.255.1";

@@ -13,32 +13,32 @@ void testIPv4() {
 
     auto serverSocket = TcpSocket::createRaw();
     if (!serverSocket.isValid()) {
-        std::cerr << "  ✗ Failed to create IPv4 server socket" << std::endl;
+        std::cerr << "   Failed to create IPv4 server socket" << std::endl;
         return;
     }
-    std::cout << "  ✓ Created IPv4 socket" << std::endl;
+    std::cout << "   Created IPv4 socket" << std::endl;
 
     if (serverSocket.getAddressFamily() != AddressFamily::IPv4) {
-        std::cerr << "  ✗ Address family mismatch" << std::endl;
+        std::cerr << "   Address family mismatch" << std::endl;
         return;
     }
-    std::cout << "  ✓ Address family is IPv4" << std::endl;
+    std::cout << "   Address family is IPv4" << std::endl;
 
     serverSocket.setReuseAddress(true);
 
     if (!serverSocket.bind("127.0.0.1", Port{8001})) {
-        std::cerr << "  ✗ Failed to bind IPv4: "
+        std::cerr << "   Failed to bind IPv4: "
                   << serverSocket.getErrorMessage() << std::endl;
         return;
     }
-    std::cout << "  ✓ Bound to 127.0.0.1:8001" << std::endl;
+    std::cout << "   Bound to 127.0.0.1:8001" << std::endl;
 
     if (!serverSocket.listen(1)) {
-        std::cerr << "  ✗ Failed to listen: " << serverSocket.getErrorMessage()
+        std::cerr << "   Failed to listen: " << serverSocket.getErrorMessage()
                   << std::endl;
         return;
     }
-    std::cout << "  ✓ Listening for connections" << std::endl;
+    std::cout << "   Listening for connections" << std::endl;
 
     // Client thread
     std::thread clientThread([&]() {
@@ -53,21 +53,21 @@ void testIPv4() {
 
     auto acceptedSocket = serverSocket.accept();
     if (acceptedSocket) {
-        std::cout << "  ✓ Accepted IPv4 connection" << std::endl;
+        std::cout << "   Accepted IPv4 connection" << std::endl;
 
         char buffer[256] = {0};
         int received = acceptedSocket->receive(buffer, sizeof(buffer) - 1);
         if (received > 0) {
-            std::cout << "  ✓ Received: " << buffer << std::endl;
+            std::cout << "   Received: " << buffer << std::endl;
         }
         acceptedSocket->close();
     } else {
-        std::cerr << "  ✗ Failed to accept connection" << std::endl;
+        std::cerr << "   Failed to accept connection" << std::endl;
     }
 
     clientThread.join();
     serverSocket.close();
-    std::cout << "  ✓ IPv4 test completed successfully" << std::endl;
+    std::cout << "   IPv4 test completed successfully" << std::endl;
     std::cout << std::endl;
 }
 
@@ -76,34 +76,34 @@ void testIPv6() {
 
     auto serverSocket = TcpSocket::createRaw(AddressFamily::IPv6);
     if (!serverSocket.isValid()) {
-        std::cerr << "  ✗ Failed to create IPv6 server socket" << std::endl;
+        std::cerr << "   Failed to create IPv6 server socket" << std::endl;
         return;
     }
-    std::cout << "  ✓ Created IPv6 socket" << std::endl;
+    std::cout << "   Created IPv6 socket" << std::endl;
 
     if (serverSocket.getAddressFamily() != AddressFamily::IPv6) {
-        std::cerr << "  ✗ Address family mismatch" << std::endl;
+        std::cerr << "   Address family mismatch" << std::endl;
         return;
     }
-    std::cout << "  ✓ Address family is IPv6" << std::endl;
+    std::cout << "   Address family is IPv6" << std::endl;
 
     serverSocket.setReuseAddress(true);
 
     if (!serverSocket.bind("::1", Port{8002})) {
-        std::cerr << "  ✗ Failed to bind IPv6: "
+        std::cerr << "   Failed to bind IPv6: "
                   << serverSocket.getErrorMessage() << std::endl;
-        std::cerr << "  ⚠ IPv6 may not be available on this system"
+        std::cerr << "   IPv6 may not be available on this system"
                   << std::endl;
         return;
     }
-    std::cout << "  ✓ Bound to ::1:8002" << std::endl;
+    std::cout << "   Bound to ::1:8002" << std::endl;
 
     if (!serverSocket.listen(1)) {
-        std::cerr << "  ✗ Failed to listen: " << serverSocket.getErrorMessage()
+        std::cerr << "   Failed to listen: " << serverSocket.getErrorMessage()
                   << std::endl;
         return;
     }
-    std::cout << "  ✓ Listening for connections" << std::endl;
+    std::cout << "   Listening for connections" << std::endl;
 
     // Client thread
     std::thread clientThread([&]() {
@@ -118,26 +118,26 @@ void testIPv6() {
 
     auto acceptedSocket = serverSocket.accept();
     if (acceptedSocket) {
-        std::cout << "  ✓ Accepted IPv6 connection" << std::endl;
+        std::cout << "   Accepted IPv6 connection" << std::endl;
 
         if (acceptedSocket->getAddressFamily() == AddressFamily::IPv6) {
-            std::cout << "  ✓ Accepted socket has IPv6 address family"
+            std::cout << "   Accepted socket has IPv6 address family"
                       << std::endl;
         }
 
         char buffer[256] = {0};
         int received = acceptedSocket->receive(buffer, sizeof(buffer) - 1);
         if (received > 0) {
-            std::cout << "  ✓ Received: " << buffer << std::endl;
+            std::cout << "   Received: " << buffer << std::endl;
         }
         acceptedSocket->close();
     } else {
-        std::cerr << "  ✗ Failed to accept connection" << std::endl;
+        std::cerr << "   Failed to accept connection" << std::endl;
     }
 
     clientThread.join();
     serverSocket.close();
-    std::cout << "  ✓ IPv6 test completed successfully" << std::endl;
+    std::cout << "   IPv6 test completed successfully" << std::endl;
     std::cout << std::endl;
 }
 
@@ -147,17 +147,17 @@ void testBackwardCompatibility() {
 
     auto defaultSocket = TcpSocket::createRaw();
     if (defaultSocket.isValid()) {
-        std::cout << "  ✓ Default socket created successfully" << std::endl;
+        std::cout << "   Default socket created successfully" << std::endl;
 
         if (defaultSocket.getAddressFamily() == AddressFamily::IPv4) {
             std::cout
-                << "  ✓ Default address family is IPv4 (backward compatible)"
+                << "   Default address family is IPv4 (backward compatible)"
                 << std::endl;
         } else {
-            std::cerr << "  ✗ Default should be IPv4" << std::endl;
+            std::cerr << "   Default should be IPv4" << std::endl;
         }
     } else {
-        std::cerr << "  ✗ Failed to create default socket" << std::endl;
+        std::cerr << "   Failed to create default socket" << std::endl;
     }
 
     std::cout << std::endl;
