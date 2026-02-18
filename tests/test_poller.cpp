@@ -1,7 +1,7 @@
 // This is a personal academic project. Dear PVS-Studio, please check it.
 // PVS-Studio Static Code Analyzer for C, C++, C#, and Java:
 // https://pvs-studio.com
-// Tests: Poller — platform-native readiness notification (kqueue/epoll/WSAPoll)
+// Tests: Poller  platform-native readiness notification (kqueue/epoll/WSAPoll)
 
 #include "Poller.h"
 #include "TcpSocket.h"
@@ -24,7 +24,7 @@ static void test_poller_construct() {
     BEGIN_TEST("Poller constructs and destructs without error");
     try {
         Poller p;
-        REQUIRE(true); // reached here → no exception thrown
+        REQUIRE(true); // reached here  no exception thrown
     } catch (const SocketException& e) {
         REQUIRE_MSG(false, std::string("SocketException: ") + e.what());
     }
@@ -58,7 +58,7 @@ static void test_poller_timeout() {
     Poller p;
     REQUIRE(p.add(srv, PollEvent::Readable));
 
-    auto results = p.wait(Milliseconds{10}); // 10 ms — nobody connects
+    auto results = p.wait(Milliseconds{10}); // 10 ms  nobody connects
     REQUIRE(results.empty());
 }
 
@@ -117,7 +117,7 @@ static void test_poller_readable_on_connect() {
 }
 
 // ---------------------------------------------------------------------------
-// Test 5: remove() — server no longer fires after deregistration.
+// Test 5: remove()  server no longer fires after deregistration.
 // ---------------------------------------------------------------------------
 static void test_poller_remove_stops_events() {
     BEGIN_TEST("Poller: removed socket no longer fires");
@@ -130,14 +130,14 @@ static void test_poller_remove_stops_events() {
     REQUIRE(p.add(srv, PollEvent::Readable));
     REQUIRE(p.remove(srv));
 
-    // Connect a client — the poller should NOT see it (srv was removed).
+    // Connect a client  the poller should NOT see it (srv was removed).
     std::thread clientThread([&]() {
         std::this_thread::sleep_for(std::chrono::milliseconds(5));
         auto c = TcpSocket::createRaw();
         (void)c.connect("127.0.0.1", Port{BASE_PORT + 3}, Milliseconds{200});
     });
 
-    auto results = p.wait(Milliseconds{10}); // short wait — no events expected
+    auto results = p.wait(Milliseconds{10}); // short wait  no events expected
     clientThread.join();
     REQUIRE(results.empty());
 
@@ -231,20 +231,20 @@ static void test_set_linger_abort() {
 //   1. setBlocking(false) on the client socket
 //   2. connect() either:
 //        a) returns true immediately (loopback can complete synchronously), or
-//        b) returns false + WouldBlock (EINPROGRESS) — then Poller watches
+//        b) returns false + WouldBlock (EINPROGRESS)  then Poller watches
 //           the client socket for Writable to detect handshake completion
-//   3. Accept → send → receive to confirm the connection is usable
+//   3. Accept  send  receive to confirm the connection is usable
 // ---------------------------------------------------------------------------
 static void test_poller_async_connect() {
     BEGIN_TEST("Poller: async (non-blocking) connect via Writable event");
 
-    // Server side — accept in main thread after poller fires.
+    // Server side  accept in main thread after poller fires.
     auto srv = TcpSocket::createRaw();
     srv.setReuseAddress(true);
     REQUIRE(srv.bind("127.0.0.1", Port{BASE_PORT + 7}));
     REQUIRE(srv.listen(5));
 
-    // Client side — non-blocking connect.
+    // Client side  non-blocking connect.
     auto client = TcpSocket::createRaw();
     REQUIRE(client.setBlocking(false));
 
@@ -270,7 +270,7 @@ static void test_poller_async_connect() {
         REQUIRE_MSG(true, "Poller fired Writable for in-progress connect");
     } else {
         REQUIRE_MSG(true,
-            "connect() completed immediately (loopback fast-path) — "
+            "connect() completed immediately (loopback fast-path)  "
             "no Poller poll needed");
     }
 

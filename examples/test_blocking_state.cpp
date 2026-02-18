@@ -26,9 +26,9 @@ int main() {
     std::cout << "  Socket is blocking: " << (defaultBlocking ? "YES" : "NO")
               << std::endl;
     if (defaultBlocking) {
-        std::cout << "  ✓ PASS - Default state is blocking" << std::endl;
+        std::cout << "   PASS - Default state is blocking" << std::endl;
     } else {
-        std::cout << "  ✗ FAIL - Expected blocking=true by default"
+        std::cout << "   FAIL - Expected blocking=true by default"
                   << std::endl;
         return 1;
     }
@@ -37,7 +37,7 @@ int main() {
     // Test 2: Set to non-blocking
     std::cout << "Test 2: Set to non-blocking mode" << std::endl;
     if (!socket.setBlocking(false)) {
-        std::cerr << "  ✗ FAIL - Could not set non-blocking mode: "
+        std::cerr << "   FAIL - Could not set non-blocking mode: "
                   << socket.getErrorMessage() << std::endl;
         return 1;
     }
@@ -45,9 +45,9 @@ int main() {
     std::cout << "  Socket is non-blocking: " << (isNonBlocking ? "YES" : "NO")
               << std::endl;
     if (isNonBlocking) {
-        std::cout << "  ✓ PASS - Successfully set to non-blocking" << std::endl;
+        std::cout << "   PASS - Successfully set to non-blocking" << std::endl;
     } else {
-        std::cout << "  ✗ FAIL - State not updated after setBlocking(false)"
+        std::cout << "   FAIL - State not updated after setBlocking(false)"
                   << std::endl;
         return 1;
     }
@@ -56,7 +56,7 @@ int main() {
     // Test 3: Set back to blocking
     std::cout << "Test 3: Set back to blocking mode" << std::endl;
     if (!socket.setBlocking(true)) {
-        std::cerr << "  ✗ FAIL - Could not set blocking mode: "
+        std::cerr << "   FAIL - Could not set blocking mode: "
                   << socket.getErrorMessage() << std::endl;
         return 1;
     }
@@ -64,10 +64,10 @@ int main() {
     std::cout << "  Socket is blocking: " << (isBlockingAgain ? "YES" : "NO")
               << std::endl;
     if (isBlockingAgain) {
-        std::cout << "  ✓ PASS - Successfully set back to blocking"
+        std::cout << "   PASS - Successfully set back to blocking"
                   << std::endl;
     } else {
-        std::cout << "  ✗ FAIL - State not updated after setBlocking(true)"
+        std::cout << "   FAIL - State not updated after setBlocking(true)"
                   << std::endl;
         return 1;
     }
@@ -84,16 +84,16 @@ int main() {
                   << (targetState ? "blocking" : "non-blocking") << ", Actual="
                   << (currentState ? "blocking" : "non-blocking");
         if (currentState == targetState) {
-            std::cout << " ✓" << std::endl;
+            std::cout << " " << std::endl;
         } else {
-            std::cout << " ✗" << std::endl;
+            std::cout << " " << std::endl;
             allPassed = false;
         }
     }
     if (allPassed) {
-        std::cout << "  ✓ PASS - All toggles tracked correctly" << std::endl;
+        std::cout << "   PASS - All toggles tracked correctly" << std::endl;
     } else {
-        std::cout << "  ✗ FAIL - Some toggles not tracked correctly"
+        std::cout << "   FAIL - Some toggles not tracked correctly"
                   << std::endl;
         return 1;
     }
@@ -122,18 +122,18 @@ int main() {
             std::cout << "  Accepted socket is blocking: "
                       << (acceptedIsBlocking ? "YES" : "NO") << std::endl;
             if (acceptedIsBlocking) {
-                std::cout << "  ✓ PASS - Accepted socket defaults to blocking"
+                std::cout << "   PASS - Accepted socket defaults to blocking"
                           << std::endl;
             } else {
                 std::cout
-                    << "  ✗ FAIL - Accepted socket should default to blocking"
+                    << "   FAIL - Accepted socket should default to blocking"
                     << std::endl;
                 clientThread.join();
                 return 1;
             }
             acceptedSocket->close();
         } else {
-            std::cout << "  ✗ FAIL - Could not accept connection" << std::endl;
+            std::cout << "   FAIL - Could not accept connection" << std::endl;
             clientThread.join();
             return 1;
         }
@@ -141,7 +141,7 @@ int main() {
         clientThread.join();
         serverSocket.close();
     } else {
-        std::cout << "  ⚠ SKIP - Could not bind/listen on port 9999"
+        std::cout << "   SKIP - Could not bind/listen on port 9999"
                   << std::endl;
     }
     std::cout << std::endl;
@@ -149,7 +149,7 @@ int main() {
     socket.close();
 
     std::cout << "==================================" << std::endl;
-    std::cout << "ALL TESTS PASSED ✓" << std::endl;
+    std::cout << "ALL TESTS PASSED " << std::endl;
     std::cout << "Blocking state tracking is working correctly!" << std::endl;
 
     return 0;

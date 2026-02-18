@@ -9,7 +9,7 @@
 namespace aiSocks {
 
 // ---------------------------------------------------------------------------
-// UdpSocket — type-safe UDP socket.
+// UdpSocket  type-safe UDP socket.
 //
 // Inherits the Socket pImpl firewall.  Only UDP-meaningful operations are
 // present; TCP-only operations (listen, accept, sendAll, receiveAll) are
@@ -39,7 +39,7 @@ class UdpSocket : public Socket {
     // Throws SocketException(CreateFailed) if the OS call fails.
     explicit UdpSocket(AddressFamily family = AddressFamily::IPv4);
 
-    // Public non-virtual destructor — chains to Socket::~Socket().
+    // Public non-virtual destructor  chains to Socket::~Socket().
     ~UdpSocket() = default;
 
     // Move.
@@ -59,7 +59,7 @@ class UdpSocket : public Socket {
     // Set a default destination.  Enables send() / receive() without an
     // explicit endpoint on every call.
     //
-    // UDP "connect" is a purely local kernel operation — it records the peer
+    // UDP "connect" is a purely local kernel operation  it records the peer
     // address so the kernel can filter incoming datagrams and fill in the
     // destination on outgoing ones.  No packets are sent; no handshake
     // occurs.  The call always completes instantly.  It cannot be polled.

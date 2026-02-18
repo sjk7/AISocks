@@ -58,7 +58,7 @@ int main() {
     }
 
     // NOTE: calling operational methods (bind, send, etc.) on a moved-from
-    // socket is a programmer error — the library asserts in debug builds.
+    // socket is a programmer error  the library asserts in debug builds.
     // Only query methods (isValid, getLastError, getErrorMessage) are
     // documented safe on a moved-from socket.
 

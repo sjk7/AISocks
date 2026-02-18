@@ -23,10 +23,10 @@ int main() {
               << std::endl;
 
     if (!socket1.isValid()) {
-        std::cout << "  ✓ PASS - socket1 properly invalidated after move"
+        std::cout << "   PASS - socket1 properly invalidated after move"
                   << std::endl;
     } else {
-        std::cout << "  ✗ FAIL - socket1 still valid after move" << std::endl;
+        std::cout << "   FAIL - socket1 still valid after move" << std::endl;
         return 1;
     }
     std::cout << std::endl;
@@ -45,9 +45,9 @@ int main() {
     std::cout << "    socket4 valid: " << socket4.isValid() << std::endl;
 
     if (!socket3.isValid() && socket4.isValid()) {
-        std::cout << "  ✓ PASS - Move assignment works correctly" << std::endl;
+        std::cout << "   PASS - Move assignment works correctly" << std::endl;
     } else {
-        std::cout << "  ✗ FAIL - Move assignment failed" << std::endl;
+        std::cout << "   FAIL - Move assignment failed" << std::endl;
         return 1;
     }
     std::cout << std::endl;
@@ -93,9 +93,9 @@ int main() {
 
     if (bindResult == false && listenResult == false && connectResult == false
         && sendResult == -1 && recvResult == -1) {
-        std::cout << "  ✓ PASS - All operations failed gracefully" << std::endl;
+        std::cout << "   PASS - All operations failed gracefully" << std::endl;
     } else {
-        std::cout << "  ✗ FAIL - Some operations didn't fail as expected"
+        std::cout << "   FAIL - Some operations didn't fail as expected"
                   << std::endl;
         return 1;
     }
@@ -112,10 +112,10 @@ int main() {
               << std::endl;
 
     if (socket7.isValid()) {
-        std::cout << "  ✓ PASS - Self-assignment handled correctly"
+        std::cout << "   PASS - Self-assignment handled correctly"
                   << std::endl;
     } else {
-        std::cout << "  ✗ FAIL - Self-assignment broke the object" << std::endl;
+        std::cout << "   FAIL - Self-assignment broke the object" << std::endl;
         return 1;
     }
     std::cout << std::endl;
@@ -132,9 +132,9 @@ int main() {
     std::cout << "    sockets[0] valid: " << sockets[0].isValid() << std::endl;
 
     if (!socket8.isValid() && sockets[0].isValid()) {
-        std::cout << "  ✓ PASS - Move into container works" << std::endl;
+        std::cout << "   PASS - Move into container works" << std::endl;
     } else {
-        std::cout << "  ✗ FAIL - Move into container failed" << std::endl;
+        std::cout << "   FAIL - Move into container failed" << std::endl;
         return 1;
     }
     std::cout << std::endl;
@@ -152,12 +152,12 @@ int main() {
                                                                     : "IPv6")
               << std::endl;
 
-    std::cout << "  ✓ PASS - Moved-from state has safe default values"
+    std::cout << "   PASS - Moved-from state has safe default values"
               << std::endl;
     std::cout << std::endl;
 
     std::cout << "==================================" << std::endl;
-    std::cout << "ALL TESTS PASSED ✓" << std::endl;
+    std::cout << "ALL TESTS PASSED " << std::endl;
     std::cout << "Move semantics working correctly!" << std::endl;
 
     return 0;

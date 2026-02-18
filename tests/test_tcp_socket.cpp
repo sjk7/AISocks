@@ -2,7 +2,7 @@
 // PVS-Studio Static Code Analyzer for C, C++, C#, and Java:
 // https://pvs-studio.com
 //
-// test_tcp_socket.cpp — Happy and sad path tests for TcpSocket specifically.
+// test_tcp_socket.cpp  Happy and sad path tests for TcpSocket specifically.
 //
 // These tests verify the TcpSocket-typed API: that correct operations work,
 // that invalid operations produce the expected errors, and that the type-safe
@@ -423,7 +423,7 @@ static void test_sad_operations() {
     BEGIN_TEST("TcpSocket: accept() returns nullptr on non-listening socket");
     {
         auto s = TcpSocket::createRaw();
-        // Not listening — accept should fail and return nullptr
+        // Not listening  accept should fail and return nullptr
         auto peer = s.accept();
         REQUIRE(peer == nullptr);
         REQUIRE(s.getLastError() == SocketError::AcceptFailed);
@@ -471,14 +471,14 @@ static void test_sad_timeout() {
     {
         // Milliseconds{0} = non-blocking connect: returns immediately.
         // With nothing listening, the OS will either:
-        //   a) refuse immediately (ECONNREFUSED → ConnectFailed), or
+        //   a) refuse immediately (ECONNREFUSED  ConnectFailed), or
         //   b) return WouldBlock (still in progress after SYN sent).
         // Both are valid outcomes for a non-blocking connect attempt.
         auto s = TcpSocket::createRaw();
         REQUIRE(s.setBlocking(false));
         bool ok
             = s.connect("127.0.0.1", Port{21899}, std::chrono::milliseconds{0});
-        // Non-blocking to nothing → should not succeed
+        // Non-blocking to nothing  should not succeed
         REQUIRE(!ok);
         REQUIRE((s.getLastError() == SocketError::WouldBlock
             || s.getLastError() == SocketError::ConnectFailed));
@@ -488,7 +488,7 @@ static void test_sad_timeout() {
 
     BEGIN_TEST("TcpSocket: connect() with short timeout to refused port");
     {
-        // Port 21898 has no listener — ECONNREFUSED arrives quickly.
+        // Port 21898 has no listener  ECONNREFUSED arrives quickly.
         auto s = TcpSocket::createRaw();
         bool ok = s.connect(
             "127.0.0.1", Port{21898}, std::chrono::milliseconds{2000});

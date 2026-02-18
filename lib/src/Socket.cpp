@@ -10,7 +10,7 @@ namespace aiSocks {
 
 // Helper used only inside constructors: if ok is false, extract the error
 // from pImpl and throw with the failing step name prepended.
-// Lazy what() for SocketException — built once on first call.
+// Lazy what() for SocketException  built once on first call.
 const char* SocketException::what() const noexcept {
     if (!whatCache_.empty()) return whatCache_.c_str();
     try {
@@ -126,7 +126,7 @@ bool Socket::doSendAllProgress(
         if (n <= 0) return false;
         sent += static_cast<size_t>(n);
         if (progress(sent, length) < 0) {
-            // Caller cancelled — leave lastError as None so the caller
+            // Caller cancelled  leave lastError as None so the caller
             // can distinguish cancellation from a genuine send error.
             return false;
         }
@@ -143,7 +143,7 @@ bool Socket::doReceiveAll(Span<std::byte> buffer) {
     return doReceiveAll(buffer.data(), buffer.size());
 }
 
-// Span overloads — delegate to the raw-pointer implementations.
+// Span overloads  delegate to the raw-pointer implementations.
 int Socket::doSend(Span<const std::byte> data) {
     return doSend(data.data(), data.size());
 }

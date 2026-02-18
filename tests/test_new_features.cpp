@@ -25,7 +25,7 @@
 
 using namespace aiSocks;
 
-// Port block: 20000 – 20099 (no overlap with existing test suites)
+// Port block: 20000  20099 (no overlap with existing test suites)
 static constexpr int BASE = 20000;
 
 // -----------------------------------------------------------------------
@@ -253,17 +253,17 @@ static void test_udp_connected() {
 }
 
 // -----------------------------------------------------------------------
-// 4c. UDP transfer tests — payload integrity, bidirectional echo,
+// 4c. UDP transfer tests  payload integrity, bidirectional echo,
 //     max-size datagrams.
 // -----------------------------------------------------------------------
 // Notable UDP constraints exercised here:
-//   • UDP is message-oriented: each send() produces exactly one recvfrom()
+//    UDP is message-oriented: each send() produces exactly one recvfrom()
 //     with the same byte count.
-//   • A datagram that is too large for the receiver's buffer is silently
+//    A datagram that is too large for the receiver's buffer is silently
 //     truncated (POSIX) or returns WSAEMSGSIZE (Windows); we stay well
 //     under the safe loopback MTU (~65507 bytes) with 8192-byte payloads.
-//   • Datagram order is not guaranteed in general but IS preserved on
-//     loopback — we rely on this for the sequenced echo test.
+//    Datagram order is not guaranteed in general but IS preserved on
+//     loopback  we rely on this for the sequenced echo test.
 static void test_udp_transfer() {
     BEGIN_TEST("UDP transfer: 20 datagrams, sequential payload integrity");
     {
@@ -309,7 +309,7 @@ static void test_udp_transfer() {
         for (int i = 0; i < 5; ++i) {
             std::string out = "echo-" + std::to_string(i);
 
-            // Client → server
+            // Client  server
             REQUIRE(cli.sendTo(out.data(), out.size(), srvAddr)
                 == static_cast<int>(out.size()));
 
@@ -355,16 +355,16 @@ static void test_udp_transfer() {
 }
 
 // -----------------------------------------------------------------------
-// 4d. Bulk throughput benchmarks — UDP vs TCP loopback
+// 4d. Bulk throughput benchmarks  UDP vs TCP loopback
 //
 // These are not pass/fail correctness tests: they report bytes transferred
 // and wall-clock throughput so the two protocols can be compared.
 //
 // Methodology:
-//   • UDP: sender thread blasts N max-size datagrams (65507 B) freely;
-//     receiver thread counts bytes independently — no per-datagram
+//    UDP: sender thread blasts N max-size datagrams (65507 B) freely;
+//     receiver thread counts bytes independently  no per-datagram
 //     rendezvous.  Measures raw kernel UDP loopback dispatch rate.
-//   • TCP: sendAll / receiveAll over a thread-pair; measures sustained
+//    TCP: sendAll / receiveAll over a thread-pair; measures sustained
 //     streaming throughput including kernel TCP buffering.
 // -----------------------------------------------------------------------
 static void test_bulk_throughput() {
@@ -375,7 +375,7 @@ static void test_bulk_throughput() {
         // Max safe UDP payload on loopback (65535 - 20 IP - 8 UDP header).
         // Keep COUNT modest so the test passes on slow/constrained CI runners.
         constexpr size_t DGRAM = 65507;
-        constexpr int COUNT = 200; // 200 × 65507 B ≈ 12.5 MB
+        constexpr int COUNT = 200; // 200  65507 B  12.5 MB
         constexpr size_t TOTAL = static_cast<size_t>(COUNT) * DGRAM;
 
         UdpSocket srv;
@@ -656,7 +656,7 @@ static void test_shutdown() {
         REQUIRE(c.connect("127.0.0.1", Port{BASE + 20}));
         REQUIRE(c.shutdown(ShutdownHow::Write));
         t.join();
-        // Peer should see 0 (clean EOF) or -1 (connection reset) — either way
+        // Peer should see 0 (clean EOF) or -1 (connection reset)  either way
         // it must have unblocked.
         REQUIRE_MSG(
             peerRecv >= 0, "peer recv unblocked after client shutdown(Write)");

@@ -52,7 +52,7 @@ int main() {
     for (const auto& addr : ipv4Tests) {
         bool valid = Socket::isValidIPv4(addr);
         std::cout << "  " << std::setw(20) << std::left << addr
-                  << (valid ? "✓ Valid" : "✗ Invalid") << std::endl;
+                  << (valid ? " Valid" : " Invalid") << std::endl;
     }
     std::cout << std::endl;
 
@@ -69,7 +69,7 @@ int main() {
     for (const auto& addr : ipv6Tests) {
         bool valid = Socket::isValidIPv6(addr);
         std::cout << "  " << std::setw(40) << std::left << addr
-                  << (valid ? "✓ Valid" : "✗ Invalid") << std::endl;
+                  << (valid ? " Valid" : " Invalid") << std::endl;
     }
     std::cout << std::endl;
 

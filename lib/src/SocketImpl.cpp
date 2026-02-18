@@ -321,16 +321,16 @@ bool SocketImpl::connect(
     // socket mode.  A RAII guard captures the original blocking state and
     // restores it on every exit (success, timeout, error, and exception).
     // This means:
-    //   • A blocking socket comes back blocking after a successful connect.
-    //   • A non-blocking socket (caller set it before constructing) comes back
-    //     non-blocking — the guard is a no-op in that case.
-    //   • timeout > 0  → wait up to that long for the handshake.
-    //   • timeout <= 0 → initiate and return WouldBlock immediately so the
+    //    A blocking socket comes back blocking after a successful connect.
+    //    A non-blocking socket (caller set it before constructing) comes back
+    //     non-blocking  the guard is a no-op in that case.
+    //    timeout > 0   wait up to that long for the handshake.
+    //    timeout <= 0  initiate and return WouldBlock immediately so the
     //     caller can drive completion via a Poller.
 
     // RAII: saves and restores the OS-level blocking flag on all exit paths.
     // Calls the platform API directly rather than setBlocking() to avoid
-    // clobbering lastError — setBlocking() sets lastError=None on success,
+    // clobbering lastError  setBlocking() sets lastError=None on success,
     // which would erase whatever error connect() stored before returning false.
     struct BlockingGuard {
         SocketImpl& impl_;
@@ -388,7 +388,7 @@ bool SocketImpl::connect(
         return false; // guard restores blocking mode
     }
 
-    // timeout <= 0: caller wants non-blocking initiation — return WouldBlock.
+    // timeout <= 0: caller wants non-blocking initiation  return WouldBlock.
     // The guard restores the original blocking mode (which was already
     // non-blocking if the caller set it, so this is a no-op in that case).
     if (timeout.count() <= 0) {
@@ -397,7 +397,7 @@ bool SocketImpl::connect(
         return false;
     }
 
-    // Wait for the handshake using the platform-native event queue — the same
+    // Wait for the handshake using the platform-native event queue  the same
     // backend as the Poller class.  No FD_SETSIZE limit; no select().
     //
     // kqueue / epoll need a queue fd; WSAPoll is per-call.
@@ -502,7 +502,7 @@ bool SocketImpl::connect(
 
         if (nReady == 0) continue; // slice elapsed; recheck deadline
 
-        // An event fired — confirm success via SO_ERROR.
+        // An event fired  confirm success via SO_ERROR.
         int sockErr = 0;
         socklen_t sockErrLen = static_cast<socklen_t>(sizeof(sockErr));
         getsockopt(socketHandle, SOL_SOCKET, SO_ERROR,
@@ -790,7 +790,7 @@ std::string SocketImpl::getErrorMessage() const {
     return lastErrorMessage;
 }
 
-// Hot-path: pointer store only — no heap allocation.
+// Hot-path: pointer store only  no heap allocation.
 void SocketImpl::setError(SocketError error, const char* description) noexcept {
     lastError = error;
     lastErrorLiteral = description;
@@ -976,7 +976,7 @@ bool SocketImpl::setKeepAlive(bool enable) {
 }
 
 // -----------------------------------------------------------------------
-// setLingerAbort (SO_LINGER, l_linger=0 → RST on close)
+// setLingerAbort (SO_LINGER, l_linger=0  RST on close)
 // -----------------------------------------------------------------------
 bool SocketImpl::setLingerAbort(bool enable) {
     if (!isValid()) {
@@ -985,7 +985,7 @@ bool SocketImpl::setLingerAbort(bool enable) {
     }
     struct linger lg{};
     lg.l_onoff = enable ? 1 : 0;
-    lg.l_linger = 0; // l_linger=0 → RST on close
+    lg.l_linger = 0; // l_linger=0  RST on close
     if (setsockopt(socketHandle, SOL_SOCKET, SO_LINGER,
             reinterpret_cast<const char*>(&lg),
             static_cast<socklen_t>(sizeof(lg)))
@@ -1014,7 +1014,7 @@ bool SocketImpl::setReusePort(bool enable) {
 }
 
 // -----------------------------------------------------------------------
-// setBroadcast (SO_BROADCAST) — required before sending to broadcast addrs
+// setBroadcast (SO_BROADCAST)  required before sending to broadcast addrs
 // -----------------------------------------------------------------------
 bool SocketImpl::setBroadcast(bool enable) {
     if (!isValid()) {
@@ -1026,7 +1026,7 @@ bool SocketImpl::setBroadcast(bool enable) {
 }
 
 // -----------------------------------------------------------------------
-// sendAll — loop until all bytes sent or error
+// sendAll  loop until all bytes sent or error
 // -----------------------------------------------------------------------
 bool SocketImpl::sendAll(const void* data, size_t length) {
     const auto* ptr = static_cast<const char*>(data);
@@ -1043,7 +1043,7 @@ bool SocketImpl::sendAll(const void* data, size_t length) {
     return true;
 }
 
-// receiveAll — loop until all bytes received, error, or EOF
+// receiveAll  loop until all bytes received, error, or EOF
 // -----------------------------------------------------------------------
 bool SocketImpl::receiveAll(void* buffer, size_t length) {
     auto* ptr = static_cast<char*>(buffer);
@@ -1054,7 +1054,7 @@ bool SocketImpl::receiveAll(void* buffer, size_t length) {
             return false; // error already recorded by receive()
         }
         if (got == 0) {
-            // Clean EOF before we got all the bytes — treat as an error.
+            // Clean EOF before we got all the bytes  treat as an error.
             setError(SocketError::ConnectionReset,
                 "Connection closed before all bytes received");
             return false;
@@ -1067,7 +1067,7 @@ bool SocketImpl::receiveAll(void* buffer, size_t length) {
 }
 
 // -----------------------------------------------------------------------
-// waitReadable / waitWritable — single-fd select convenience
+// waitReadable / waitWritable  single-fd select convenience
 // -----------------------------------------------------------------------
 bool SocketImpl::waitReady(bool forRead, std::chrono::milliseconds timeout) {
     if (!isValid()) {
@@ -1290,7 +1290,7 @@ std::vector<NetworkInterface> SocketImpl::getLocalAddresses() {
             iface.name = ifa->ifa_name;
 
             int family = ifa->ifa_addr->sa_family;
-            // Use IFF_LOOPBACK (POSIX) — reliable on macOS (lo0) and Linux (lo).
+            // Use IFF_LOOPBACK (POSIX)  reliable on macOS (lo0) and Linux (lo).
             const bool isLo = (ifa->ifa_flags & IFF_LOOPBACK) != 0;
             if (family == AF_INET) {
                 char buffer[INET_ADDRSTRLEN];
