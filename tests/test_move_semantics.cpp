@@ -1,6 +1,8 @@
 // This is a personal academic project. Dear PVS-Studio, please check it.
 // PVS-Studio Static Code Analyzer for C, C++, C#, and Java:
-// https://pvs-studio.com Tests: Move constructor and move assignment operator.
+// https://pvs-studio.com 
+// 
+// Tests: Move constructor and move assignment operator.
 // Checks observable behaviour only.
 
 #include "Socket.h"
@@ -73,7 +75,7 @@ int main() {
     {
         Socket a(SocketType::TCP, AddressFamily::IPv4);
         Socket b(std::move(a));
-        std::string msg = a.getErrorMessage();
+        std::string msg = a.getErrorMessage(); //-V808
         REQUIRE_MSG(
             true, "getErrorMessage() on moved-from socket did not crash");
     }
@@ -91,10 +93,10 @@ int main() {
 
     BEGIN_TEST("Socket can be stored in a vector using move");
     {
-        std::vector<Socket> vec;
+        std::vector<Socket> vec; //-V826
         vec.emplace_back(SocketType::TCP, AddressFamily::IPv4);
         vec.emplace_back(SocketType::TCP, AddressFamily::IPv6);
-        REQUIRE(vec.size() == 2);
+        REQUIRE(vec.size() == 2); //-V547
         REQUIRE(vec[0].isValid());
         REQUIRE(vec[1].isValid());
     }

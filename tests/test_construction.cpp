@@ -1,7 +1,7 @@
 // This is a personal academic project. Dear PVS-Studio, please check it.
 // PVS-Studio Static Code Analyzer for C, C++, C#, and Java:
-// https://pvs-studio.com 
-// 
+// https://pvs-studio.com
+//
 // Tests: correct-by-construction Socket API. Verifies
 // that constructors throw SocketException on failure and produce a fully usable
 // socket on success.

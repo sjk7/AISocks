@@ -107,7 +107,7 @@ int main() {
     std::cout << "  socket7 valid before self-assignment: " << socket7.isValid()
               << std::endl;
 
-    socket7 = std::move(socket7);
+    socket7 = std::move(socket7); //-V570
     std::cout << "  socket7 valid after self-assignment: " << socket7.isValid()
               << std::endl;
 
@@ -122,7 +122,7 @@ int main() {
 
     // Test 5: Move into container
     std::cout << "Test 5: Move into Container" << std::endl;
-    std::vector<Socket> sockets;
+    std::vector<Socket> sockets; //-V826
     Socket socket8(SocketType::TCP, AddressFamily::IPv4);
 
     std::cout << "  socket8 valid: " << socket8.isValid() << std::endl;
