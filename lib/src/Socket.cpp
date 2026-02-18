@@ -57,8 +57,27 @@ Socket::Socket(SocketType type, AddressFamily family, const ConnectTo& cfg)
     : pImpl(std::make_unique<SocketImpl>(type, family)) {
     throwIfFailed(pImpl->isValid(), "socket()", pImpl);
 
-    throwIfFailed(pImpl->connect(cfg.address, cfg.port, cfg.connectTimeout),
-        "connect(" + cfg.address + ":" + std::to_string(cfg.port) + ")", pImpl);
+    if (cfg.async) {
+        // Set non-blocking BEFORE connect so BlockingGuard in SocketImpl
+        // saves the non-blocking state and restores it on exit — leaving the
+        // socket non-blocking for the caller's Poller loop.
+        throwIfFailed(pImpl->setBlocking(false), "setBlocking(false)", pImpl);
+        // Pass Milliseconds{0} so connect() returns WouldBlock immediately
+        // rather than waiting; that is the expected outcome for async.
+        bool ok = pImpl->connect(cfg.address, cfg.port, Milliseconds{0});
+        // WouldBlock is the expected result for an async connect in progress.
+        if (!ok && pImpl->getLastError() != SocketError::WouldBlock) {
+            auto ctx = pImpl->getErrorContext();
+            throw SocketException(pImpl->getLastError(),
+                "connect(" + cfg.address + ":" + std::to_string(cfg.port) + ")",
+                ctx.description, ctx.sysCode, ctx.isDns);
+        }
+    } else {
+        throwIfFailed(
+            pImpl->connect(cfg.address, cfg.port, cfg.connectTimeout),
+            "connect(" + cfg.address + ":" + std::to_string(cfg.port) + ")",
+            pImpl);
+    }
 }
 
 Socket::Socket(std::unique_ptr<SocketImpl> impl) : pImpl(std::move(impl)) {}
@@ -115,6 +134,24 @@ bool Socket::doSendAll(const void* data, size_t length) {
 
 bool Socket::doSendAll(Span<const std::byte> data) {
     return doSendAll(data.data(), data.size());
+}
+
+bool Socket::doSendAllProgress(
+    const void* data, size_t length, SendProgressSink& progress) {
+    assert(pImpl);
+    const auto* ptr = static_cast<const char*>(data);
+    size_t sent = 0;
+    while (sent < length) {
+        int n = pImpl->send(ptr + sent, length - sent);
+        if (n <= 0) return false;
+        sent += static_cast<size_t>(n);
+        if (progress(sent, length) < 0) {
+            // Caller cancelled — leave lastError as None so the caller
+            // can distinguish cancellation from a genuine send error.
+            return false;
+        }
+    }
+    return true;
 }
 
 bool Socket::doReceiveAll(void* buffer, size_t length) {

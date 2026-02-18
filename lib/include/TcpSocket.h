@@ -28,10 +28,6 @@ namespace aiSocks {
 // ---------------------------------------------------------------------------
 class TcpSocket : public Socket {
     public:
-    // Creates a bare TCP socket fd.
-    // Throws SocketException(CreateFailed) if the OS call fails.
-    explicit TcpSocket(AddressFamily family = AddressFamily::IPv4);
-
     // Server socket — socket() → [SO_REUSEADDR] → bind() → listen().
     // Throws SocketException on any step failure.
     TcpSocket(AddressFamily family, const ServerBind& cfg);
@@ -43,13 +39,20 @@ class TcpSocket : public Socket {
     // Public non-virtual destructor — chains to Socket::~Socket().
     ~TcpSocket() = default;
 
-    // No copy.
-    TcpSocket(const TcpSocket&) = delete;
-    TcpSocket& operator=(const TcpSocket&) = delete;
-
     // Move.
     TcpSocket(TcpSocket&&) noexcept = default;
     TcpSocket& operator=(TcpSocket&&) noexcept = default;
+
+    // Creates a raw, unbound, unconnected TCP socket fd.
+    //
+    // Prefer the ServerBind / ConnectTo constructors — they construct a
+    // fully-ready socket in one step and uphold the correct-by-construction
+    // invariant.  Use createRaw() only when you need an empty socket to test
+    // socket options, error codes, or move semantics in isolation.
+    //
+    // Returns an invalid socket (isValid() == false) instead of throwing if
+    // the OS call fails.
+    static TcpSocket createRaw(AddressFamily family = AddressFamily::IPv4);
 
     // --- Server operations ---
     [[nodiscard]] bool bind(const std::string& address, Port port) {
@@ -60,13 +63,16 @@ class TcpSocket : public Socket {
     // Accept the next incoming connection.
     // Returns nullptr if accept() fails (check getLastError()).
     // Defined in TcpSocket.cpp (needs SocketImpl.h for the impl move).
-    std::unique_ptr<TcpSocket> accept();
+    [[nodiscard]] std::unique_ptr<TcpSocket> accept();
 
     // --- Client operation ---
-    //   defaultTimeout (30 s) — wait for handshake.
-    //   Milliseconds{0}       — non-blocking initiation (Poller-driven).
+    // Blocking connect: waits for the TCP handshake and returns true on success.
+    //   defaultTimeout (30 s) — used when not specified.
     //   any positive duration — fail with Timeout if not connected in time.
-    bool connect(const std::string& address, Port port,
+    //
+    // For non-blocking (Poller-driven) connect, construct via:
+    //   TcpSocket c(family, ConnectTo{addr, port, .async = true});
+    [[nodiscard]] bool connect(const std::string& address, Port port,
         Milliseconds timeout = defaultTimeout) {
         return doConnect(address, port, timeout);
     }
@@ -97,24 +103,34 @@ class TcpSocket : public Socket {
     bool receiveAll(Span<std::byte> buffer) { return doReceiveAll(buffer); }
 
     // sendAll with a per-chunk progress callback.
-    // `progress` is called after each successful write with the cumulative
-    // bytes sent so far and the total requested.  On error the callback
-    // reflects the last successfully sent offset.
-    // Fn signature: void(size_t bytesSentSoFar, size_t total)
+    //
+    // `progress` is called after each successful write chunk with:
+    //   bytesSentSoFar — cumulative bytes delivered so far
+    //   total          — total bytes requested
+    //
+    // Return value from the callback:
+    //   >= 0  continue sending
+    //   <  0  cancel immediately; sendAll() returns false with
+    //          getLastError() == SocketError::None (distinguishes
+    //          user cancellation from a genuine send error)
+    //
+    // Any callable is accepted (lambda with captures, functor, etc.).
+    // The Adapter is stack-local — no heap allocation.
     template <typename Fn>
     bool sendAll(const void* data, size_t length, Fn&& progress) {
-        const auto* ptr    = static_cast<const char*>(data);
-        size_t      sent   = 0;
-        while (sent < length) {
-            int n = doSend(ptr + sent, length - sent);
-            if (n <= 0) return false;
-            sent += static_cast<size_t>(n);
-            std::forward<Fn>(progress)(sent, length);
-        }
-        return true;
+        struct Adapter : SendProgressSink {
+            Fn& fn_;
+            explicit Adapter(Fn& f) noexcept : fn_(f) {}
+            int operator()(size_t s, size_t t) override { return fn_(s, t); }
+        } adapter{progress};
+        return doSendAllProgress(data, length, adapter);
     }
 
     private:
+    // Raw socket without bind/connect.  Private so users cannot
+    // accidentally hold an unconnected socket.  Use createRaw() instead.
+    explicit TcpSocket(AddressFamily family = AddressFamily::IPv4);
+
     // Used by accept() to wrap an accepted SocketImpl.
     // Defined in TcpSocket.cpp.
     explicit TcpSocket(std::unique_ptr<SocketImpl> impl);
