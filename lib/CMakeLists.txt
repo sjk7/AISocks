@@ -41,3 +41,4 @@ if(MSVC)
 else()
     target_compile_options(aiSocksLib PRIVATE -Wall -Wextra -Wpedantic -Werror)
 endif()
+
