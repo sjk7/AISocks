@@ -27,4 +27,7 @@ set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
 set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
 set(CMAKE_FIND_ROOT_PATH_MODE_PACKAGE ONLY)
 
-# MinGW produces Windows PE binaries; linking ws2_32 etc. works normally.
+# Statically link the MinGW C/C++/pthread runtimes so the .exe is self-contained
+# (no libstdc++-6.dll, libgcc_s_seh-1.dll, or libwinpthread-1.dll needed).
+set(CMAKE_EXE_LINKER_FLAGS_INIT    "-static-libgcc -static-libstdc++ -static")
+set(CMAKE_SHARED_LINKER_FLAGS_INIT "-static-libgcc -static-libstdc++ -static")
