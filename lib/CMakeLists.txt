@@ -37,7 +37,7 @@ endif()
 
 # Compiler-specific settings
 if(MSVC)
-    target_compile_options(aiSocksLib PRIVATE /W4 /WX)
+    target_compile_options(aiSocksLib PRIVATE /W4 /WX /utf-8)
 else()
     target_compile_options(aiSocksLib PRIVATE -Wall -Wextra -Wpedantic -Werror)
 endif()
