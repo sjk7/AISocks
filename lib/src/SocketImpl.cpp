@@ -43,7 +43,6 @@ static SocketError classifyTransferSysError(int sysErr) noexcept {
 static SocketError resolveToSockaddr(const std::string& address, Port port,
     AddressFamily family, SocketType sockType, bool doDns,
     sockaddr_storage& out, socklen_t& outLen, int* gaiErr = nullptr) {
-    std::memset(&out, 0, sizeof(out));
     if (family == AddressFamily::IPv6) {
         sockaddr_in6 a6{};
         a6.sin6_family = AF_INET6;
@@ -68,6 +67,7 @@ static SocketError resolveToSockaddr(const std::string& address, Port port,
         } else {
             return SocketError::BindFailed;
         }
+        std::memset(&out, 0, sizeof(out));
         std::memcpy(&out, &a6, sizeof(a6));
         outLen = sizeof(sockaddr_in6);
     } else {
@@ -94,6 +94,7 @@ static SocketError resolveToSockaddr(const std::string& address, Port port,
         } else {
             return SocketError::BindFailed;
         }
+        std::memset(&out, 0, sizeof(out));
         std::memcpy(&out, &a4, sizeof(a4));
         outLen = sizeof(sockaddr_in);
     }
