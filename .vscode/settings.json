@@ -1,6 +1,18 @@
 {
     "cmake.sourceDirectory": "/Users/stevekerr/Documents/AISocks",
     "chat.tools.terminal.autoApprove": {
-        "git check-ignore": true
+        "git check-ignore": true,
+        "/^\\./tests/test_new_features 2>&1 \\| grep -A4 \"throughput\\\\\\|time:\"$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^cd /Users/stevekerr/Documents/AISocks/build-release && \\./tests/test_new_features 2>&1 \\| grep -A5 \"bulk throughput\"$/": {
+            "approve": true,
+            "matchCommandLine": true
+        },
+        "/^\\./tests/test_new_features 2>&1 \\| grep -A6 \"bulk throughput\"$/": {
+            "approve": true,
+            "matchCommandLine": true
+        }
     }
 }

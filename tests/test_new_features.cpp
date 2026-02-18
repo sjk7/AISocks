@@ -342,8 +342,7 @@ static void test_udp_transfer() {
         // Fill with a recognisable pattern.
         constexpr size_t SZ = 8192;
         std::vector<char> out(SZ);
-        for (size_t i = 0; i < SZ; ++i)
-            out[i] = static_cast<char>(i & 0xFF);
+        for (size_t i = 0; i < SZ; ++i) out[i] = static_cast<char>(i & 0xFF);
 
         REQUIRE(cli.sendTo(out.data(), SZ, dest) == static_cast<int>(SZ));
 
@@ -413,8 +412,7 @@ static void test_bulk_throughput() {
 
         auto t0 = std::chrono::steady_clock::now();
 
-        for (int i = 0; i < COUNT; ++i)
-            cli.sendTo(pkt.data(), DGRAM, dest);
+        for (int i = 0; i < COUNT; ++i) cli.sendTo(pkt.data(), DGRAM, dest);
 
         auto t1 = std::chrono::steady_clock::now(); // time sender only
         senderDone = true;
