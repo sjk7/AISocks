@@ -16,7 +16,7 @@ int main() {
 
     BEGIN_TEST("Move constructor transfers validity");
     {
-        TcpSocket a;
+        auto a = TcpSocket::createRaw();
         REQUIRE(a.isValid());
         TcpSocket b(std::move(a));
         REQUIRE(b.isValid());
@@ -25,15 +25,15 @@ int main() {
 
     BEGIN_TEST("Move constructor transfers address family");
     {
-        TcpSocket a(AddressFamily::IPv6);
+        auto a = TcpSocket::createRaw(AddressFamily::IPv6);
         TcpSocket b(std::move(a));
         REQUIRE(b.getAddressFamily() == AddressFamily::IPv6);
     }
 
     BEGIN_TEST("Move assignment transfers validity");
     {
-        TcpSocket a;
-        TcpSocket b;
+        auto a = TcpSocket::createRaw();
+        auto b = TcpSocket::createRaw();
         b = std::move(a);
         REQUIRE(b.isValid());
         REQUIRE(!a.isValid());
@@ -42,8 +42,8 @@ int main() {
     BEGIN_TEST("Move assignment closes the displaced socket resource");
     {
         // b holds a valid socket; after move assignment, b's old socket is gone
-        TcpSocket a;
-        TcpSocket b;
+        auto a = TcpSocket::createRaw();
+        auto b = TcpSocket::createRaw();
         b = std::move(a);
         // No crash = the displaced socket was released cleanly
         REQUIRE_MSG(
@@ -52,7 +52,7 @@ int main() {
 
     BEGIN_TEST("Moved-from socket reports invalid");
     {
-        TcpSocket a;
+        auto a = TcpSocket::createRaw();
         TcpSocket b(std::move(a));
         REQUIRE(!a.isValid());
     }
@@ -64,7 +64,7 @@ int main() {
 
     BEGIN_TEST("getLastError on moved-from socket does not crash");
     {
-        TcpSocket a;
+        auto a = TcpSocket::createRaw();
         TcpSocket b(std::move(a));
         SocketError err = a.getLastError();
         (void)err;
@@ -73,7 +73,7 @@ int main() {
 
     BEGIN_TEST("getErrorMessage on moved-from socket does not crash");
     {
-        TcpSocket a;
+        auto a = TcpSocket::createRaw();
         TcpSocket b(std::move(a));
         std::string msg = a.getErrorMessage(); //-V808
         REQUIRE_MSG(
@@ -82,7 +82,7 @@ int main() {
 
     BEGIN_TEST("Self-move-assignment does not invalidate the socket");
     {
-        TcpSocket a;
+        auto a = TcpSocket::createRaw();
         TcpSocket& ref = a;
         ref = std::move(a); // self-move
         // After self-move the standard only requires the object is in a valid
@@ -94,8 +94,8 @@ int main() {
     BEGIN_TEST("Socket can be stored in a vector using move");
     {
         std::vector<TcpSocket> vec; //-V826
-        vec.emplace_back();
-        vec.emplace_back(AddressFamily::IPv6);
+        vec.emplace_back(TcpSocket::createRaw());
+        vec.emplace_back(TcpSocket::createRaw(AddressFamily::IPv6));
         REQUIRE(vec.size() == 2); //-V547
         REQUIRE(vec[0].isValid());
         REQUIRE(vec[1].isValid());

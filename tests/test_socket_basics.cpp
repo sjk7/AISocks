@@ -14,14 +14,14 @@ int main() {
 
     BEGIN_TEST("TCP/IPv4 socket is valid after construction");
     {
-        TcpSocket s;
+        auto s = TcpSocket::createRaw();
         REQUIRE(s.isValid());
         REQUIRE(s.getAddressFamily() == AddressFamily::IPv4);
     }
 
     BEGIN_TEST("TCP/IPv6 socket is valid after construction");
     {
-        TcpSocket s(AddressFamily::IPv6);
+        auto s = TcpSocket::createRaw(AddressFamily::IPv6);
         REQUIRE(s.isValid());
         REQUIRE(s.getAddressFamily() == AddressFamily::IPv6);
     }
@@ -42,20 +42,20 @@ int main() {
 
     BEGIN_TEST("Default constructor creates TCP/IPv4 socket");
     {
-        TcpSocket s;
+        auto s = TcpSocket::createRaw();
         REQUIRE(s.isValid());
         REQUIRE(s.getAddressFamily() == AddressFamily::IPv4);
     }
 
     BEGIN_TEST("Socket reports no error when freshly created");
     {
-        TcpSocket s;
+        auto s = TcpSocket::createRaw();
         REQUIRE(s.getLastError() == SocketError::None);
     }
 
     BEGIN_TEST("Socket is invalid after close()");
     {
-        TcpSocket s;
+        auto s = TcpSocket::createRaw();
         REQUIRE(s.isValid());
         s.close();
         REQUIRE(!s.isValid());
@@ -63,7 +63,7 @@ int main() {
 
     BEGIN_TEST("Calling close() twice does not crash");
     {
-        TcpSocket s;
+        auto s = TcpSocket::createRaw();
         s.close();
         s.close(); // must be safe
         REQUIRE_MSG(true, "double close() did not crash");
@@ -71,7 +71,7 @@ int main() {
 
     BEGIN_TEST("New socket is blocking by default");
     {
-        TcpSocket s;
+        auto s = TcpSocket::createRaw();
         REQUIRE(s.isBlocking());
     }
 

@@ -197,7 +197,7 @@ static void test_dns_error_message() {
     BEGIN_TEST(
         "DNS failure: non-throwing path — getErrorMessage contains hostname");
     {
-        TcpSocket s;
+        auto s = TcpSocket::createRaw();
         // connect() non-throwing path
         s.connect(BAD_HOST, Port{BASE + 10});
         std::string msg = s.getErrorMessage();
@@ -216,7 +216,7 @@ static void test_dns_error_message() {
 static void test_invalid_socket_code() {
     BEGIN_TEST("send() on closed socket: error code is InvalidSocket");
     {
-        TcpSocket s;
+        auto s = TcpSocket::createRaw();
         s.close();
         s.send("x", 1);
         REQUIRE(s.getLastError() == SocketError::InvalidSocket);
@@ -224,7 +224,7 @@ static void test_invalid_socket_code() {
 
     BEGIN_TEST("receive() on closed socket: error code is InvalidSocket");
     {
-        TcpSocket s;
+        auto s = TcpSocket::createRaw();
         s.close();
         char buf[16];
         s.receive(buf, sizeof(buf));
@@ -233,7 +233,7 @@ static void test_invalid_socket_code() {
 
     BEGIN_TEST("bind() on closed socket: error code is InvalidSocket");
     {
-        TcpSocket s;
+        auto s = TcpSocket::createRaw();
         s.close();
         REQUIRE(!s.bind("127.0.0.1", Port{BASE + 20}));
         REQUIRE(s.getLastError() == SocketError::InvalidSocket);
@@ -241,7 +241,7 @@ static void test_invalid_socket_code() {
 
     BEGIN_TEST("connect() on closed socket: error code is InvalidSocket");
     {
-        TcpSocket s;
+        auto s = TcpSocket::createRaw();
         s.close();
         s.connect("127.0.0.1", Port{BASE + 20});
         REQUIRE(s.getLastError() == SocketError::InvalidSocket);
@@ -268,7 +268,7 @@ static void test_invalid_socket_code() {
 
     BEGIN_TEST("setReceiveBufferSize() on closed socket: InvalidSocket");
     {
-        TcpSocket s;
+        auto s = TcpSocket::createRaw();
         s.close();
         s.setReceiveBufferSize(64 * 1024);
         REQUIRE(s.getLastError() == SocketError::InvalidSocket);
@@ -276,7 +276,7 @@ static void test_invalid_socket_code() {
 
     BEGIN_TEST("setSendBufferSize() on closed socket: InvalidSocket");
     {
-        TcpSocket s;
+        auto s = TcpSocket::createRaw();
         s.close();
         s.setSendBufferSize(64 * 1024);
         REQUIRE(s.getLastError() == SocketError::InvalidSocket);
@@ -290,7 +290,7 @@ static void test_invalid_socket_message_content() {
     BEGIN_TEST(
         "send() on closed socket: getErrorMessage() is non-empty with bracket");
     {
-        TcpSocket s;
+        auto s = TcpSocket::createRaw();
         s.close();
         s.send("x", 1);
         std::string msg = s.getErrorMessage();
@@ -331,7 +331,7 @@ static void test_error_clears_on_success() {
         "getErrorMessage(): returns empty string when lastError == None");
     {
         // Fresh socket — no error has ever occurred.
-        TcpSocket s;
+        auto s = TcpSocket::createRaw();
         REQUIRE(s.getLastError() == SocketError::None);
         REQUIRE_MSG(s.getErrorMessage().empty(),
             "getErrorMessage() is empty on fresh socket");
@@ -340,7 +340,7 @@ static void test_error_clears_on_success() {
     BEGIN_TEST(
         "getErrorMessage(): empty after a failure followed by a success");
     {
-        TcpSocket srv;
+        auto srv = TcpSocket::createRaw();
         srv.setReuseAddress(true);
         REQUIRE(srv.bind("127.0.0.1", Port{BASE + 40}));
         REQUIRE(srv.listen(1));
@@ -350,7 +350,7 @@ static void test_error_clears_on_success() {
             if (peer) peer->close();
         });
 
-        TcpSocket c;
+        auto c = TcpSocket::createRaw();
         // Trigger a failure first.
         c.connect("127.0.0.1", Port{1}); // refused
         REQUIRE(c.getLastError() != SocketError::None);
@@ -358,7 +358,7 @@ static void test_error_clears_on_success() {
 
         // Re-connect successfully (need a fresh socket since connect() on an
         // ECONNREFUSED socket is not retryable on all platforms).
-        TcpSocket c2;
+        auto c2 = TcpSocket::createRaw();
         REQUIRE(c2.connect("127.0.0.1", Port{BASE + 40}));
         REQUIRE(c2.getLastError() == SocketError::None);
         REQUIRE_MSG(c2.getErrorMessage().empty(),
@@ -374,14 +374,14 @@ static void test_error_clears_on_success() {
 static void test_post_shutdown_errors() {
     BEGIN_TEST("send() after shutdown(Write): returns -1 and sets an error");
     {
-        TcpSocket srv;
+        auto srv = TcpSocket::createRaw();
         srv.setReuseAddress(true);
         REQUIRE(srv.bind("127.0.0.1", Port{BASE + 50}));
         REQUIRE(srv.listen(1));
 
         std::thread t([&]() { srv.accept(); });
 
-        TcpSocket c;
+        auto c = TcpSocket::createRaw();
         REQUIRE(c.connect("127.0.0.1", Port{BASE + 50}));
         REQUIRE(c.shutdown(ShutdownHow::Write));
 
@@ -405,7 +405,7 @@ static void test_no_stale_error_on_fresh_socket() {
     BEGIN_TEST("Fresh socket: getLastError() == None, getErrorMessage() empty");
     {
         for (int i = 0; i < 5; ++i) {
-            TcpSocket s;
+            auto s = TcpSocket::createRaw();
             REQUIRE(s.getLastError() == SocketError::None);
             REQUIRE(s.getErrorMessage().empty());
         }
@@ -413,7 +413,7 @@ static void test_no_stale_error_on_fresh_socket() {
 
     BEGIN_TEST("After setReuseAddress(true): getLastError() == None");
     {
-        TcpSocket s;
+        auto s = TcpSocket::createRaw();
         REQUIRE(s.setReuseAddress(true));
         REQUIRE(s.getLastError() == SocketError::None);
         REQUIRE(s.getErrorMessage().empty());

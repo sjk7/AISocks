@@ -13,6 +13,10 @@ namespace aiSocks {
 
 TcpSocket::TcpSocket(AddressFamily family) : Socket(SocketType::TCP, family) {}
 
+TcpSocket TcpSocket::createRaw(AddressFamily family) {
+    return TcpSocket(family);
+}
+
 TcpSocket::TcpSocket(AddressFamily family, const ServerBind& cfg)
     : Socket(SocketType::TCP, family, cfg) {}
 

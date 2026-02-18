@@ -21,7 +21,7 @@ void runServer(const std::string& bindAddr) {
     std::cout << "Starting server on " << bindAddr << ":" << TEST_PORT
               << "...\n";
 
-    TcpSocket serverSocket;
+    auto serverSocket = TcpSocket::createRaw();
     serverSocket.setReuseAddress(true);
 
     if (!serverSocket.bind(bindAddr, Port{TEST_PORT})) {
@@ -81,7 +81,7 @@ void runClient(const std::string& addr) {
     std::this_thread::sleep_for(std::chrono::milliseconds(200));
     std::cout << "Connecting to " << addr << ":" << TEST_PORT << "...\n";
 
-    TcpSocket clientSocket;
+    auto clientSocket = TcpSocket::createRaw();
     if (!clientSocket.connect(addr, Port{TEST_PORT})) {
         std::cerr << "Connect failed: " << clientSocket.getErrorMessage()
                   << "\n";
