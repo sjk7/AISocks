@@ -15,9 +15,11 @@
 #include "test_helpers.h"
 #include <atomic>
 #include <chrono>
+#include <cstdio>
 #include <cstring>
 #include <string>
 #include <thread>
+#include <vector>
 
 using namespace aiSocks;
 
@@ -249,6 +251,109 @@ static void test_udp_connected() {
 }
 
 // -----------------------------------------------------------------------
+// 4c. UDP transfer tests — payload integrity, bidirectional echo,
+//     max-size datagrams.
+// -----------------------------------------------------------------------
+// Notable UDP constraints exercised here:
+//   • UDP is message-oriented: each send() produces exactly one recvfrom()
+//     with the same byte count.
+//   • A datagram that is too large for the receiver's buffer is silently
+//     truncated (POSIX) or returns WSAEMSGSIZE (Windows); we stay well
+//     under the safe loopback MTU (~65507 bytes) with 8192-byte payloads.
+//   • Datagram order is not guaranteed in general but IS preserved on
+//     loopback — we rely on this for the sequenced echo test.
+static void test_udp_transfer() {
+    BEGIN_TEST("UDP transfer: 20 datagrams, sequential payload integrity");
+    {
+        UdpSocket srv;
+        srv.setReuseAddress(true);
+        REQUIRE(srv.bind("127.0.0.1", Port{BASE + 50}));
+        srv.setReceiveTimeout(Milliseconds{2000});
+
+        UdpSocket cli;
+        Endpoint dest{"127.0.0.1", Port{BASE + 50}, AddressFamily::IPv4};
+
+        for (int i = 0; i < 20; ++i) {
+            // Build a payload with a recognisable sequence number embedded.
+            char payload[64];
+            int payloadLen
+                = std::snprintf(payload, sizeof(payload), "datagram-%03d", i);
+            REQUIRE(payloadLen > 0);
+
+            int s = cli.sendTo(payload, static_cast<size_t>(payloadLen), dest);
+            REQUIRE(s == payloadLen);
+
+            char buf[128] = {};
+            Endpoint from;
+            int r = srv.receiveFrom(buf, sizeof(buf), from);
+            REQUIRE(r == payloadLen);
+            REQUIRE(std::string(buf, static_cast<size_t>(r))
+                == std::string(payload, static_cast<size_t>(payloadLen)));
+        }
+    }
+
+    BEGIN_TEST(
+        "UDP transfer: bidirectional echo (client sends, server echoes)");
+    {
+        UdpSocket srv;
+        srv.setReuseAddress(true);
+        REQUIRE(srv.bind("127.0.0.1", Port{BASE + 51}));
+        srv.setReceiveTimeout(Milliseconds{2000});
+
+        UdpSocket cli;
+        cli.setReceiveTimeout(Milliseconds{2000});
+        Endpoint srvAddr{"127.0.0.1", Port{BASE + 51}, AddressFamily::IPv4};
+
+        for (int i = 0; i < 5; ++i) {
+            std::string out = "echo-" + std::to_string(i);
+
+            // Client → server
+            REQUIRE(cli.sendTo(out.data(), out.size(), srvAddr)
+                == static_cast<int>(out.size()));
+
+            // Server echoes back to origin
+            char recvBuf[64] = {};
+            Endpoint from;
+            int r = srv.receiveFrom(recvBuf, sizeof(recvBuf), from);
+            REQUIRE(r == static_cast<int>(out.size()));
+            srv.sendTo(recvBuf, static_cast<size_t>(r), from);
+
+            // Client receives echo
+            char echoBuf[64] = {};
+            Endpoint ignored;
+            int er = cli.receiveFrom(echoBuf, sizeof(echoBuf), ignored);
+            REQUIRE(er == static_cast<int>(out.size()));
+            REQUIRE(std::string(echoBuf, static_cast<size_t>(er)) == out);
+        }
+    }
+
+    BEGIN_TEST("UDP transfer: 8192-byte datagram round-trip");
+    {
+        UdpSocket srv;
+        srv.setReuseAddress(true);
+        REQUIRE(srv.bind("127.0.0.1", Port{BASE + 52}));
+        srv.setReceiveTimeout(Milliseconds{2000});
+
+        UdpSocket cli;
+        Endpoint dest{"127.0.0.1", Port{BASE + 52}, AddressFamily::IPv4};
+
+        // Fill with a recognisable pattern.
+        constexpr size_t SZ = 8192;
+        std::vector<char> out(SZ);
+        for (size_t i = 0; i < SZ; ++i)
+            out[i] = static_cast<char>(i & 0xFF);
+
+        REQUIRE(cli.sendTo(out.data(), SZ, dest) == static_cast<int>(SZ));
+
+        std::vector<char> in(SZ + 1, 0);
+        Endpoint from;
+        int r = srv.receiveFrom(in.data(), in.size(), from);
+        REQUIRE(r == static_cast<int>(SZ));
+        REQUIRE(std::memcmp(out.data(), in.data(), SZ) == 0);
+    }
+}
+
+// -----------------------------------------------------------------------
 // 5. Span-based send / receive overloads
 // -----------------------------------------------------------------------
 static void test_span_overloads() {
@@ -462,6 +567,7 @@ int main() {
     test_no_delay();
     test_udp();
     test_udp_connected();
+    test_udp_transfer();
     test_span_overloads();
     test_buffer_sizes();
     test_shutdown();
