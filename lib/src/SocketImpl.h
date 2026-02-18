@@ -28,6 +28,7 @@ using SocketHandle = SOCKET;
 #include <netdb.h>
 #include <errno.h>
 #include <ifaddrs.h>
+#include <net/if.h>      // IFF_LOOPBACK
 #include <netinet/tcp.h>
 using SocketHandle = int;
 #define INVALID_SOCKET_HANDLE -1
