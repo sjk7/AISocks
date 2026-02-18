@@ -134,8 +134,8 @@ class SocketImpl {
     mutable bool errorMessageDirty{false};
 
     bool blockingMode{true};
-    bool shutdownCalled_{false}; // true after user calls shutdown(); close()
-                                 // skips redundant ::shutdown()
+    // true after user calls shutdown(); close() skips redundant ::shutdown()
+    bool shutdownCalled_{false};
 
     // Hot-path setter: stores a pointer to a string literal — zero allocation.
     void setError(SocketError error, const char* description) noexcept;

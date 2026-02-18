@@ -1,0 +1,77 @@
+---
+Language: Cpp
+Standard: c++17
+
+BasedOnStyle: LLVM
+
+# Indentation
+IndentWidth: 4
+ContinuationIndentWidth: 4
+TabWidth: 4
+UseTab: Never
+NamespaceIndentation: Inner
+IndentCaseLabels: true
+AccessModifierOffset: 0   # public:/private: at same indent level as members
+
+# Line length
+ColumnLimit: 80
+
+# Braces
+BreakBeforeBraces: Attach
+
+# Function parameters / call arguments — don't align to opening paren;
+# continuation lines get a simple +ContinuationIndentWidth indent instead.
+AlignAfterOpenBracket: DontAlign
+BinPackParameters: true
+BinPackArguments: true
+AllowAllParametersOfDeclarationOnNextLine: true
+
+# Constructor initialisers — each member on its own line.
+BreakConstructorInitializersBeforeComma: true
+ConstructorInitializerAllOnOneLineOrOnePerLine: true
+ConstructorInitializerIndentWidth: 4
+
+# Short forms
+AllowShortFunctionsOnASingleLine: Inline
+AllowShortIfStatementsOnASingleLine: WithoutElse
+AllowShortLoopsOnASingleLine: false
+AllowShortBlocksOnASingleLine: false
+
+# Pointers / references — attach to the type, not the name.
+PointerAlignment: Left
+DerivePointerAlignment: false
+
+# Operators
+AlignOperands: false
+BreakBeforeBinaryOperators: All
+BreakBeforeTernaryOperators: true
+
+# Comments
+AlignTrailingComments: false
+ReflowComments: false       # don't reflow hand-wrapped comments/docs
+SpacesBeforeTrailingComments: 1
+
+# Includes — preserve hand-ordered include groups.
+SortIncludes: false
+
+# Alignment
+AlignConsecutiveAssignments: false
+AlignConsecutiveDeclarations: false
+AlignEscapedNewlines: Left
+
+# Spaces
+SpaceAfterCStyleCast: false
+SpaceBeforeAssignmentOperators: true
+SpaceBeforeParens: ControlStatements
+SpacesInAngles: false
+SpacesInParentheses: false
+SpacesInSquareBrackets: false
+SpacesInContainerLiterals: false
+
+# Penalties (discourage ugly line breaks)
+PenaltyBreakBeforeFirstCallParameter: 19
+PenaltyBreakComment: 300
+PenaltyBreakString: 1000
+PenaltyExcessCharacter: 1000000
+PenaltyReturnTypeOnItsOwnLine: 60
+...

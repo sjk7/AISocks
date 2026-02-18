@@ -4,14 +4,13 @@
 #include <iostream>
 #include <iomanip>
 
-
 #ifdef SOMAXCONN
-error ("SOMAXCONN is defined, which may cause issues with our "
-       "SocketImpl::listen() method. Compiler firewall broken!");
-       
+error("SOMAXCONN is defined, which may cause issues with our "
+      "SocketImpl::listen() method. Compiler firewall broken!");
+
 #endif
 
-    using namespace aiSocks;
+using namespace aiSocks;
 
 int main() {
     std::cout << "=== aiSocks IP Address Utilities Test ===" << std::endl;
@@ -42,7 +41,8 @@ int main() {
 
     // Test 2: Validate IPv4 addresses
     std::cout << "=== IPv4 Address Validation ===" << std::endl;
-    std::vector<std::string> ipv4Tests = { //-V826
+    std::vector<std::string> ipv4Tests = {
+        //-V826
         "127.0.0.1", "192.168.1.1", "10.0.0.1",
         "256.256.256.256", // Invalid
         "192.168.1", // Invalid
@@ -58,7 +58,8 @@ int main() {
 
     // Test 3: Validate IPv6 addresses
     std::cout << "=== IPv6 Address Validation ===" << std::endl;
-    std::vector<std::string> ipv6Tests = { //-V826
+    std::vector<std::string> ipv6Tests = {
+        //-V826
         "::1", "fe80::1", "2001:0db8:85a3:0000:0000:8a2e:0370:7334",
         "2001:db8::1",
         "::ffff:192.168.1.1", // IPv4-mapped IPv6
