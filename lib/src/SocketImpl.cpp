@@ -181,6 +181,18 @@ SocketImpl::SocketImpl(
     , addressFamily(family)
     , lastError(SocketError::None)
     , blockingMode(true) {
+    // Accepted sockets inherit the server fd's blocking mode, which may differ
+    // from our default.  Query the kernel so isBlocking() reflects reality.
+#ifndef _WIN32
+    if (handle != INVALID_SOCKET_HANDLE) {
+        int flags = ::fcntl(handle, F_GETFL, 0);
+        if (flags != -1)
+            blockingMode = (flags & O_NONBLOCK) == 0;
+    }
+#else
+    // Windows: no portable way to query FIONBIO state; default (true) is
+    // correct because accepted sockets always start in blocking mode on WinSock.
+#endif
 #ifdef SO_NOSIGPIPE
     if (socketHandle != INVALID_SOCKET_HANDLE) {
         int noSigPipe = 1;
@@ -832,8 +844,16 @@ int SocketImpl::sendTo(
 
     sockaddr_storage addr{};
     socklen_t addrLen = 0;
-    resolveToSockaddr(remote.address, remote.port, remote.family, socketType,
-        /*doDns=*/false, addr, addrLen);
+    {
+        auto rr = resolveToSockaddr(remote.address, remote.port, remote.family,
+            socketType, /*doDns=*/false, addr, addrLen);
+        if (rr != SocketError::None) {
+            setError(SocketError::SendFailed,
+                "sendTo(): invalid destination address '" + remote.address
+                    + "'");
+            return -1;
+        }
+    }
 
     for (;;) {
 #ifdef _WIN32
@@ -1266,6 +1286,8 @@ std::vector<NetworkInterface> SocketImpl::getLocalAddresses() {
             iface.name = ifa->ifa_name;
 
             int family = ifa->ifa_addr->sa_family;
+            // Use IFF_LOOPBACK (POSIX) — reliable on macOS (lo0) and Linux (lo).
+            const bool isLo = (ifa->ifa_flags & IFF_LOOPBACK) != 0;
             if (family == AF_INET) {
                 char buffer[INET_ADDRSTRLEN];
                 sockaddr_in* sin
@@ -1273,8 +1295,7 @@ std::vector<NetworkInterface> SocketImpl::getLocalAddresses() {
                 inet_ntop(AF_INET, &sin->sin_addr, buffer, INET_ADDRSTRLEN);
                 iface.address = buffer;
                 iface.family = AddressFamily::IPv4;
-                iface.isLoopback
-                    = (iface.name == "lo" || iface.address == "127.0.0.1");
+                iface.isLoopback = isLo;
                 interfaces.push_back(iface);
             } else if (family == AF_INET6) {
                 char buffer[INET6_ADDRSTRLEN];
@@ -1283,8 +1304,7 @@ std::vector<NetworkInterface> SocketImpl::getLocalAddresses() {
                 inet_ntop(AF_INET6, &sin6->sin6_addr, buffer, INET6_ADDRSTRLEN);
                 iface.address = buffer;
                 iface.family = AddressFamily::IPv6;
-                iface.isLoopback
-                    = (iface.name == "lo" || iface.address == "::1");
+                iface.isLoopback = isLo;
                 interfaces.push_back(iface);
             }
         }

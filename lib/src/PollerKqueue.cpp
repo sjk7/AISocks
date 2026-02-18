@@ -63,9 +63,34 @@ bool Poller::add(const Socket& s, PollEvent interest) {
 }
 
 bool Poller::modify(const Socket& s, PollEvent interest) {
-    // Remove both filters unconditionally, then re-add with new interest.
-    remove(s);
-    return add(s, interest);
+    // Update both filters atomically with a single kevent() call using
+    // EV_ADD (which acts as modify when already registered) and EV_DELETE
+    // for filters that are no longer wanted.  This avoids the remove→add
+    // gap during which an event on the fd could be lost.
+    auto fd = static_cast<int>(s.getNativeHandle());
+    if (fd == -1) return false;
+
+    struct kevent changes[2];
+    int n = 0;
+    // Add/enable desired filters.
+    if (hasFlag(interest, PollEvent::Readable)) {
+        EV_SET(&changes[n++], static_cast<uintptr_t>(fd), EVFILT_READ,
+            EV_ADD | EV_ENABLE, 0, 0, nullptr);
+    } else {
+        EV_SET(&changes[n++], static_cast<uintptr_t>(fd), EVFILT_READ,
+            EV_DELETE, 0, 0, nullptr);
+    }
+    if (hasFlag(interest, PollEvent::Writable)) {
+        EV_SET(&changes[n++], static_cast<uintptr_t>(fd), EVFILT_WRITE,
+            EV_ADD | EV_ENABLE, 0, 0, nullptr);
+    } else {
+        EV_SET(&changes[n++], static_cast<uintptr_t>(fd), EVFILT_WRITE,
+            EV_DELETE, 0, 0, nullptr);
+    }
+    // kevent() returns ENOENT for filters that were not registered — benign.
+    ::kevent(pImpl_->kq, changes, n, nullptr, 0, nullptr);
+    pImpl_->sockets[static_cast<uintptr_t>(fd)] = &s;
+    return true;
 }
 
 bool Poller::remove(const Socket& s) {

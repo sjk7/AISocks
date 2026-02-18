@@ -9,13 +9,6 @@
 
 namespace aiSocks {
 
-namespace detail {
-    // C++17-compatible no-op progress callback default type.
-    struct NoOpProgress {
-        void operator()(size_t /*sent*/, size_t /*total*/) const noexcept {}
-    };
-} // namespace detail
-
 // ---------------------------------------------------------------------------
 // TcpSocket — type-safe TCP socket.
 //
@@ -103,15 +96,22 @@ class TcpSocket : public Socket {
     }
     bool receiveAll(Span<std::byte> buffer) { return doReceiveAll(buffer); }
 
-    // sendAll with per-completion progress callback.
-    // Fn signature: void(size_t bytesSent, size_t total)
-    template <typename Fn = detail::NoOpProgress>
-    bool sendAll(const void* data, size_t length, Fn&& progress = Fn{}) {
-        bool ok = doSendAll(data, length);
-        if (ok) {
-            std::forward<Fn>(progress)(length, length);
+    // sendAll with a per-chunk progress callback.
+    // `progress` is called after each successful write with the cumulative
+    // bytes sent so far and the total requested.  On error the callback
+    // reflects the last successfully sent offset.
+    // Fn signature: void(size_t bytesSentSoFar, size_t total)
+    template <typename Fn>
+    bool sendAll(const void* data, size_t length, Fn&& progress) {
+        const auto* ptr    = static_cast<const char*>(data);
+        size_t      sent   = 0;
+        while (sent < length) {
+            int n = doSend(ptr + sent, length - sent);
+            if (n <= 0) return false;
+            sent += static_cast<size_t>(n);
+            std::forward<Fn>(progress)(sent, length);
         }
-        return ok;
+        return true;
     }
 
     private:
