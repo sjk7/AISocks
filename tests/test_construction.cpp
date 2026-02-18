@@ -64,7 +64,7 @@ static void test_server_bind_happy() {
         REQUIRE(!threw);
     }
 
-    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
 
     BEGIN_TEST("ServerBind ctor: can immediately accept a connection");
     {
@@ -77,12 +77,12 @@ static void test_server_bind_happy() {
             ready = true;
 
             std::thread clt([&]() {
-                // Wait a moment then connect
-                std::this_thread::sleep_for(std::chrono::milliseconds(30));
+                // server is already blocking on accept(); connect immediately
                 try {
                     Socket c(SocketType::TCP, AddressFamily::IPv4,
                         ConnectTo{"127.0.0.1", Port{BASE + 1}});
-                    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+                    // peer closes on scope exit — accept() on server side has
+                    // already returned by the time connect() completes
                 } catch (...) {
                 }
             });
@@ -97,7 +97,7 @@ static void test_server_bind_happy() {
         REQUIRE(!threw);
     }
 
-    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
 
     BEGIN_TEST("ServerBind ctor: reuseAddr=false still works on a fresh port");
     {
@@ -118,7 +118,7 @@ static void test_server_bind_happy() {
 // Happy paths – ConnectTo constructor
 // -----------------------------------------------------------------------
 static void test_connect_to_happy() {
-    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
 
     BEGIN_TEST("ConnectTo ctor: creates a connected socket");
     {
@@ -131,10 +131,8 @@ static void test_connect_to_happy() {
                     ServerBind{"127.0.0.1", Port{BASE + 3}});
                 ready = true;
                 auto peer = srv.accept();
-                if (peer) {
-                    std::this_thread::sleep_for(std::chrono::milliseconds(200));
-                    peer->close();
-                }
+                // peer closes on scope exit; isValid() on the client side
+                // checks the fd, not the liveness of the peer
             } catch (...) {
                 ready = true;
             }
@@ -158,7 +156,7 @@ static void test_connect_to_happy() {
         REQUIRE(!threw);
     }
 
-    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
 
     BEGIN_TEST(
         "ConnectTo ctor: send/receive works immediately after construction");
@@ -208,7 +206,7 @@ static void test_connect_to_happy() {
 // Unhappy paths – exceptions on construction failure
 // -----------------------------------------------------------------------
 static void test_server_bind_failures() {
-    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
 
     BEGIN_TEST("ServerBind ctor: throws SocketException on port-in-use (same "
                "port, no reuseAddr)");
@@ -237,7 +235,7 @@ static void test_server_bind_failures() {
         std::cout << "  exception message: " << what << "\n";
     }
 
-    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
 
     BEGIN_TEST(
         "ServerBind ctor: throws SocketException on invalid bind address");
@@ -280,7 +278,7 @@ static void test_server_bind_failures() {
 }
 
 static void test_connect_to_failures() {
-    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
 
     BEGIN_TEST(
         "ConnectTo ctor: throws SocketException when nothing is listening");
@@ -418,7 +416,7 @@ static void test_exception_is_std_exception() {
 // Move semantics still work with throwing constructors
 // -----------------------------------------------------------------------
 static void test_move_after_server_bind() {
-    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
 
     BEGIN_TEST("ServerBind socket can be move-constructed");
     {
@@ -440,13 +438,23 @@ static void test_move_after_server_bind() {
 int main() {
     std::cout << "=== Constructor Correctness Tests ===\n";
 
-    test_basic_constructor();
-    test_server_bind_happy();
-    test_connect_to_happy();
-    test_server_bind_failures();
-    test_connect_to_failures();
-    test_exception_is_std_exception();
-    test_move_after_server_bind();
+    using clock = std::chrono::steady_clock;
+    auto time = [&](const char* name, auto fn) {
+        auto t0 = clock::now();
+        fn();
+        auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+            clock::now() - t0)
+                      .count();
+        std::cout << "  [timing] " << name << ": " << ms << " ms\n";
+    };
+
+    time("test_basic_constructor", test_basic_constructor);
+    time("test_server_bind_happy", test_server_bind_happy);
+    time("test_connect_to_happy", test_connect_to_happy);
+    time("test_server_bind_failures", test_server_bind_failures);
+    time("test_connect_to_failures", test_connect_to_failures);
+    time("test_exception_is_std_exception", test_exception_is_std_exception);
+    time("test_move_after_server_bind", test_move_after_server_bind);
 
     return test_summary();
 }
