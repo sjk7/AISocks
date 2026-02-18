@@ -19,7 +19,8 @@
 //   6. Closed-socket operations produce SocketError::InvalidSocket
 //   specifically.
 
-#include "Socket.h"
+#include "TcpSocket.h"
+#include "UdpSocket.h"
 #include "test_helpers.h"
 #include <atomic>
 #include <cstring>
@@ -59,7 +60,7 @@ static void test_connect_exception_message() {
     {
         std::string what;
         try {
-            Socket c(SocketType::TCP, AddressFamily::IPv4,
+            TcpSocket c(AddressFamily::IPv4,
                 ConnectTo{"127.0.0.1", Port{1}});
         } catch (const SocketException& e) {
             what = e.what();
@@ -78,7 +79,7 @@ static void test_connect_exception_message() {
     {
         SocketError code = SocketError::None;
         try {
-            Socket c(SocketType::TCP, AddressFamily::IPv4,
+            TcpSocket c(AddressFamily::IPv4,
                 ConnectTo{"127.0.0.1", Port{1}});
         } catch (const SocketException& e) {
             code = e.errorCode();
@@ -90,7 +91,7 @@ static void test_connect_exception_message() {
     {
         std::string what;
         try {
-            Socket c(SocketType::TCP, AddressFamily::IPv4,
+            TcpSocket c(AddressFamily::IPv4,
                 ConnectTo{"127.0.0.1", Port{2}});
         } catch (const SocketException& e) {
             what = e.what();
@@ -107,11 +108,11 @@ static void test_bind_exception_message() {
     BEGIN_TEST(
         "ServerBind exception: what() contains step, address, and OS bracket");
     {
-        Socket occupant(SocketType::TCP, AddressFamily::IPv4,
+        TcpSocket occupant(AddressFamily::IPv4,
             ServerBind{"127.0.0.1", Port{BASE}, 5, false});
         std::string what;
         try {
-            Socket s(SocketType::TCP, AddressFamily::IPv4,
+            TcpSocket s(AddressFamily::IPv4,
                 ServerBind{"127.0.0.1", Port{BASE}, 5, false});
         } catch (const SocketException& e) {
             what = e.what();
@@ -128,11 +129,11 @@ static void test_bind_exception_message() {
 
     BEGIN_TEST("ServerBind exception: errorCode() == BindFailed");
     {
-        Socket occupant(SocketType::TCP, AddressFamily::IPv4,
+        TcpSocket occupant(AddressFamily::IPv4,
             ServerBind{"127.0.0.1", Port{BASE + 1}, 5, false});
         SocketError code = SocketError::None;
         try {
-            Socket s(SocketType::TCP, AddressFamily::IPv4,
+            TcpSocket s(AddressFamily::IPv4,
                 ServerBind{"127.0.0.1", Port{BASE + 1}, 5, false});
         } catch (const SocketException& e) {
             code = e.errorCode();
@@ -153,7 +154,7 @@ static void test_dns_error_message() {
     {
         std::string what;
         try {
-            Socket c(SocketType::TCP, AddressFamily::IPv4,
+            TcpSocket c(AddressFamily::IPv4,
                 ConnectTo{BAD_HOST, Port{BASE + 10}});
         } catch (const SocketException& e) {
             what = e.what();
@@ -169,7 +170,7 @@ static void test_dns_error_message() {
     {
         std::string what;
         try {
-            Socket c(SocketType::TCP, AddressFamily::IPv4,
+            TcpSocket c(AddressFamily::IPv4,
                 ConnectTo{BAD_HOST, Port{BASE + 10}});
         } catch (const SocketException& e) {
             what = e.what();
@@ -184,7 +185,7 @@ static void test_dns_error_message() {
     {
         std::string what;
         try {
-            Socket c(SocketType::TCP, AddressFamily::IPv4,
+            TcpSocket c(AddressFamily::IPv4,
                 ConnectTo{BAD_HOST, Port{BASE + 10}});
         } catch (const SocketException& e) {
             what = e.what();
@@ -196,7 +197,7 @@ static void test_dns_error_message() {
     BEGIN_TEST(
         "DNS failure: non-throwing path — getErrorMessage contains hostname");
     {
-        Socket s(SocketType::TCP, AddressFamily::IPv4);
+        TcpSocket s;
         // connect() non-throwing path
         s.connect(BAD_HOST, Port{BASE + 10});
         std::string msg = s.getErrorMessage();
@@ -215,7 +216,7 @@ static void test_dns_error_message() {
 static void test_invalid_socket_code() {
     BEGIN_TEST("send() on closed socket: error code is InvalidSocket");
     {
-        Socket s(SocketType::TCP, AddressFamily::IPv4);
+        TcpSocket s;
         s.close();
         s.send("x", 1);
         REQUIRE(s.getLastError() == SocketError::InvalidSocket);
@@ -223,7 +224,7 @@ static void test_invalid_socket_code() {
 
     BEGIN_TEST("receive() on closed socket: error code is InvalidSocket");
     {
-        Socket s(SocketType::TCP, AddressFamily::IPv4);
+        TcpSocket s;
         s.close();
         char buf[16];
         s.receive(buf, sizeof(buf));
@@ -232,7 +233,7 @@ static void test_invalid_socket_code() {
 
     BEGIN_TEST("bind() on closed socket: error code is InvalidSocket");
     {
-        Socket s(SocketType::TCP, AddressFamily::IPv4);
+        TcpSocket s;
         s.close();
         REQUIRE(!s.bind("127.0.0.1", Port{BASE + 20}));
         REQUIRE(s.getLastError() == SocketError::InvalidSocket);
@@ -240,7 +241,7 @@ static void test_invalid_socket_code() {
 
     BEGIN_TEST("connect() on closed socket: error code is InvalidSocket");
     {
-        Socket s(SocketType::TCP, AddressFamily::IPv4);
+        TcpSocket s;
         s.close();
         s.connect("127.0.0.1", Port{BASE + 20});
         REQUIRE(s.getLastError() == SocketError::InvalidSocket);
@@ -248,7 +249,7 @@ static void test_invalid_socket_code() {
 
     BEGIN_TEST("sendTo() on closed socket: error code is InvalidSocket");
     {
-        Socket s(SocketType::UDP, AddressFamily::IPv4);
+        UdpSocket s;
         s.close();
         Endpoint dest{"127.0.0.1", Port{BASE + 20}, AddressFamily::IPv4};
         s.sendTo("x", 1, dest);
@@ -257,7 +258,7 @@ static void test_invalid_socket_code() {
 
     BEGIN_TEST("receiveFrom() on closed socket: error code is InvalidSocket");
     {
-        Socket s(SocketType::UDP, AddressFamily::IPv4);
+        UdpSocket s;
         s.close();
         char buf[16];
         Endpoint from;
@@ -267,7 +268,7 @@ static void test_invalid_socket_code() {
 
     BEGIN_TEST("setReceiveBufferSize() on closed socket: InvalidSocket");
     {
-        Socket s(SocketType::TCP, AddressFamily::IPv4);
+        TcpSocket s;
         s.close();
         s.setReceiveBufferSize(64 * 1024);
         REQUIRE(s.getLastError() == SocketError::InvalidSocket);
@@ -275,7 +276,7 @@ static void test_invalid_socket_code() {
 
     BEGIN_TEST("setSendBufferSize() on closed socket: InvalidSocket");
     {
-        Socket s(SocketType::TCP, AddressFamily::IPv4);
+        TcpSocket s;
         s.close();
         s.setSendBufferSize(64 * 1024);
         REQUIRE(s.getLastError() == SocketError::InvalidSocket);
@@ -289,7 +290,7 @@ static void test_invalid_socket_message_content() {
     BEGIN_TEST(
         "send() on closed socket: getErrorMessage() is non-empty with bracket");
     {
-        Socket s(SocketType::TCP, AddressFamily::IPv4);
+        TcpSocket s;
         s.close();
         s.send("x", 1);
         std::string msg = s.getErrorMessage();
@@ -303,7 +304,7 @@ static void test_invalid_socket_message_content() {
 
     BEGIN_TEST("sendTo() on closed socket: getErrorMessage() is non-empty");
     {
-        Socket s(SocketType::UDP, AddressFamily::IPv4);
+        UdpSocket s;
         s.close();
         Endpoint dest{"127.0.0.1", Port{BASE + 30}, AddressFamily::IPv4};
         s.sendTo("x", 1, dest);
@@ -313,7 +314,7 @@ static void test_invalid_socket_message_content() {
     BEGIN_TEST(
         "receiveFrom() on closed socket: getErrorMessage() is non-empty");
     {
-        Socket s(SocketType::UDP, AddressFamily::IPv4);
+        UdpSocket s;
         s.close();
         char buf[16];
         Endpoint from;
@@ -330,7 +331,7 @@ static void test_error_clears_on_success() {
         "getErrorMessage(): returns empty string when lastError == None");
     {
         // Fresh socket — no error has ever occurred.
-        Socket s(SocketType::TCP, AddressFamily::IPv4);
+        TcpSocket s;
         REQUIRE(s.getLastError() == SocketError::None);
         REQUIRE_MSG(s.getErrorMessage().empty(),
             "getErrorMessage() is empty on fresh socket");
@@ -339,7 +340,7 @@ static void test_error_clears_on_success() {
     BEGIN_TEST(
         "getErrorMessage(): empty after a failure followed by a success");
     {
-        Socket srv(SocketType::TCP, AddressFamily::IPv4);
+        TcpSocket srv;
         srv.setReuseAddress(true);
         REQUIRE(srv.bind("127.0.0.1", Port{BASE + 40}));
         REQUIRE(srv.listen(1));
@@ -349,7 +350,7 @@ static void test_error_clears_on_success() {
             if (peer) peer->close();
         });
 
-        Socket c(SocketType::TCP, AddressFamily::IPv4);
+        TcpSocket c;
         // Trigger a failure first.
         c.connect("127.0.0.1", Port{1}); // refused
         REQUIRE(c.getLastError() != SocketError::None);
@@ -357,7 +358,7 @@ static void test_error_clears_on_success() {
 
         // Re-connect successfully (need a fresh socket since connect() on an
         // ECONNREFUSED socket is not retryable on all platforms).
-        Socket c2(SocketType::TCP, AddressFamily::IPv4);
+        TcpSocket c2;
         REQUIRE(c2.connect("127.0.0.1", Port{BASE + 40}));
         REQUIRE(c2.getLastError() == SocketError::None);
         REQUIRE_MSG(c2.getErrorMessage().empty(),
@@ -373,14 +374,14 @@ static void test_error_clears_on_success() {
 static void test_post_shutdown_errors() {
     BEGIN_TEST("send() after shutdown(Write): returns -1 and sets an error");
     {
-        Socket srv(SocketType::TCP, AddressFamily::IPv4);
+        TcpSocket srv;
         srv.setReuseAddress(true);
         REQUIRE(srv.bind("127.0.0.1", Port{BASE + 50}));
         REQUIRE(srv.listen(1));
 
         std::thread t([&]() { srv.accept(); });
 
-        Socket c(SocketType::TCP, AddressFamily::IPv4);
+        TcpSocket c;
         REQUIRE(c.connect("127.0.0.1", Port{BASE + 50}));
         REQUIRE(c.shutdown(ShutdownHow::Write));
 
@@ -404,7 +405,7 @@ static void test_no_stale_error_on_fresh_socket() {
     BEGIN_TEST("Fresh socket: getLastError() == None, getErrorMessage() empty");
     {
         for (int i = 0; i < 5; ++i) {
-            Socket s(SocketType::TCP, AddressFamily::IPv4);
+            TcpSocket s;
             REQUIRE(s.getLastError() == SocketError::None);
             REQUIRE(s.getErrorMessage().empty());
         }
@@ -412,7 +413,7 @@ static void test_no_stale_error_on_fresh_socket() {
 
     BEGIN_TEST("After setReuseAddress(true): getLastError() == None");
     {
-        Socket s(SocketType::TCP, AddressFamily::IPv4);
+        TcpSocket s;
         REQUIRE(s.setReuseAddress(true));
         REQUIRE(s.getLastError() == SocketError::None);
         REQUIRE(s.getErrorMessage().empty());

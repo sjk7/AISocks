@@ -5,7 +5,7 @@
 // Tests: Move constructor and move assignment operator.
 // Checks observable behaviour only.
 
-#include "Socket.h"
+#include "TcpSocket.h"
 #include "test_helpers.h"
 #include <vector>
 
@@ -16,24 +16,24 @@ int main() {
 
     BEGIN_TEST("Move constructor transfers validity");
     {
-        Socket a(SocketType::TCP, AddressFamily::IPv4);
+        TcpSocket a;
         REQUIRE(a.isValid());
-        Socket b(std::move(a));
+        TcpSocket b(std::move(a));
         REQUIRE(b.isValid());
         REQUIRE(!a.isValid());
     }
 
     BEGIN_TEST("Move constructor transfers address family");
     {
-        Socket a(SocketType::TCP, AddressFamily::IPv6);
-        Socket b(std::move(a));
+        TcpSocket a(AddressFamily::IPv6);
+        TcpSocket b(std::move(a));
         REQUIRE(b.getAddressFamily() == AddressFamily::IPv6);
     }
 
     BEGIN_TEST("Move assignment transfers validity");
     {
-        Socket a(SocketType::TCP, AddressFamily::IPv4);
-        Socket b(SocketType::TCP, AddressFamily::IPv4);
+        TcpSocket a;
+        TcpSocket b;
         b = std::move(a);
         REQUIRE(b.isValid());
         REQUIRE(!a.isValid());
@@ -42,8 +42,8 @@ int main() {
     BEGIN_TEST("Move assignment closes the displaced socket resource");
     {
         // b holds a valid socket; after move assignment, b's old socket is gone
-        Socket a(SocketType::TCP, AddressFamily::IPv4);
-        Socket b(SocketType::TCP, AddressFamily::IPv4);
+        TcpSocket a;
+        TcpSocket b;
         b = std::move(a);
         // No crash = the displaced socket was released cleanly
         REQUIRE_MSG(
@@ -52,8 +52,8 @@ int main() {
 
     BEGIN_TEST("Moved-from socket reports invalid");
     {
-        Socket a(SocketType::TCP, AddressFamily::IPv4);
-        Socket b(std::move(a));
+        TcpSocket a;
+        TcpSocket b(std::move(a));
         REQUIRE(!a.isValid());
     }
 
@@ -64,8 +64,8 @@ int main() {
 
     BEGIN_TEST("getLastError on moved-from socket does not crash");
     {
-        Socket a(SocketType::TCP, AddressFamily::IPv4);
-        Socket b(std::move(a));
+        TcpSocket a;
+        TcpSocket b(std::move(a));
         SocketError err = a.getLastError();
         (void)err;
         REQUIRE_MSG(true, "getLastError() on moved-from socket did not crash");
@@ -73,8 +73,8 @@ int main() {
 
     BEGIN_TEST("getErrorMessage on moved-from socket does not crash");
     {
-        Socket a(SocketType::TCP, AddressFamily::IPv4);
-        Socket b(std::move(a));
+        TcpSocket a;
+        TcpSocket b(std::move(a));
         std::string msg = a.getErrorMessage(); //-V808
         REQUIRE_MSG(
             true, "getErrorMessage() on moved-from socket did not crash");
@@ -82,8 +82,8 @@ int main() {
 
     BEGIN_TEST("Self-move-assignment does not invalidate the socket");
     {
-        Socket a(SocketType::TCP, AddressFamily::IPv4);
-        Socket& ref = a;
+        TcpSocket a;
+        TcpSocket& ref = a;
         ref = std::move(a); // self-move
         // After self-move the standard only requires the object is in a valid
         // (destructible) state; some implementations keep it valid.
@@ -93,9 +93,9 @@ int main() {
 
     BEGIN_TEST("Socket can be stored in a vector using move");
     {
-        std::vector<Socket> vec; //-V826
-        vec.emplace_back(SocketType::TCP, AddressFamily::IPv4);
-        vec.emplace_back(SocketType::TCP, AddressFamily::IPv6);
+        std::vector<TcpSocket> vec; //-V826
+        vec.emplace_back();
+        vec.emplace_back(AddressFamily::IPv6);
         REQUIRE(vec.size() == 2); //-V547
         REQUIRE(vec[0].isValid());
         REQUIRE(vec[1].isValid());

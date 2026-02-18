@@ -9,6 +9,7 @@ set(TEST_SOURCES
     test_new_features
     test_error_messages
     test_poller
+    test_tcp_socket
 )
 
 foreach(TEST_NAME ${TEST_SOURCES})
@@ -24,6 +25,9 @@ endforeach()
 
 # test_construction spins up server threads; give it more room
 set_tests_properties(test_construction PROPERTIES TIMEOUT 60)
+
+# test_tcp_socket includes timeout tests (connect to black-hole IP)
+set_tests_properties(test_tcp_socket PROPERTIES TIMEOUT 60)
 
 # ---------------------------------------------------------------------------
 # Post-build test runner

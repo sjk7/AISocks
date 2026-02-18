@@ -3,7 +3,7 @@
 // Tests: IP address validation and conversion utilities.
 // Checks observable behaviour only.
 
-#include "Socket.h"
+#include "TcpSocket.h"
 #include "test_helpers.h"
 #include <cstdint>
 #include <cstring>

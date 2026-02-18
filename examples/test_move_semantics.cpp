@@ -1,6 +1,6 @@
 // This is a personal academic project. Dear PVS-Studio, please check it.
 // PVS-Studio Static Code Analyzer for C, C++, C#, and Java: https://pvs-studio.com
-#include "Socket.h"
+#include "TcpSocket.h"
 #include <iostream>
 #include <vector>
 
@@ -13,10 +13,10 @@ int main() {
 
     // Test 1: Move constructor
     std::cout << "Test 1: Move Constructor" << std::endl;
-    Socket socket1(SocketType::TCP, AddressFamily::IPv4);
+    TcpSocket socket1;
     std::cout << "  Created socket1, valid: " << socket1.isValid() << std::endl;
 
-    Socket socket2(std::move(socket1));
+    TcpSocket socket2(std::move(socket1));
     std::cout << "  Moved to socket2, socket2 valid: " << socket2.isValid()
               << std::endl;
     std::cout << "  socket1 (moved-from) valid: " << socket1.isValid()
@@ -33,8 +33,8 @@ int main() {
 
     // Test 2: Move assignment
     std::cout << "Test 2: Move Assignment" << std::endl;
-    Socket socket3(SocketType::TCP, AddressFamily::IPv4);
-    Socket socket4(SocketType::TCP, AddressFamily::IPv4);
+    TcpSocket socket3;
+    TcpSocket socket4;
 
     std::cout << "  socket3 valid: " << socket3.isValid() << std::endl;
     std::cout << "  socket4 valid: " << socket4.isValid() << std::endl;
@@ -54,8 +54,8 @@ int main() {
 
     // Test 3: Operations on moved-from object should not crash
     std::cout << "Test 3: Operations on Moved-From Object" << std::endl;
-    Socket socket5(SocketType::TCP, AddressFamily::IPv4);
-    Socket socket6(std::move(socket5));
+    TcpSocket socket5;
+    TcpSocket socket6(std::move(socket5));
 
     std::cout << "  Calling operations on moved-from socket5..." << std::endl;
 
@@ -103,7 +103,7 @@ int main() {
 
     // Test 4: Self-assignment
     std::cout << "Test 4: Self-Assignment" << std::endl;
-    Socket socket7(SocketType::TCP, AddressFamily::IPv4);
+    TcpSocket socket7;
     std::cout << "  socket7 valid before self-assignment: " << socket7.isValid()
               << std::endl;
 
@@ -122,8 +122,8 @@ int main() {
 
     // Test 5: Move into container
     std::cout << "Test 5: Move into Container" << std::endl;
-    std::vector<Socket> sockets; //-V826
-    Socket socket8(SocketType::TCP, AddressFamily::IPv4);
+    std::vector<TcpSocket> sockets; //-V826
+    TcpSocket socket8;
 
     std::cout << "  socket8 valid: " << socket8.isValid() << std::endl;
     sockets.push_back(std::move(socket8));
@@ -141,8 +141,8 @@ int main() {
 
     // Test 6: Moved-from state properties
     std::cout << "Test 6: Moved-From State Properties" << std::endl;
-    Socket socket9(SocketType::TCP, AddressFamily::IPv4);
-    Socket socket10(std::move(socket9));
+    TcpSocket socket9;
+    TcpSocket socket10(std::move(socket9));
 
     std::cout << "  Checking moved-from socket9 properties:" << std::endl;
     std::cout << "    isValid(): " << socket9.isValid() << std::endl;

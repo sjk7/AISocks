@@ -88,6 +88,7 @@ class SocketImpl {
     bool setLingerAbort(bool enable);
     bool setReceiveBufferSize(int bytes);
     bool setSendBufferSize(int bytes);
+    bool setBroadcast(bool enable);
     bool shutdown(ShutdownHow how);
     bool sendAll(const void* data, size_t length);
     bool receiveAll(void* buffer, size_t length);

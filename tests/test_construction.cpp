@@ -6,7 +6,8 @@
 // that constructors throw SocketException on failure and produce a fully usable
 // socket on success.
 
-#include "Socket.h"
+#include "TcpSocket.h"
+#include "UdpSocket.h"
 #include "test_helpers.h"
 #include <thread>
 #include <chrono>
@@ -26,7 +27,7 @@ static void test_basic_constructor() {
     {
         bool threw = false;
         try {
-            Socket s(SocketType::TCP, AddressFamily::IPv4);
+            TcpSocket s;
         } catch (...) {
             threw = true;
         }
@@ -37,10 +38,10 @@ static void test_basic_constructor() {
     {
         bool threw = false;
         try {
-            Socket a(SocketType::TCP, AddressFamily::IPv4);
-            Socket b(SocketType::TCP, AddressFamily::IPv6);
-            Socket c(SocketType::UDP, AddressFamily::IPv4);
-            Socket d(SocketType::UDP, AddressFamily::IPv6);
+            TcpSocket a;
+            TcpSocket b(AddressFamily::IPv6);
+            UdpSocket c;
+            UdpSocket d(AddressFamily::IPv6);
         } catch (...) {
             threw = true;
         }
@@ -56,7 +57,7 @@ static void test_server_bind_happy() {
     {
         bool threw = false;
         try {
-            Socket s(SocketType::TCP, AddressFamily::IPv4,
+            TcpSocket s(AddressFamily::IPv4,
                 ServerBind{"127.0.0.1", Port{BASE}});
             REQUIRE(s.isValid());
         } catch (const SocketException& e) {
@@ -73,7 +74,7 @@ static void test_server_bind_happy() {
         bool threw = false;
         std::atomic<bool> ready{false};
         try {
-            Socket srv(SocketType::TCP, AddressFamily::IPv4,
+            TcpSocket srv(AddressFamily::IPv4,
                 ServerBind{"127.0.0.1", Port{BASE + 1}});
             REQUIRE(srv.isValid());
             ready = true;
@@ -82,7 +83,7 @@ static void test_server_bind_happy() {
             std::thread clt([&]() {
                 // server is already blocking on accept(); connect immediately
                 try {
-                    Socket c(SocketType::TCP, AddressFamily::IPv4,
+                    TcpSocket c(AddressFamily::IPv4,
                         ConnectTo{"127.0.0.1", Port{BASE + 1}});
                     // peer closes on scope exit — accept() on server side has
                     // already returned by the time connect() completes
@@ -108,7 +109,7 @@ static void test_server_bind_happy() {
     {
         bool threw = false;
         try {
-            Socket s(SocketType::TCP, AddressFamily::IPv4,
+            TcpSocket s(AddressFamily::IPv4,
                 ServerBind{"127.0.0.1", Port{BASE + 2}, 5, false});
             REQUIRE(s.isValid());
         } catch (const SocketException& e) {
@@ -132,7 +133,7 @@ static void test_connect_to_happy() {
 
         std::thread srvThread([&]() {
             try {
-                Socket srv(SocketType::TCP, AddressFamily::IPv4,
+                TcpSocket srv(AddressFamily::IPv4,
                     ServerBind{"127.0.0.1", Port{BASE + 3}});
                 ready = true;
                 auto peer = srv.accept();
@@ -150,7 +151,7 @@ static void test_connect_to_happy() {
             std::this_thread::sleep_for(std::chrono::milliseconds(5));
 
         try {
-            Socket c(SocketType::TCP, AddressFamily::IPv4,
+            TcpSocket c(AddressFamily::IPv4,
                 ConnectTo{"127.0.0.1", Port{BASE + 3}});
             REQUIRE(c.isValid());
         } catch (const SocketException& e) {
@@ -172,7 +173,7 @@ static void test_connect_to_happy() {
 
         std::thread srvThread([&]() {
             try {
-                Socket srv(SocketType::TCP, AddressFamily::IPv4,
+                TcpSocket srv(AddressFamily::IPv4,
                     ServerBind{"127.0.0.1", Port{BASE + 4}});
                 ready = true;
                 auto peer = srv.accept();
@@ -194,7 +195,7 @@ static void test_connect_to_happy() {
 
         bool threw = false;
         try {
-            Socket c(SocketType::TCP, AddressFamily::IPv4,
+            TcpSocket c(AddressFamily::IPv4,
                 ConnectTo{"127.0.0.1", Port{BASE + 4}});
             c.send(payload.data(), payload.size());
         } catch (const SocketException& e) {
@@ -217,14 +218,14 @@ static void test_server_bind_failures() {
                "port, no reuseAddr)");
     {
         // First socket holds the port
-        Socket first(SocketType::TCP, AddressFamily::IPv4,
+        TcpSocket first(AddressFamily::IPv4,
             ServerBind{"127.0.0.1", Port{BASE + 10}, 5, false});
 
         bool threw = false;
         SocketError code = SocketError::None;
         std::string what;
         try {
-            Socket second(SocketType::TCP, AddressFamily::IPv4,
+            TcpSocket second(AddressFamily::IPv4,
                 ServerBind{"127.0.0.1", Port{BASE + 10}, 5, false});
         } catch (const SocketException& e) {
             threw = true;
@@ -248,7 +249,7 @@ static void test_server_bind_failures() {
         bool threw = false;
         SocketError code = SocketError::None;
         try {
-            Socket s(SocketType::TCP, AddressFamily::IPv4,
+            TcpSocket s(AddressFamily::IPv4,
                 ServerBind{"999.999.999.999", Port{BASE + 11}});
         } catch (const SocketException& e) {
             threw = true;
@@ -263,11 +264,11 @@ static void test_server_bind_failures() {
         "ServerBind ctor: exception message contains OS error description");
     {
         // Reuse the already-bound port scenario to reliably get a failure
-        Socket occupant(SocketType::TCP, AddressFamily::IPv4,
+        TcpSocket occupant(AddressFamily::IPv4,
             ServerBind{"127.0.0.1", Port{BASE + 12}, 5, false});
         std::string what;
         try {
-            Socket s(SocketType::TCP, AddressFamily::IPv4,
+            TcpSocket s(AddressFamily::IPv4,
                 ServerBind{"127.0.0.1", Port{BASE + 12}, 5, false});
         } catch (const SocketException& e) {
             what = e.what();
@@ -294,7 +295,7 @@ static void test_connect_to_failures() {
         try {
             // Port 1 is virtually never listening and requires no privilege to
             // attempt
-            Socket c(SocketType::TCP, AddressFamily::IPv4,
+            TcpSocket c(AddressFamily::IPv4,
                 ConnectTo{"127.0.0.1", Port{1}});
         } catch (const SocketException& e) {
             threw = true;
@@ -315,7 +316,7 @@ static void test_connect_to_failures() {
         bool threw = false;
         SocketError code = SocketError::None;
         try {
-            Socket c(SocketType::TCP, AddressFamily::IPv4,
+            TcpSocket c(AddressFamily::IPv4,
                 ConnectTo{"999.999.999.999", Port{BASE + 20}});
         } catch (const SocketException& e) {
             threw = true;
@@ -335,7 +336,7 @@ static void test_connect_to_failures() {
         bool threw = false;
         SocketError code = SocketError::None;
         try {
-            Socket c(SocketType::TCP, AddressFamily::IPv4,
+            TcpSocket c(AddressFamily::IPv4,
                 ConnectTo{"this.host.does.not.exist.invalid", Port{BASE + 21}});
         } catch (const SocketException& e) {
             threw = true;
@@ -360,7 +361,7 @@ static void test_connect_to_failures() {
         SocketError code = SocketError::None;
         std::string what;
         try {
-            Socket c(SocketType::TCP, AddressFamily::IPv4,
+            TcpSocket c(AddressFamily::IPv4,
                 ConnectTo{nonRouteableIP, Port{9}, Milliseconds{TIMEOUT_MS}});
         } catch (const SocketException& e) {
             threw = true;
@@ -393,7 +394,7 @@ static void test_exception_is_std_exception() {
     {
         bool caught = false;
         try {
-            Socket c(SocketType::TCP, AddressFamily::IPv4,
+            TcpSocket c(AddressFamily::IPv4,
                 ConnectTo{"127.0.0.1", Port{1}});
         } catch (const std::exception& e) {
             caught = true;
@@ -408,7 +409,7 @@ static void test_exception_is_std_exception() {
     {
         SocketError code = SocketError::None;
         try {
-            Socket c(SocketType::TCP, AddressFamily::IPv4,
+            TcpSocket c(AddressFamily::IPv4,
                 ConnectTo{"127.0.0.1", Port{1}});
         } catch (const SocketException& e) {
             code = e.errorCode();
@@ -427,9 +428,9 @@ static void test_move_after_server_bind() {
     {
         bool threw = false;
         try {
-            Socket s(SocketType::TCP, AddressFamily::IPv4,
+            TcpSocket s(AddressFamily::IPv4,
                 ServerBind{"127.0.0.1", Port{BASE + 30}});
-            Socket moved(std::move(s));
+            TcpSocket moved(std::move(s));
             REQUIRE(moved.isValid());
             REQUIRE(!s.isValid());
         } catch (const SocketException& e) {

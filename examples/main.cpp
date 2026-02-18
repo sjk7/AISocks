@@ -1,7 +1,7 @@
 // This is a personal academic project. Dear PVS-Studio, please check it.
 // PVS-Studio Static Code Analyzer for C, C++, C#, and Java:
 // https://pvs-studio.com
-#include "Socket.h"
+#include "TcpSocket.h"
 #include <iostream>
 #include <thread>
 #include <chrono>
@@ -21,7 +21,7 @@ void runServer(const std::string& bindAddr) {
     std::cout << "Starting server on " << bindAddr << ":" << TEST_PORT
               << "...\n";
 
-    Socket serverSocket(SocketType::TCP);
+    TcpSocket serverSocket;
     serverSocket.setReuseAddress(true);
 
     if (!serverSocket.bind(bindAddr, Port{TEST_PORT})) {
@@ -81,7 +81,7 @@ void runClient(const std::string& addr) {
     std::this_thread::sleep_for(std::chrono::milliseconds(200));
     std::cout << "Connecting to " << addr << ":" << TEST_PORT << "...\n";
 
-    Socket clientSocket(SocketType::TCP);
+    TcpSocket clientSocket;
     if (!clientSocket.connect(addr, Port{TEST_PORT})) {
         std::cerr << "Connect failed: " << clientSocket.getErrorMessage()
                   << "\n";

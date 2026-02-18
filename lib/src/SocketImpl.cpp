@@ -922,6 +922,18 @@ bool SocketImpl::setReusePort(bool enable) {
 }
 
 // -----------------------------------------------------------------------
+// setBroadcast (SO_BROADCAST) — required before sending to broadcast addrs
+// -----------------------------------------------------------------------
+bool SocketImpl::setBroadcast(bool enable) {
+    if (!isValid()) {
+        setError(SocketError::InvalidSocket, "Socket is not valid");
+        return false;
+    }
+    return setBoolOpt(
+        SOL_SOCKET, SO_BROADCAST, enable, "Failed to set SO_BROADCAST");
+}
+
+// -----------------------------------------------------------------------
 // sendAll — loop until all bytes sent or error
 // -----------------------------------------------------------------------
 bool SocketImpl::sendAll(const void* data, size_t length) {

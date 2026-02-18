@@ -1,6 +1,6 @@
 // This is a personal academic project. Dear PVS-Studio, please check it.
 // PVS-Studio Static Code Analyzer for C, C++, C#, and Java: https://pvs-studio.com
-#include "Socket.h"
+#include "TcpSocket.h"
 #include <iostream>
 #include <thread>
 #include <chrono>
@@ -19,7 +19,7 @@ constexpr int POLL_DELAY_MS = 1; // Polling delay
 void runServerNonBlocking() {
     std::cout << "Starting non-blocking server on port 8080..." << std::endl;
 
-    Socket serverSocket(SocketType::TCP);
+    TcpSocket serverSocket;
 
     if (!serverSocket.isValid()) {
         std::cerr << "Failed to create server socket: "
@@ -131,7 +131,7 @@ void runClientNonBlocking() {
 
     std::cout << "Connecting to server..." << std::endl;
 
-    Socket clientSocket(SocketType::TCP);
+    TcpSocket clientSocket;
 
     if (!clientSocket.isValid()) {
         std::cerr << "Failed to create client socket: "

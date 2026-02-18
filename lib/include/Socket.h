@@ -215,100 +215,42 @@ struct ConnectTo {
     Milliseconds connectTimeout{defaultTimeout}; // see above
 };
 
+// ---------------------------------------------------------------------------
+// Socket — pImpl firewall base for TcpSocket and UdpSocket.
+//
+// All constructors, the destructor, and protocol-specific data-transfer
+// methods are protected so that Socket cannot be instantiated or deleted
+// through a base pointer directly.  Use TcpSocket or UdpSocket instead.
+//
+// All socket-option and query methods remain public so that code holding a
+// reference to the base class can still call setTimeout(), setNoDelay(), etc.
+//
+// The protected do*() bridge methods expose the underlying SocketImpl
+// operations to derived classes without leaking SocketImpl.h into their
+// headers.  Socket.cpp is the only file (besides TcpSocket.cpp for accept())
+// that includes SocketImpl.h — the single firewall point.
+// ---------------------------------------------------------------------------
 class Socket {
     public:
-    // Basic constructor – creates the underlying socket fd.
-    // Throws SocketException(SocketError::CreateFailed, ...) if the OS call
-    // fails.
-    Socket(SocketType type = SocketType::TCP,
-        AddressFamily family = AddressFamily::IPv4);
+    // -----------------------------------------------------------------
+    // Public: socket options and query methods (shared by TCP + UDP)
+    // -----------------------------------------------------------------
 
-    // Server socket – socket() → [SO_REUSEADDR] → bind() → listen().
-    // Throws SocketException (with the failing step prepended) on any failure.
-    Socket(SocketType type, AddressFamily family, const ServerBind& config);
-
-    // Client socket – socket() → connect().
-    // Throws SocketException (with the failing step prepended) on any failure.
-    Socket(SocketType type, AddressFamily family, const ConnectTo& config);
-
-    virtual ~Socket();
-
-    // Prevent copying
-    Socket(const Socket&) = delete;
-    Socket& operator=(const Socket&) = delete;
-
-    // Allow moving
-    Socket(Socket&& other) noexcept;
-    Socket& operator=(Socket&& other) noexcept;
-
-    // Server operations
-    [[nodiscard]] bool bind(const std::string& address, Port port);
-    [[nodiscard]] bool listen(int backlog = 10);
-    std::unique_ptr<Socket> accept();
-
-    // Client operations
-    //
-    // timeout controls how long to wait for the TCP handshake:
-    //   defaultTimeout (30 s) — used when not specified.
-    //   Milliseconds{0}       — defer to the OS (blocks indefinitely, or, on a
-    //                           non-blocking socket, initiates and returns
-    //                           WouldBlock so a Poller can detect completion).
-    //   any positive duration — fail with SocketError::Timeout if not connected
-    //                           within that duration; polls in 10 ms slices so
-    //                           the call stays responsive throughout.
-    //
-    // Note: DNS resolution is synchronous and not covered by the timeout.
-    bool connect(const std::string& address, Port port,
-        Milliseconds timeout = defaultTimeout);
-
-    // Data transfer (raw pointer overloads)
-    int send(const void* data, size_t length);
-    int receive(void* buffer, size_t length);
-
-    // Send all bytes, looping until every byte is delivered or an error
-    // occurs.  Returns true on success; false on error (check getLastError()).
-    bool sendAll(const void* data, size_t length);
-    bool sendAll(Span<const std::byte> data);
-
-    // Receive exactly `length` bytes, looping until the buffer is full, an
-    // error occurs, or the peer closes the connection (EOF).
-    // Returns true only when all `length` bytes have been received.
-    // Returns false on error or EOF before `length` bytes (check
-    // getLastError(); SocketError::ConnectionReset signals a clean peer-close
-    // mid-stream).
-    bool receiveAll(void* buffer, size_t length);
-    bool receiveAll(Span<std::byte> buffer);
-
-    // Span-based overloads — delegates to the raw-pointer overloads.
-    // On C++20 these accept std::span<const std::byte> / std::span<std::byte>
-    // directly; on C++17 use aiSocks::Span<> or supply {ptr, size} directly.
-    int send(Span<const std::byte> data);
-    int receive(Span<std::byte> buffer);
-
-    // UDP-only data transfer (connected or connectionless)
-    // sendTo: sends a datagram to the specified remote endpoint.
-    //   Connected-mode UDP: call connect() first, then use send() / receive()
-    //   directly — the kernel fills in the peer address automatically.  The
-    //   sendTo/receiveFrom overloads are available for connectionless mode.
-    // receiveFrom: receives a datagram and fills `remote` with the sender.
-    int sendTo(const void* data, size_t length, const Endpoint& remote);
-    int receiveFrom(void* buffer, size_t length, Endpoint& remote);
-    int sendTo(Span<const std::byte> data, const Endpoint& remote);
-    int receiveFrom(Span<std::byte> buffer, Endpoint& remote);
-
-    // Socket options
+    // Blocking mode
     bool setBlocking(bool blocking);
     bool isBlocking() const noexcept;
-    bool setReuseAddress(bool reuse);
 
     // Block until the socket has readable data (or EOF) within the given
-    // timeout.  Returns true if ready, false on timeout (SocketError::Timeout)
-    // or select() failure (SocketError::Unknown).
+    // timeout.  Returns true if ready, false on timeout
+    // (SocketError::Timeout) or select() failure (SocketError::Unknown).
     bool waitReadable(Milliseconds timeout);
 
     // Block until the socket send-buffer has space within the given timeout.
-    // Returns true if ready, false on timeout or select() failure.
     bool waitWritable(Milliseconds timeout);
+
+    // SO_REUSEADDR / SO_REUSEPORT
+    bool setReuseAddress(bool reuse);
+    bool setReusePort(bool enable);
 
     // Set SO_RCVTIMEO on the socket.
     //   defaultTimeout (30 s) — used when not specified.
@@ -327,34 +269,19 @@ class Socket {
     bool setNoDelay(bool noDelay);
 
     // Set the kernel receive / send socket buffer sizes (SO_RCVBUF /
-    // SO_SNDBUF). `bytes` is the requested buffer size in bytes; the kernel may
-    // round it up to its own alignment or clamp it to a system maximum (see
-    // rmem_max / wmem_max on Linux).  Returns false and records SetOptionFailed
-    // if the setsockopt() call fails.
+    // SO_SNDBUF). `bytes` is the requested buffer size in bytes; the kernel
+    // may round it up or clamp it. Returns false on setsockopt() failure.
     bool setReceiveBufferSize(int bytes);
     bool setSendBufferSize(int bytes);
 
-    // Enable/disable SO_KEEPALIVE.  Requires OS idle/interval/count tuning
-    // for meaningful control; enabling the option is still useful to detect
-    // dead peers on long-lived connections.
+    // Enable/disable SO_KEEPALIVE.
     bool setKeepAlive(bool enable);
 
     // Half-close the connection in the specified direction.
-    // Unlike close(), the socket fd remains valid after shutdown().
     bool shutdown(ShutdownHow how);
 
     // Configure SO_LINGER with l_linger=0: close() sends RST instead of FIN.
-    // Useful in test code (avoids TIME_WAIT on rapid connect/disconnect cycles)
-    // and server accept-loops that want to hard-reject bad clients.
-    // DO NOT pass l_linger>0 (blocking linger); use shutdown(Write)+drain
-    // instead.
     bool setLingerAbort(bool enable);
-
-    // Enable multiple sockets to bind the same address/port (SO_REUSEPORT).
-    // The kernel distributes incoming connections/datagrams across all bound
-    // sockets.  Returns false with SetOptionFailed on platforms that lack the
-    // option (some older Windows builds).
-    bool setReusePort(bool enable);
 
     // Utility
     void close() noexcept;
@@ -363,14 +290,15 @@ class Socket {
     SocketError getLastError() const noexcept;
     std::string getErrorMessage() const;
 
-    // Query the local address/port assigned to this socket
-    // (populated after bind() or connect()).
-    // Returns std::nullopt if the socket is invalid or getsockname fails.
+    // Query the local address/port assigned to this socket.
     std::optional<Endpoint> getLocalEndpoint() const;
 
     // Query the remote address/port this socket is connected to.
-    // Returns std::nullopt if not connected or the socket is invalid.
     std::optional<Endpoint> getPeerEndpoint() const;
+
+    // Returns the underlying OS socket descriptor as an opaque integer.
+    // Advanced use only (e.g. Poller integration).
+    uintptr_t getNativeHandle() const noexcept;
 
     // Static utility methods
     static std::vector<NetworkInterface> getLocalAddresses();
@@ -378,15 +306,91 @@ class Socket {
     static bool isValidIPv6(const std::string& address);
     static std::string ipToString(const void* addr, AddressFamily family);
 
-    // Returns the underlying OS socket descriptor as an opaque integer.
-    // Advanced use only (e.g. Poller integration).  Returns (uintptr_t)-1 if
-    // the socket is invalid or moved-from.
-    uintptr_t getNativeHandle() const noexcept;
+    // Prevent copying
+    Socket(const Socket&) = delete;
+    Socket& operator=(const Socket&) = delete;
+
+    protected:
+    // -----------------------------------------------------------------
+    // Protected: constructors / destructor / move
+    // (only TcpSocket and UdpSocket may instantiate / destroy Socket)
+    // -----------------------------------------------------------------
+
+    // Basic constructor — creates the underlying socket fd.
+    // Throws SocketException(SocketError::CreateFailed, ...) if the OS call
+    // fails.
+    Socket(SocketType type, AddressFamily family);
+
+    // Server socket — socket() → [SO_REUSEADDR] → bind() → listen().
+    // Throws SocketException (with the failing step prepended) on any failure.
+    Socket(SocketType type, AddressFamily family, const ServerBind& config);
+
+    // Client socket — socket() → connect().
+    // Throws SocketException (with the failing step prepended) on any failure.
+    Socket(SocketType type, AddressFamily family, const ConnectTo& config);
+
+    // Takes ownership of an already-constructed impl (used by TcpSocket::accept()).
+    explicit Socket(std::unique_ptr<SocketImpl> impl);
+
+    // Non-virtual protected destructor: no vtable; delete-through-Socket* is a
+    // compile-time error outside the hierarchy.
+    ~Socket();
+
+    // Allow moving by derived classes.
+    Socket(Socket&&) noexcept;
+    Socket& operator=(Socket&&) noexcept;
+
+    // -----------------------------------------------------------------
+    // Protected: protocol bridge methods (do* prefix)
+    // Bodies live in Socket.cpp — the single SocketImpl.h include point.
+    // -----------------------------------------------------------------
+
+    // Server operations
+    [[nodiscard]] bool doBind(const std::string& address, Port port);
+    [[nodiscard]] bool doListen(int backlog = 10);
+
+    // Returns the accepted SocketImpl, or nullptr on failure.
+    // TcpSocket::accept() wraps this in a new TcpSocket.
+    std::unique_ptr<SocketImpl> doAccept();
+
+    // Client operation
+    //
+    // timeout controls how long to wait for the TCP handshake:
+    //   defaultTimeout (30 s) — used when not specified.
+    //   Milliseconds{0}       — defer to the OS (blocks indefinitely, or on a
+    //                           non-blocking socket returns WouldBlock so a
+    //                           Poller can detect completion).
+    //   any positive duration — fail with SocketError::Timeout if not connected
+    //                           within that duration.
+    bool doConnect(const std::string& address, Port port,
+        Milliseconds timeout = defaultTimeout);
+
+    // Data transfer (raw pointer overloads)
+    int doSend(const void* data, size_t length);
+    int doReceive(void* buffer, size_t length);
+
+    // Send all bytes, looping until every byte is delivered or an error occurs.
+    bool doSendAll(const void* data, size_t length);
+    bool doSendAll(Span<const std::byte> data);
+
+    // Receive exactly `length` bytes; returns false on error or EOF.
+    bool doReceiveAll(void* buffer, size_t length);
+    bool doReceiveAll(Span<std::byte> buffer);
+
+    // Span overloads
+    int doSend(Span<const std::byte> data);
+    int doReceive(Span<std::byte> buffer);
+
+    // UDP datagram transfer
+    int doSendTo(const void* data, size_t length, const Endpoint& remote);
+    int doReceiveFrom(void* buffer, size_t length, Endpoint& remote);
+    int doSendTo(Span<const std::byte> data, const Endpoint& remote);
+    int doReceiveFrom(Span<std::byte> buffer, Endpoint& remote);
+
+    // UDP SO_BROADCAST
+    bool doSetBroadcast(bool enable);
 
     private:
-    // Private constructor for accepted connections
-    Socket(std::unique_ptr<SocketImpl> impl);
-
     std::unique_ptr<SocketImpl> pImpl;
 };
 

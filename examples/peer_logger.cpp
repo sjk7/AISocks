@@ -14,7 +14,8 @@
 // Both functions delegate to getpeername(2) / getsockname(2) internally and
 // return std::nullopt if the socket is invalid or not yet connected.
 
-#include "Socket.h"
+#include "TcpSocket.h"
+#include "UdpSocket.h"
 #include <cassert>
 #include <iostream>
 #include <string>
@@ -50,7 +51,7 @@ static void logPeerInfo(const Socket& s, const std::string& role) {
 // ---------------------------------------------------------------------------
 // logAcceptedPeer — server side: log each inbound connection.
 // ---------------------------------------------------------------------------
-static void logAcceptedPeer(const Socket& accepted) {
+static void logAcceptedPeer(const TcpSocket& accepted) {
     logPeerInfo(accepted, "server-side accepted");
 }
 
@@ -59,7 +60,7 @@ static void logAcceptedPeer(const Socket& accepted) {
 // Runs on the provided port, handles one connection, then exits.
 // ---------------------------------------------------------------------------
 static void runEchoServer(Port port) {
-    Socket server(SocketType::TCP, AddressFamily::IPv4,
+    TcpSocket server(AddressFamily::IPv4,
         ServerBind{.address = "127.0.0.1", .port = port, .backlog = 1});
 
     auto localEp = server.getLocalEndpoint();
@@ -91,8 +92,8 @@ static void runEchoServer(Port port) {
 // A minimal TCP echo client that logs its own endpoint after connect.
 // ---------------------------------------------------------------------------
 static void runEchoClient(Port port) {
-    Socket client(SocketType::TCP, AddressFamily::IPv4,
-        ConnectTo{.address = "127.0.0.1", .port = port});
+    TcpSocket client(
+        AddressFamily::IPv4, ConnectTo{.address = "127.0.0.1", .port = port});
 
     // Log immediately after connect — shows the kernel-assigned ephemeral port.
     logPeerInfo(client, "client-side connected");
@@ -113,7 +114,7 @@ static void runEchoClient(Port port) {
 // ---------------------------------------------------------------------------
 static void runUdpPeerLog(Port port) {
     // Server side: just bind and receive one datagram.
-    Socket server(SocketType::UDP, AddressFamily::IPv4);
+    UdpSocket server;
     server.setReuseAddress(true);
     if (!server.bind("127.0.0.1", port)) {
         std::cerr << "[udp-server] bind failed\n";
@@ -121,7 +122,7 @@ static void runUdpPeerLog(Port port) {
     }
 
     // Client: connect() the UDP socket so send() works without explicit dest.
-    Socket client(SocketType::UDP, AddressFamily::IPv4);
+    UdpSocket client;
     if (!client.connect("127.0.0.1", port)) {
         std::cerr << "[udp-client] connect failed\n";
         return;
