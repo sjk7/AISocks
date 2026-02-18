@@ -1,7 +1,7 @@
 // This is a personal academic project. Dear PVS-Studio, please check it.
-// PVS-Studio Static Code Analyzer for C, C++, C#, and Java: https://pvs-studio.com
-// Tests: Error reporting and graceful failure for invalid/misused operations.
-// Checks observable behaviour only.
+// PVS-Studio Static Code Analyzer for C, C++, C#, and Java:
+// https://pvs-studio.com Tests: Error reporting and graceful failure for
+// invalid/misused operations. Checks observable behaviour only.
 
 #include "Socket.h"
 #include "test_helpers.h"
