@@ -236,7 +236,8 @@ int main() {
         // receiveAll loop.  Client calls receiveAll(256) and checks the result.
         constexpr size_t PAYLOAD = 256;
         std::vector<char> expected(PAYLOAD);
-        for (size_t i = 0; i < PAYLOAD; ++i) expected[i] = static_cast<char>(i);
+        for (size_t i = 0; i < PAYLOAD; ++i)
+            expected[i] = static_cast<char>(i);
 
         std::atomic<bool> ready{false};
         std::thread srvThread([&]() {
