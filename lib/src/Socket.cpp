@@ -3,6 +3,7 @@
 // https://pvs-studio.com
 #include "Socket.h"
 #include "SocketImpl.h"
+#include <cassert>
 #include <string>
 
 namespace aiSocks {
@@ -77,17 +78,17 @@ Socket& Socket::operator=(Socket&& other) noexcept {
 }
 
 bool Socket::bind(const std::string& address, Port port) {
-    if (!pImpl) return false;
+    assert(pImpl);
     return pImpl->bind(address, port);
 }
 
 bool Socket::listen(int backlog) {
-    if (!pImpl) return false;
+    assert(pImpl);
     return pImpl->listen(backlog);
 }
 
 std::unique_ptr<Socket> Socket::accept() {
-    if (!pImpl) return nullptr;
+    assert(pImpl);
     auto clientImpl = pImpl->accept();
     if (!clientImpl) {
         return nullptr;
@@ -97,22 +98,22 @@ std::unique_ptr<Socket> Socket::accept() {
 
 bool Socket::connect(
     const std::string& address, Port port, Milliseconds timeout) {
-    if (!pImpl) return false;
+    assert(pImpl);
     return pImpl->connect(address, port, timeout);
 }
 
 int Socket::send(const void* data, size_t length) {
-    if (!pImpl) return -1;
+    assert(pImpl);
     return pImpl->send(data, length);
 }
 
 int Socket::receive(void* buffer, size_t length) {
-    if (!pImpl) return -1;
+    assert(pImpl);
     return pImpl->receive(buffer, length);
 }
 
 bool Socket::sendAll(const void* data, size_t length) {
-    if (!pImpl) return false;
+    assert(pImpl);
     return pImpl->sendAll(data, length);
 }
 
@@ -130,12 +131,12 @@ int Socket::receive(Span<std::byte> buffer) {
 }
 
 int Socket::sendTo(const void* data, size_t length, const Endpoint& remote) {
-    if (!pImpl) return -1;
+    assert(pImpl);
     return pImpl->sendTo(data, length, remote);
 }
 
 int Socket::receiveFrom(void* buffer, size_t length, Endpoint& remote) {
-    if (!pImpl) return -1;
+    assert(pImpl);
     return pImpl->receiveFrom(buffer, length, remote);
 }
 
@@ -149,72 +150,72 @@ int Socket::receiveFrom(Span<std::byte> buffer, Endpoint& remote) {
 }
 
 bool Socket::setBlocking(bool blocking) {
-    if (!pImpl) return false;
+    assert(pImpl);
     return pImpl->setBlocking(blocking);
 }
 
 bool Socket::isBlocking() const {
-    if (!pImpl) return true; // Default to blocking for moved-from state
+    assert(pImpl);
     return pImpl->isBlocking();
 }
 
 bool Socket::waitReadable(Milliseconds timeout) {
-    if (!pImpl) return false;
+    assert(pImpl);
     return pImpl->waitReadable(timeout);
 }
 
 bool Socket::waitWritable(Milliseconds timeout) {
-    if (!pImpl) return false;
+    assert(pImpl);
     return pImpl->waitWritable(timeout);
 }
 
 bool Socket::setReuseAddress(bool reuse) {
-    if (!pImpl) return false;
+    assert(pImpl);
     return pImpl->setReuseAddress(reuse);
 }
 
 bool Socket::setReusePort(bool enable) {
-    if (!pImpl) return false;
+    assert(pImpl);
     return pImpl->setReusePort(enable);
 }
 
 bool Socket::setTimeout(Milliseconds timeout) {
-    if (!pImpl) return false;
+    assert(pImpl);
     return pImpl->setTimeout(timeout);
 }
 
 bool Socket::setSendTimeout(Milliseconds timeout) {
-    if (!pImpl) return false;
+    assert(pImpl);
     return pImpl->setSendTimeout(timeout);
 }
 
 bool Socket::setNoDelay(bool noDelay) {
-    if (!pImpl) return false;
+    assert(pImpl);
     return pImpl->setNoDelay(noDelay);
 }
 
 bool Socket::setReceiveBufferSize(int bytes) {
-    if (!pImpl) return false;
+    assert(pImpl);
     return pImpl->setReceiveBufferSize(bytes);
 }
 
 bool Socket::setSendBufferSize(int bytes) {
-    if (!pImpl) return false;
+    assert(pImpl);
     return pImpl->setSendBufferSize(bytes);
 }
 
 bool Socket::setKeepAlive(bool enable) {
-    if (!pImpl) return false;
+    assert(pImpl);
     return pImpl->setKeepAlive(enable);
 }
 
 bool Socket::setLingerAbort(bool enable) {
-    if (!pImpl) return false;
+    assert(pImpl);
     return pImpl->setLingerAbort(enable);
 }
 
 bool Socket::shutdown(ShutdownHow how) {
-    if (!pImpl) return false;
+    assert(pImpl);
     return pImpl->shutdown(how);
 }
 
