@@ -227,7 +227,7 @@ struct ConnectTo {
 // through a base pointer directly.  Use TcpSocket or UdpSocket instead.
 //
 // All socket-option and query methods remain public so that code holding a
-// reference to the base class can still call setTimeout(), setNoDelay(), etc.
+// reference to the base class can still call setReceiveTimeout(), setSendTimeout(), setNoDelay(), etc.
 //
 // The protected do*() bridge methods expose the underlying SocketImpl
 // operations to derived classes without leaking SocketImpl.h into their
@@ -262,9 +262,9 @@ class Socket {
     //                           indefinitely until data arrives.
     //   any positive duration — recv() returns SocketError::Timeout after
     //                           waiting this long with no data.
-    bool setTimeout(Milliseconds timeout);
+    bool setReceiveTimeout(Milliseconds timeout);
 
-    // Set SO_SNDTIMEO on the socket (same semantics as setTimeout).
+    // Set SO_SNDTIMEO on the socket (same semantics as setReceiveTimeout).
     bool setSendTimeout(Milliseconds timeout);
 
     // Disable/enable Nagle's algorithm (TCP only).
