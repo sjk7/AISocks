@@ -289,7 +289,7 @@ class Socket {
 
     // Socket options
     bool setBlocking(bool blocking);
-    bool isBlocking() const;
+    bool isBlocking() const noexcept;
     bool setReuseAddress(bool reuse);
 
     // Block until the socket has readable data (or EOF) within the given
@@ -348,10 +348,10 @@ class Socket {
     bool setReusePort(bool enable);
 
     // Utility
-    void close();
-    bool isValid() const;
-    AddressFamily getAddressFamily() const;
-    SocketError getLastError() const;
+    void close() noexcept;
+    bool isValid() const noexcept;
+    AddressFamily getAddressFamily() const noexcept;
+    SocketError getLastError() const noexcept;
     std::string getErrorMessage() const;
 
     // Query the local address/port assigned to this socket
