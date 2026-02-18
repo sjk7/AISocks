@@ -57,14 +57,18 @@ set_tests_properties(test_tcp_socket PROPERTIES TIMEOUT 60)
 # Works on Windows (MSVC / Ninja), Linux, and macOS.
 # -C $<CONFIG> is a no-op on single-config generators but required for MSVC.
 # ---------------------------------------------------------------------------
-add_custom_target(run_all_tests ALL
-    COMMAND ${CMAKE_CTEST_COMMAND}
-        --output-on-failure
-        --no-compress-output
-        -C $<CONFIG>
-        --timeout 60
-    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
-    COMMENT "========== Running aiSocks tests =========="
-    DEPENDS ${TEST_SOURCES}
-    VERBATIM
-)
+# Only auto-run tests when building natively; skip when cross-compiling
+# (the .exe binaries can't execute on a non-Windows host).
+if(NOT CMAKE_CROSSCOMPILING)
+    add_custom_target(run_all_tests ALL
+        COMMAND ${CMAKE_CTEST_COMMAND}
+            --output-on-failure
+            --no-compress-output
+            -C $<CONFIG>
+            --timeout 60
+        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+        COMMENT "========== Running aiSocks tests =========="
+        DEPENDS ${TEST_SOURCES}
+        VERBATIM
+    )
+endif()
