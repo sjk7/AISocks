@@ -22,7 +22,7 @@ static const uint16_t BASE_PORT = 19400;
 // closes.
 static void server_send(
     Port port, const std::string& payload, std::atomic<bool>& ready) {
-    TcpSocket srv;
+    auto srv = TcpSocket::createRaw();
     srv.setReuseAddress(true);
     if (!srv.bind("127.0.0.1", port) || !srv.listen(1)) return;
     ready = true;
@@ -53,14 +53,14 @@ int main() {
 
     BEGIN_TEST("Client can connect to a listening server");
     {
-        TcpSocket srv;
+        auto srv = TcpSocket::createRaw();
         srv.setReuseAddress(true);
         REQUIRE(srv.bind("127.0.0.1", Port{BASE_PORT}));
         REQUIRE(srv.listen(1));
 
         std::thread t([&]() {
             std::this_thread::sleep_for(std::chrono::milliseconds(5));
-            TcpSocket c;
+            auto c = TcpSocket::createRaw();
             c.connect("127.0.0.1", Port{BASE_PORT});
             std::this_thread::sleep_for(std::chrono::milliseconds(2));
         });
@@ -86,7 +86,7 @@ int main() {
         while (!ready && std::chrono::steady_clock::now() < deadline)
             std::this_thread::sleep_for(std::chrono::milliseconds(5));
 
-        TcpSocket client;
+        auto client = TcpSocket::createRaw();
         REQUIRE(client.connect("127.0.0.1", Port{BASE_PORT + 1}));
 
         std::string received;
@@ -111,7 +111,7 @@ int main() {
         while (!ready && std::chrono::steady_clock::now() < deadline)
             std::this_thread::sleep_for(std::chrono::milliseconds(5));
 
-        TcpSocket client;
+        auto client = TcpSocket::createRaw();
         REQUIRE(client.connect("127.0.0.1", Port{BASE_PORT + 2}));
 
         std::string received;
@@ -130,7 +130,7 @@ int main() {
         std::atomic<bool> ready{false};
 
         std::thread srvThread([&]() {
-            TcpSocket srv;
+            auto srv = TcpSocket::createRaw();
             srv.setReuseAddress(true);
             REQUIRE(srv.bind("127.0.0.1", Port{BASE_PORT + 3}));
             REQUIRE(srv.listen(1));
@@ -149,7 +149,7 @@ int main() {
         while (!ready && std::chrono::steady_clock::now() < deadline)
             std::this_thread::sleep_for(std::chrono::milliseconds(5));
 
-        TcpSocket client;
+        auto client = TcpSocket::createRaw();
         REQUIRE(client.connect("127.0.0.1", Port{BASE_PORT + 3}));
         REQUIRE(client.send(msg.data(), msg.size())
             == static_cast<int>(msg.size()));
@@ -168,7 +168,7 @@ int main() {
     {
         // First server: bind, listen, close
         {
-            TcpSocket srv;
+            auto srv = TcpSocket::createRaw();
             srv.setReuseAddress(true);
             REQUIRE(srv.bind("127.0.0.1", Port{BASE_PORT + 4}));
             REQUIRE(srv.listen(1));
@@ -177,7 +177,7 @@ int main() {
         // Short wait for OS to release
         std::this_thread::sleep_for(std::chrono::milliseconds(3));
         // Second server: should be able to re-bind
-        TcpSocket srv2;
+        auto srv2 = TcpSocket::createRaw();
         srv2.setReuseAddress(true);
         REQUIRE(srv2.bind("127.0.0.1", Port{BASE_PORT + 4}));
     }
@@ -190,7 +190,7 @@ int main() {
         std::atomic<bool> ready{false};
 
         std::thread srvThread([&]() {
-            TcpSocket srv(AddressFamily::IPv6);
+            auto srv = TcpSocket::createRaw(AddressFamily::IPv6);
             srv.setReuseAddress(true);
             if (!srv.bind("::1", Port{BASE_PORT + 5}) || !srv.listen(1)) {
                 ready = true; // Signal even on failure so client doesn't block
@@ -215,7 +215,7 @@ int main() {
         while (!ready && std::chrono::steady_clock::now() < deadline)
             std::this_thread::sleep_for(std::chrono::milliseconds(5));
 
-        TcpSocket client(AddressFamily::IPv6);
+        auto client = TcpSocket::createRaw(AddressFamily::IPv6);
         bool connected = client.connect("::1", Port{BASE_PORT + 5});
         srvThread.join();
 
@@ -241,7 +241,7 @@ int main() {
 
         std::atomic<bool> ready{false};
         std::thread srvThread([&]() {
-            TcpSocket srv;
+            auto srv = TcpSocket::createRaw();
             srv.setReuseAddress(true);
             if (!srv.bind("127.0.0.1", Port{BASE_PORT + 6}) || !srv.listen(1)) {
                 ready = true;
@@ -262,7 +262,7 @@ int main() {
         while (!ready && std::chrono::steady_clock::now() < deadline)
             std::this_thread::sleep_for(std::chrono::milliseconds(5));
 
-        TcpSocket client;
+        auto client = TcpSocket::createRaw();
         REQUIRE(client.connect("127.0.0.1", Port{BASE_PORT + 6}));
 
         std::vector<char> buf(PAYLOAD, 0);
@@ -283,7 +283,7 @@ int main() {
 
         std::atomic<bool> ready{false};
         std::thread srvThread([&]() {
-            TcpSocket srv;
+            auto srv = TcpSocket::createRaw();
             srv.setReuseAddress(true);
             if (!srv.bind("127.0.0.1", Port{BASE_PORT + 7}) || !srv.listen(1)) {
                 ready = true;
@@ -303,7 +303,7 @@ int main() {
         while (!ready && std::chrono::steady_clock::now() < deadline)
             std::this_thread::sleep_for(std::chrono::milliseconds(5));
 
-        TcpSocket client;
+        auto client = TcpSocket::createRaw();
         REQUIRE(client.connect("127.0.0.1", Port{BASE_PORT + 7}));
 
         std::vector<char> buf(WANT, 0);

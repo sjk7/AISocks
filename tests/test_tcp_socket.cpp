@@ -26,7 +26,7 @@ static const uint16_t BASE = 21800; // unique port range for this test suite
 static void test_happy_construction() {
     BEGIN_TEST("TcpSocket: default ctor (TCP/IPv4) is valid");
     {
-        TcpSocket s;
+        auto s = TcpSocket::createRaw();
         REQUIRE(s.isValid());
         REQUIRE(s.getAddressFamily() == AddressFamily::IPv4);
         REQUIRE(s.getLastError() == SocketError::None);
@@ -34,7 +34,7 @@ static void test_happy_construction() {
 
     BEGIN_TEST("TcpSocket: explicit IPv6 ctor is valid");
     {
-        TcpSocket s(AddressFamily::IPv6);
+        auto s = TcpSocket::createRaw(AddressFamily::IPv6);
         REQUIRE(s.isValid());
         REQUIRE(s.getAddressFamily() == AddressFamily::IPv6);
     }
@@ -101,14 +101,14 @@ static void test_happy_accept() {
 
     BEGIN_TEST("TcpSocket::accept() returns unique_ptr<TcpSocket>");
     {
-        TcpSocket srv;
+        auto srv = TcpSocket::createRaw();
         srv.setReuseAddress(true);
         REQUIRE(srv.bind("127.0.0.1", Port{BASE + 2}));
         REQUIRE(srv.listen(1));
 
         std::thread clt([] {
             try {
-                TcpSocket c;
+                auto c = TcpSocket::createRaw();
                 c.connect("127.0.0.1", Port{BASE + 2});
             } catch (...) {
             }
@@ -139,7 +139,7 @@ static void test_happy_send_receive() {
         std::atomic<bool> ready{false};
 
         std::thread srvThread([&] {
-            TcpSocket srv;
+            auto srv = TcpSocket::createRaw();
             srv.setReuseAddress(true);
             if (!srv.bind("127.0.0.1", Port{BASE + 3}) || !srv.listen(1)) {
                 ready = true;
@@ -159,7 +159,7 @@ static void test_happy_send_receive() {
         while (!ready && std::chrono::steady_clock::now() < deadline)
             std::this_thread::sleep_for(std::chrono::milliseconds(5));
 
-        TcpSocket c;
+        auto c = TcpSocket::createRaw();
         REQUIRE(c.connect("127.0.0.1", Port{BASE + 3}));
         int sent = c.send(msg.data(), msg.size());
         REQUIRE(sent == static_cast<int>(msg.size()));
@@ -178,7 +178,7 @@ static void test_happy_send_receive() {
         std::atomic<bool> ready{false};
 
         std::thread srvThread([&] {
-            TcpSocket srv;
+            auto srv = TcpSocket::createRaw();
             srv.setReuseAddress(true);
             if (!srv.bind("127.0.0.1", Port{BASE + 4}) || !srv.listen(1)) {
                 ready = true;
@@ -196,7 +196,7 @@ static void test_happy_send_receive() {
         while (!ready && std::chrono::steady_clock::now() < deadline)
             std::this_thread::sleep_for(std::chrono::milliseconds(5));
 
-        TcpSocket c;
+        auto c = TcpSocket::createRaw();
         REQUIRE(c.connect("127.0.0.1", Port{BASE + 4}));
         REQUIRE(c.sendAll(msg.data(), msg.size()));
         c.close();
@@ -220,7 +220,7 @@ static void test_happy_progress_callback() {
         size_t reportedTotal = 0;
 
         std::thread srvThread([&] {
-            TcpSocket srv;
+            auto srv = TcpSocket::createRaw();
             srv.setReuseAddress(true);
             if (!srv.bind("127.0.0.1", Port{BASE + 5}) || !srv.listen(1)) {
                 ready = true;
@@ -239,12 +239,13 @@ static void test_happy_progress_callback() {
         while (!ready && std::chrono::steady_clock::now() < deadline)
             std::this_thread::sleep_for(std::chrono::milliseconds(5));
 
-        TcpSocket c;
+        auto c = TcpSocket::createRaw();
         REQUIRE(c.connect("127.0.0.1", Port{BASE + 5}));
         bool ok
             = c.sendAll(msg.data(), msg.size(), [&](size_t sent, size_t total) {
                   reportedSent = sent;
                   reportedTotal = total;
+                  return 0; // continue
               });
         REQUIRE(ok);
         REQUIRE(reportedSent == msg.size());
@@ -261,7 +262,7 @@ static void test_happy_progress_callback() {
 static void test_happy_move() {
     BEGIN_TEST("TcpSocket: move construction transfers ownership");
     {
-        TcpSocket a;
+        auto a = TcpSocket::createRaw();
         REQUIRE(a.isValid());
         TcpSocket b(std::move(a));
         REQUIRE(b.isValid());
@@ -271,8 +272,8 @@ static void test_happy_move() {
 
     BEGIN_TEST("TcpSocket: move assignment transfers ownership");
     {
-        TcpSocket a;
-        TcpSocket b;
+        auto a = TcpSocket::createRaw();
+        auto b = TcpSocket::createRaw();
         REQUIRE(a.isValid());
         REQUIRE(b.isValid());
         b = std::move(a);
@@ -287,7 +288,7 @@ static void test_happy_move() {
 static void test_happy_options() {
     BEGIN_TEST("TcpSocket: setNoDelay / setKeepAlive / setReuseAddress work");
     {
-        TcpSocket s;
+        auto s = TcpSocket::createRaw();
         REQUIRE(s.isValid());
         REQUIRE(s.setReuseAddress(true));
         REQUIRE(s.setNoDelay(true));
@@ -300,7 +301,7 @@ static void test_happy_options() {
 
     BEGIN_TEST("TcpSocket: setBlocking / isBlocking round-trip");
     {
-        TcpSocket s;
+        auto s = TcpSocket::createRaw();
         REQUIRE(s.isBlocking()); // default is blocking
         REQUIRE(s.setBlocking(false));
         REQUIRE(!s.isBlocking());
@@ -383,7 +384,7 @@ static void test_sad_operations() {
 
     BEGIN_TEST("TcpSocket: bind() fails on bad address (manual call)");
     {
-        TcpSocket s;
+        auto s = TcpSocket::createRaw();
         bool ok = s.bind("999.999.999.999", Port{BASE + 20});
         REQUIRE(!ok);
         REQUIRE(s.getLastError() == SocketError::BindFailed);
@@ -391,7 +392,7 @@ static void test_sad_operations() {
 
     BEGIN_TEST("TcpSocket: connect() fails when nothing is listening");
     {
-        TcpSocket s;
+        auto s = TcpSocket::createRaw();
         bool ok = s.connect(
             "127.0.0.1", Port{21898}, std::chrono::milliseconds{500});
         REQUIRE(!ok);
@@ -401,7 +402,7 @@ static void test_sad_operations() {
 
     BEGIN_TEST("TcpSocket: send() on closed socket returns error");
     {
-        TcpSocket s;
+        auto s = TcpSocket::createRaw();
         s.close();
         REQUIRE(!s.isValid());
         int r = s.send("x", 1);
@@ -411,7 +412,7 @@ static void test_sad_operations() {
 
     BEGIN_TEST("TcpSocket: receive() on closed socket returns error");
     {
-        TcpSocket s;
+        auto s = TcpSocket::createRaw();
         s.close();
         char buf[16];
         int r = s.receive(buf, sizeof(buf));
@@ -421,7 +422,7 @@ static void test_sad_operations() {
 
     BEGIN_TEST("TcpSocket: accept() returns nullptr on non-listening socket");
     {
-        TcpSocket s;
+        auto s = TcpSocket::createRaw();
         // Not listening — accept should fail and return nullptr
         auto peer = s.accept();
         REQUIRE(peer == nullptr);
@@ -430,7 +431,7 @@ static void test_sad_operations() {
 
     BEGIN_TEST("TcpSocket: sendAll() on closed socket returns false");
     {
-        TcpSocket s;
+        auto s = TcpSocket::createRaw();
         s.close();
         bool ok = s.sendAll("data", 4);
         REQUIRE(!ok);
@@ -439,7 +440,7 @@ static void test_sad_operations() {
 
     BEGIN_TEST("TcpSocket: receiveAll() on closed socket returns false");
     {
-        TcpSocket s;
+        auto s = TcpSocket::createRaw();
         s.close();
         char buf[8] = {};
         bool ok = s.receiveAll(buf, sizeof(buf));
@@ -449,7 +450,7 @@ static void test_sad_operations() {
 
     BEGIN_TEST("TcpSocket: listen() without bind fails gracefully");
     {
-        TcpSocket s;
+        auto s = TcpSocket::createRaw();
         // listen() on unbound socket is OS-dependent but should not crash
         bool ok = s.listen(1);
         // We only require it doesn't crash; some OSes let loopback-assign
@@ -473,7 +474,7 @@ static void test_sad_timeout() {
         //   a) refuse immediately (ECONNREFUSED → ConnectFailed), or
         //   b) return WouldBlock (still in progress after SYN sent).
         // Both are valid outcomes for a non-blocking connect attempt.
-        TcpSocket s;
+        auto s = TcpSocket::createRaw();
         REQUIRE(s.setBlocking(false));
         bool ok
             = s.connect("127.0.0.1", Port{21899}, std::chrono::milliseconds{0});
@@ -488,7 +489,7 @@ static void test_sad_timeout() {
     BEGIN_TEST("TcpSocket: connect() with short timeout to refused port");
     {
         // Port 21898 has no listener — ECONNREFUSED arrives quickly.
-        TcpSocket s;
+        auto s = TcpSocket::createRaw();
         bool ok = s.connect(
             "127.0.0.1", Port{21898}, std::chrono::milliseconds{2000});
         REQUIRE(!ok);
@@ -505,7 +506,7 @@ static void test_happy_endpoints() {
 
     BEGIN_TEST("TcpSocket: getLocalEndpoint() reflects bind address");
     {
-        TcpSocket s;
+        auto s = TcpSocket::createRaw();
         REQUIRE(s.bind("127.0.0.1", Port{BASE + 30}));
         auto ep = s.getLocalEndpoint();
         REQUIRE(ep.has_value());
@@ -519,7 +520,7 @@ static void test_happy_endpoints() {
     {
         std::atomic<bool> ready{false};
         std::thread srvThread([&] {
-            TcpSocket srv;
+            auto srv = TcpSocket::createRaw();
             srv.setReuseAddress(true);
             if (!srv.bind("127.0.0.1", Port{BASE + 31}) || !srv.listen(1)) {
                 ready = true;
@@ -534,7 +535,7 @@ static void test_happy_endpoints() {
         while (!ready && std::chrono::steady_clock::now() < deadline)
             std::this_thread::sleep_for(std::chrono::milliseconds(5));
 
-        TcpSocket c;
+        auto c = TcpSocket::createRaw();
         REQUIRE(c.connect("127.0.0.1", Port{BASE + 31}));
         auto peer = c.getPeerEndpoint();
         REQUIRE(peer.has_value());
@@ -551,7 +552,7 @@ static void test_happy_lifecycle() {
     BEGIN_TEST(
         "TcpSocket: isValid() true after construction, false after close");
     {
-        TcpSocket s;
+        auto s = TcpSocket::createRaw();
         REQUIRE(s.isValid());
         s.close();
         REQUIRE(!s.isValid());

@@ -13,7 +13,7 @@ int main() {
 
     // Test 1: Move constructor
     std::cout << "Test 1: Move Constructor" << std::endl;
-    TcpSocket socket1;
+    auto socket1 = TcpSocket::createRaw();
     std::cout << "  Created socket1, valid: " << socket1.isValid() << std::endl;
 
     TcpSocket socket2(std::move(socket1));
@@ -33,8 +33,8 @@ int main() {
 
     // Test 2: Move assignment
     std::cout << "Test 2: Move Assignment" << std::endl;
-    TcpSocket socket3;
-    TcpSocket socket4;
+    auto socket3 = TcpSocket::createRaw();
+    auto socket4 = TcpSocket::createRaw();
 
     std::cout << "  socket3 valid: " << socket3.isValid() << std::endl;
     std::cout << "  socket4 valid: " << socket4.isValid() << std::endl;
@@ -54,7 +54,7 @@ int main() {
 
     // Test 3: Operations on moved-from object should not crash
     std::cout << "Test 3: Operations on Moved-From Object" << std::endl;
-    TcpSocket socket5;
+    auto socket5 = TcpSocket::createRaw();
     TcpSocket socket6(std::move(socket5));
 
     std::cout << "  Calling operations on moved-from socket5..." << std::endl;
@@ -103,7 +103,7 @@ int main() {
 
     // Test 4: Self-assignment
     std::cout << "Test 4: Self-Assignment" << std::endl;
-    TcpSocket socket7;
+    auto socket7 = TcpSocket::createRaw();
     std::cout << "  socket7 valid before self-assignment: " << socket7.isValid()
               << std::endl;
 
@@ -123,7 +123,7 @@ int main() {
     // Test 5: Move into container
     std::cout << "Test 5: Move into Container" << std::endl;
     std::vector<TcpSocket> sockets; //-V826
-    TcpSocket socket8;
+    auto socket8 = TcpSocket::createRaw();
 
     std::cout << "  socket8 valid: " << socket8.isValid() << std::endl;
     sockets.push_back(std::move(socket8));
@@ -141,7 +141,7 @@ int main() {
 
     // Test 6: Moved-from state properties
     std::cout << "Test 6: Moved-From State Properties" << std::endl;
-    TcpSocket socket9;
+    auto socket9 = TcpSocket::createRaw();
     TcpSocket socket10(std::move(socket9));
 
     std::cout << "  Checking moved-from socket9 properties:" << std::endl;

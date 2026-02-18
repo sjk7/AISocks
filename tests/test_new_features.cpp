@@ -30,7 +30,7 @@ static constexpr int BASE = 20000;
 static void test_endpoints() {
     BEGIN_TEST("getLocalEndpoint: address and port correct after bind");
     {
-        TcpSocket s;
+        auto s = TcpSocket::createRaw();
         s.setReuseAddress(true);
         REQUIRE(s.bind("127.0.0.1", Port{BASE}));
         auto ep = s.getLocalEndpoint();
@@ -44,7 +44,7 @@ static void test_endpoints() {
     BEGIN_TEST(
         "getLocalEndpoint: ephemeral port non-zero after bind on port 0");
     {
-        TcpSocket s;
+        auto s = TcpSocket::createRaw();
         REQUIRE(s.bind("127.0.0.1", Port{0}));
         auto ep = s.getLocalEndpoint();
         REQUIRE(ep.has_value());
@@ -56,7 +56,7 @@ static void test_endpoints() {
 
     BEGIN_TEST("getPeerEndpoint: populated after TCP connect");
     {
-        TcpSocket srv;
+        auto srv = TcpSocket::createRaw();
         srv.setReuseAddress(true);
         REQUIRE(srv.bind("127.0.0.1", Port{BASE + 1}));
         REQUIRE(srv.listen(1));
@@ -66,7 +66,7 @@ static void test_endpoints() {
             // peer goes out of scope; connection closes
         });
 
-        TcpSocket c;
+        auto c = TcpSocket::createRaw();
         REQUIRE(c.connect("127.0.0.1", Port{BASE + 1}));
         auto ep = c.getPeerEndpoint();
         REQUIRE(ep.has_value());
@@ -81,7 +81,7 @@ static void test_endpoints() {
 
     BEGIN_TEST("getLocalEndpoint: nullopt on closed socket");
     {
-        TcpSocket s;
+        auto s = TcpSocket::createRaw();
         s.close();
         auto ep = s.getLocalEndpoint();
         REQUIRE(!ep.has_value());
@@ -89,7 +89,7 @@ static void test_endpoints() {
 
     BEGIN_TEST("getPeerEndpoint: nullopt on unconnected socket");
     {
-        TcpSocket s;
+        auto s = TcpSocket::createRaw();
         (void)s.bind("127.0.0.1", Port{0});
         auto ep = s.getPeerEndpoint();
         REQUIRE(!ep.has_value());
@@ -108,21 +108,21 @@ static void test_endpoints() {
 static void test_send_timeout() {
     BEGIN_TEST("setSendTimeout: succeeds with positive duration");
     {
-        TcpSocket s;
+        auto s = TcpSocket::createRaw();
         REQUIRE(s.setSendTimeout(Milliseconds{5000}));
         REQUIRE(s.getLastError() == SocketError::None);
     }
 
     BEGIN_TEST("setSendTimeout: Milliseconds{0} disables timeout");
     {
-        TcpSocket s;
+        auto s = TcpSocket::createRaw();
         REQUIRE(s.setSendTimeout(Milliseconds{0}));
         REQUIRE(s.getLastError() == SocketError::None);
     }
 
     BEGIN_TEST("setSendTimeout: fails on closed socket");
     {
-        TcpSocket s;
+        auto s = TcpSocket::createRaw();
         s.close();
         REQUIRE(!s.setSendTimeout(Milliseconds{1000}));
     }
@@ -134,14 +134,14 @@ static void test_send_timeout() {
 static void test_no_delay() {
     BEGIN_TEST("setNoDelay(true): enables TCP_NODELAY");
     {
-        TcpSocket s;
+        auto s = TcpSocket::createRaw();
         REQUIRE(s.setNoDelay(true));
         REQUIRE(s.getLastError() == SocketError::None);
     }
 
     BEGIN_TEST("setNoDelay: can be toggled off");
     {
-        TcpSocket s;
+        auto s = TcpSocket::createRaw();
         REQUIRE(s.setNoDelay(true));
         REQUIRE(s.setNoDelay(false));
         REQUIRE(s.getLastError() == SocketError::None);
@@ -149,7 +149,7 @@ static void test_no_delay() {
 
     BEGIN_TEST("setNoDelay: fails on closed socket");
     {
-        TcpSocket s;
+        auto s = TcpSocket::createRaw();
         s.close();
         REQUIRE(!s.setNoDelay(true));
     }
@@ -254,7 +254,7 @@ static void test_udp_connected() {
 static void test_span_overloads() {
     BEGIN_TEST("Span send/receive: TCP loopback echo via std::byte spans");
     {
-        TcpSocket srv;
+        auto srv = TcpSocket::createRaw();
         srv.setReuseAddress(true);
         REQUIRE(srv.bind("127.0.0.1", Port{BASE + 40}));
         REQUIRE(srv.listen(1));
@@ -272,7 +272,7 @@ static void test_span_overloads() {
             }
         });
 
-        TcpSocket cli;
+        auto cli = TcpSocket::createRaw();
         cli.setReceiveTimeout(Milliseconds{2000});
         REQUIRE(cli.connect("127.0.0.1", Port{BASE + 40}));
 
@@ -338,7 +338,7 @@ static void test_span_overloads() {
 static void test_buffer_sizes() {
     BEGIN_TEST("setReceiveBufferSize: succeeds on valid socket");
     {
-        TcpSocket s;
+        auto s = TcpSocket::createRaw();
         // 64 KiB is a commonly accepted value on all platforms.
         REQUIRE(s.setReceiveBufferSize(64 * 1024));
         REQUIRE(s.getLastError() == SocketError::None);
@@ -346,7 +346,7 @@ static void test_buffer_sizes() {
 
     BEGIN_TEST("setSendBufferSize: succeeds on valid socket");
     {
-        TcpSocket s;
+        auto s = TcpSocket::createRaw();
         REQUIRE(s.setSendBufferSize(64 * 1024));
         REQUIRE(s.getLastError() == SocketError::None);
     }
@@ -360,14 +360,14 @@ static void test_buffer_sizes() {
 
     BEGIN_TEST("setReceiveBufferSize: fails on closed socket");
     {
-        TcpSocket s;
+        auto s = TcpSocket::createRaw();
         s.close();
         REQUIRE(!s.setReceiveBufferSize(64 * 1024));
     }
 
     BEGIN_TEST("setSendBufferSize: fails on closed socket");
     {
-        TcpSocket s;
+        auto s = TcpSocket::createRaw();
         s.close();
         REQUIRE(!s.setSendBufferSize(64 * 1024));
     }
@@ -379,7 +379,7 @@ static void test_buffer_sizes() {
 static void test_shutdown() {
     BEGIN_TEST("shutdown(Write): peer recv sees EOF (returns 0)");
     {
-        TcpSocket srv;
+        auto srv = TcpSocket::createRaw();
         srv.setReuseAddress(true);
         REQUIRE(srv.bind("127.0.0.1", Port{BASE + 20}));
         REQUIRE(srv.listen(1));
@@ -394,7 +394,7 @@ static void test_shutdown() {
             }
         });
 
-        TcpSocket c;
+        auto c = TcpSocket::createRaw();
         REQUIRE(c.connect("127.0.0.1", Port{BASE + 20}));
         REQUIRE(c.shutdown(ShutdownHow::Write));
         t.join();
@@ -406,14 +406,14 @@ static void test_shutdown() {
 
     BEGIN_TEST("shutdown(Both): socket remains isValid() after call");
     {
-        TcpSocket srv;
+        auto srv = TcpSocket::createRaw();
         srv.setReuseAddress(true);
         REQUIRE(srv.bind("127.0.0.1", Port{BASE + 21}));
         REQUIRE(srv.listen(1));
 
         std::thread t([&]() { srv.accept(); });
 
-        TcpSocket c;
+        auto c = TcpSocket::createRaw();
         REQUIRE(c.connect("127.0.0.1", Port{BASE + 21}));
         REQUIRE(c.shutdown(ShutdownHow::Both));
         REQUIRE(c.isValid()); // fd still open; only close() destroys it
@@ -422,7 +422,7 @@ static void test_shutdown() {
 
     BEGIN_TEST("shutdown: fails on closed socket");
     {
-        TcpSocket s;
+        auto s = TcpSocket::createRaw();
         s.close();
         REQUIRE(!s.shutdown(ShutdownHow::Both));
     }
@@ -434,14 +434,14 @@ static void test_shutdown() {
 static void test_keepalive() {
     BEGIN_TEST("setKeepAlive(true): enables SO_KEEPALIVE");
     {
-        TcpSocket s;
+        auto s = TcpSocket::createRaw();
         REQUIRE(s.setKeepAlive(true));
         REQUIRE(s.getLastError() == SocketError::None);
     }
 
     BEGIN_TEST("setKeepAlive: can be disabled after enable");
     {
-        TcpSocket s;
+        auto s = TcpSocket::createRaw();
         REQUIRE(s.setKeepAlive(true));
         REQUIRE(s.setKeepAlive(false));
         REQUIRE(s.getLastError() == SocketError::None);
@@ -449,7 +449,7 @@ static void test_keepalive() {
 
     BEGIN_TEST("setKeepAlive: fails on closed socket");
     {
-        TcpSocket s;
+        auto s = TcpSocket::createRaw();
         s.close();
         REQUIRE(!s.setKeepAlive(true));
     }
