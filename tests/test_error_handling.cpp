@@ -77,7 +77,7 @@ int main() {
             // Port may already be in use; skip gracefully
             REQUIRE_MSG(true, "SKIP - port 19701 unavailable");
         } else {
-            s1.listen(1);
+            REQUIRE(s1.listen(1));
             bool second = s2.bind("127.0.0.1", Port{19701});
             REQUIRE(!second);
         }

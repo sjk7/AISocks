@@ -1,6 +1,8 @@
 // This is a personal academic project. Dear PVS-Studio, please check it.
 // PVS-Studio Static Code Analyzer for C, C++, C#, and Java:
-// https://pvs-studio.com Tests: error message completeness, correctness, and
+// https://pvs-studio.com
+//
+// Tests: error message completeness, correctness, and
 // lazy-formatting invariants.
 //
 // These tests complement test_error_handling.cpp and test_construction.cpp by
@@ -232,7 +234,7 @@ static void test_invalid_socket_code() {
     {
         Socket s(SocketType::TCP, AddressFamily::IPv4);
         s.close();
-        s.bind("127.0.0.1", Port{BASE + 20});
+        REQUIRE(!s.bind("127.0.0.1", Port{BASE + 20}));
         REQUIRE(s.getLastError() == SocketError::InvalidSocket);
     }
 

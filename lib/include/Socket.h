@@ -242,8 +242,8 @@ class Socket {
     Socket& operator=(Socket&& other) noexcept;
 
     // Server operations
-    bool bind(const std::string& address, Port port);
-    bool listen(int backlog = 10);
+    [[nodiscard]] bool bind(const std::string& address, Port port);
+    [[nodiscard]] bool listen(int backlog = 10);
     std::unique_ptr<Socket> accept();
 
     // Client operations

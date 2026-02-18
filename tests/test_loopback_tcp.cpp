@@ -1,6 +1,8 @@
 // This is a personal academic project. Dear PVS-Studio, please check it.
 // PVS-Studio Static Code Analyzer for C, C++, C#, and Java:
-// https://pvs-studio.com Tests: End-to-end TCP send/receive over the loopback
+// https://pvs-studio.com
+//
+// Tests: End-to-end TCP send/receive over the loopback
 // interface. Checks observable behaviour only.
 
 #include "Socket.h"
@@ -130,8 +132,8 @@ int main() {
         std::thread srvThread([&]() {
             Socket srv(SocketType::TCP, AddressFamily::IPv4);
             srv.setReuseAddress(true);
-            srv.bind("127.0.0.1", Port{BASE_PORT + 3});
-            srv.listen(1);
+            REQUIRE(srv.bind("127.0.0.1", Port{BASE_PORT + 3}));
+            REQUIRE(srv.listen(1));
             ready = true;
             auto c = srv.accept();
             if (c) {
@@ -168,8 +170,8 @@ int main() {
         {
             Socket srv(SocketType::TCP, AddressFamily::IPv4);
             srv.setReuseAddress(true);
-            srv.bind("127.0.0.1", Port{BASE_PORT + 4});
-            srv.listen(1);
+            REQUIRE(srv.bind("127.0.0.1", Port{BASE_PORT + 4}));
+            REQUIRE(srv.listen(1));
             srv.close();
         }
         // Short wait for OS to release
