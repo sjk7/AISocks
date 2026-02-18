@@ -516,7 +516,7 @@ static void test_shutdown() {
         REQUIRE(srv.bind("127.0.0.1", Port{BASE + 21}));
         REQUIRE(srv.listen(1));
 
-        std::thread t([&]() { srv.accept(); });
+        std::thread t([&]() { (void)srv.accept(); });
 
         auto c = TcpSocket::createRaw();
         REQUIRE(c.connect("127.0.0.1", Port{BASE + 21}));
