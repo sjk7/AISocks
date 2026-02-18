@@ -45,12 +45,12 @@ static SocketError resolveToSockaddr(const std::string& address, Port port,
     sockaddr_storage& out, socklen_t& outLen, int* gaiErr = nullptr) {
     std::memset(&out, 0, sizeof(out));
     if (family == AddressFamily::IPv6) {
-        auto* a6 = static_cast<sockaddr_in6*>(static_cast<void*>(&out));
-        a6->sin6_family = AF_INET6;
-        a6->sin6_port = htons(port);
+        sockaddr_in6 a6{};
+        a6.sin6_family = AF_INET6;
+        a6.sin6_port = htons(port);
         if (address.empty() || address == "::" || address == "0.0.0.0") {
-            a6->sin6_addr = in6addr_any;
-        } else if (inet_pton(AF_INET6, address.c_str(), &a6->sin6_addr) > 0) {
+            a6.sin6_addr = in6addr_any;
+        } else if (inet_pton(AF_INET6, address.c_str(), &a6.sin6_addr) > 0) {
             // literal parsed OK
         } else if (doDns) {
             struct addrinfo hints{}, *res = nullptr;
@@ -62,20 +62,21 @@ static SocketError resolveToSockaddr(const std::string& address, Port port,
                 if (gaiErr) *gaiErr = gai;
                 return SocketError::ConnectFailed;
             }
-            *a6 = *static_cast<sockaddr_in6*>(static_cast<void*>(res->ai_addr));
-            a6->sin6_port = htons(port);
+            std::memcpy(&a6, res->ai_addr, sizeof(a6));
+            a6.sin6_port = htons(port);
             freeaddrinfo(res);
         } else {
             return SocketError::BindFailed;
         }
+        std::memcpy(&out, &a6, sizeof(a6));
         outLen = sizeof(sockaddr_in6);
     } else {
-        auto* a4 = static_cast<sockaddr_in*>(static_cast<void*>(&out));
-        a4->sin_family = AF_INET;
-        a4->sin_port = htons(port);
+        sockaddr_in a4{};
+        a4.sin_family = AF_INET;
+        a4.sin_port = htons(port);
         if (address.empty() || address == "0.0.0.0") {
-            a4->sin_addr.s_addr = INADDR_ANY;
-        } else if (inet_pton(AF_INET, address.c_str(), &a4->sin_addr) > 0) {
+            a4.sin_addr.s_addr = INADDR_ANY;
+        } else if (inet_pton(AF_INET, address.c_str(), &a4.sin_addr) > 0) {
             // literal parsed OK
         } else if (doDns) {
             struct addrinfo hints{}, *res = nullptr;
@@ -87,12 +88,13 @@ static SocketError resolveToSockaddr(const std::string& address, Port port,
                 if (gaiErr) *gaiErr = gai;
                 return SocketError::ConnectFailed;
             }
-            *a4 = *static_cast<sockaddr_in*>(static_cast<void*>(res->ai_addr));
-            a4->sin_port = htons(port);
+            std::memcpy(&a4, res->ai_addr, sizeof(a4));
+            a4.sin_port = htons(port);
             freeaddrinfo(res);
         } else {
             return SocketError::BindFailed;
         }
+        std::memcpy(&out, &a4, sizeof(a4));
         outLen = sizeof(sockaddr_in);
     }
     return SocketError::None;
@@ -1036,14 +1038,16 @@ Endpoint SocketImpl::endpointFromSockaddr(const sockaddr_storage& addr) {
     Endpoint ep;
     if (addr.ss_family == AF_INET6) {
         ep.family = AddressFamily::IPv6;
-        const auto* a6 = static_cast<const sockaddr_in6*>(static_cast<const void*>(&addr));
+        const auto* a6
+            = static_cast<const sockaddr_in6*>(static_cast<const void*>(&addr));
         ep.port = Port{ntohs(a6->sin6_port)};
         char buf[INET6_ADDRSTRLEN];
         inet_ntop(AF_INET6, &a6->sin6_addr, buf, sizeof(buf));
         ep.address = buf;
     } else {
         ep.family = AddressFamily::IPv4;
-        const auto* a4 = static_cast<const sockaddr_in*>(static_cast<const void*>(&addr));
+        const auto* a4
+            = static_cast<const sockaddr_in*>(static_cast<const void*>(&addr));
         ep.port = Port{ntohs(a4->sin_port)};
         char buf[INET_ADDRSTRLEN];
         inet_ntop(AF_INET, &a4->sin_addr, buf, sizeof(buf));
