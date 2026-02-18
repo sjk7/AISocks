@@ -152,14 +152,14 @@ static void test_send_all() {
     BEGIN_TEST("sendAll: transmits all bytes in a single call");
     Socket srv(SocketType::TCP, AddressFamily::IPv4);
     srv.setReuseAddress(true);
-    REQUIRE(srv.bind("127.0.0.1", Port{BASE_PORT + 4}));
+    REQUIRE(srv.bind("127.0.0.1", Port{BASE_PORT + 4})); //-V112
     REQUIRE(srv.listen(1));
 
     std::string received;
     std::atomic<bool> done{false};
     std::thread clientThread([&]() {
         Socket c(SocketType::TCP, AddressFamily::IPv4);
-        if (!c.connect("127.0.0.1", Port{BASE_PORT + 4}, Milliseconds{500}))
+        if (!c.connect("127.0.0.1", Port{BASE_PORT + 4}, Milliseconds{500})) //-V112
             return;
         char buf[256]{};
         int n = c.receive(buf, sizeof(buf) - 1);
