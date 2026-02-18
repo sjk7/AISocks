@@ -5,7 +5,8 @@
 // Tests: Blocking/non-blocking mode transitions. Checks
 // observable behaviour only.
 
-#include "Socket.h"
+#include "TcpSocket.h"
+#include "UdpSocket.h"
 #include "test_helpers.h"
 #include <thread>
 #include <chrono>
@@ -17,20 +18,20 @@ int main() {
 
     BEGIN_TEST("New socket is blocking by default");
     {
-        Socket s(SocketType::TCP, AddressFamily::IPv4);
+        TcpSocket s;
         REQUIRE(s.isBlocking());
     }
 
     BEGIN_TEST("setBlocking(false) returns true and makes socket non-blocking");
     {
-        Socket s(SocketType::TCP, AddressFamily::IPv4);
+        TcpSocket s;
         REQUIRE(s.setBlocking(false));
         REQUIRE(!s.isBlocking());
     }
 
     BEGIN_TEST("setBlocking(true) restores blocking mode");
     {
-        Socket s(SocketType::TCP, AddressFamily::IPv4);
+        TcpSocket s;
         s.setBlocking(false);
         REQUIRE(s.setBlocking(true));
         REQUIRE(s.isBlocking());
@@ -38,7 +39,7 @@ int main() {
 
     BEGIN_TEST("Blocking mode can be toggled multiple times correctly");
     {
-        Socket s(SocketType::TCP, AddressFamily::IPv4);
+        TcpSocket s;
         bool ok = true;
         for (int i = 0; i < 6; ++i) {
             bool target = (i % 2 == 0) ? false : true;
@@ -53,7 +54,7 @@ int main() {
 
     BEGIN_TEST("UDP socket blocking mode behaves the same as TCP");
     {
-        Socket s(SocketType::UDP, AddressFamily::IPv4);
+        UdpSocket s;
         REQUIRE(s.isBlocking());
         REQUIRE(s.setBlocking(false));
         REQUIRE(!s.isBlocking());
@@ -64,7 +65,7 @@ int main() {
     BEGIN_TEST("Non-blocking recv on unconnected socket returns WouldBlock or "
                "error instantly");
     {
-        Socket s(SocketType::TCP, AddressFamily::IPv4);
+        TcpSocket s;
         s.setBlocking(false);
         char buf[64];
         int r = s.receive(buf, sizeof(buf));
@@ -76,7 +77,7 @@ int main() {
     BEGIN_TEST(
         "Accepted socket inherits blocking state (defaults to blocking)");
     {
-        Socket server(SocketType::TCP, AddressFamily::IPv4);
+        TcpSocket server;
         server.setReuseAddress(true);
         // Use a fixed port; if in use the test is skipped gracefully
         bool bound = server.bind("127.0.0.1", Port{19300}) && server.listen(1);
@@ -85,7 +86,7 @@ int main() {
         } else {
             std::thread connector([]() {
                 std::this_thread::sleep_for(std::chrono::milliseconds(5));
-                Socket c(SocketType::TCP, AddressFamily::IPv4);
+                TcpSocket c;
                 c.connect("127.0.0.1", Port{19300});
                 std::this_thread::sleep_for(std::chrono::milliseconds(10));
             });

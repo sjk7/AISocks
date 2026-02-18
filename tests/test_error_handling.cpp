@@ -3,7 +3,7 @@
 // https://pvs-studio.com Tests: Error reporting and graceful failure for
 // invalid/misused operations. Checks observable behaviour only.
 
-#include "Socket.h"
+#include "TcpSocket.h"
 #include "test_helpers.h"
 #include <thread>
 #include <chrono>
@@ -15,14 +15,14 @@ int main() {
 
     BEGIN_TEST("bind() on invalid socket returns false");
     {
-        Socket s(SocketType::TCP, AddressFamily::IPv4);
+        TcpSocket s;
         s.close(); // invalidate
         REQUIRE(!s.bind("127.0.0.1", Port{19700}));
     }
 
     BEGIN_TEST("listen() without bind returns false");
     {
-        Socket s(SocketType::TCP, AddressFamily::IPv4);
+        TcpSocket s;
         // listen without prior bind should fail
         bool result = s.listen(5);
         // Not guaranteed to fail on every OS, but getLastError must not be None
@@ -33,7 +33,7 @@ int main() {
 
     BEGIN_TEST("connect() to a refused port returns false");
     {
-        Socket s(SocketType::TCP, AddressFamily::IPv4);
+        TcpSocket s;
         // Port 1 is almost certainly not listening
         bool r = s.connect("127.0.0.1", Port{1});
         REQUIRE(!r);
@@ -43,7 +43,7 @@ int main() {
     BEGIN_TEST(
         "getErrorMessage returns non-empty string after a failed operation");
     {
-        Socket s(SocketType::TCP, AddressFamily::IPv4);
+        TcpSocket s;
         s.connect("127.0.0.1", Port{1}); // will fail
         std::string msg = s.getErrorMessage();
         REQUIRE(!msg.empty());
@@ -51,14 +51,14 @@ int main() {
 
     BEGIN_TEST("send() on unconnected socket returns <= 0");
     {
-        Socket s(SocketType::TCP, AddressFamily::IPv4);
+        TcpSocket s;
         int r = s.send("hello", 5);
         REQUIRE(r <= 0);
     }
 
     BEGIN_TEST("receive() on unconnected socket returns <= 0");
     {
-        Socket s(SocketType::TCP, AddressFamily::IPv4);
+        TcpSocket s;
         char buf[64];
         int r = s.receive(buf, sizeof(buf));
         REQUIRE(r <= 0);
@@ -67,8 +67,8 @@ int main() {
     BEGIN_TEST(
         "bind() to the same address/port twice returns false on second call");
     {
-        Socket s1(SocketType::TCP, AddressFamily::IPv4);
-        Socket s2(SocketType::TCP, AddressFamily::IPv4);
+        TcpSocket s1;
+        TcpSocket s2;
         s1.setReuseAddress(false);
         s2.setReuseAddress(false);
 
@@ -85,7 +85,7 @@ int main() {
 
     BEGIN_TEST("connect() on closed socket returns false and sets an error");
     {
-        Socket s(SocketType::TCP, AddressFamily::IPv4);
+        TcpSocket s;
         s.close();
         bool r = s.connect("127.0.0.1", Port{19702});
         REQUIRE(!r);
@@ -93,7 +93,7 @@ int main() {
 
     BEGIN_TEST("accept() on a socket that is not listening returns nullptr");
     {
-        Socket s(SocketType::TCP, AddressFamily::IPv4);
+        TcpSocket s;
         // Not bound or listening - accept should fail/return null quickly
         // Set non-blocking to avoid hanging
         s.setBlocking(false);
@@ -103,7 +103,7 @@ int main() {
 
     BEGIN_TEST("setTimeout does not crash and returns bool");
     {
-        Socket s(SocketType::TCP, AddressFamily::IPv4);
+        TcpSocket s;
         bool r = s.setTimeout(std::chrono::seconds{1});
         (void)r;
         REQUIRE_MSG(true, "setTimeout() returned without crash");
@@ -111,7 +111,7 @@ int main() {
 
     BEGIN_TEST("SocketError::None on fresh socket, error set after failure");
     {
-        Socket s(SocketType::TCP, AddressFamily::IPv4);
+        TcpSocket s;
         REQUIRE(s.getLastError() == SocketError::None);
         s.connect("127.0.0.1", Port{1}); // forced failure
         REQUIRE(s.getLastError() != SocketError::None);

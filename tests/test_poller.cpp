@@ -4,7 +4,7 @@
 // Tests: Poller — platform-native readiness notification (kqueue/epoll/WSAPoll)
 
 #include "Poller.h"
-#include "Socket.h"
+#include "TcpSocket.h"
 #include "test_helpers.h"
 
 #include <atomic>
@@ -35,7 +35,7 @@ static void test_poller_construct() {
 // ---------------------------------------------------------------------------
 static void test_poller_add_remove() {
     BEGIN_TEST("Poller: add/remove a server socket without error");
-    Socket srv(SocketType::TCP, AddressFamily::IPv4);
+    TcpSocket srv;
     srv.setReuseAddress(true);
     REQUIRE(srv.bind("127.0.0.1", Port{BASE_PORT}));
     REQUIRE(srv.listen(5));
@@ -50,7 +50,7 @@ static void test_poller_add_remove() {
 // ---------------------------------------------------------------------------
 static void test_poller_timeout() {
     BEGIN_TEST("Poller: wait() returns empty vector on timeout");
-    Socket srv(SocketType::TCP, AddressFamily::IPv4);
+    TcpSocket srv;
     srv.setReuseAddress(true);
     REQUIRE(srv.bind("127.0.0.1", Port{BASE_PORT + 1}));
     REQUIRE(srv.listen(5));
@@ -67,7 +67,7 @@ static void test_poller_timeout() {
 // ---------------------------------------------------------------------------
 static void test_poller_readable_on_connect() {
     BEGIN_TEST("Poller: server socket fires Readable when client connects");
-    Socket srv(SocketType::TCP, AddressFamily::IPv4);
+    TcpSocket srv;
     srv.setReuseAddress(true);
     REQUIRE(srv.bind("127.0.0.1", Port{BASE_PORT + 2}));
     REQUIRE(srv.listen(5));
@@ -82,7 +82,7 @@ static void test_poller_readable_on_connect() {
     // Client thread: connect, receive one message, store it.
     std::thread clientThread([&]() {
         std::this_thread::sleep_for(std::chrono::milliseconds(5));
-        Socket c(SocketType::TCP, AddressFamily::IPv4);
+        TcpSocket c;
         if (!c.connect("127.0.0.1", Port{BASE_PORT + 2}, Milliseconds{500})) {
             return;
         }
@@ -121,7 +121,7 @@ static void test_poller_readable_on_connect() {
 // ---------------------------------------------------------------------------
 static void test_poller_remove_stops_events() {
     BEGIN_TEST("Poller: removed socket no longer fires");
-    Socket srv(SocketType::TCP, AddressFamily::IPv4);
+    TcpSocket srv;
     srv.setReuseAddress(true);
     REQUIRE(srv.bind("127.0.0.1", Port{BASE_PORT + 3}));
     REQUIRE(srv.listen(5));
@@ -133,7 +133,7 @@ static void test_poller_remove_stops_events() {
     // Connect a client — the poller should NOT see it (srv was removed).
     std::thread clientThread([&]() {
         std::this_thread::sleep_for(std::chrono::milliseconds(5));
-        Socket c(SocketType::TCP, AddressFamily::IPv4);
+        TcpSocket c;
         c.connect("127.0.0.1", Port{BASE_PORT + 3}, Milliseconds{200});
     });
 
@@ -150,7 +150,7 @@ static void test_poller_remove_stops_events() {
 // ---------------------------------------------------------------------------
 static void test_send_all() {
     BEGIN_TEST("sendAll: transmits all bytes in a single call");
-    Socket srv(SocketType::TCP, AddressFamily::IPv4);
+    TcpSocket srv;
     srv.setReuseAddress(true);
     REQUIRE(srv.bind("127.0.0.1", Port{BASE_PORT + 4})); //-V112
     REQUIRE(srv.listen(1));
@@ -158,7 +158,7 @@ static void test_send_all() {
     std::string received;
     std::atomic<bool> done{false};
     std::thread clientThread([&]() {
-        Socket c(SocketType::TCP, AddressFamily::IPv4);
+        TcpSocket c;
         if (!c.connect(
                 "127.0.0.1", Port{BASE_PORT + 4}, Milliseconds{500})) //-V112
             return;
@@ -184,14 +184,14 @@ static void test_send_all() {
 static void test_wait_readable_writable() {
     BEGIN_TEST(
         "waitReadable/waitWritable: writable fires immediately on send buffer");
-    Socket srv(SocketType::TCP, AddressFamily::IPv4);
+    TcpSocket srv;
     srv.setReuseAddress(true);
     REQUIRE(srv.bind("127.0.0.1", Port{BASE_PORT + 5}));
     REQUIRE(srv.listen(1));
 
     std::thread clientThread([&]() {
         std::this_thread::sleep_for(std::chrono::milliseconds(5));
-        Socket c(SocketType::TCP, AddressFamily::IPv4);
+        TcpSocket c;
         c.connect("127.0.0.1", Port{BASE_PORT + 5}, Milliseconds{500});
         std::this_thread::sleep_for(std::chrono::milliseconds(50));
     });
@@ -205,7 +205,7 @@ static void test_wait_readable_writable() {
     clientThread.join();
 
     // waitReadable should time out on a socket with no data pending.
-    Socket lonely(SocketType::TCP, AddressFamily::IPv4);
+    TcpSocket lonely;
     lonely.setReuseAddress(true);
     REQUIRE(lonely.bind("127.0.0.1", Port{BASE_PORT + 6}));
     REQUIRE(lonely.listen(1));
@@ -219,7 +219,7 @@ static void test_wait_readable_writable() {
 // ---------------------------------------------------------------------------
 static void test_set_linger_abort() {
     BEGIN_TEST("setLingerAbort: succeeds on a valid socket");
-    Socket s(SocketType::TCP, AddressFamily::IPv4);
+    TcpSocket s;
     REQUIRE(s.setLingerAbort(true));
     REQUIRE(s.setLingerAbort(false));
 }
@@ -239,13 +239,13 @@ static void test_poller_async_connect() {
     BEGIN_TEST("Poller: async (non-blocking) connect via Writable event");
 
     // Server side — accept in main thread after poller fires.
-    Socket srv(SocketType::TCP, AddressFamily::IPv4);
+    TcpSocket srv;
     srv.setReuseAddress(true);
     REQUIRE(srv.bind("127.0.0.1", Port{BASE_PORT + 7}));
     REQUIRE(srv.listen(5));
 
     // Client side — non-blocking connect.
-    Socket client(SocketType::TCP, AddressFamily::IPv4);
+    TcpSocket client;
     REQUIRE(client.setBlocking(false));
 
     // connect() may return true immediately (loopback) or false + WouldBlock

@@ -3,6 +3,8 @@ cmake_minimum_required(VERSION 3.15)
 # Library target
 add_library(aiSocksLib STATIC
     src/Socket.cpp
+    src/TcpSocket.cpp
+    src/UdpSocket.cpp
     src/SocketImpl.cpp
     src/SocketImpl.h
 )
