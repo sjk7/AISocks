@@ -59,12 +59,12 @@ class UdpSocket : public Socket {
     // Set a default destination.  Enables send() / receive() without an
     // explicit endpoint on every call.
     //
-    // UDP "connect" is a kernel filter only — no handshake is performed, so
-    // this always completes immediately regardless of the timeout value.
-    // Milliseconds{0} is fine; WouldBlock will never be returned.
-    [[nodiscard]] bool connect(const std::string& address, Port port,
-        Milliseconds timeout = defaultTimeout) {
-        return doConnect(address, port, timeout);
+    // UDP "connect" is a purely local kernel operation — it records the peer
+    // address so the kernel can filter incoming datagrams and fill in the
+    // destination on outgoing ones.  No packets are sent; no handshake
+    // occurs.  The call always completes instantly.  It cannot be polled.
+    [[nodiscard]] bool connect(const std::string& address, Port port) {
+        return doConnect(address, port, Milliseconds{0});
     }
 
     // --- Data transfer (connectionless) ---
