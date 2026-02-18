@@ -78,7 +78,7 @@ int main() {
     bool allPassed = true;
     for (int i = 0; i < 5; i++) {
         bool targetState = (i % 2 == 0);
-        socket.setBlocking(targetState);
+        (void)socket.setBlocking(targetState);
         bool currentState = socket.isBlocking();
         std::cout << "  Toggle " << (i + 1) << ": Expected="
                   << (targetState ? "blocking" : "non-blocking") << ", Actual="
@@ -111,7 +111,7 @@ int main() {
         std::thread clientThread([&]() {
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
             auto client = TcpSocket::createRaw();
-            client.connect("127.0.0.1", Port{9999});
+            (void)client.connect("127.0.0.1", Port{9999});
             std::this_thread::sleep_for(std::chrono::milliseconds(200));
         });
 

@@ -44,7 +44,7 @@ int main() {
         "getErrorMessage returns non-empty string after a failed operation");
     {
         auto s = TcpSocket::createRaw();
-        s.connect("127.0.0.1", Port{1}); // will fail
+        (void)s.connect("127.0.0.1", Port{1}); // will fail
         std::string msg = s.getErrorMessage();
         REQUIRE(!msg.empty());
     }
@@ -96,7 +96,7 @@ int main() {
         auto s = TcpSocket::createRaw();
         // Not bound or listening - accept should fail/return null quickly
         // Set non-blocking to avoid hanging
-        s.setBlocking(false);
+        (void)s.setBlocking(false);
         auto accepted = s.accept();
         REQUIRE(accepted == nullptr);
     }
@@ -113,7 +113,7 @@ int main() {
     {
         auto s = TcpSocket::createRaw();
         REQUIRE(s.getLastError() == SocketError::None);
-        s.connect("127.0.0.1", Port{1}); // forced failure
+        (void)s.connect("127.0.0.1", Port{1}); // forced failure
         REQUIRE(s.getLastError() != SocketError::None);
     }
 
