@@ -1,6 +1,8 @@
 // This is a personal academic project. Dear PVS-Studio, please check it.
 // PVS-Studio Static Code Analyzer for C, C++, C#, and Java:
-// https://pvs-studio.com Tests: correct-by-construction Socket API. Verifies
+// https://pvs-studio.com 
+// 
+// Tests: correct-by-construction Socket API. Verifies
 // that constructors throw SocketException on failure and produce a fully usable
 // socket on success.
 
@@ -76,6 +78,7 @@ static void test_server_bind_happy() {
             REQUIRE(srv.isValid());
             ready = true;
 
+            std::string cltError;
             std::thread clt([&]() {
                 // server is already blocking on accept(); connect immediately
                 try {
@@ -83,12 +86,14 @@ static void test_server_bind_happy() {
                         ConnectTo{"127.0.0.1", Port{BASE + 1}});
                     // peer closes on scope exit — accept() on server side has
                     // already returned by the time connect() completes
-                } catch (...) {
+                } catch (const std::exception& e) {
+                    cltError = e.what();
                 }
             });
 
             auto peer = srv.accept();
             clt.join();
+            REQUIRE(cltError.empty());
             REQUIRE(peer != nullptr);
         } catch (const SocketException& e) {
             std::cerr << "  Unexpected exception: " << e.what() << "\n";
@@ -198,7 +203,7 @@ static void test_connect_to_happy() {
         }
         srvThread.join();
         REQUIRE(!threw);
-        REQUIRE(received == payload);
+        REQUIRE(received == payload); //-V547
     }
 }
 
