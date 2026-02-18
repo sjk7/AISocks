@@ -43,8 +43,8 @@ static void test_happy_construction() {
     {
         bool threw = false;
         try {
-            TcpSocket srv(AddressFamily::IPv4,
-                ServerBind{"127.0.0.1", Port{BASE}});
+            TcpSocket srv(
+                AddressFamily::IPv4, ServerBind{"127.0.0.1", Port{BASE}});
             REQUIRE(srv.isValid());
             auto ep = srv.getLocalEndpoint();
             REQUIRE(ep.has_value());
@@ -71,15 +71,15 @@ static void test_happy_construction() {
                 ready = true;
             }
         });
-        auto deadline =
-            std::chrono::steady_clock::now() + std::chrono::seconds(3);
+        auto deadline
+            = std::chrono::steady_clock::now() + std::chrono::seconds(3);
         while (!ready && std::chrono::steady_clock::now() < deadline)
             std::this_thread::sleep_for(std::chrono::milliseconds(5));
 
         bool threw = false;
         try {
-            TcpSocket c(AddressFamily::IPv4,
-                ConnectTo{"127.0.0.1", Port{BASE + 1}});
+            TcpSocket c(
+                AddressFamily::IPv4, ConnectTo{"127.0.0.1", Port{BASE + 1}});
             REQUIRE(c.isValid());
             auto peer = c.getPeerEndpoint();
             REQUIRE(peer.has_value());
@@ -110,7 +110,8 @@ static void test_happy_accept() {
             try {
                 TcpSocket c;
                 c.connect("127.0.0.1", Port{BASE + 2});
-            } catch (...) {}
+            } catch (...) {
+            }
         });
 
         auto peer = srv.accept();
@@ -153,8 +154,8 @@ static void test_happy_send_receive() {
             }
         });
 
-        auto deadline =
-            std::chrono::steady_clock::now() + std::chrono::seconds(3);
+        auto deadline
+            = std::chrono::steady_clock::now() + std::chrono::seconds(3);
         while (!ready && std::chrono::steady_clock::now() < deadline)
             std::this_thread::sleep_for(std::chrono::milliseconds(5));
 
@@ -190,8 +191,8 @@ static void test_happy_send_receive() {
             }
         });
 
-        auto deadline =
-            std::chrono::steady_clock::now() + std::chrono::seconds(3);
+        auto deadline
+            = std::chrono::steady_clock::now() + std::chrono::seconds(3);
         while (!ready && std::chrono::steady_clock::now() < deadline)
             std::this_thread::sleep_for(std::chrono::milliseconds(5));
 
@@ -233,18 +234,18 @@ static void test_happy_progress_callback() {
             }
         });
 
-        auto deadline =
-            std::chrono::steady_clock::now() + std::chrono::seconds(3);
+        auto deadline
+            = std::chrono::steady_clock::now() + std::chrono::seconds(3);
         while (!ready && std::chrono::steady_clock::now() < deadline)
             std::this_thread::sleep_for(std::chrono::milliseconds(5));
 
         TcpSocket c;
         REQUIRE(c.connect("127.0.0.1", Port{BASE + 5}));
-        bool ok = c.sendAll(msg.data(), msg.size(),
-            [&](size_t sent, size_t total) {
-                reportedSent = sent;
-                reportedTotal = total;
-            });
+        bool ok
+            = c.sendAll(msg.data(), msg.size(), [&](size_t sent, size_t total) {
+                  reportedSent = sent;
+                  reportedTotal = total;
+              });
         REQUIRE(ok);
         REQUIRE(reportedSent == msg.size());
         REQUIRE(reportedTotal == msg.size());
@@ -360,8 +361,8 @@ static void test_sad_construction() {
         try {
             // Port 21899 is in our exclusive range but nothing is listening
             TcpSocket c(AddressFamily::IPv4,
-                ConnectTo{"127.0.0.1", Port{21899},
-                    std::chrono::milliseconds{500}});
+                ConnectTo{
+                    "127.0.0.1", Port{21899}, std::chrono::milliseconds{500}});
         } catch (const SocketException& e) {
             threw = true;
             code = e.errorCode();
@@ -391,8 +392,8 @@ static void test_sad_operations() {
     BEGIN_TEST("TcpSocket: connect() fails when nothing is listening");
     {
         TcpSocket s;
-        bool ok = s.connect("127.0.0.1", Port{21898},
-            std::chrono::milliseconds{500});
+        bool ok = s.connect(
+            "127.0.0.1", Port{21898}, std::chrono::milliseconds{500});
         REQUIRE(!ok);
         REQUIRE((s.getLastError() == SocketError::ConnectFailed
             || s.getLastError() == SocketError::Timeout));
@@ -474,8 +475,8 @@ static void test_sad_timeout() {
         // Both are valid outcomes for a non-blocking connect attempt.
         TcpSocket s;
         REQUIRE(s.setBlocking(false));
-        bool ok = s.connect("127.0.0.1", Port{21899},
-            std::chrono::milliseconds{0});
+        bool ok
+            = s.connect("127.0.0.1", Port{21899}, std::chrono::milliseconds{0});
         // Non-blocking to nothing → should not succeed
         REQUIRE(!ok);
         REQUIRE((s.getLastError() == SocketError::WouldBlock
@@ -488,8 +489,8 @@ static void test_sad_timeout() {
     {
         // Port 21898 has no listener — ECONNREFUSED arrives quickly.
         TcpSocket s;
-        bool ok = s.connect("127.0.0.1", Port{21898},
-            std::chrono::milliseconds{2000});
+        bool ok = s.connect(
+            "127.0.0.1", Port{21898}, std::chrono::milliseconds{2000});
         REQUIRE(!ok);
         REQUIRE((s.getLastError() == SocketError::ConnectFailed
             || s.getLastError() == SocketError::Timeout));
@@ -528,8 +529,8 @@ static void test_happy_endpoints() {
             srv.accept(); // accept and discard
         });
 
-        auto deadline =
-            std::chrono::steady_clock::now() + std::chrono::seconds(3);
+        auto deadline
+            = std::chrono::steady_clock::now() + std::chrono::seconds(3);
         while (!ready && std::chrono::steady_clock::now() < deadline)
             std::this_thread::sleep_for(std::chrono::milliseconds(5));
 
@@ -547,7 +548,8 @@ static void test_happy_endpoints() {
 // Happy path: close + isValid lifecycle
 // -----------------------------------------------------------------------
 static void test_happy_lifecycle() {
-    BEGIN_TEST("TcpSocket: isValid() true after construction, false after close");
+    BEGIN_TEST(
+        "TcpSocket: isValid() true after construction, false after close");
     {
         TcpSocket s;
         REQUIRE(s.isValid());
