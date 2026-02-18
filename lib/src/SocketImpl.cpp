@@ -61,7 +61,8 @@ static SocketError resolveToSockaddr(const std::string& address, Port port,
                 if (gaiErr) *gaiErr = gai;
                 return SocketError::ConnectFailed;
             }
-            std::memcpy(&a6, res->ai_addr, res->ai_addrlen);
+            std::memcpy(
+                &a6, res->ai_addr, static_cast<size_t>(res->ai_addrlen));
             a6.sin6_port = htons(port);
             freeaddrinfo(res);
         } else {
@@ -88,7 +89,8 @@ static SocketError resolveToSockaddr(const std::string& address, Port port,
                 if (gaiErr) *gaiErr = gai;
                 return SocketError::ConnectFailed;
             }
-            std::memcpy(&a4, res->ai_addr, res->ai_addrlen);
+            std::memcpy(
+                &a4, res->ai_addr, static_cast<size_t>(res->ai_addrlen));
             a4.sin_port = htons(port);
             freeaddrinfo(res);
         } else {
@@ -680,7 +682,8 @@ std::string formatErrorContext(const ErrorContext& ctx) {
     char buf[512] = {};
     DWORD len = FormatMessageA(
         FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, nullptr,
-        static_cast<DWORD>(ctx.sysCode), 0, buf, static_cast<DWORD>(sizeof(buf)), nullptr);
+        static_cast<DWORD>(ctx.sysCode), 0, buf,
+        static_cast<DWORD>(sizeof(buf)), nullptr);
     while (len > 0 && (buf[len - 1] == '\r' || buf[len - 1] == '\n'))
         buf[--len] = '\0';
     sysText = buf;
