@@ -101,12 +101,12 @@ int main() {
         REQUIRE(accepted == nullptr);
     }
 
-    BEGIN_TEST("setTimeout does not crash and returns bool");
+    BEGIN_TEST("setReceiveTimeout does not crash and returns bool");
     {
         TcpSocket s;
-        bool r = s.setTimeout(std::chrono::seconds{1});
+        bool r = s.setReceiveTimeout(std::chrono::seconds{1});
         (void)r;
-        REQUIRE_MSG(true, "setTimeout() returned without crash");
+        REQUIRE_MSG(true, "setReceiveTimeout() returned without crash");
     }
 
     BEGIN_TEST("SocketError::None on fresh socket, error set after failure");

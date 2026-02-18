@@ -164,7 +164,7 @@ static void test_udp() {
         UdpSocket receiver;
         receiver.setReuseAddress(true);
         REQUIRE(receiver.bind("127.0.0.1", Port{BASE + 10}));
-        receiver.setTimeout(Milliseconds{2000});
+        receiver.setReceiveTimeout(Milliseconds{2000});
 
         UdpSocket sender;
 
@@ -188,7 +188,7 @@ static void test_udp() {
         UdpSocket srv;
         srv.setReuseAddress(true);
         REQUIRE(srv.bind("127.0.0.1", Port{BASE + 11}));
-        srv.setTimeout(Milliseconds{2000});
+        srv.setReceiveTimeout(Milliseconds{2000});
 
         UdpSocket cli;
         Endpoint dest{"127.0.0.1", Port{BASE + 11}, AddressFamily::IPv4};
@@ -220,7 +220,7 @@ static void test_udp_connected() {
         UdpSocket server;
         server.setReuseAddress(true);
         REQUIRE(server.bind("127.0.0.1", Port{BASE + 30}));
-        server.setTimeout(Milliseconds{2000});
+        server.setReceiveTimeout(Milliseconds{2000});
 
         UdpSocket client;
         // Connect the client to the server so send()/receive() need no
@@ -262,7 +262,7 @@ static void test_span_overloads() {
         std::thread t([&]() {
             auto conn = srv.accept();
             if (!conn) return;
-            conn->setTimeout(Milliseconds{2000});
+            conn->setReceiveTimeout(Milliseconds{2000});
             std::vector<std::byte> echoBuf(64);
             int r = conn->receive(
                 Span<std::byte>{echoBuf.data(), echoBuf.size()});
@@ -273,7 +273,7 @@ static void test_span_overloads() {
         });
 
         TcpSocket cli;
-        cli.setTimeout(Milliseconds{2000});
+        cli.setReceiveTimeout(Milliseconds{2000});
         REQUIRE(cli.connect("127.0.0.1", Port{BASE + 40}));
 
         std::string payload = "span-hello";
@@ -304,7 +304,7 @@ static void test_span_overloads() {
         UdpSocket receiver;
         receiver.setReuseAddress(true);
         REQUIRE(receiver.bind("127.0.0.1", Port{BASE + 41}));
-        receiver.setTimeout(Milliseconds{2000});
+        receiver.setReceiveTimeout(Milliseconds{2000});
 
         UdpSocket sender;
         Endpoint dest{"127.0.0.1", Port{BASE + 41}, AddressFamily::IPv4};
@@ -388,7 +388,7 @@ static void test_shutdown() {
         std::thread t([&]() {
             auto peer = srv.accept();
             if (peer) {
-                peer->setTimeout(Milliseconds{2000});
+                peer->setReceiveTimeout(Milliseconds{2000});
                 char buf[64];
                 peerRecv = peer->receive(buf, sizeof(buf));
             }

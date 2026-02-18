@@ -82,7 +82,7 @@ class SocketImpl {
     bool isBlocking() const noexcept;
     bool setReuseAddress(bool reuse);
     bool setReusePort(bool enable);
-    bool setTimeout(std::chrono::milliseconds timeout);
+    bool setTimeout(std::chrono::milliseconds timeout);  // used by setReceiveTimeout
     bool setSendTimeout(std::chrono::milliseconds timeout);
     bool setNoDelay(bool noDelay);
     bool setKeepAlive(bool enable);

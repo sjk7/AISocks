@@ -292,7 +292,7 @@ static void test_happy_options() {
         REQUIRE(s.setReuseAddress(true));
         REQUIRE(s.setNoDelay(true));
         REQUIRE(s.setKeepAlive(true));
-        REQUIRE(s.setTimeout(std::chrono::seconds(10)));
+        REQUIRE(s.setReceiveTimeout(std::chrono::seconds(10)));
         REQUIRE(s.setSendTimeout(std::chrono::seconds(10)));
         REQUIRE(s.setReceiveBufferSize(64 * 1024));
         REQUIRE(s.setSendBufferSize(64 * 1024));

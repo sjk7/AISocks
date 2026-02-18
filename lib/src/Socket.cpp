@@ -184,7 +184,7 @@ bool Socket::setReusePort(bool enable) {
     return pImpl->setReusePort(enable);
 }
 
-bool Socket::setTimeout(Milliseconds timeout) {
+bool Socket::setReceiveTimeout(Milliseconds timeout) {
     assert(pImpl);
     return pImpl->setTimeout(timeout);
 }
