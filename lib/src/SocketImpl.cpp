@@ -62,7 +62,7 @@ static SocketError resolveToSockaddr(const std::string& address, Port port,
                 if (gaiErr) *gaiErr = gai;
                 return SocketError::ConnectFailed;
             }
-            std::memcpy(&a6, res->ai_addr, sizeof(a6));
+            std::memcpy(&a6, res->ai_addr, res->ai_addrlen);
             a6.sin6_port = htons(port);
             freeaddrinfo(res);
         } else {
@@ -88,7 +88,7 @@ static SocketError resolveToSockaddr(const std::string& address, Port port,
                 if (gaiErr) *gaiErr = gai;
                 return SocketError::ConnectFailed;
             }
-            std::memcpy(&a4, res->ai_addr, sizeof(a4));
+            std::memcpy(&a4, res->ai_addr, res->ai_addrlen);
             a4.sin_port = htons(port);
             freeaddrinfo(res);
         } else {
