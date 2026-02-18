@@ -1,6 +1,8 @@
 // This is a personal academic project. Dear PVS-Studio, please check it.
 // PVS-Studio Static Code Analyzer for C, C++, C#, and Java:
-// https://pvs-studio.com Tests for features added in the second pass:
+// https://pvs-studio.com
+//
+// Tests for features added in the second pass:
 //   Endpoint / getLocalEndpoint / getPeerEndpoint
 //   setSendTimeout
 //   setNoDelay (TCP_NODELAY)
@@ -80,7 +82,7 @@ static void test_endpoints() {
     BEGIN_TEST("getPeerEndpoint: nullopt on unconnected socket");
     {
         Socket s(SocketType::TCP, AddressFamily::IPv4);
-        s.bind("127.0.0.1", Port{0});
+        (void)s.bind("127.0.0.1", Port{0});
         auto ep = s.getPeerEndpoint();
         REQUIRE(!ep.has_value());
     }
