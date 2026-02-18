@@ -1,6 +1,6 @@
 // This is a personal academic project. Dear PVS-Studio, please check it.
-// PVS-Studio Static Code Analyzer for C, C++, C#, and Java: https://pvs-studio.com
-// Tests: Move constructor and move assignment operator.
+// PVS-Studio Static Code Analyzer for C, C++, C#, and Java:
+// https://pvs-studio.com Tests: Move constructor and move assignment operator.
 // Checks observable behaviour only.
 
 #include "Socket.h"
@@ -55,22 +55,10 @@ int main() {
         REQUIRE(!a.isValid());
     }
 
-    BEGIN_TEST("Operations on moved-from socket fail gracefully (no crash)");
-    {
-        Socket a(SocketType::TCP, AddressFamily::IPv4);
-        Socket b(std::move(a));
-
-        // All of these must not crash and must return failure
-        REQUIRE(a.bind("127.0.0.1", Port{19500}) == false);
-        REQUIRE(a.listen(5) == false);
-        REQUIRE(a.connect("127.0.0.1", Port{19500}) == false);
-        REQUIRE(a.send("x", 1) <= 0);
-        char buf[8];
-        REQUIRE(a.receive(buf, sizeof(buf)) <= 0);
-        a.close(); // must be safe
-        REQUIRE_MSG(
-            true, "all ops on moved-from socket complete without crash");
-    }
+    // NOTE: calling operational methods (bind, send, etc.) on a moved-from
+    // socket is a programmer error — the library asserts in debug builds.
+    // Only query methods (isValid, getLastError, getErrorMessage) are
+    // documented safe on a moved-from socket.
 
     BEGIN_TEST("getLastError on moved-from socket does not crash");
     {
