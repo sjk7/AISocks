@@ -126,35 +126,12 @@ jobs:
         if: matrix.compiler == 'msvc'
         shell: pwsh
         run: |
-          cmake --build build --config ${{ matrix.build_type }} `
-            --target aiSocksLib `
-                    test_socket_basics `
-                    test_ip_utils `
-                    test_blocking `
-                    test_move_semantics `
-                    test_loopback_tcp `
-                    test_error_handling `
-                    test_construction `
-                    test_new_features `
-                    test_error_messages `
-                    aiSocksPeerLogger `
-            --parallel
+          cmake --build build --config ${{ matrix.build_type }} --parallel
 
       - name: Build (single-config)
         if: matrix.compiler != 'msvc'
         run: |
           cmake --build build \
-            --target aiSocksLib \
-                    test_socket_basics \
-                    test_ip_utils \
-                    test_blocking \
-                    test_move_semantics \
-                    test_loopback_tcp \
-                    test_error_handling \
-                    test_construction \
-                    test_new_features \
-                    test_error_messages \
-                    aiSocksPeerLogger \
             --parallel $(nproc 2>/dev/null || sysctl -n hw.logicalcpu 2>/dev/null || echo 2)
 
       # ------------------------------------------------------------------ #
