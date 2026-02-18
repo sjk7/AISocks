@@ -70,8 +70,11 @@ class TcpSocket : public Socket {
     //   defaultTimeout (30 s) — used when not specified.
     //   any positive duration — fail with Timeout if not connected in time.
     //
-    // For non-blocking (Poller-driven) connect, construct via:
-    //   TcpSocket c(family, ConnectTo{addr, port, .async = true});
+    // For Poller-driven (non-blocking) connect:
+    //   call setBlocking(false) first, then connect(..., Milliseconds{0}).
+    //   WouldBlock is returned — that is not an error; it means the handshake
+    //   is in progress.  BlockingGuard inside SocketImpl::connect() saves the
+    //   OS non-blocking flag and restores it on all exit paths.
     [[nodiscard]] bool connect(const std::string& address, Port port,
         Milliseconds timeout = defaultTimeout) {
         return doConnect(address, port, timeout);
