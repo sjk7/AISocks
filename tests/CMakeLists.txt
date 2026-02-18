@@ -33,6 +33,7 @@ foreach(TEST_NAME ${TEST_SOURCES})
         )
     else()
         target_compile_options(${TEST_NAME} PRIVATE
+            /utf-8          # treat source as UTF-8 (handles em dashes in comments)
             $<$<CONFIG:Release>:/O1>
         )
     endif()
