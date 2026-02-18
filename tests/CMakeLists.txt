@@ -21,6 +21,24 @@ foreach(TEST_NAME ${TEST_SOURCES})
     )
     add_test(NAME ${TEST_NAME} COMMAND ${TEST_NAME})
     set_tests_properties(${TEST_NAME} PROPERTIES TIMEOUT 30)
+
+    # ── -O1 in Release for test binaries ────────────────────────────────────
+    # Tests don't need -O2/-O3.  Halves the LLVM backend time per test TU
+    # without affecting the library itself (which keeps its own optimisation
+    # level).  GENERATOR_EXPRESSION so Debug/RelWithDebInfo are unaffected.
+    if(NOT MSVC)
+        target_compile_options(${TEST_NAME} PRIVATE
+            $<$<CONFIG:Release>:-O1>
+            $<$<CONFIG:Release>:-fno-lto>
+        )
+    else()
+        target_compile_options(${TEST_NAME} PRIVATE
+            $<$<CONFIG:Release>:/O1>
+        )
+    endif()
+
+    # Note: UNITY_BUILD is intentionally omitted.  Each test binary has
+    # exactly one .cpp, so unity merging is a no-op and only adds confusion.
 endforeach()
 
 # test_construction spins up server threads; give it more room
