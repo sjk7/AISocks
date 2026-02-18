@@ -442,7 +442,8 @@ static void test_bulk_throughput() {
     BEGIN_TEST("TCP bulk throughput (loopback, sendAll/receiveAll)");
     {
         constexpr size_t CHUNK = 64 * 1024; // 64 KB chunks
-        constexpr size_t TOTAL = 4 * 1024 * 1024; // 4 MB — enough for a throughput reading, fast on CI
+        constexpr size_t TOTAL = 4 * 1024
+            * 1024; // 4 MB — enough for a throughput reading, fast on CI
 
         std::vector<char> sendBuf(CHUNK, 0xCD);
         std::vector<char> recvBuf(CHUNK);
