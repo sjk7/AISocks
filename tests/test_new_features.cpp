@@ -218,8 +218,7 @@ static void test_udp_connected() {
 
         // After connect(), getPeerEndpoint() is populated on UDP too.
         auto peer = client.getPeerEndpoint();
-        REQUIRE(peer.has_value());
-        REQUIRE(peer->port == Port{BASE + 30});
+        REQUIRE(peer.has_value() && peer->port == Port{BASE + 30});
 
         // Send via the connected path (no Endpoint argument).
         const char msg[] = "connected-udp";
