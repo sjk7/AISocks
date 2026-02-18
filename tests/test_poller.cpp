@@ -159,7 +159,8 @@ static void test_send_all() {
     std::atomic<bool> done{false};
     std::thread clientThread([&]() {
         Socket c(SocketType::TCP, AddressFamily::IPv4);
-        if (!c.connect("127.0.0.1", Port{BASE_PORT + 4}, Milliseconds{500})) //-V112
+        if (!c.connect(
+                "127.0.0.1", Port{BASE_PORT + 4}, Milliseconds{500})) //-V112
             return;
         char buf[256]{};
         int n = c.receive(buf, sizeof(buf) - 1);

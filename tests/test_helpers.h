@@ -10,33 +10,33 @@
 static int g_failed = 0;
 static int g_passed = 0;
 
-#define REQUIRE(expr)                                                          \
-    do {                                                                       \
-        if (!(expr)) {                                                         \
-            std::cerr << "  FAIL [" << __FILE__ << ":" << __LINE__ << "] "     \
-                      << #expr << "\n";                                        \
-            ++g_failed;                                                        \
-        } else {                                                               \
-            std::cout << "  pass: " << #expr << "\n";                          \
-            ++g_passed;                                                        \
-        }                                                                      \
+#define REQUIRE(expr)                                                      \
+    do {                                                                   \
+        if (!(expr)) {                                                     \
+            std::cerr << "  FAIL [" << __FILE__ << ":" << __LINE__ << "] " \
+                      << #expr << "\n";                                    \
+            ++g_failed;                                                    \
+        } else {                                                           \
+            std::cout << "  pass: " << #expr << "\n";                      \
+            ++g_passed;                                                    \
+        }                                                                  \
     } while (0)
 
-#define REQUIRE_MSG(expr, msg)                                                 \
-    do {                                                                       \
-        if (!(expr)) {                                                         \
-            std::cerr << "  FAIL [" << __FILE__ << ":" << __LINE__ << "] "     \
-                      << msg << "\n";                                          \
-            ++g_failed;                                                        \
-        } else {                                                               \
-            std::cout << "  pass: " << msg << "\n";                            \
-            ++g_passed;                                                        \
-        }                                                                      \
+#define REQUIRE_MSG(expr, msg)                                             \
+    do {                                                                   \
+        if (!(expr)) {                                                     \
+            std::cerr << "  FAIL [" << __FILE__ << ":" << __LINE__ << "] " \
+                      << msg << "\n";                                      \
+            ++g_failed;                                                    \
+        } else {                                                           \
+            std::cout << "  pass: " << msg << "\n";                        \
+            ++g_passed;                                                    \
+        }                                                                  \
     } while (0)
 
-#define BEGIN_TEST(name)                                                       \
-    do {                                                                       \
-        std::cout << "\n--- " << name << " ---\n";                             \
+#define BEGIN_TEST(name)                           \
+    do {                                           \
+        std::cout << "\n--- " << name << " ---\n"; \
     } while (0)
 
 inline int test_summary() {
