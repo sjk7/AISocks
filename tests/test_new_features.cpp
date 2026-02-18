@@ -10,7 +10,8 @@
 //   shutdown(ShutdownHow)
 //   setKeepAlive (SO_KEEPALIVE)
 
-#include "Socket.h"
+#include "TcpSocket.h"
+#include "UdpSocket.h"
 #include "test_helpers.h"
 #include <atomic>
 #include <chrono>
@@ -29,7 +30,7 @@ static constexpr int BASE = 20000;
 static void test_endpoints() {
     BEGIN_TEST("getLocalEndpoint: address and port correct after bind");
     {
-        Socket s(SocketType::TCP, AddressFamily::IPv4);
+        TcpSocket s;
         s.setReuseAddress(true);
         REQUIRE(s.bind("127.0.0.1", Port{BASE}));
         auto ep = s.getLocalEndpoint();
@@ -43,7 +44,7 @@ static void test_endpoints() {
     BEGIN_TEST(
         "getLocalEndpoint: ephemeral port non-zero after bind on port 0");
     {
-        Socket s(SocketType::TCP, AddressFamily::IPv4);
+        TcpSocket s;
         REQUIRE(s.bind("127.0.0.1", Port{0}));
         auto ep = s.getLocalEndpoint();
         REQUIRE(ep.has_value());
@@ -55,7 +56,7 @@ static void test_endpoints() {
 
     BEGIN_TEST("getPeerEndpoint: populated after TCP connect");
     {
-        Socket srv(SocketType::TCP, AddressFamily::IPv4);
+        TcpSocket srv;
         srv.setReuseAddress(true);
         REQUIRE(srv.bind("127.0.0.1", Port{BASE + 1}));
         REQUIRE(srv.listen(1));
@@ -65,7 +66,7 @@ static void test_endpoints() {
             // peer goes out of scope; connection closes
         });
 
-        Socket c(SocketType::TCP, AddressFamily::IPv4);
+        TcpSocket c;
         REQUIRE(c.connect("127.0.0.1", Port{BASE + 1}));
         auto ep = c.getPeerEndpoint();
         REQUIRE(ep.has_value());
@@ -80,7 +81,7 @@ static void test_endpoints() {
 
     BEGIN_TEST("getLocalEndpoint: nullopt on closed socket");
     {
-        Socket s(SocketType::TCP, AddressFamily::IPv4);
+        TcpSocket s;
         s.close();
         auto ep = s.getLocalEndpoint();
         REQUIRE(!ep.has_value());
@@ -88,7 +89,7 @@ static void test_endpoints() {
 
     BEGIN_TEST("getPeerEndpoint: nullopt on unconnected socket");
     {
-        Socket s(SocketType::TCP, AddressFamily::IPv4);
+        TcpSocket s;
         (void)s.bind("127.0.0.1", Port{0});
         auto ep = s.getPeerEndpoint();
         REQUIRE(!ep.has_value());
@@ -107,21 +108,21 @@ static void test_endpoints() {
 static void test_send_timeout() {
     BEGIN_TEST("setSendTimeout: succeeds with positive duration");
     {
-        Socket s(SocketType::TCP, AddressFamily::IPv4);
+        TcpSocket s;
         REQUIRE(s.setSendTimeout(Milliseconds{5000}));
         REQUIRE(s.getLastError() == SocketError::None);
     }
 
     BEGIN_TEST("setSendTimeout: Milliseconds{0} disables timeout");
     {
-        Socket s(SocketType::TCP, AddressFamily::IPv4);
+        TcpSocket s;
         REQUIRE(s.setSendTimeout(Milliseconds{0}));
         REQUIRE(s.getLastError() == SocketError::None);
     }
 
     BEGIN_TEST("setSendTimeout: fails on closed socket");
     {
-        Socket s(SocketType::TCP, AddressFamily::IPv4);
+        TcpSocket s;
         s.close();
         REQUIRE(!s.setSendTimeout(Milliseconds{1000}));
     }
@@ -133,14 +134,14 @@ static void test_send_timeout() {
 static void test_no_delay() {
     BEGIN_TEST("setNoDelay(true): enables TCP_NODELAY");
     {
-        Socket s(SocketType::TCP, AddressFamily::IPv4);
+        TcpSocket s;
         REQUIRE(s.setNoDelay(true));
         REQUIRE(s.getLastError() == SocketError::None);
     }
 
     BEGIN_TEST("setNoDelay: can be toggled off");
     {
-        Socket s(SocketType::TCP, AddressFamily::IPv4);
+        TcpSocket s;
         REQUIRE(s.setNoDelay(true));
         REQUIRE(s.setNoDelay(false));
         REQUIRE(s.getLastError() == SocketError::None);
@@ -148,7 +149,7 @@ static void test_no_delay() {
 
     BEGIN_TEST("setNoDelay: fails on closed socket");
     {
-        Socket s(SocketType::TCP, AddressFamily::IPv4);
+        TcpSocket s;
         s.close();
         REQUIRE(!s.setNoDelay(true));
     }
@@ -160,11 +161,11 @@ static void test_no_delay() {
 static void test_udp() {
     BEGIN_TEST("UDP sendTo/receiveFrom: basic loopback datagram exchange");
     {
-        Socket receiver(SocketType::UDP, AddressFamily::IPv4);
+        UdpSocket receiver;
         receiver.setReuseAddress(true);
         REQUIRE(receiver.bind("127.0.0.1", Port{BASE + 10}));
 
-        Socket sender(SocketType::UDP, AddressFamily::IPv4);
+        UdpSocket sender;
 
         const char msg[] = "hello udp";
         Endpoint dest{"127.0.0.1", Port{BASE + 10}, AddressFamily::IPv4};
@@ -183,11 +184,11 @@ static void test_udp() {
 
     BEGIN_TEST("UDP sendTo/receiveFrom: multiple datagrams in sequence");
     {
-        Socket srv(SocketType::UDP, AddressFamily::IPv4);
+        UdpSocket srv;
         srv.setReuseAddress(true);
         REQUIRE(srv.bind("127.0.0.1", Port{BASE + 11}));
 
-        Socket cli(SocketType::UDP, AddressFamily::IPv4);
+        UdpSocket cli;
         Endpoint dest{"127.0.0.1", Port{BASE + 11}, AddressFamily::IPv4};
 
         for (int i = 0; i < 3; ++i) {
@@ -214,11 +215,11 @@ static void test_udp() {
 static void test_udp_connected() {
     BEGIN_TEST("connected-mode UDP: connect() then send() / receive()");
     {
-        Socket server(SocketType::UDP, AddressFamily::IPv4);
+        UdpSocket server;
         server.setReuseAddress(true);
         REQUIRE(server.bind("127.0.0.1", Port{BASE + 30}));
 
-        Socket client(SocketType::UDP, AddressFamily::IPv4);
+        UdpSocket client;
         // Connect the client to the server so send()/receive() need no
         // per-call endpoint.
         REQUIRE(client.connect("127.0.0.1", Port{BASE + 30}));
@@ -250,7 +251,7 @@ static void test_udp_connected() {
 static void test_span_overloads() {
     BEGIN_TEST("Span send/receive: TCP loopback echo via std::byte spans");
     {
-        Socket srv(SocketType::TCP, AddressFamily::IPv4);
+        TcpSocket srv;
         srv.setReuseAddress(true);
         REQUIRE(srv.bind("127.0.0.1", Port{BASE + 40}));
         REQUIRE(srv.listen(1));
@@ -267,7 +268,7 @@ static void test_span_overloads() {
             }
         });
 
-        Socket cli(SocketType::TCP, AddressFamily::IPv4);
+        TcpSocket cli;
         REQUIRE(cli.connect("127.0.0.1", Port{BASE + 40}));
 
         std::string payload = "span-hello";
@@ -295,11 +296,11 @@ static void test_span_overloads() {
 
     BEGIN_TEST("Span sendTo/receiveFrom: UDP datagram with byte spans");
     {
-        Socket receiver(SocketType::UDP, AddressFamily::IPv4);
+        UdpSocket receiver;
         receiver.setReuseAddress(true);
         REQUIRE(receiver.bind("127.0.0.1", Port{BASE + 41}));
 
-        Socket sender(SocketType::UDP, AddressFamily::IPv4);
+        UdpSocket sender;
         Endpoint dest{"127.0.0.1", Port{BASE + 41}, AddressFamily::IPv4};
 
         std::string msg = "span-udp";
@@ -331,7 +332,7 @@ static void test_span_overloads() {
 static void test_buffer_sizes() {
     BEGIN_TEST("setReceiveBufferSize: succeeds on valid socket");
     {
-        Socket s(SocketType::TCP, AddressFamily::IPv4);
+        TcpSocket s;
         // 64 KiB is a commonly accepted value on all platforms.
         REQUIRE(s.setReceiveBufferSize(64 * 1024));
         REQUIRE(s.getLastError() == SocketError::None);
@@ -339,28 +340,28 @@ static void test_buffer_sizes() {
 
     BEGIN_TEST("setSendBufferSize: succeeds on valid socket");
     {
-        Socket s(SocketType::TCP, AddressFamily::IPv4);
+        TcpSocket s;
         REQUIRE(s.setSendBufferSize(64 * 1024));
         REQUIRE(s.getLastError() == SocketError::None);
     }
 
     BEGIN_TEST("setReceiveBufferSize: succeeds for UDP socket");
     {
-        Socket s(SocketType::UDP, AddressFamily::IPv4);
+        UdpSocket s;
         REQUIRE(s.setReceiveBufferSize(128 * 1024));
         REQUIRE(s.getLastError() == SocketError::None);
     }
 
     BEGIN_TEST("setReceiveBufferSize: fails on closed socket");
     {
-        Socket s(SocketType::TCP, AddressFamily::IPv4);
+        TcpSocket s;
         s.close();
         REQUIRE(!s.setReceiveBufferSize(64 * 1024));
     }
 
     BEGIN_TEST("setSendBufferSize: fails on closed socket");
     {
-        Socket s(SocketType::TCP, AddressFamily::IPv4);
+        TcpSocket s;
         s.close();
         REQUIRE(!s.setSendBufferSize(64 * 1024));
     }
@@ -372,7 +373,7 @@ static void test_buffer_sizes() {
 static void test_shutdown() {
     BEGIN_TEST("shutdown(Write): peer recv sees EOF (returns 0)");
     {
-        Socket srv(SocketType::TCP, AddressFamily::IPv4);
+        TcpSocket srv;
         srv.setReuseAddress(true);
         REQUIRE(srv.bind("127.0.0.1", Port{BASE + 20}));
         REQUIRE(srv.listen(1));
@@ -386,7 +387,7 @@ static void test_shutdown() {
             }
         });
 
-        Socket c(SocketType::TCP, AddressFamily::IPv4);
+        TcpSocket c;
         REQUIRE(c.connect("127.0.0.1", Port{BASE + 20}));
         REQUIRE(c.shutdown(ShutdownHow::Write));
         t.join();
@@ -398,14 +399,14 @@ static void test_shutdown() {
 
     BEGIN_TEST("shutdown(Both): socket remains isValid() after call");
     {
-        Socket srv(SocketType::TCP, AddressFamily::IPv4);
+        TcpSocket srv;
         srv.setReuseAddress(true);
         REQUIRE(srv.bind("127.0.0.1", Port{BASE + 21}));
         REQUIRE(srv.listen(1));
 
         std::thread t([&]() { srv.accept(); });
 
-        Socket c(SocketType::TCP, AddressFamily::IPv4);
+        TcpSocket c;
         REQUIRE(c.connect("127.0.0.1", Port{BASE + 21}));
         REQUIRE(c.shutdown(ShutdownHow::Both));
         REQUIRE(c.isValid()); // fd still open; only close() destroys it
@@ -414,7 +415,7 @@ static void test_shutdown() {
 
     BEGIN_TEST("shutdown: fails on closed socket");
     {
-        Socket s(SocketType::TCP, AddressFamily::IPv4);
+        TcpSocket s;
         s.close();
         REQUIRE(!s.shutdown(ShutdownHow::Both));
     }
@@ -426,14 +427,14 @@ static void test_shutdown() {
 static void test_keepalive() {
     BEGIN_TEST("setKeepAlive(true): enables SO_KEEPALIVE");
     {
-        Socket s(SocketType::TCP, AddressFamily::IPv4);
+        TcpSocket s;
         REQUIRE(s.setKeepAlive(true));
         REQUIRE(s.getLastError() == SocketError::None);
     }
 
     BEGIN_TEST("setKeepAlive: can be disabled after enable");
     {
-        Socket s(SocketType::TCP, AddressFamily::IPv4);
+        TcpSocket s;
         REQUIRE(s.setKeepAlive(true));
         REQUIRE(s.setKeepAlive(false));
         REQUIRE(s.getLastError() == SocketError::None);
@@ -441,7 +442,7 @@ static void test_keepalive() {
 
     BEGIN_TEST("setKeepAlive: fails on closed socket");
     {
-        Socket s(SocketType::TCP, AddressFamily::IPv4);
+        TcpSocket s;
         s.close();
         REQUIRE(!s.setKeepAlive(true));
     }

@@ -77,85 +77,81 @@ Socket& Socket::operator=(Socket&& other) noexcept {
     return *this;
 }
 
-bool Socket::bind(const std::string& address, Port port) {
+bool Socket::doBind(const std::string& address, Port port) {
     assert(pImpl);
     return pImpl->bind(address, port);
 }
 
-bool Socket::listen(int backlog) {
+bool Socket::doListen(int backlog) {
     assert(pImpl);
     return pImpl->listen(backlog);
 }
 
-std::unique_ptr<Socket> Socket::accept() {
+std::unique_ptr<SocketImpl> Socket::doAccept() {
     assert(pImpl);
-    auto clientImpl = pImpl->accept();
-    if (!clientImpl) {
-        return nullptr;
-    }
-    return std::unique_ptr<Socket>(new Socket(std::move(clientImpl)));
+    return pImpl->accept();
 }
 
-bool Socket::connect(
+bool Socket::doConnect(
     const std::string& address, Port port, Milliseconds timeout) {
     assert(pImpl);
     return pImpl->connect(address, port, timeout);
 }
 
-int Socket::send(const void* data, size_t length) {
+int Socket::doSend(const void* data, size_t length) {
     assert(pImpl);
     return pImpl->send(data, length);
 }
 
-int Socket::receive(void* buffer, size_t length) {
+int Socket::doReceive(void* buffer, size_t length) {
     assert(pImpl);
     return pImpl->receive(buffer, length);
 }
 
-bool Socket::sendAll(const void* data, size_t length) {
+bool Socket::doSendAll(const void* data, size_t length) {
     assert(pImpl);
     return pImpl->sendAll(data, length);
 }
 
-bool Socket::sendAll(Span<const std::byte> data) {
-    return sendAll(data.data(), data.size());
+bool Socket::doSendAll(Span<const std::byte> data) {
+    return doSendAll(data.data(), data.size());
 }
 
-bool Socket::receiveAll(void* buffer, size_t length) {
+bool Socket::doReceiveAll(void* buffer, size_t length) {
     assert(pImpl);
     return pImpl->receiveAll(buffer, length);
 }
 
-bool Socket::receiveAll(Span<std::byte> buffer) {
-    return receiveAll(buffer.data(), buffer.size());
+bool Socket::doReceiveAll(Span<std::byte> buffer) {
+    return doReceiveAll(buffer.data(), buffer.size());
 }
 
 // Span overloads — delegate to the raw-pointer implementations.
-int Socket::send(Span<const std::byte> data) {
-    return send(data.data(), data.size());
+int Socket::doSend(Span<const std::byte> data) {
+    return doSend(data.data(), data.size());
 }
 
-int Socket::receive(Span<std::byte> buffer) {
-    return receive(buffer.data(), buffer.size());
+int Socket::doReceive(Span<std::byte> buffer) {
+    return doReceive(buffer.data(), buffer.size());
 }
 
-int Socket::sendTo(const void* data, size_t length, const Endpoint& remote) {
+int Socket::doSendTo(const void* data, size_t length, const Endpoint& remote) {
     assert(pImpl);
     return pImpl->sendTo(data, length, remote);
 }
 
-int Socket::receiveFrom(void* buffer, size_t length, Endpoint& remote) {
+int Socket::doReceiveFrom(void* buffer, size_t length, Endpoint& remote) {
     assert(pImpl);
     return pImpl->receiveFrom(buffer, length, remote);
 }
 
 // Span overloads for UDP sendTo / receiveFrom.
-int Socket::sendTo(Span<const std::byte> data, const Endpoint& remote) {
-    return sendTo(data.data(), data.size(), remote);
+int Socket::doSendTo(Span<const std::byte> data, const Endpoint& remote) {
+    return doSendTo(data.data(), data.size(), remote);
 }
 
-int Socket::receiveFrom(Span<std::byte> buffer, Endpoint& remote) {
-    return receiveFrom(buffer.data(), buffer.size(), remote);
+int Socket::doReceiveFrom(Span<std::byte> buffer, Endpoint& remote) {
+    return doReceiveFrom(buffer.data(), buffer.size(), remote);
 }
 
 bool Socket::setBlocking(bool blocking) {
@@ -221,6 +217,11 @@ bool Socket::setKeepAlive(bool enable) {
 bool Socket::setLingerAbort(bool enable) {
     assert(pImpl);
     return pImpl->setLingerAbort(enable);
+}
+
+bool Socket::doSetBroadcast(bool enable) {
+    assert(pImpl);
+    return pImpl->setBroadcast(enable);
 }
 
 bool Socket::shutdown(ShutdownHow how) {
