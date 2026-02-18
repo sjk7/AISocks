@@ -95,7 +95,8 @@ std::vector<PollResult> Poller::wait(Milliseconds timeout) {
     }
 
     // Allocate enough room for two events per registered socket (READ+WRITE).
-    const int maxEvents = static_cast<int>(pImpl_->sockets.size() * 2) + 1;
+    auto& sockets = pImpl_->sockets;
+    const int maxEvents = static_cast<int>(sockets.size() * 2) + 1;
     std::vector<struct kevent> events(static_cast<size_t>(maxEvents));
 
     for (;;) {
@@ -134,8 +135,8 @@ std::vector<PollResult> Poller::wait(Milliseconds timeout) {
         std::vector<PollResult> results;
         results.reserve(ready.size());
         for (const auto& kv : ready) {
-            auto it = pImpl_->sockets.find(kv.first);
-            if (it != pImpl_->sockets.end()) {
+            auto it = sockets.find(kv.first);
+            if (it != sockets.end()) {
                 results.push_back({it->second, kv.second});
             }
         }
