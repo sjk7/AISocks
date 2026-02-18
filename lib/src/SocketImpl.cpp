@@ -397,8 +397,8 @@ bool SocketImpl::connect(
         long long sliceMs
             = (remaining < POLL_INTERVAL_MS) ? remaining : POLL_INTERVAL_MS;
         struct timeval tv;
-        tv.tv_sec = static_cast<long>(sliceMs / 1000);
-        tv.tv_usec = static_cast<long>((sliceMs % 1000) * 1000);
+        tv.tv_sec = static_cast<decltype(tv.tv_sec)>(sliceMs / 1000);
+        tv.tv_usec = static_cast<decltype(tv.tv_usec)>((sliceMs % 1000) * 1000);
 
         fd_set writeSet, errSet;
         FD_ZERO(&writeSet);
@@ -598,8 +598,8 @@ bool SocketImpl::setTimeoutOpt(
     }
 #else
     struct timeval tv;
-    tv.tv_sec = static_cast<long>(ms / 1000);
-    tv.tv_usec = static_cast<long>((ms % 1000) * 1000);
+    tv.tv_sec = static_cast<decltype(tv.tv_sec)>(ms / 1000);
+    tv.tv_usec = static_cast<decltype(tv.tv_usec)>((ms % 1000) * 1000);
     if (setsockopt(socketHandle, SOL_SOCKET, optname, &tv,
             static_cast<socklen_t>(sizeof(tv)))
         == SOCKET_ERROR_CODE) {
@@ -956,8 +956,8 @@ bool SocketImpl::waitReady(bool forRead, std::chrono::milliseconds timeout) {
         if (rem < 0) rem = 0;
 
         struct timeval tv;
-        tv.tv_sec = static_cast<long>(rem / 1000);
-        tv.tv_usec = static_cast<long>((rem % 1000) * 1000);
+        tv.tv_sec = static_cast<decltype(tv.tv_sec)>(rem / 1000);
+        tv.tv_usec = static_cast<decltype(tv.tv_usec)>((rem % 1000) * 1000);
 
         fd_set fdSet;
         FD_ZERO(&fdSet);
