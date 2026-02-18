@@ -939,6 +939,29 @@ bool SocketImpl::sendAll(const void* data, size_t length) {
     return true;
 }
 
+// receiveAll — loop until all bytes received, error, or EOF
+// -----------------------------------------------------------------------
+bool SocketImpl::receiveAll(void* buffer, size_t length) {
+    auto* ptr = static_cast<char*>(buffer);
+    size_t remaining = length;
+    while (remaining > 0) {
+        int got = receive(ptr, remaining);
+        if (got < 0) {
+            return false; // error already recorded by receive()
+        }
+        if (got == 0) {
+            // Clean EOF before we got all the bytes — treat as an error.
+            setError(SocketError::ConnectionReset,
+                "Connection closed before all bytes received");
+            return false;
+        }
+        ptr += static_cast<size_t>(got);
+        remaining -= static_cast<size_t>(got);
+    }
+    lastError = SocketError::None;
+    return true;
+}
+
 // -----------------------------------------------------------------------
 // waitReadable / waitWritable — single-fd select convenience
 // -----------------------------------------------------------------------

@@ -121,6 +121,15 @@ bool Socket::sendAll(Span<const std::byte> data) {
     return sendAll(data.data(), data.size());
 }
 
+bool Socket::receiveAll(void* buffer, size_t length) {
+    assert(pImpl);
+    return pImpl->receiveAll(buffer, length);
+}
+
+bool Socket::receiveAll(Span<std::byte> buffer) {
+    return receiveAll(buffer.data(), buffer.size());
+}
+
 // Span overloads — delegate to the raw-pointer implementations.
 int Socket::send(Span<const std::byte> data) {
     return send(data.data(), data.size());
