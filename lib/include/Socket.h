@@ -116,8 +116,12 @@ struct Endpoint {
     Port port{0}; // port number
     AddressFamily family{}; // IPv4 or IPv6
 
-    // Convenience: "addr:port" string for logging.
+    // Convenience: "addr:port" (IPv4) or "[addr]:port" (IPv6) string for
+    // logging.  The bracketed form is required for IPv6 so the port is
+    // unambiguous (RFC 2732 / the URI standard).
     std::string toString() const {
+        if (family == AddressFamily::IPv6)
+            return "[" + address + "]:" + std::to_string(port.value);
         return address + ":" + std::to_string(port.value);
     }
 };
