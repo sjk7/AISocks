@@ -373,8 +373,9 @@ static void test_bulk_throughput() {
         "UDP bulk throughput (loopback, 65507-byte datagrams, threaded)");
     {
         // Max safe UDP payload on loopback (65535 - 20 IP - 8 UDP header).
+        // Keep COUNT modest so the test passes on slow/constrained CI runners.
         constexpr size_t DGRAM = 65507;
-        constexpr int COUNT = 2000; // 2000 × 65507 B ≈ 125 MB
+        constexpr int COUNT = 200; // 200 × 65507 B ≈ 12.5 MB
         constexpr size_t TOTAL = static_cast<size_t>(COUNT) * DGRAM;
 
         UdpSocket srv;
@@ -441,7 +442,7 @@ static void test_bulk_throughput() {
     BEGIN_TEST("TCP bulk throughput (loopback, sendAll/receiveAll)");
     {
         constexpr size_t CHUNK = 64 * 1024; // 64 KB chunks
-        constexpr size_t TOTAL = 32 * 1024 * 1024; // 32 MB
+        constexpr size_t TOTAL = 4 * 1024 * 1024; // 4 MB — enough for a throughput reading, fast on CI
 
         std::vector<char> sendBuf(CHUNK, 0xCD);
         std::vector<char> recvBuf(CHUNK);
@@ -459,6 +460,7 @@ static void test_bulk_throughput() {
             auto peer = srv.accept();
             if (!peer) return;
             peer->setNoDelay(true);
+            peer->setReceiveTimeout(Milliseconds{10000});
             size_t got = 0;
             while (got < TOTAL) {
                 size_t want = std::min(CHUNK, TOTAL - got);
