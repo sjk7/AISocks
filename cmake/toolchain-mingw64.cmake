@@ -27,7 +27,10 @@ set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
 set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
 set(CMAKE_FIND_ROOT_PATH_MODE_PACKAGE ONLY)
 
-# Statically link the MinGW C/C++/pthread runtimes so the .exe is self-contained
+# Tell CMake the target system cannot execute binaries on the build host.
+# This suppresses the "BAD_COMMAND" CTest noise when cross-compiling.
+set(CMAKE_CROSSCOMPILING_EMULATOR "")
+set(CMAKE_CROSSCOMPILING TRUE)
 # (no libstdc++-6.dll, libgcc_s_seh-1.dll, or libwinpthread-1.dll needed).
 set(CMAKE_EXE_LINKER_FLAGS_INIT    "-static-libgcc -static-libstdc++ -static")
 set(CMAKE_SHARED_LINKER_FLAGS_INIT "-static-libgcc -static-libstdc++ -static")
