@@ -2,7 +2,7 @@
 // PVS-Studio Static Code Analyzer for C, C++, C#, and Java:
 // https://pvs-studio.com
 
-// PollerKqueue.cpp — kqueue backend for macOS / BSD.
+// PollerKqueue.cpp  kqueue backend for macOS / BSD.
 // Compiled only when CMAKE detects Apple or FreeBSD.
 
 #include "Poller.h"
@@ -20,7 +20,7 @@ namespace aiSocks {
 
 struct Poller::Impl {
     int kq{-1};
-    // Maps raw fd → borrowed Socket pointer (never owned).
+    // Maps raw fd  borrowed Socket pointer (never owned).
     std::unordered_map<uintptr_t, const Socket*> sockets;
 };
 
@@ -65,7 +65,7 @@ bool Poller::add(const Socket& s, PollEvent interest) {
 bool Poller::modify(const Socket& s, PollEvent interest) {
     // Update both filters atomically with a single kevent() call using
     // EV_ADD (which acts as modify when already registered) and EV_DELETE
-    // for filters that are no longer wanted.  This avoids the remove→add
+    // for filters that are no longer wanted.  This avoids the removeadd
     // gap during which an event on the fd could be lost.
     auto fd = static_cast<int>(s.getNativeHandle());
     if (fd == -1) return false;
@@ -87,7 +87,7 @@ bool Poller::modify(const Socket& s, PollEvent interest) {
         EV_SET(&changes[n++], static_cast<uintptr_t>(fd), EVFILT_WRITE,
             EV_DELETE, 0, 0, nullptr);
     }
-    // kevent() returns ENOENT for filters that were not registered — benign.
+    // kevent() returns ENOENT for filters that were not registered  benign.
     ::kevent(pImpl_->kq, changes, n, nullptr, 0, nullptr);
     pImpl_->sockets[static_cast<uintptr_t>(fd)] = &s;
     return true;
@@ -102,7 +102,7 @@ bool Poller::remove(const Socket& s) {
         0, nullptr);
     EV_SET(&changes[1], static_cast<uintptr_t>(fd), EVFILT_WRITE, EV_DELETE, 0,
         0, nullptr);
-    // Ignore errors — filters that weren't registered return ENOENT.
+    // Ignore errors  filters that weren't registered return ENOENT.
     ::kevent(pImpl_->kq, changes, 2, nullptr, 0, nullptr);
 
     pImpl_->sockets.erase(static_cast<uintptr_t>(fd));

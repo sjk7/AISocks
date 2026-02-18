@@ -14,7 +14,7 @@
 #include <vector>
 
 // ---------------------------------------------------------------------------
-// Span<T> — resolves to std::span on C++20; a minimal shim on C++17.
+// Span<T>  resolves to std::span on C++20; a minimal shim on C++17.
 //
 // Usage (same on both standards):
 //   std::vector<std::byte> buf(1024);
@@ -180,7 +180,7 @@ class SocketException : public std::exception {
     std::string step_;
     std::string description_; // SocketImpl step description
     int sysCode_{0}; // errno / WSAGetLastError / EAI_*
-    bool isDns_{false}; // true → translate with gai_strerror
+    bool isDns_{false}; // true  translate with gai_strerror
     mutable std::string whatCache_;
 };
 
@@ -190,7 +190,7 @@ class SocketException : public std::exception {
 // bind/listen/connect manually.
 // -----------------------------------------------------------------------
 
-// Creates a server socket: socket() → [SO_REUSEADDR] → bind() → listen()
+// Creates a server socket: socket()  [SO_REUSEADDR]  bind()  listen()
 // Throws SocketException with context if any step fails.
 struct ServerBind {
     std::string address; // e.g. "0.0.0.0", "127.0.0.1", "::1"
@@ -199,21 +199,21 @@ struct ServerBind {
     bool reuseAddr = true;
 };
 
-// Creates a connected client socket: socket() → connect()
+// Creates a connected client socket: socket()  connect()
 // Throws SocketException with context if any step fails.
 //
 // connectTimeout controls how long to wait for the TCP handshake:
-//   defaultTimeout (30 s) — used when not specified.
-//   any positive duration — throw SocketException(Timeout) if not connected
+//   defaultTimeout (30 s)  used when not specified.
+//   any positive duration  throw SocketException(Timeout) if not connected
 //                           within that duration.
-//   Milliseconds{0}       — initiate the connect and return immediately with
+//   Milliseconds{0}        initiate the connect and return immediately with
 //                           getLastError() == WouldBlock (connect in progress).
 //                           The socket is left in whatever blocking mode it
 //                           was in before the call (BlockingGuard restores it).
 //                           For a Poller-driven async connect:
 //                             1. Call setBlocking(false) on the socket first.
 //                             2. Use connectTimeout = Milliseconds{0}.
-//                             3. Expect WouldBlock — that is not an error.
+//                             3. Expect WouldBlock  that is not an error.
 //                             4. Register with a Poller (PollEvent::Writable).
 //                             5. Call getPeerEndpoint() after writable fires
 //                                to confirm success.
@@ -229,7 +229,7 @@ struct ConnectTo {
 };
 
 // ---------------------------------------------------------------------------
-// Socket — pImpl firewall base for TcpSocket and UdpSocket.
+// Socket  pImpl firewall base for TcpSocket and UdpSocket.
 //
 // All constructors, the destructor, and protocol-specific data-transfer
 // methods are protected so that Socket cannot be instantiated or deleted
@@ -241,7 +241,7 @@ struct ConnectTo {
 // The protected do*() bridge methods expose the underlying SocketImpl
 // operations to derived classes without leaking SocketImpl.h into their
 // headers.  Socket.cpp is the only file (besides TcpSocket.cpp for accept())
-// that includes SocketImpl.h — the single firewall point.
+// that includes SocketImpl.h  the single firewall point.
 // ---------------------------------------------------------------------------
 class Socket {
     public:
@@ -266,10 +266,10 @@ class Socket {
     bool setReusePort(bool enable);
 
     // Set SO_RCVTIMEO on the socket.
-    //   defaultTimeout (30 s) — used when not specified.
-    //   Milliseconds{0}       — disables the timeout; recv() blocks
+    //   defaultTimeout (30 s)  used when not specified.
+    //   Milliseconds{0}        disables the timeout; recv() blocks
     //                           indefinitely until data arrives.
-    //   any positive duration — recv() returns SocketError::Timeout after
+    //   any positive duration  recv() returns SocketError::Timeout after
     //                           waiting this long with no data.
     bool setReceiveTimeout(Milliseconds timeout);
 
@@ -329,16 +329,16 @@ class Socket {
     // (only TcpSocket and UdpSocket may instantiate / destroy Socket)
     // -----------------------------------------------------------------
 
-    // Basic constructor — creates the underlying socket fd.
+    // Basic constructor  creates the underlying socket fd.
     // Throws SocketException(SocketError::CreateFailed, ...) if the OS call
     // fails.
     Socket(SocketType type, AddressFamily family);
 
-    // Server socket — socket() → [SO_REUSEADDR] → bind() → listen().
+    // Server socket  socket()  [SO_REUSEADDR]  bind()  listen().
     // Throws SocketException (with the failing step prepended) on any failure.
     Socket(SocketType type, AddressFamily family, const ServerBind& config);
 
-    // Client socket — socket() → connect().
+    // Client socket  socket()  connect().
     // Throws SocketException (with the failing step prepended) on any failure.
     Socket(SocketType type, AddressFamily family, const ConnectTo& config);
 
@@ -355,7 +355,7 @@ class Socket {
 
     // -----------------------------------------------------------------
     // Protected: protocol bridge methods (do* prefix)
-    // Bodies live in Socket.cpp — the single SocketImpl.h include point.
+    // Bodies live in Socket.cpp  the single SocketImpl.h include point.
     // -----------------------------------------------------------------
 
     // Server operations
@@ -369,10 +369,10 @@ class Socket {
     // Client operation
     //
     // timeout controls how long to wait for the TCP handshake:
-    //   defaultTimeout (30 s) — used when not specified.
-    //   any positive duration — fail with SocketError::Timeout if not connected
+    //   defaultTimeout (30 s)  used when not specified.
+    //   any positive duration  fail with SocketError::Timeout if not connected
     //                           within that duration.
-    //   Milliseconds{0}       — initiate connect and return WouldBlock
+    //   Milliseconds{0}        initiate connect and return WouldBlock
     //                           immediately; call setBlocking(false) first so
     //                           BlockingGuard saves & restores non-blocking mode.
     bool doConnect(const std::string& address, Port port,
@@ -399,7 +399,7 @@ class Socket {
     // cumulative bytes sent so far and the total requested.
     // Return 0 to continue; return any negative value to cancel the
     // transfer immediately (doSendAllProgress returns false with
-    // SocketError::None — the caller distinguishes cancel from error
+    // SocketError::None  the caller distinguishes cancel from error
     // by checking getLastError()).
     struct SendProgressSink {
         virtual int operator()(size_t bytesSentSoFar, size_t total) = 0;

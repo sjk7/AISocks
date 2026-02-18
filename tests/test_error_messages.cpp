@@ -29,7 +29,7 @@
 
 using namespace aiSocks;
 
-// Port block: 21000 – 21099 (no overlap with any other test suite)
+// Port block: 21000  21099 (no overlap with any other test suite)
 static constexpr uint16_t BASE = 21000;
 
 // -----------------------------------------------------------------------
@@ -172,7 +172,7 @@ static void test_dns_error_message() {
         } catch (const SocketException& e) {
             what = e.what();
         }
-        // Old message was "Failed to resolve hostname" — too vague.
+        // Old message was "Failed to resolve hostname"  too vague.
         // It must now contain the actual hostname instead.
         REQUIRE_MSG(what.find("resolve 'this.") != std::string::npos,
             "what() says \"resolve '<hostname>'\" with the actual hostname");
@@ -192,7 +192,7 @@ static void test_dns_error_message() {
     }
 
     BEGIN_TEST(
-        "DNS failure: non-throwing path — getErrorMessage contains hostname");
+        "DNS failure: non-throwing path  getErrorMessage contains hostname");
     {
         auto s = TcpSocket::createRaw();
         // connect() non-throwing path
@@ -327,7 +327,7 @@ static void test_error_clears_on_success() {
     BEGIN_TEST(
         "getErrorMessage(): returns empty string when lastError == None");
     {
-        // Fresh socket — no error has ever occurred.
+        // Fresh socket  no error has ever occurred.
         auto s = TcpSocket::createRaw();
         REQUIRE(s.getLastError() == SocketError::None);
         REQUIRE_MSG(s.getErrorMessage().empty(),
