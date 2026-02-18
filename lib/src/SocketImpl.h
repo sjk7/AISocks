@@ -13,8 +13,10 @@
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #include <iphlpapi.h>
+#ifdef _MSC_VER
 #pragma comment(lib, "ws2_32.lib")
 #pragma comment(lib, "iphlpapi.lib")
+#endif
 using SocketHandle = SOCKET;
 #define INVALID_SOCKET_HANDLE INVALID_SOCKET
 #define SOCKET_ERROR_CODE SOCKET_ERROR
@@ -28,7 +30,7 @@ using SocketHandle = SOCKET;
 #include <netdb.h>
 #include <errno.h>
 #include <ifaddrs.h>
-#include <net/if.h>      // IFF_LOOPBACK
+#include <net/if.h> // IFF_LOOPBACK
 #include <netinet/tcp.h>
 using SocketHandle = int;
 #define INVALID_SOCKET_HANDLE -1
@@ -82,7 +84,8 @@ class SocketImpl {
     bool isBlocking() const noexcept;
     bool setReuseAddress(bool reuse);
     bool setReusePort(bool enable);
-    bool setTimeout(std::chrono::milliseconds timeout);  // used by setReceiveTimeout
+    bool setTimeout(
+        std::chrono::milliseconds timeout); // used by setReceiveTimeout
     bool setSendTimeout(std::chrono::milliseconds timeout);
     bool setNoDelay(bool noDelay);
     bool setKeepAlive(bool enable);

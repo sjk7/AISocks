@@ -32,7 +32,7 @@ target_include_directories(aiSocksLib
 
 # Platform-specific libraries
 if(WIN32)
-    target_link_libraries(aiSocksLib PRIVATE ws2_32)
+    target_link_libraries(aiSocksLib PRIVATE ws2_32 iphlpapi)
 endif()
 
 # Compiler-specific settings
