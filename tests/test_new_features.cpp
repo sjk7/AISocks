@@ -33,9 +33,10 @@ static void test_endpoints() {
         s.setReuseAddress(true);
         REQUIRE(s.bind("127.0.0.1", Port{BASE}));
         auto ep = s.getLocalEndpoint();
-        REQUIRE(ep.has_value() && ep.value().port == Port{BASE}
-            && ep.value().address == "127.0.0.1"
-            && ep.value().family == AddressFamily::IPv4);
+        REQUIRE(ep.has_value());
+        const auto& e = ep.value();
+        REQUIRE(e.port == Port{BASE} && e.address == "127.0.0.1"
+            && e.family == AddressFamily::IPv4);
     }
 
     BEGIN_TEST(
@@ -44,10 +45,10 @@ static void test_endpoints() {
         Socket s(SocketType::TCP, AddressFamily::IPv4);
         REQUIRE(s.bind("127.0.0.1", Port{0}));
         auto ep = s.getLocalEndpoint();
-        REQUIRE(ep.has_value() && ep.value().port.value != 0);
-        if (ep)
-            std::cout << "  assigned ephemeral port: " << ep.value().port.value
-                      << "\n";
+        REQUIRE(ep.has_value());
+        const auto& e = ep.value();
+        REQUIRE(e.port.value != 0);
+        std::cout << "  assigned ephemeral port: " << e.port.value << "\n";
     }
 
     BEGIN_TEST("getPeerEndpoint: populated after TCP connect");
@@ -65,8 +66,9 @@ static void test_endpoints() {
         Socket c(SocketType::TCP, AddressFamily::IPv4);
         REQUIRE(c.connect("127.0.0.1", Port{BASE + 1}));
         auto ep = c.getPeerEndpoint();
-        REQUIRE(ep.has_value() && ep.value().port == Port{BASE + 1}
-            && ep.value().address == "127.0.0.1");
+        REQUIRE(ep.has_value());
+        const auto& e = ep.value();
+        REQUIRE(e.port == Port{BASE + 1} && e.address == "127.0.0.1");
         t.join();
     }
 
