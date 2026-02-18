@@ -21,6 +21,9 @@ add_subdirectory(lib)
 # Primary example — always built so the library is exercised out of the box.
 add_executable(aiSocksExample examples/main.cpp)
 target_link_libraries(aiSocksExample PRIVATE aiSocksLib)
+if(MSVC)
+    target_compile_options(aiSocksExample PRIVATE /utf-8)
+endif()
 # Set the startup project for Visual Studio
 set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT aiSocksExample)
 
@@ -36,23 +39,26 @@ endif()
 # would pull platform headers into the example TUs and break the
 # SOMAXCONN firewall canary in examples/test_ip_utils.cpp.
 if(BUILD_EXAMPLES)
-    add_executable(aiSocksNonBlocking examples/nonblocking.cpp)
-    target_link_libraries(aiSocksNonBlocking PRIVATE aiSocksLib)
-
-    add_executable(aiSocksTestBlocking examples/test_blocking_state.cpp)
-    target_link_libraries(aiSocksTestBlocking PRIVATE aiSocksLib)
-
-    add_executable(aiSocksTestIPv6 examples/test_ipv6.cpp)
-    target_link_libraries(aiSocksTestIPv6 PRIVATE aiSocksLib)
-
-    add_executable(aiSocksTestIPUtils examples/test_ip_utils.cpp)
-    target_link_libraries(aiSocksTestIPUtils PRIVATE aiSocksLib)
-
-    add_executable(aiSocksTestMove examples/test_move_semantics.cpp)
-    target_link_libraries(aiSocksTestMove PRIVATE aiSocksLib)
-
-    add_executable(aiSocksPeerLogger examples/peer_logger.cpp)
-    target_link_libraries(aiSocksPeerLogger PRIVATE aiSocksLib)
+    set(_EXAMPLES
+        aiSocksNonBlocking      examples/nonblocking.cpp
+        aiSocksTestBlocking     examples/test_blocking_state.cpp
+        aiSocksTestIPv6         examples/test_ipv6.cpp
+        aiSocksTestIPUtils      examples/test_ip_utils.cpp
+        aiSocksTestMove         examples/test_move_semantics.cpp
+        aiSocksPeerLogger       examples/peer_logger.cpp
+    )
+    list(LENGTH _EXAMPLES _len)
+    math(EXPR _last "${_len} - 2")
+    foreach(_i RANGE 0 ${_last} 2)
+        math(EXPR _j "${_i} + 1")
+        list(GET _EXAMPLES ${_i} _tgt)
+        list(GET _EXAMPLES ${_j} _src)
+        add_executable(${_tgt} ${_src})
+        target_link_libraries(${_tgt} PRIVATE aiSocksLib)
+        if(MSVC)
+            target_compile_options(${_tgt} PRIVATE /utf-8)
+        endif()
+    endforeach()
 endif()
 
 # Print configuration summary
