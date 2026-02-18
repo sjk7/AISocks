@@ -57,9 +57,6 @@ namespace aiSocks {
 using Milliseconds = std::chrono::milliseconds;
 
 // Default timeout applied to all optional timeout parameters.
-// Passing Milliseconds{0} explicitly to any timeout parameter overrides this
-// and tells the library to defer entirely to the OS (blocking until the kernel
-// gives up, which can be several minutes on a dropped-SYN connection).
 inline constexpr Milliseconds defaultTimeout{std::chrono::seconds{30}};
 
 // Strong port-number type.  Accepts integer literals and named well-known
@@ -207,16 +204,23 @@ struct ServerBind {
 //
 // connectTimeout controls how long to wait for the TCP handshake:
 //   defaultTimeout (30 s) — used when not specified.
-//   Milliseconds{0}       — defer to the OS; blocks until the kernel gives up
-//                           (can be several minutes on a silent SYN-drop).
 //   any positive duration — throw SocketException(Timeout) if not connected
 //                           within that duration.
+//
+// async — if true, the socket is set to non-blocking mode and the connect is
+//   initiated but not waited on.  The constructor returns with the socket in
+//   non-blocking mode and getLastError() == WouldBlock (connect in progress).
+//   Register the socket with a Poller watching PollEvent::Writable to detect
+//   completion, then call getPeerEndpoint() to confirm it succeeded.
+//   connectTimeout is ignored when async is true.
 //
 // Note: DNS resolution is synchronous and not covered by this timeout.
 struct ConnectTo {
     std::string address; // Remote address or hostname
     Port port{0};
-    Milliseconds connectTimeout{defaultTimeout}; // see above
+    Milliseconds connectTimeout{
+        defaultTimeout}; // see above; ignored when async
+    bool async{false}; // true → non-blocking initiation (Poller-driven)
 };
 
 // ---------------------------------------------------------------------------
@@ -241,7 +245,7 @@ class Socket {
     // -----------------------------------------------------------------
 
     // Blocking mode
-    bool setBlocking(bool blocking);
+    [[nodiscard]] bool setBlocking(bool blocking);
     bool isBlocking() const noexcept;
 
     // Block until the socket has readable data (or EOF) within the given
@@ -361,11 +365,14 @@ class Socket {
     //
     // timeout controls how long to wait for the TCP handshake:
     //   defaultTimeout (30 s) — used when not specified.
-    //   Milliseconds{0}       — defer to the OS (blocks indefinitely, or on a
-    //                           non-blocking socket returns WouldBlock so a
-    //                           Poller can detect completion).
     //   any positive duration — fail with SocketError::Timeout if not connected
     //                           within that duration.
+    //   Milliseconds{0}       — initiate connect non-blocking and return
+    //                           immediately with SocketError::WouldBlock; the
+    //                           caller drives completion via a Poller.
+    //
+    // Note: the ConnectTo{.async=true} constructor handles the setBlocking(false)
+    // call and passes Milliseconds{0} automatically.
     bool doConnect(const std::string& address, Port port,
         Milliseconds timeout = defaultTimeout);
 
@@ -384,6 +391,25 @@ class Socket {
     // Span overloads
     int doSend(Span<const std::byte> data);
     int doReceive(Span<std::byte> buffer);
+
+    // Type-erased progress sink used by doSendAllProgress().
+    // operator() is called after each successful send chunk with the
+    // cumulative bytes sent so far and the total requested.
+    // Return 0 to continue; return any negative value to cancel the
+    // transfer immediately (doSendAllProgress returns false with
+    // SocketError::None — the caller distinguishes cancel from error
+    // by checking getLastError()).
+    struct SendProgressSink {
+        virtual int operator()(size_t bytesSentSoFar, size_t total) = 0;
+        virtual ~SendProgressSink() = default;
+    };
+
+    // Loop body lives in Socket.cpp behind the pImpl firewall.
+    // The TcpSocket::sendAll<Fn> template builds a stack-local Adapter
+    // that wraps any callable into a SendProgressSink, so callers use
+    // lambdas with captures at zero allocation cost.
+    bool doSendAllProgress(
+        const void* data, size_t length, SendProgressSink& progress);
 
     // UDP datagram transfer
     int doSendTo(const void* data, size_t length, const Endpoint& remote);

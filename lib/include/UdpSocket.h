@@ -42,10 +42,6 @@ class UdpSocket : public Socket {
     // Public non-virtual destructor — chains to Socket::~Socket().
     ~UdpSocket() = default;
 
-    // No copy.
-    UdpSocket(const UdpSocket&) = delete;
-    UdpSocket& operator=(const UdpSocket&) = delete;
-
     // Move.
     UdpSocket(UdpSocket&&) noexcept = default;
     UdpSocket& operator=(UdpSocket&&) noexcept = default;
