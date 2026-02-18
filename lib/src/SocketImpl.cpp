@@ -562,7 +562,7 @@ bool SocketImpl::setBlocking(bool blocking) {
     return true;
 }
 
-bool SocketImpl::isBlocking() const {
+bool SocketImpl::isBlocking() const noexcept {
     return blockingMode;
 }
 
@@ -640,7 +640,7 @@ bool SocketImpl::setTimeout(std::chrono::milliseconds timeout) {
     return setTimeoutOpt(SO_RCVTIMEO, timeout, "Failed to set receive timeout");
 }
 
-void SocketImpl::close() {
+void SocketImpl::close() noexcept {
     if (isValid()) {
         // Only call ::shutdown() if the user hasn't already done so.
         // If shutdown(Write) was called for a deliberate half-close sequence,
@@ -663,15 +663,15 @@ void SocketImpl::close() {
     }
 }
 
-bool SocketImpl::isValid() const {
+bool SocketImpl::isValid() const noexcept {
     return socketHandle != INVALID_SOCKET_HANDLE;
 }
 
-AddressFamily SocketImpl::getAddressFamily() const {
+AddressFamily SocketImpl::getAddressFamily() const noexcept {
     return addressFamily;
 }
 
-SocketError SocketImpl::getLastError() const {
+SocketError SocketImpl::getLastError() const noexcept {
     return lastError;
 }
 

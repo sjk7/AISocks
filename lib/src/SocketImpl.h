@@ -78,7 +78,7 @@ class SocketImpl {
 
     // Socket options
     bool setBlocking(bool blocking);
-    bool isBlocking() const;
+    bool isBlocking() const noexcept;
     bool setReuseAddress(bool reuse);
     bool setReusePort(bool enable);
     bool setTimeout(std::chrono::milliseconds timeout);
@@ -94,10 +94,10 @@ class SocketImpl {
     bool waitWritable(std::chrono::milliseconds timeout);
 
     // Utility
-    void close();
-    bool isValid() const;
-    AddressFamily getAddressFamily() const;
-    SocketError getLastError() const;
+    void close() noexcept;
+    bool isValid() const noexcept;
+    AddressFamily getAddressFamily() const noexcept;
+    SocketError getLastError() const noexcept;
     std::string getErrorMessage() const;
     ErrorContext getErrorContext() const;
     std::optional<Endpoint> getLocalEndpoint() const;

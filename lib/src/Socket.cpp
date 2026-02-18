@@ -154,7 +154,7 @@ bool Socket::setBlocking(bool blocking) {
     return pImpl->setBlocking(blocking);
 }
 
-bool Socket::isBlocking() const {
+bool Socket::isBlocking() const noexcept {
     assert(pImpl);
     return pImpl->isBlocking();
 }
@@ -219,22 +219,22 @@ bool Socket::shutdown(ShutdownHow how) {
     return pImpl->shutdown(how);
 }
 
-void Socket::close() {
+void Socket::close() noexcept {
     if (pImpl) {
         pImpl->close();
     }
 }
 
-bool Socket::isValid() const {
+bool Socket::isValid() const noexcept {
     return pImpl && pImpl->isValid();
 }
 
-AddressFamily Socket::getAddressFamily() const {
+AddressFamily Socket::getAddressFamily() const noexcept {
     if (!pImpl) return AddressFamily::IPv4; // Default for moved-from state
     return pImpl->getAddressFamily();
 }
 
-SocketError Socket::getLastError() const {
+SocketError Socket::getLastError() const noexcept {
     if (!pImpl) return SocketError::InvalidSocket;
     return pImpl->getLastError();
 }

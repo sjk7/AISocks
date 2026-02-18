@@ -18,12 +18,12 @@ enum class PollEvent : uint8_t {
     Error = 4,
 };
 
-inline PollEvent operator|(PollEvent a, PollEvent b) {
+inline PollEvent operator|(PollEvent a, PollEvent b) noexcept {
     return static_cast<PollEvent>(
         static_cast<uint8_t>(a) | static_cast<uint8_t>(b));
 }
 
-inline bool hasFlag(PollEvent set, PollEvent flag) {
+inline bool hasFlag(PollEvent set, PollEvent flag) noexcept {
     return (static_cast<uint8_t>(set) & static_cast<uint8_t>(flag)) != 0;
 }
 
