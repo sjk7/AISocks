@@ -669,12 +669,35 @@ static void test_shutdown() {
         REQUIRE(srv.bind("127.0.0.1", Port{BASE + 21}));
         REQUIRE(srv.listen(1));
 
-        std::thread t([&]() { (void)srv.accept(); });
+        // Signal so the client waits until accept() has been called; calling
+        // shutdown(SHUT_RDWR) before the peer accepts can return ENOTCONN on
+        // some kernels even though connect() already succeeded.
+        std::atomic<bool> accepted{false};
+        std::atomic<bool> clientDone{false};
+        std::thread t([&]() {
+            auto peer = srv.accept();
+            accepted = true;
+            // Keep the peer socket alive until the client has shut down,
+            // so the client-side shutdown() doesn't hit a broken connection.
+            auto deadline
+                = std::chrono::steady_clock::now() + std::chrono::seconds(2);
+            while (!clientDone && std::chrono::steady_clock::now() < deadline)
+                std::this_thread::sleep_for(std::chrono::milliseconds(1));
+            (void)peer;
+        });
 
         auto c = TcpSocket::createRaw();
         REQUIRE(c.connect("127.0.0.1", Port{BASE + 21}));
+
+        // Busy-wait with a short timeout for the server to accept.
+        auto deadline
+            = std::chrono::steady_clock::now() + std::chrono::seconds(2);
+        while (!accepted && std::chrono::steady_clock::now() < deadline)
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+
         REQUIRE(c.shutdown(ShutdownHow::Both));
         REQUIRE(c.isValid()); // fd still open; only close() destroys it
+        clientDone = true;
         t.join();
     }
 
