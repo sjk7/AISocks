@@ -206,21 +206,26 @@ struct ServerBind {
 //   defaultTimeout (30 s) — used when not specified.
 //   any positive duration — throw SocketException(Timeout) if not connected
 //                           within that duration.
-//
-// async — if true, the socket is set to non-blocking mode and the connect is
-//   initiated but not waited on.  The constructor returns with the socket in
-//   non-blocking mode and getLastError() == WouldBlock (connect in progress).
-//   Register the socket with a Poller watching PollEvent::Writable to detect
-//   completion, then call getPeerEndpoint() to confirm it succeeded.
-//   connectTimeout is ignored when async is true.
+//   Milliseconds{0}       — initiate the connect and return immediately with
+//                           getLastError() == WouldBlock (connect in progress).
+//                           The socket is left in whatever blocking mode it
+//                           was in before the call (BlockingGuard restores it).
+//                           For a Poller-driven async connect:
+//                             1. Call setBlocking(false) on the socket first.
+//                             2. Use connectTimeout = Milliseconds{0}.
+//                             3. Expect WouldBlock — that is not an error.
+//                             4. Register with a Poller (PollEvent::Writable).
+//                             5. Call getPeerEndpoint() after writable fires
+//                                to confirm success.
 //
 // Note: DNS resolution is synchronous and not covered by this timeout.
+// Note: connect() is always issued on a non-blocking fd internally.
+//       BlockingGuard saves the current OS blocking flag, sets O_NONBLOCK,
+//       issues connect(), then restores the original flag on all exit paths.
 struct ConnectTo {
     std::string address; // Remote address or hostname
     Port port{0};
-    Milliseconds connectTimeout{
-        defaultTimeout}; // see above; ignored when async
-    bool async{false}; // true → non-blocking initiation (Poller-driven)
+    Milliseconds connectTimeout{defaultTimeout};
 };
 
 // ---------------------------------------------------------------------------
@@ -367,12 +372,9 @@ class Socket {
     //   defaultTimeout (30 s) — used when not specified.
     //   any positive duration — fail with SocketError::Timeout if not connected
     //                           within that duration.
-    //   Milliseconds{0}       — initiate connect non-blocking and return
-    //                           immediately with SocketError::WouldBlock; the
-    //                           caller drives completion via a Poller.
-    //
-    // Note: the ConnectTo{.async=true} constructor handles the setBlocking(false)
-    // call and passes Milliseconds{0} automatically.
+    //   Milliseconds{0}       — initiate connect and return WouldBlock
+    //                           immediately; call setBlocking(false) first so
+    //                           BlockingGuard saves & restores non-blocking mode.
     bool doConnect(const std::string& address, Port port,
         Milliseconds timeout = defaultTimeout);
 
