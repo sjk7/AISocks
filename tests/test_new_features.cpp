@@ -17,6 +17,8 @@
 #include <chrono>
 #include <cstdio>
 #include <cstring>
+#include <iomanip>
+#include <iostream>
 #include <string>
 #include <thread>
 #include <vector>
@@ -354,6 +356,135 @@ static void test_udp_transfer() {
 }
 
 // -----------------------------------------------------------------------
+// 4d. Bulk throughput benchmarks — UDP vs TCP loopback
+//
+// These are not pass/fail correctness tests: they report bytes transferred
+// and wall-clock throughput so the two protocols can be compared.
+//
+// Methodology:
+//   • UDP: sender blasts N fixed-size datagrams; receiver counts bytes.
+//     No ack — measures raw kernel UDP dispatch rate on loopback.
+//   • TCP: sendAll / receiveAll over a thread-pair; measures sustained
+//     streaming throughput including Nagle / TCP buffering.
+//   Both are single-threaded send + single-threaded receive.
+// -----------------------------------------------------------------------
+static void test_bulk_throughput() {
+    // ---- UDP --------------------------------------------------------
+    BEGIN_TEST("UDP bulk throughput (loopback, 1400-byte datagrams)");
+    {
+        constexpr size_t DGRAM = 1400;
+        constexpr int COUNT = 20000; // 20 000 × 1400 B = ~26.7 MB
+        constexpr size_t TOTAL = static_cast<size_t>(COUNT) * DGRAM;
+
+        UdpSocket srv;
+        srv.setReuseAddress(true);
+        REQUIRE(srv.bind("127.0.0.1", Port{BASE + 60}));
+        srv.setReceiveTimeout(Milliseconds{5000});
+
+        UdpSocket cli;
+        Endpoint dest{"127.0.0.1", Port{BASE + 60}, AddressFamily::IPv4};
+
+        std::vector<char> pkt(DGRAM, 0xAB);
+        std::vector<char> buf(DGRAM);
+
+        size_t recvTotal = 0;
+        size_t dropped = 0;
+
+        auto t0 = std::chrono::steady_clock::now();
+
+        for (int i = 0; i < COUNT; ++i) {
+            cli.sendTo(pkt.data(), DGRAM, dest);
+            Endpoint from;
+            int r = srv.receiveFrom(buf.data(), buf.size(), from);
+            if (r == static_cast<int>(DGRAM))
+                recvTotal += static_cast<size_t>(r);
+            else
+                ++dropped;
+        }
+
+        auto t1 = std::chrono::steady_clock::now();
+        double ms = std::chrono::duration<double, std::milli>(t1 - t0).count();
+        double mbps = (recvTotal / (1024.0 * 1024.0)) / (ms / 1000.0);
+
+        std::cout << std::fixed << std::setprecision(1);
+        std::cout << "  datagrams: " << COUNT << "  size: " << DGRAM
+                  << " B  total: " << std::setprecision(1)
+                  << (TOTAL / (1024.0 * 1024.0))
+                  << " MB  received: " << (recvTotal / (1024.0 * 1024.0))
+                  << " MB  dropped: " << dropped << "\n";
+        std::cout << "  time: " << ms << " ms  throughput: " << mbps
+                  << " MB/s\n";
+
+        REQUIRE(dropped == 0); // loopback should not drop
+    }
+
+    // ---- TCP --------------------------------------------------------
+    BEGIN_TEST("TCP bulk throughput (loopback, sendAll/receiveAll)");
+    {
+        constexpr size_t CHUNK = 64 * 1024; // 64 KB chunks
+        constexpr size_t TOTAL = 32 * 1024 * 1024; // 32 MB
+
+        std::vector<char> sendBuf(CHUNK, 0xCD);
+        std::vector<char> recvBuf(CHUNK);
+        std::atomic<size_t> recvTotal{0};
+        std::atomic<bool> ready{false};
+
+        std::thread srvThread([&] {
+            auto srv = TcpSocket::createRaw();
+            srv.setReuseAddress(true);
+            if (!srv.bind("127.0.0.1", Port{BASE + 61}) || !srv.listen(1)) {
+                ready = true;
+                return;
+            }
+            ready = true;
+            auto peer = srv.accept();
+            if (!peer) return;
+            peer->setNoDelay(true);
+            size_t got = 0;
+            while (got < TOTAL) {
+                size_t want = std::min(CHUNK, TOTAL - got);
+                if (!peer->receiveAll(recvBuf.data(), want)) break;
+                got += want;
+            }
+            recvTotal = got;
+        });
+
+        auto deadline
+            = std::chrono::steady_clock::now() + std::chrono::seconds(3);
+        while (!ready && std::chrono::steady_clock::now() < deadline)
+            std::this_thread::sleep_for(std::chrono::milliseconds(5));
+
+        auto c = TcpSocket::createRaw();
+        REQUIRE(c.connect("127.0.0.1", Port{BASE + 61}));
+        c.setNoDelay(true);
+
+        auto t0 = std::chrono::steady_clock::now();
+        size_t sent = 0;
+        while (sent < TOTAL) {
+            size_t want = std::min(CHUNK, TOTAL - sent);
+            REQUIRE(c.sendAll(sendBuf.data(), want));
+            sent += want;
+        }
+        c.close();
+        srvThread.join();
+        auto t1 = std::chrono::steady_clock::now();
+
+        double ms = std::chrono::duration<double, std::milli>(t1 - t0).count();
+        double mbps
+            = (static_cast<double>(TOTAL) / (1024.0 * 1024.0)) / (ms / 1000.0);
+
+        std::cout << std::fixed << std::setprecision(1);
+        std::cout << "  total: " << (TOTAL / (1024 * 1024))
+                  << " MB  sent: " << sent
+                  << " B  received: " << recvTotal.load() << " B\n";
+        std::cout << "  time: " << ms << " ms  throughput: " << mbps
+                  << " MB/s\n";
+
+        REQUIRE(recvTotal.load() == TOTAL);
+    }
+}
+
+// -----------------------------------------------------------------------
 // 5. Span-based send / receive overloads
 // -----------------------------------------------------------------------
 static void test_span_overloads() {
@@ -568,6 +699,7 @@ int main() {
     test_udp();
     test_udp_connected();
     test_udp_transfer();
+    test_bulk_throughput();
     test_span_overloads();
     test_buffer_sizes();
     test_shutdown();
