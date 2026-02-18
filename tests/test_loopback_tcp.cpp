@@ -62,7 +62,7 @@ int main() {
             std::this_thread::sleep_for(std::chrono::milliseconds(5));
             TcpSocket c;
             c.connect("127.0.0.1", Port{BASE_PORT});
-            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            std::this_thread::sleep_for(std::chrono::milliseconds(2));
         });
 
         auto accepted = srv.accept();
@@ -70,7 +70,7 @@ int main() {
         REQUIRE(accepted != nullptr);
     }
 
-    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
 
     BEGIN_TEST("Server can send data, client receives it exactly");
     {
@@ -96,7 +96,7 @@ int main() {
         REQUIRE(received == message);
     }
 
-    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
 
     BEGIN_TEST("Large payload is transferred completely");
     {
@@ -122,7 +122,7 @@ int main() {
         REQUIRE(received == payload);
     }
 
-    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
 
     BEGIN_TEST("Client can send to server and server echoes back");
     {
@@ -162,7 +162,7 @@ int main() {
         REQUIRE(std::string(buf, r) == msg);
     }
 
-    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
 
     BEGIN_TEST("setReuseAddress allows rapid re-bind on same port");
     {
@@ -175,14 +175,14 @@ int main() {
             srv.close();
         }
         // Short wait for OS to release
-        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        std::this_thread::sleep_for(std::chrono::milliseconds(3));
         // Second server: should be able to re-bind
         TcpSocket srv2;
         srv2.setReuseAddress(true);
         REQUIRE(srv2.bind("127.0.0.1", Port{BASE_PORT + 4}));
     }
 
-    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
 
     BEGIN_TEST("IPv6 loopback send/receive works");
     {
@@ -228,7 +228,7 @@ int main() {
         }
     }
 
-    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
 
     BEGIN_TEST("receiveAll reads exactly N bytes even across partial recvs");
     {
@@ -273,7 +273,7 @@ int main() {
         REQUIRE(buf == expected);
     }
 
-    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
 
     BEGIN_TEST("receiveAll returns false on premature EOF");
     {
