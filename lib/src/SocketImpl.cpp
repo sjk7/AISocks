@@ -45,7 +45,7 @@ static SocketError resolveToSockaddr(const std::string& address, Port port,
     sockaddr_storage& out, socklen_t& outLen, int* gaiErr = nullptr) {
     std::memset(&out, 0, sizeof(out));
     if (family == AddressFamily::IPv6) {
-        auto* a6 = reinterpret_cast<sockaddr_in6*>(&out);
+        auto* a6 = static_cast<sockaddr_in6*>(static_cast<void*>(&out));
         a6->sin6_family = AF_INET6;
         a6->sin6_port = htons(port);
         if (address.empty() || address == "::" || address == "0.0.0.0") {
@@ -62,7 +62,7 @@ static SocketError resolveToSockaddr(const std::string& address, Port port,
                 if (gaiErr) *gaiErr = gai;
                 return SocketError::ConnectFailed;
             }
-            *a6 = *reinterpret_cast<sockaddr_in6*>(res->ai_addr);
+            *a6 = *static_cast<sockaddr_in6*>(static_cast<void*>(res->ai_addr));
             a6->sin6_port = htons(port);
             freeaddrinfo(res);
         } else {
@@ -70,7 +70,7 @@ static SocketError resolveToSockaddr(const std::string& address, Port port,
         }
         outLen = sizeof(sockaddr_in6);
     } else {
-        auto* a4 = reinterpret_cast<sockaddr_in*>(&out);
+        auto* a4 = static_cast<sockaddr_in*>(static_cast<void*>(&out));
         a4->sin_family = AF_INET;
         a4->sin_port = htons(port);
         if (address.empty() || address == "0.0.0.0") {
@@ -87,7 +87,7 @@ static SocketError resolveToSockaddr(const std::string& address, Port port,
                 if (gaiErr) *gaiErr = gai;
                 return SocketError::ConnectFailed;
             }
-            *a4 = *reinterpret_cast<sockaddr_in*>(res->ai_addr);
+            *a4 = *static_cast<sockaddr_in*>(static_cast<void*>(res->ai_addr));
             a4->sin_port = htons(port);
             freeaddrinfo(res);
         } else {
@@ -1036,14 +1036,14 @@ Endpoint SocketImpl::endpointFromSockaddr(const sockaddr_storage& addr) {
     Endpoint ep;
     if (addr.ss_family == AF_INET6) {
         ep.family = AddressFamily::IPv6;
-        const auto* a6 = reinterpret_cast<const sockaddr_in6*>(&addr);
+        const auto* a6 = static_cast<const sockaddr_in6*>(static_cast<const void*>(&addr));
         ep.port = Port{ntohs(a6->sin6_port)};
         char buf[INET6_ADDRSTRLEN];
         inet_ntop(AF_INET6, &a6->sin6_addr, buf, sizeof(buf));
         ep.address = buf;
     } else {
         ep.family = AddressFamily::IPv4;
-        const auto* a4 = reinterpret_cast<const sockaddr_in*>(&addr);
+        const auto* a4 = static_cast<const sockaddr_in*>(static_cast<const void*>(&addr));
         ep.port = Port{ntohs(a4->sin_port)};
         char buf[INET_ADDRSTRLEN];
         inet_ntop(AF_INET, &a4->sin_addr, buf, sizeof(buf));
