@@ -34,6 +34,7 @@ static void test_endpoints() {
         REQUIRE(s.bind("127.0.0.1", Port{BASE}));
         auto ep = s.getLocalEndpoint();
         REQUIRE(ep.has_value());
+        if (!ep) return;
         const auto& e = *ep;
         REQUIRE(e.port == Port{BASE} && e.address == "127.0.0.1"
             && e.family == AddressFamily::IPv4);
@@ -46,6 +47,7 @@ static void test_endpoints() {
         REQUIRE(s.bind("127.0.0.1", Port{0}));
         auto ep = s.getLocalEndpoint();
         REQUIRE(ep.has_value());
+        if (!ep) return;
         const auto& e = *ep;
         REQUIRE(e.port.value != 0);
         std::cout << "  assigned ephemeral port: " << e.port.value << "\n";
@@ -67,6 +69,10 @@ static void test_endpoints() {
         REQUIRE(c.connect("127.0.0.1", Port{BASE + 1}));
         auto ep = c.getPeerEndpoint();
         REQUIRE(ep.has_value());
+        if (!ep) {
+            t.join();
+            return;
+        }
         const auto& e = *ep;
         REQUIRE(e.port == Port{BASE + 1} && e.address == "127.0.0.1");
         t.join();
