@@ -9,6 +9,14 @@
 #ifndef _WIN32
 #include <signal.h>
 #endif
+// Platform-native poll headers used by the timed connect() loop.
+#if defined(__APPLE__) || defined(__FreeBSD__)
+#include <sys/event.h>
+#elif defined(__linux__)
+#include <sys/epoll.h>
+#elif defined(_WIN32)
+// WSAPoll is declared in <winsock2.h>, already pulled in via SocketImpl.h.
+#endif
 
 namespace aiSocks {
 
@@ -373,12 +381,63 @@ bool SocketImpl::connect(
         return false;
     }
 
-    // Poll with short intervals so this thread blocks for at most
-    // POLL_INTERVAL_MS at a time, keeping it responsive to cancellation.
-    // The deadline is measured with steady_clock (monotonic) so it is
-    // immune to wall-clock adjustments and EINTR restarts cost only the
-    // remaining slice, not the full timeout.
-    static constexpr int POLL_INTERVAL_MS = 10;
+    // Use the platform-native event queue for the timed wait — the same
+    // backend as the Poller class.  No FD_SETSIZE limit; no select().
+    //
+    // kqueue (macOS/BSD) and epoll (Linux) need a queue fd created once
+    // before the loop.  WSAPoll (Windows) is per-call and needs no fd.
+    // An RAII guard closes the queue fd on all exit paths.
+    int evFd = -1;
+    struct EvFdGuard {
+        int& fd_;
+        ~EvFdGuard() {
+#if !defined(_WIN32)
+            if (fd_ != -1) { ::close(fd_); fd_ = -1; }
+#endif
+        }
+    } evFdGuard{evFd};
+
+#if defined(__APPLE__) || defined(__FreeBSD__)
+    evFd = ::kqueue();
+    if (evFd == -1) {
+        setError(SocketError::ConnectFailed, "kqueue() failed during connect");
+        restoreBlocking();
+        return false;
+    }
+    {
+        struct kevent reg{};
+        EV_SET(&reg, static_cast<uintptr_t>(socketHandle), EVFILT_WRITE,
+            EV_ADD | EV_ENABLE, 0, 0, nullptr);
+        if (::kevent(evFd, &reg, 1, nullptr, 0, nullptr) == -1) {
+            setError(SocketError::ConnectFailed,
+                "kevent() registration failed during connect");
+            restoreBlocking();
+            return false;
+        }
+    }
+#elif defined(__linux__)
+    evFd = ::epoll_create1(EPOLL_CLOEXEC);
+    if (evFd == -1) {
+        setError(SocketError::ConnectFailed,
+            "epoll_create1() failed during connect");
+        restoreBlocking();
+        return false;
+    }
+    {
+        struct epoll_event epev{};
+        epev.events = EPOLLOUT | EPOLLERR;
+        epev.data.fd = socketHandle;
+        if (::epoll_ctl(evFd, EPOLL_CTL_ADD, socketHandle, &epev) == -1) {
+            setError(SocketError::ConnectFailed,
+                "epoll_ctl() failed during connect");
+            restoreBlocking();
+            return false;
+        }
+    }
+#endif
+
+    // Deadline loop: each iteration waits at most 100 ms so the monotonic
+    // clock check stays responsive; EINTR restarts with the remaining slice.
     auto deadline = std::chrono::steady_clock::now() + timeout;
 
     for (;;) {
@@ -392,39 +451,48 @@ bool SocketImpl::connect(
             restoreBlocking();
             return false;
         }
+        const long long sliceMs = (remaining < 100) ? remaining : 100;
 
-        // Use the shorter of the poll interval and remaining time.
-        long long sliceMs
-            = (remaining < POLL_INTERVAL_MS) ? remaining : POLL_INTERVAL_MS;
-        struct timeval tv;
-        tv.tv_sec = static_cast<decltype(tv.tv_sec)>(sliceMs / 1000);
-        tv.tv_usec = static_cast<decltype(tv.tv_usec)>((sliceMs % 1000) * 1000);
-
-        fd_set writeSet, errSet;
-        FD_ZERO(&writeSet);
-        FD_SET(socketHandle, &writeSet);
-        FD_ZERO(&errSet);
-        FD_SET(socketHandle, &errSet);
-
-        int sel = ::select(static_cast<int>(socketHandle) + 1, nullptr,
-            &writeSet, &errSet, &tv);
-
-        if (sel < 0) {
-#ifndef _WIN32
-            if (errno == EINTR) continue; // signal interrupted; retry
-#endif
-            setError(
-                SocketError::ConnectFailed, "select() failed during connect");
+        int nReady = 0;
+#if defined(_WIN32)
+        WSAPOLLFD pfd{};
+        pfd.fd     = socketHandle;
+        pfd.events = POLLWRNORM;
+        nReady = ::WSAPoll(&pfd, 1, static_cast<int>(sliceMs));
+        if (nReady < 0) {
+            setError(SocketError::ConnectFailed,
+                "WSAPoll() failed during connect");
             restoreBlocking();
             return false;
         }
-
-        if (sel == 0) {
-            // Slice timed out; check overall deadline at top of loop.
-            continue;
+#elif defined(__APPLE__) || defined(__FreeBSD__)
+        struct kevent out{};
+        struct timespec ts{};
+        ts.tv_sec  = static_cast<time_t>(sliceMs / 1000);
+        ts.tv_nsec = static_cast<long>((sliceMs % 1000) * 1'000'000L);
+        nReady = ::kevent(evFd, nullptr, 0, &out, 1, &ts);
+        if (nReady < 0) {
+            if (errno == EINTR) continue;
+            setError(SocketError::ConnectFailed,
+                "kevent() failed during connect");
+            restoreBlocking();
+            return false;
         }
+#elif defined(__linux__)
+        struct epoll_event outev{};
+        nReady = ::epoll_wait(evFd, &outev, 1, static_cast<int>(sliceMs));
+        if (nReady < 0) {
+            if (errno == EINTR) continue;
+            setError(SocketError::ConnectFailed,
+                "epoll_wait() failed during connect");
+            restoreBlocking();
+            return false;
+        }
+#endif
 
-        // select() returned > 0: check whether the connection succeeded.
+        if (nReady == 0) continue; // slice elapsed; recheck deadline
+
+        // An event fired — confirm success via SO_ERROR.
         int sockErr = 0;
         socklen_t sockErrLen = static_cast<socklen_t>(sizeof(sockErr));
         getsockopt(socketHandle, SOL_SOCKET, SO_ERROR,
