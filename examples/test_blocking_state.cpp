@@ -12,7 +12,7 @@ int main() {
     std::cout << std::endl;
 
     // Create a TCP socket
-    TcpSocket socket;
+    auto socket = TcpSocket::createRaw();
 
     if (!socket.isValid()) {
         std::cerr << "Failed to create socket: " << socket.getErrorMessage()
@@ -101,7 +101,7 @@ int main() {
 
     // Test 5: Accepted socket should default to blocking
     std::cout << "Test 5: Accepted socket blocking state" << std::endl;
-    TcpSocket serverSocket;
+    auto serverSocket = TcpSocket::createRaw();
     serverSocket.setReuseAddress(true);
 
     if (serverSocket.bind("127.0.0.1", Port{9999}) && serverSocket.listen(1)) {
@@ -110,7 +110,7 @@ int main() {
         // Create client socket and connect in a separate thread
         std::thread clientThread([&]() {
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
-            TcpSocket client;
+            auto client = TcpSocket::createRaw();
             client.connect("127.0.0.1", Port{9999});
             std::this_thread::sleep_for(std::chrono::milliseconds(200));
         });

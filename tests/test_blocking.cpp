@@ -18,20 +18,20 @@ int main() {
 
     BEGIN_TEST("New socket is blocking by default");
     {
-        TcpSocket s;
+        auto s = TcpSocket::createRaw();
         REQUIRE(s.isBlocking());
     }
 
     BEGIN_TEST("setBlocking(false) returns true and makes socket non-blocking");
     {
-        TcpSocket s;
+        auto s = TcpSocket::createRaw();
         REQUIRE(s.setBlocking(false));
         REQUIRE(!s.isBlocking());
     }
 
     BEGIN_TEST("setBlocking(true) restores blocking mode");
     {
-        TcpSocket s;
+        auto s = TcpSocket::createRaw();
         s.setBlocking(false);
         REQUIRE(s.setBlocking(true));
         REQUIRE(s.isBlocking());
@@ -39,7 +39,7 @@ int main() {
 
     BEGIN_TEST("Blocking mode can be toggled multiple times correctly");
     {
-        TcpSocket s;
+        auto s = TcpSocket::createRaw();
         bool ok = true;
         for (int i = 0; i < 6; ++i) {
             bool target = (i % 2 == 0) ? false : true;
@@ -65,7 +65,7 @@ int main() {
     BEGIN_TEST("Non-blocking recv on unconnected socket returns WouldBlock or "
                "error instantly");
     {
-        TcpSocket s;
+        auto s = TcpSocket::createRaw();
         s.setBlocking(false);
         char buf[64];
         int r = s.receive(buf, sizeof(buf));
@@ -77,7 +77,7 @@ int main() {
     BEGIN_TEST(
         "Accepted socket inherits blocking state (defaults to blocking)");
     {
-        TcpSocket server;
+        auto server = TcpSocket::createRaw();
         server.setReuseAddress(true);
         // Use a fixed port; if in use the test is skipped gracefully
         bool bound = server.bind("127.0.0.1", Port{19300}) && server.listen(1);
@@ -86,7 +86,7 @@ int main() {
         } else {
             std::thread connector([]() {
                 std::this_thread::sleep_for(std::chrono::milliseconds(5));
-                TcpSocket c;
+                auto c = TcpSocket::createRaw();
                 c.connect("127.0.0.1", Port{19300});
                 std::this_thread::sleep_for(std::chrono::milliseconds(10));
             });

@@ -27,7 +27,7 @@ static void test_basic_constructor() {
     {
         bool threw = false;
         try {
-            TcpSocket s;
+            auto s = TcpSocket::createRaw();
         } catch (...) {
             threw = true;
         }
@@ -38,8 +38,8 @@ static void test_basic_constructor() {
     {
         bool threw = false;
         try {
-            TcpSocket a;
-            TcpSocket b(AddressFamily::IPv6);
+            auto a = TcpSocket::createRaw();
+            auto b = TcpSocket::createRaw(AddressFamily::IPv6);
             UdpSocket c;
             UdpSocket d(AddressFamily::IPv6);
         } catch (...) {

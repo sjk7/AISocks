@@ -5,7 +5,6 @@
 #include <chrono>
 #include <cstring>
 #include <mutex>
-#include <sstream>
 #ifndef _WIN32
 #include <signal.h>
 #endif
@@ -186,8 +185,7 @@ SocketImpl::SocketImpl(
 #ifndef _WIN32
     if (handle != INVALID_SOCKET_HANDLE) {
         int flags = ::fcntl(handle, F_GETFL, 0);
-        if (flags != -1)
-            blockingMode = (flags & O_NONBLOCK) == 0;
+        if (flags != -1) blockingMode = (flags & O_NONBLOCK) == 0;
     }
 #else
     // Windows: no portable way to query FIONBIO state; default (true) is
@@ -318,65 +316,63 @@ bool SocketImpl::connect(
         }
     }
 
-    // --- Phase 2: connect (with optional select()-based timeout) ------------
-    if (timeout.count() <= 0) {
-        // Blocking connect — or non-blocking initiate if the socket is already
-        // in non-blocking mode (blockingMode == false).  In the non-blocking
-        // case ::connect() returns immediately with EINPROGRESS / EWOULDBLOCK,
-        // which we translate to WouldBlock so callers can use Poller::wait()
-        // with PollEvent::Writable to detect completion.
-        if (::connect(
-                socketHandle, reinterpret_cast<sockaddr*>(&serverAddr), addrLen)
-            == SOCKET_ERROR_CODE) {
-            int sysErr0 = getLastSystemError();
-            bool inProg0 =
+    // --- Phase 2: connect -------------------------------------------------------
+    // Always use the non-blocking + event-queue path regardless of the current
+    // socket mode.  A RAII guard captures the original blocking state and
+    // restores it on every exit (success, timeout, error, and exception).
+    // This means:
+    //   • A blocking socket comes back blocking after a successful connect.
+    //   • A non-blocking socket (caller set it before constructing) comes back
+    //     non-blocking — the guard is a no-op in that case.
+    //   • timeout > 0  → wait up to that long for the handshake.
+    //   • timeout <= 0 → initiate and return WouldBlock immediately so the
+    //     caller can drive completion via a Poller.
+
+    // RAII: saves and restores the OS-level blocking flag on all exit paths.
+    // Calls the platform API directly rather than setBlocking() to avoid
+    // clobbering lastError — setBlocking() sets lastError=None on success,
+    // which would erase whatever error connect() stored before returning false.
+    struct BlockingGuard {
+        SocketImpl& impl_;
 #ifdef _WIN32
-                (sysErr0 == WSAEWOULDBLOCK) || (sysErr0 == WSAEINPROGRESS);
-#else
-                (sysErr0 == EINPROGRESS) || (sysErr0 == EWOULDBLOCK);
-#endif
-            if (inProg0) {
-                // Non-blocking socket: connect initiated; caller polls for
-                // completion via Poller (Writable) or waitWritable().
-                setError(SocketError::WouldBlock,
-                    "connect() in progress (non-blocking socket)");
-                return false;
+        bool wasBlocking_;
+        explicit BlockingGuard(SocketImpl& impl)
+            : impl_(impl), wasBlocking_(impl.isBlocking()) {
+            if (wasBlocking_) {
+                u_long nb = 1;
+                ioctlsocket(impl_.socketHandle, FIONBIO, &nb);
+                impl_.blockingMode = false;
             }
-            setError(SocketError::ConnectFailed, "Failed to connect to server");
-            return false;
         }
-        lastError = SocketError::None;
-        return true;
-    }
-
-    // Switch to non-blocking so connect() returns immediately.
-#ifdef _WIN32
-    u_long nbMode = 1;
-    ioctlsocket(socketHandle, FIONBIO, &nbMode);
+        ~BlockingGuard() {
+            if (wasBlocking_) {
+                u_long blk = 0;
+                ioctlsocket(impl_.socketHandle, FIONBIO, &blk);
+                impl_.blockingMode = true;
+            }
+        }
 #else
-    int savedFlags = fcntl(socketHandle, F_GETFL, 0);
-    fcntl(socketHandle, F_SETFL, savedFlags | O_NONBLOCK);
+        int savedFlags_;
+        explicit BlockingGuard(SocketImpl& impl)
+            : impl_(impl), savedFlags_(fcntl(impl.socketHandle, F_GETFL, 0)) {
+            // Set O_NONBLOCK if not already set.
+            if ((savedFlags_ & O_NONBLOCK) == 0)
+                fcntl(impl_.socketHandle, F_SETFL, savedFlags_ | O_NONBLOCK);
+            impl_.blockingMode = false;
+        }
+        ~BlockingGuard() {
+            fcntl(impl_.socketHandle, F_SETFL, savedFlags_);
+            impl_.blockingMode = (savedFlags_ & O_NONBLOCK) == 0;
+        }
 #endif
-
-    // Restore flags and sync blockingMode on any exit path.
-    auto restoreBlocking = [&]() {
-#ifdef _WIN32
-        u_long blkMode = 0;
-        ioctlsocket(socketHandle, FIONBIO, &blkMode);
-        blockingMode = true;
-#else
-        fcntl(socketHandle, F_SETFL, savedFlags);
-        blockingMode = (savedFlags & O_NONBLOCK) == 0;
-#endif
-    };
+    } blockingGuard(*this);
 
     int rc = ::connect(
         socketHandle, reinterpret_cast<sockaddr*>(&serverAddr), addrLen);
     if (rc == 0) {
-        // Immediate success (rare but valid on loopback).
-        restoreBlocking();
+        // Immediate success (common on loopback).
         lastError = SocketError::None;
-        return true;
+        return true; // guard restores blocking mode
     }
 
     int sysErr = getLastSystemError();
@@ -389,22 +385,32 @@ bool SocketImpl::connect(
 
     if (!inProgress) {
         setError(SocketError::ConnectFailed, "Failed to connect to server");
-        restoreBlocking();
+        return false; // guard restores blocking mode
+    }
+
+    // timeout <= 0: caller wants non-blocking initiation — return WouldBlock.
+    // The guard restores the original blocking mode (which was already
+    // non-blocking if the caller set it, so this is a no-op in that case).
+    if (timeout.count() <= 0) {
+        setError(SocketError::WouldBlock,
+            "connect() in progress (non-blocking socket)");
         return false;
     }
 
-    // Use the platform-native event queue for the timed wait — the same
+    // Wait for the handshake using the platform-native event queue — the same
     // backend as the Poller class.  No FD_SETSIZE limit; no select().
     //
-    // kqueue (macOS/BSD) and epoll (Linux) need a queue fd created once
-    // before the loop.  WSAPoll (Windows) is per-call and needs no fd.
-    // An RAII guard closes the queue fd on all exit paths.
+    // kqueue / epoll need a queue fd; WSAPoll is per-call.
+    // EvFdGuard closes the queue fd on all exit paths.
     int evFd = -1;
     struct EvFdGuard {
         int& fd_;
         ~EvFdGuard() {
 #if !defined(_WIN32)
-            if (fd_ != -1) { ::close(fd_); fd_ = -1; }
+            if (fd_ != -1) {
+                ::close(fd_);
+                fd_ = -1;
+            }
 #endif
         }
     } evFdGuard{evFd};
@@ -413,7 +419,6 @@ bool SocketImpl::connect(
     evFd = ::kqueue();
     if (evFd == -1) {
         setError(SocketError::ConnectFailed, "kqueue() failed during connect");
-        restoreBlocking();
         return false;
     }
     {
@@ -423,7 +428,6 @@ bool SocketImpl::connect(
         if (::kevent(evFd, &reg, 1, nullptr, 0, nullptr) == -1) {
             setError(SocketError::ConnectFailed,
                 "kevent() registration failed during connect");
-            restoreBlocking();
             return false;
         }
     }
@@ -432,7 +436,6 @@ bool SocketImpl::connect(
     if (evFd == -1) {
         setError(SocketError::ConnectFailed,
             "epoll_create1() failed during connect");
-        restoreBlocking();
         return false;
     }
     {
@@ -442,7 +445,6 @@ bool SocketImpl::connect(
         if (::epoll_ctl(evFd, EPOLL_CTL_ADD, socketHandle, &epev) == -1) {
             setError(SocketError::ConnectFailed,
                 "epoll_ctl() failed during connect");
-            restoreBlocking();
             return false;
         }
     }
@@ -460,7 +462,6 @@ bool SocketImpl::connect(
             setError(SocketError::Timeout,
                 "connect() timed out after " + std::to_string(timeout.count())
                     + " ms");
-            restoreBlocking();
             return false;
         }
         const long long sliceMs = (remaining < 100) ? remaining : 100;
@@ -468,26 +469,24 @@ bool SocketImpl::connect(
         int nReady = 0;
 #if defined(_WIN32)
         WSAPOLLFD pfd{};
-        pfd.fd     = socketHandle;
+        pfd.fd = socketHandle;
         pfd.events = POLLWRNORM;
         nReady = ::WSAPoll(&pfd, 1, static_cast<int>(sliceMs));
         if (nReady < 0) {
-            setError(SocketError::ConnectFailed,
-                "WSAPoll() failed during connect");
-            restoreBlocking();
+            setError(
+                SocketError::ConnectFailed, "WSAPoll() failed during connect");
             return false;
         }
 #elif defined(__APPLE__) || defined(__FreeBSD__)
         struct kevent out{};
         struct timespec ts{};
-        ts.tv_sec  = static_cast<time_t>(sliceMs / 1000);
+        ts.tv_sec = static_cast<time_t>(sliceMs / 1000);
         ts.tv_nsec = static_cast<long>((sliceMs % 1000) * 1'000'000L);
         nReady = ::kevent(evFd, nullptr, 0, &out, 1, &ts);
         if (nReady < 0) {
             if (errno == EINTR) continue;
-            setError(SocketError::ConnectFailed,
-                "kevent() failed during connect");
-            restoreBlocking();
+            setError(
+                SocketError::ConnectFailed, "kevent() failed during connect");
             return false;
         }
 #elif defined(__linux__)
@@ -497,7 +496,6 @@ bool SocketImpl::connect(
             if (errno == EINTR) continue;
             setError(SocketError::ConnectFailed,
                 "epoll_wait() failed during connect");
-            restoreBlocking();
             return false;
         }
 #endif
@@ -516,13 +514,11 @@ bool SocketImpl::connect(
             errno = sockErr;
 #endif
             setError(SocketError::ConnectFailed, "Failed to connect to server");
-            restoreBlocking();
             return false;
         }
 
-        restoreBlocking();
         lastError = SocketError::None;
-        return true;
+        return true; // guard restores blocking mode
     }
 }
 
@@ -770,10 +766,18 @@ std::string formatErrorContext(const ErrorContext& ctx) {
 #else
     sysText = ctx.isDns ? ::gai_strerror(ctx.sysCode) : ::strerror(ctx.sysCode);
 #endif
-    std::ostringstream oss;
-    oss << (ctx.description ? ctx.description : "") << " [" << ctx.sysCode
-        << ": " << sysText << "]";
-    return oss.str();
+    // Avoid <sstream> (pulls in wide-string instantiations that add ~100 ms
+    // of template instantiation cost across every TU).  Plain concatenation
+    // produces the same output with zero overhead.
+    std::string result;
+    result.reserve(128);
+    if (ctx.description) result += ctx.description;
+    result += " [";
+    result += std::to_string(ctx.sysCode);
+    result += ": ";
+    result += sysText;
+    result += "]";
+    return result;
 }
 
 std::string SocketImpl::getErrorMessage() const {

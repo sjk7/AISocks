@@ -11,7 +11,7 @@ using namespace aiSocks;
 void testIPv4() {
     std::cout << "=== IPv4 Test ===" << std::endl;
 
-    TcpSocket serverSocket;
+    auto serverSocket = TcpSocket::createRaw();
     if (!serverSocket.isValid()) {
         std::cerr << "  ✗ Failed to create IPv4 server socket" << std::endl;
         return;
@@ -43,7 +43,7 @@ void testIPv4() {
     // Client thread
     std::thread clientThread([&]() {
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
-        TcpSocket client;
+        auto client = TcpSocket::createRaw();
         if (client.connect("127.0.0.1", Port{8001})) {
             const char* msg = "Hello IPv4";
             client.send(msg, strlen(msg));
@@ -74,7 +74,7 @@ void testIPv4() {
 void testIPv6() {
     std::cout << "=== IPv6 Test ===" << std::endl;
 
-    TcpSocket serverSocket(AddressFamily::IPv6);
+    auto serverSocket = TcpSocket::createRaw(AddressFamily::IPv6);
     if (!serverSocket.isValid()) {
         std::cerr << "  ✗ Failed to create IPv6 server socket" << std::endl;
         return;
@@ -108,7 +108,7 @@ void testIPv6() {
     // Client thread
     std::thread clientThread([&]() {
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
-        TcpSocket client(AddressFamily::IPv6);
+        auto client = TcpSocket::createRaw(AddressFamily::IPv6);
         if (client.connect("::1", Port{8002})) {
             const char* msg = "Hello IPv6";
             client.send(msg, strlen(msg));
@@ -145,7 +145,7 @@ void testBackwardCompatibility() {
     std::cout << "=== Backward Compatibility Test ===" << std::endl;
     std::cout << "Testing default socket (should be IPv4)..." << std::endl;
 
-    TcpSocket defaultSocket;
+    auto defaultSocket = TcpSocket::createRaw();
     if (defaultSocket.isValid()) {
         std::cout << "  ✓ Default socket created successfully" << std::endl;
 
