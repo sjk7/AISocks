@@ -58,7 +58,7 @@ static void test_poller_timeout() {
     Poller p;
     REQUIRE(p.add(srv, PollEvent::Readable));
 
-    auto results = p.wait(Milliseconds{50}); // 50 ms — nobody connects
+    auto results = p.wait(Milliseconds{10}); // 10 ms — nobody connects
     REQUIRE(results.empty());
 }
 
@@ -95,8 +95,8 @@ static void test_poller_readable_on_connect() {
         clientDone = true;
     });
 
-    // wait() should fire within 200 ms once the client connects.
-    auto results = p.wait(Milliseconds{200});
+    // wait() should fire within 50 ms once the client connects.
+    auto results = p.wait(Milliseconds{50});
     REQUIRE(!results.empty());
     if (!results.empty()) {
         REQUIRE(results[0].socket == &srv);
@@ -137,7 +137,7 @@ static void test_poller_remove_stops_events() {
         c.connect("127.0.0.1", Port{BASE_PORT + 3}, Milliseconds{200});
     });
 
-    auto results = p.wait(Milliseconds{80}); // short wait — no events expected
+    auto results = p.wait(Milliseconds{10}); // short wait — no events expected
     clientThread.join();
     REQUIRE(results.empty());
 
@@ -193,14 +193,14 @@ static void test_wait_readable_writable() {
         std::this_thread::sleep_for(std::chrono::milliseconds(5));
         TcpSocket c;
         c.connect("127.0.0.1", Port{BASE_PORT + 5}, Milliseconds{500});
-        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        std::this_thread::sleep_for(std::chrono::milliseconds(5));
     });
 
     auto conn = srv.accept();
     REQUIRE(conn != nullptr);
     if (conn) {
         // A freshly accepted connected socket should be writable immediately.
-        REQUIRE(conn->waitWritable(Milliseconds{200}));
+        REQUIRE(conn->waitWritable(Milliseconds{50}));
     }
     clientThread.join();
 
@@ -209,7 +209,7 @@ static void test_wait_readable_writable() {
     lonely.setReuseAddress(true);
     REQUIRE(lonely.bind("127.0.0.1", Port{BASE_PORT + 6}));
     REQUIRE(lonely.listen(1));
-    bool timedOut = !lonely.waitReadable(Milliseconds{30});
+    bool timedOut = !lonely.waitReadable(Milliseconds{10});
     REQUIRE(timedOut);
     REQUIRE(lonely.getLastError() == SocketError::Timeout);
 }
@@ -259,7 +259,7 @@ static void test_poller_async_connect() {
         Poller p;
         REQUIRE(p.add(client, PollEvent::Writable));
 
-        auto results = p.wait(Milliseconds{500});
+        auto results = p.wait(Milliseconds{100});
         REQUIRE(!results.empty());
         bool writable = false;
         for (const auto& r : results) {
