@@ -90,6 +90,7 @@ class SocketImpl {
     bool setSendBufferSize(int bytes);
     bool shutdown(ShutdownHow how);
     bool sendAll(const void* data, size_t length);
+    bool receiveAll(void* buffer, size_t length);
     bool waitReadable(std::chrono::milliseconds timeout);
     bool waitWritable(std::chrono::milliseconds timeout);
 

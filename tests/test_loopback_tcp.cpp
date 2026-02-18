@@ -32,7 +32,7 @@ static void server_send(
         while (sent < payload.size()) {
             int r = client->send(payload.data() + sent, payload.size() - sent);
             if (r <= 0) break;
-            sent += r;
+            sent += r; //-V101
         }
         client->close();
     }
@@ -44,7 +44,7 @@ static void recv_all(Socket& s, std::string& out) {
     while (true) {
         int r = s.receive(buf, sizeof(buf));
         if (r <= 0) break;
-        out.append(buf, r);
+        out.append(buf, r); //-V106
     }
 }
 
@@ -204,7 +204,7 @@ int main() {
                     int r = client->send(
                         message.data() + sent, message.size() - sent);
                     if (r <= 0) break;
-                    sent += r;
+                    sent += r; //-V101
                 }
                 client->close();
             }
@@ -226,6 +226,91 @@ int main() {
             recv_all(client, received);
             REQUIRE(received == message);
         }
+    }
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+
+    BEGIN_TEST("receiveAll reads exactly N bytes even across partial recvs");
+    {
+        // Server sends a 256-byte payload in 16-byte chunks to exercise the
+        // receiveAll loop.  Client calls receiveAll(256) and checks the result.
+        constexpr size_t PAYLOAD = 256;
+        std::vector<char> expected(PAYLOAD);
+        for (size_t i = 0; i < PAYLOAD; ++i) expected[i] = static_cast<char>(i);
+
+        std::atomic<bool> ready{false};
+        std::thread srvThread([&]() {
+            Socket srv(SocketType::TCP, AddressFamily::IPv4);
+            srv.setReuseAddress(true);
+            if (!srv.bind("127.0.0.1", Port{BASE_PORT + 6}) || !srv.listen(1)) {
+                ready = true;
+                return;
+            }
+            ready = true;
+            auto cli = srv.accept();
+            if (cli) {
+                constexpr size_t CHUNK = 16;
+                for (size_t off = 0; off < PAYLOAD; off += CHUNK)
+                    cli->sendAll(expected.data() + off, CHUNK);
+                cli->close();
+            }
+        });
+
+        auto deadline
+            = std::chrono::steady_clock::now() + std::chrono::seconds(2);
+        while (!ready && std::chrono::steady_clock::now() < deadline)
+            std::this_thread::sleep_for(std::chrono::milliseconds(5));
+
+        Socket client(SocketType::TCP, AddressFamily::IPv4);
+        REQUIRE(client.connect("127.0.0.1", Port{BASE_PORT + 6}));
+
+        std::vector<char> buf(PAYLOAD, 0);
+        bool ok = client.receiveAll(buf.data(), PAYLOAD);
+        srvThread.join();
+
+        REQUIRE(ok);
+        REQUIRE(buf == expected);
+    }
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+
+    BEGIN_TEST("receiveAll returns false on premature EOF");
+    {
+        // Server closes after sending only half the expected bytes.
+        constexpr size_t SEND = 32;
+        constexpr size_t WANT = 64; // client asks for more than available
+
+        std::atomic<bool> ready{false};
+        std::thread srvThread([&]() {
+            Socket srv(SocketType::TCP, AddressFamily::IPv4);
+            srv.setReuseAddress(true);
+            if (!srv.bind("127.0.0.1", Port{BASE_PORT + 7}) || !srv.listen(1)) {
+                ready = true;
+                return;
+            }
+            ready = true;
+            auto cli = srv.accept();
+            if (cli) {
+                std::vector<char> data(SEND, 'x');
+                cli->sendAll(data.data(), SEND);
+                cli->close(); // close before client has read everything
+            }
+        });
+
+        auto deadline
+            = std::chrono::steady_clock::now() + std::chrono::seconds(2);
+        while (!ready && std::chrono::steady_clock::now() < deadline)
+            std::this_thread::sleep_for(std::chrono::milliseconds(5));
+
+        Socket client(SocketType::TCP, AddressFamily::IPv4);
+        REQUIRE(client.connect("127.0.0.1", Port{BASE_PORT + 7}));
+
+        std::vector<char> buf(WANT, 0);
+        bool ok = client.receiveAll(buf.data(), WANT);
+        srvThread.join();
+
+        REQUIRE(!ok);
+        REQUIRE(client.getLastError() == SocketError::ConnectionReset);
     }
 
     return test_summary();

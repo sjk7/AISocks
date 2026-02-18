@@ -270,6 +270,15 @@ class Socket {
     bool sendAll(const void* data, size_t length);
     bool sendAll(Span<const std::byte> data);
 
+    // Receive exactly `length` bytes, looping until the buffer is full, an
+    // error occurs, or the peer closes the connection (EOF).
+    // Returns true only when all `length` bytes have been received.
+    // Returns false on error or EOF before `length` bytes (check
+    // getLastError(); SocketError::ConnectionReset signals a clean peer-close
+    // mid-stream).
+    bool receiveAll(void* buffer, size_t length);
+    bool receiveAll(Span<std::byte> buffer);
+
     // Span-based overloads — delegates to the raw-pointer overloads.
     // On C++20 these accept std::span<const std::byte> / std::span<std::byte>
     // directly; on C++17 use aiSocks::Span<> or supply {ptr, size} directly.
