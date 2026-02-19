@@ -79,14 +79,19 @@ void runServer(const std::string& bindAddr) {
 
 void runClient(const std::string& addr) {
     std::this_thread::sleep_for(std::chrono::milliseconds(200));
-    std::cout << "Connecting to " << addr << ":" << TEST_PORT << "...\n";
+    std::cout << "Connecting to " << addr << ":" << TEST_PORT << "...\n";    
+    std::cout.flush();
 
     auto clientSocket = TcpSocket::createRaw();
-    if (!clientSocket.connect(addr, Port{TEST_PORT})) {
+    std::cout << "  [DEBUG] Attempting connect with 5s timeout...\n";    
+    std::cout.flush();
+    if (!clientSocket.connect(addr, Port{TEST_PORT}, Milliseconds{5000})) {
         std::cerr << "Connect failed: " << clientSocket.getErrorMessage()
                   << "\n";
         return;
     }
+    std::cout << "  [DEBUG] Connect succeeded\n";    
+    std::cout.flush();
 
     std::cout << "Connected! Receiving...\n";
 
@@ -96,8 +101,18 @@ void runClient(const std::string& addr) {
 
     while (totalReceived < TOTAL_DATA) {
         int n = clientSocket.receive(buffer.data(), buffer.size());
-        if (n <= 0) break;
+        if (n <= 0) {
+            std::cout << "  [DEBUG] receive returned " << n << ", error: "
+                      << static_cast<int>(clientSocket.getLastError()) << "\n";            
+            std::cout.flush();
+            break;        
+        }
         totalReceived += static_cast<size_t>(n);
+        if (totalReceived % (10 * 1024 * 1024) == 0) {
+            std::cout << "  [DEBUG] received " << (totalReceived / (1024*1024)) 
+                      << " MB so far\n";            
+            std::cout.flush();
+        }
     }
 
     auto endTime = std::chrono::high_resolution_clock::now();
@@ -117,9 +132,17 @@ void runClient(const std::string& addr) {
 
 void runTest(const std::string& label, const std::string& addr) {
     std::cout << "\n--- " << label << " (" << addr << ") ---\n";
+    std::cout.flush();
     std::thread serverThread(runServer, addr);
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
     runClient(addr);
-    serverThread.join();
+    std::cout << "  [DEBUG] Waiting for server thread to finish...\n";
+    std::cout.flush();
+    if (serverThread.joinable()) {
+        serverThread.join();
+        std::cout << "  [DEBUG] Server thread finished\n";
+    }
+    std::cout.flush();
 }
 
 int main() {
