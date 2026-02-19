@@ -148,7 +148,7 @@ jobs:
                 --output-on-failure `
                 --no-compress-output `
                 --timeout 60 `
-                --parallel 1
+                --parallel 4
 
       - name: Run tests (single-config)
         if: matrix.compiler != 'msvc'
@@ -158,7 +158,7 @@ jobs:
           ctest --output-on-failure \
                 --no-compress-output \
                 --timeout 60 \
-                --parallel 1
+                --parallel 4
 
       # ------------------------------------------------------------------ #
       # 6. Upload test results on failure                                   #

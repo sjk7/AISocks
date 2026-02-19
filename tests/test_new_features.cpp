@@ -22,6 +22,8 @@
 #include <string>
 #include <thread>
 #include <vector>
+#include <optional>
+
 
 using namespace aiSocks;
 

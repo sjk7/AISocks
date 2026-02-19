@@ -20,7 +20,7 @@ TcpSocket TcpSocket::createRaw(AddressFamily family) {
 TcpSocket::TcpSocket(AddressFamily family, const ServerBind& cfg)
     : Socket(SocketType::TCP, family, cfg) {}
 
-TcpSocket::TcpSocket(AddressFamily family, const ConnectTo& cfg)
+TcpSocket::TcpSocket(AddressFamily family, const ConnectArgs& cfg)
     : Socket(SocketType::TCP, family, cfg) {}
 
 TcpSocket::TcpSocket(std::unique_ptr<SocketImpl> impl)

@@ -53,7 +53,7 @@ Socket::Socket(SocketType type, AddressFamily family, const ServerBind& cfg)
         "listen(backlog=" + std::to_string(cfg.backlog) + ")", pImpl);
 }
 
-Socket::Socket(SocketType type, AddressFamily family, const ConnectTo& cfg)
+Socket::Socket(SocketType type, AddressFamily family, const ConnectArgs& cfg)
     : pImpl(std::make_unique<SocketImpl>(type, family)) {
     throwIfFailed(pImpl->isValid(), "socket()", pImpl);
     throwIfFailed(pImpl->connect(cfg.address, cfg.port, cfg.connectTimeout),
