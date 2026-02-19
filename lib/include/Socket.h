@@ -60,6 +60,14 @@ using Milliseconds = std::chrono::milliseconds;
 inline constexpr Milliseconds defaultTimeout{std::chrono::seconds{30}};
 inline constexpr Milliseconds defaultConnectTimeout{std::chrono::seconds{10}};
 
+// Named timeout constants for common use cases.
+namespace Timeouts {
+    inline constexpr Milliseconds Immediate{0};
+    inline constexpr Milliseconds Short{1000};
+    inline constexpr Milliseconds Medium{5000};
+    inline constexpr Milliseconds Long{30000};
+}
+
 // Strong port-number type.  Accepts integer literals and named well-known
 // ports interchangeably and converts back to uint16_t implicitly so all
 // platform socket API calls (htons, etc.) require no casts.
@@ -122,6 +130,13 @@ struct Endpoint {
             return "[" + address + "]:" + std::to_string(port.value);
         return address + ":" + std::to_string(port.value);
     }
+
+    // Check if this endpoint is a loopback address (127.x.x.x or ::1).
+    bool isLoopback() const;
+
+    // Check if this endpoint is on a private/reserved network
+    // (10.x.x.x, 172.16-31.x.x, 192.168.x.x, fc00::/7, etc.).
+    bool isPrivateNetwork() const;
 };
 
 // Controls which direction shutdown() closes.
@@ -282,11 +297,20 @@ class Socket {
     // increased packet count.
     bool setNoDelay(bool noDelay);
 
+    // Query the current TCP_NODELAY setting.
+    // Returns -1 on getsockopt() failure; call with (bool&) to check status.
+    bool getNoDelay() const;
+
     // Set the kernel receive / send socket buffer sizes (SO_RCVBUF /
     // SO_SNDBUF). `bytes` is the requested buffer size in bytes; the kernel
     // may round it up or clamp it. Returns false on setsockopt() failure.
     bool setReceiveBufferSize(int bytes);
     bool setSendBufferSize(int bytes);
+
+    // Query the current kernel receive / send socket buffer sizes.
+    // Returns -1 on getsockopt() failure.
+    int getReceiveBufferSize() const;
+    int getSendBufferSize() const;
 
     // Enable/disable SO_KEEPALIVE.
     bool setKeepAlive(bool enable);
@@ -422,6 +446,14 @@ class Socket {
 
     // UDP SO_BROADCAST
     bool doSetBroadcast(bool enable);
+
+    // UDP multicast TTL
+    bool doSetMulticastTTL(int ttl);
+
+    // Socket option getters
+    int doGetReceiveBufferSize() const;
+    int doGetSendBufferSize() const;
+    bool doGetNoDelay() const;
 
     private:
     std::unique_ptr<SocketImpl> pImpl;
