@@ -10,6 +10,7 @@ set(TEST_SOURCES
     test_error_messages
     test_poller
     test_tcp_socket
+    test_simple_client
 )
 
 foreach(TEST_NAME ${TEST_SOURCES})
