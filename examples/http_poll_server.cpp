@@ -1,22 +1,23 @@
 // This is a personal academic project. Dear PVS-Studio, please check it.
 // PVS-Studio Static Code Analyzer for C, C++, C#, and Java:
 // https://pvs-studio.com
-#include "SimpleServer.h"
-#include <cstring>
+
+// Poll-driven HTTP/1.x server built on ServerBase.
+// ServerBase owns all client socket/state bookkeeping; this file only
+// contains HTTP framing logic.
+
+#include "ServerBase.h"
 #include <iostream>
 #include <string>
-#include <unordered_map>
-#include <cassert>
 
 using namespace aiSocks;
 
+// ---------------------------------------------------------------------------
+// HTTP helpers
+// ---------------------------------------------------------------------------
 namespace {
 
-struct ClientState {
-    std::string request;
-    std::string response;
-    size_t sent = 0;
-};
+static constexpr size_t MAX_REQUEST_BYTES = 64 * 1024;
 
 bool isHttpRequest(const std::string& req) {
     return req.rfind("GET ", 0) == 0 || req.rfind("POST", 0) == 0
@@ -29,130 +30,135 @@ bool requestComplete(const std::string& req) {
     return req.find("\r\n\r\n") != std::string::npos;
 }
 
-std::string makeHttpResponse(
-    const char* statusLine, const char* contentType, const std::string& body) {
-    std::string response;
-    response.reserve(256 + body.size());
-    response += statusLine;
-    response += "\r\nContent-Type: ";
-    response += contentType;
-    response += "\r\nContent-Length: ";
-    response += std::to_string(body.size());
-    response += "\r\nConnection: close\r\n\r\n";
-    response += body;
-    return response;
+std::string makeResponse(const char* statusLine, const char* contentType,
+    const std::string& body) {
+    std::string r;
+    r.reserve(256 + body.size());
+    r += statusLine;
+    r += "\r\nContent-Type: ";
+    r += contentType;
+    r += "\r\nContent-Length: ";
+    r += std::to_string(body.size());
+    r += "\r\nConnection: close\r\n\r\n";
+    r += body;
+    return r;
 }
 
 } // namespace
 
+// ---------------------------------------------------------------------------
+// Per-connection state
+// ---------------------------------------------------------------------------
+struct HttpClientState {
+    std::string request;
+    std::string response;
+    size_t sent{0};
+};
+
+// ---------------------------------------------------------------------------
+// HttpServer -- derives from ServerBase, handles HTTP framing only
+// ---------------------------------------------------------------------------
+class HttpServer : public ServerBase<HttpClientState> {
+public:
+    explicit HttpServer(const ServerBind& bind)
+        : ServerBase<HttpClientState>(bind) {
+        std::cout << "Listening on " << bind.address << ":"
+                  << static_cast<int>(bind.port) << "\n";
+    }
+
+protected:
+    bool onReadable(TcpSocket& sock, HttpClientState& s) override {
+        char buf[4096];
+        for (;;) {
+            int n = sock.receive(buf, sizeof(buf));
+            if (n > 0) {
+                s.request.append(buf, static_cast<size_t>(n));
+
+                if (s.request.size() > MAX_REQUEST_BYTES) {
+                    s.response = makeResponse("HTTP/1.1 413 Payload Too Large",
+                        "text/plain; charset=utf-8", "Request too large.\n");
+                    return true; // let onWritable flush then disconnect
+                }
+
+                if (s.response.empty() && requestComplete(s.request)) {
+                    buildResponse(s);
+                    return true;
+                }
+            } else if (n == 0) {
+                return false; // peer closed
+            } else {
+                const auto err = sock.getLastError();
+                if (err == SocketError::WouldBlock
+                    || err == SocketError::Timeout) {
+                    break; // no more data right now
+                }
+                return false; // real error
+            }
+        }
+        return true;
+    }
+
+    bool onWritable(TcpSocket& sock, HttpClientState& s) override {
+        if (s.response.empty()) return true; // nothing to send yet
+
+        while (s.sent < s.response.size()) {
+            const char* out = s.response.data() + s.sent;
+            const size_t left = s.response.size() - s.sent;
+            int n = sock.send(out, left);
+            if (n > 0) {
+                s.sent += static_cast<size_t>(n);
+            } else {
+                const auto err = sock.getLastError();
+                if (err == SocketError::WouldBlock
+                    || err == SocketError::Timeout) {
+                    break;
+                }
+                return false;
+            }
+        }
+
+        if (s.sent >= s.response.size()) {
+            sock.shutdown(ShutdownHow::Both);
+            return false; // done -- remove client
+        }
+        return true;
+    }
+
+private:
+    static void buildResponse(HttpClientState& s) {
+        if (isHttpRequest(s.request)) {
+            const std::string body =
+                "<!DOCTYPE html>\n"
+                "<html><body>\n"
+                "<h1>HTTP Poll Server</h1>\n"
+                "<p>Server is running.</p>\n"
+                "</body></html>\n";
+            s.response =
+                makeResponse("HTTP/1.1 200 OK", "text/html; charset=utf-8",
+                    body);
+        } else {
+            s.response = makeResponse("HTTP/1.1 400 Bad Request",
+                "text/plain; charset=utf-8",
+                "Bad Request: this server only accepts HTTP requests.\n");
+        }
+    }
+};
+
+// ---------------------------------------------------------------------------
+// main
+// ---------------------------------------------------------------------------
 int main() {
-    std::cout << "=== Poll-Driven HTTP Server Example ===\n";
-    std::cout << "Starting HTTP-only server on 0.0.0.0:8080\n";
-    std::cout << "Accept/read/write are all poll-driven and non-blocking.\n\n";
-
+    std::cout << "=== Poll-Driven HTTP Server ===\n";
     try {
-        ServerBind config{
+        HttpServer server(ServerBind{
             .address = "0.0.0.0",
-            .port = Port{8080},
+            .port    = Port{8080},
             .backlog = 64,
-        };
-
-        SimpleServer server(config);
-        std::unordered_map<const Socket*, ClientState> states;
-        assert(!server.getSocket().isBlocking());
-
-        server.pollClients([&states](TcpSocket& client, PollEvent events) {
-            const Socket* key = &client;
-            auto& state = states[key];
-            assert(!client.isBlocking());
-
-            if (hasFlag(events, PollEvent::Readable)) {
-                char buffer[4096];
-                for (;;) {
-                    int received = client.receive(buffer, sizeof(buffer));
-                    if (received > 0) {
-                        state.request.append(
-                            buffer, static_cast<size_t>(received));
-
-                        if (state.request.size() > 64 * 1024) {
-                            state.response = makeHttpResponse(
-                                "HTTP/1.1 413 Payload Too Large",
-                                "text/plain; charset=utf-8",
-                                "Request too large.\n");
-                            break;
-                        }
-
-                        if (state.response.empty()
-                            && requestComplete(state.request)) {
-                            if (isHttpRequest(state.request)) {
-                                const std::string body
-                                    = "<!DOCTYPE html>\n"
-                                      "<html><body>\n"
-                                      "<h1>HTTP Poll Server</h1>\n"
-                                      "<p>Server is running on port 8080.</p>\n"
-                                      "<p>This endpoint is HTTP-only.</p>\n"
-                                      "</body></html>\n";
-                                state.response
-                                    = makeHttpResponse("HTTP/1.1 200 OK",
-                                        "text/html; charset=utf-8", body);
-                            } else {
-                                state.response = makeHttpResponse(
-                                    "HTTP/1.1 400 Bad Request",
-                                    "text/plain; charset=utf-8",
-                                    "Bad Request: this server only accepts "
-                                    "HTTP requests.\n");
-                            }
-                            break;
-                        }
-                    } else if (received == 0) {
-                        states.erase(key);
-                        return false;
-                    } else {
-                        const auto err = client.getLastError();
-                        if (err == SocketError::WouldBlock
-                            || err == SocketError::Timeout) {
-                            break;
-                        }
-                        states.erase(key);
-                        return false;
-                    }
-                }
-            }
-
-            if (hasFlag(events, PollEvent::Writable)
-                && !state.response.empty()) {
-                while (state.sent < state.response.size()) {
-                    const char* out = state.response.data() + state.sent;
-                    const size_t left = state.response.size() - state.sent;
-                    int n = client.send(out, left);
-
-                    if (n > 0) {
-                        state.sent += static_cast<size_t>(n);
-                    } else {
-                        const auto err = client.getLastError();
-                        if (err == SocketError::WouldBlock
-                            || err == SocketError::Timeout) {
-                            break;
-                        }
-                        states.erase(key);
-                        return false;
-                    }
-                }
-
-                if (state.sent >= state.response.size()) {
-                    client.shutdown(ShutdownHow::Both);
-                    states.erase(key);
-                    return false;
-                }
-            }
-
-            return true;
         });
-
+        server.run();
     } catch (const SocketException& e) {
         std::cerr << "Server error: " << e.what() << "\n";
         return 1;
     }
-
     return 0;
 }
