@@ -61,7 +61,7 @@ static void logAcceptedPeer(const TcpSocket& accepted) {
 // ---------------------------------------------------------------------------
 static void runEchoServer(Port port) {
     TcpSocket server(AddressFamily::IPv4,
-        ServerBind{.address = "127.0.0.1", .port = port, .backlog = 1});
+        ServerBind{"127.0.0.1", port, 1});
 
     auto localEp = server.getLocalEndpoint();
     std::cout << "[server] listening on "
@@ -93,7 +93,7 @@ static void runEchoServer(Port port) {
 // ---------------------------------------------------------------------------
 static void runEchoClient(Port port) {
     TcpSocket client(
-        AddressFamily::IPv4, ConnectArgs{.address = "127.0.0.1", .port = port});
+        AddressFamily::IPv4, ConnectArgs{"127.0.0.1", port});
 
     // Log immediately after connect  shows the kernel-assigned ephemeral port.
     logPeerInfo(client, "client-side connected");

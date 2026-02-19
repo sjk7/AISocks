@@ -80,11 +80,25 @@ static void test_connect_exception_message() {
     {
         SocketError code = SocketError::None;
         try {
-            TcpSocket c(AddressFamily::IPv4, ConnectArgs{"127.0.0.1", Port{1}, Milliseconds{100}});
+            // Use Class E experimental address (240.0.0.0/4) that gets silently dropped,
+            // ensuring a reliable timeout rather than immediate ICMP rejection
+            TcpSocket c(AddressFamily::IPv4, ConnectArgs{"240.0.0.1", Port{1}, Milliseconds{100}});
         } catch (const SocketException& e) {
             code = e.errorCode();
         }
         REQUIRE(code == SocketError::Timeout);
+    }
+
+    BEGIN_TEST("ConnectArgs exception: errorCode() == ConnectFailed for immediate refusal");
+    {
+        SocketError code = SocketError::None;
+        try {
+            // Localhost on a closed port immediately returns connection refused
+            TcpSocket c(AddressFamily::IPv4, ConnectArgs{"127.0.0.1", Port{1}, Milliseconds{100}});
+        } catch (const SocketException& e) {
+            code = e.errorCode();
+        }
+        REQUIRE(code == SocketError::ConnectFailed);
     }
 
     BEGIN_TEST("ConnectArgs exception: port number appears in what()");
