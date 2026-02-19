@@ -93,6 +93,7 @@ class SocketImpl {
     bool setReceiveBufferSize(int bytes);
     bool setSendBufferSize(int bytes);
     bool setBroadcast(bool enable);
+    bool setMulticastTTL(int ttl);
     bool shutdown(ShutdownHow how);
     bool sendAll(const void* data, size_t length);
     bool receiveAll(void* buffer, size_t length);
@@ -109,6 +110,11 @@ class SocketImpl {
     std::optional<Endpoint> getLocalEndpoint() const;
     std::optional<Endpoint> getPeerEndpoint() const;
     SocketHandle getRawHandle() const noexcept { return socketHandle; }
+
+    // Query socket options
+    int getReceiveBufferSize() const;
+    int getSendBufferSize() const;
+    bool getNoDelay() const;
 
     // Constructor for accepted connections (public for make_unique)
     SocketImpl(SocketHandle handle, SocketType type, AddressFamily family);

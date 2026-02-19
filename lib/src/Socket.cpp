@@ -8,6 +8,36 @@
 
 namespace aiSocks {
 
+// Endpoint utility methods
+bool Endpoint::isLoopback() const {
+    if (family == AddressFamily::IPv4) {
+        // Check for 127.x.x.x
+        return address.substr(0, 4) == "127.";
+    } else {
+        // IPv6: check for ::1
+        return address == "::1" || address == "::" || address == "0000:0000:0000:0000:0000:0000:0000:0001";
+    }
+}
+
+bool Endpoint::isPrivateNetwork() const {
+    if (family == AddressFamily::IPv4) {
+        // 10.0.0.0/8
+        if (address.substr(0, 3) == "10.") return true;
+        // 172.16.0.0/12
+        if (address.substr(0, 4) == "172.") {
+            int second = std::stoi(address.substr(4, address.find('.', 4) - 4));
+            if (second >= 16 && second <= 31) return true;
+        }
+        // 192.168.0.0/16
+        if (address.substr(0, 8) == "192.168.") return true;
+        return false;
+    } else {
+        // IPv6 ULA: fc00::/7 or fd00::/8
+        return (address.size() >= 2) && (address[0] == 'f') && 
+               (address[1] == 'c' || address[1] == 'd');
+    }
+}
+
 // Helper used only inside constructors: if ok is false, extract the error
 // from pImpl and throw with the failing step name prepended.
 // Lazy what() for SocketException  built once on first call.
@@ -226,6 +256,21 @@ bool Socket::setSendBufferSize(int bytes) {
     return pImpl->setSendBufferSize(bytes);
 }
 
+int Socket::getReceiveBufferSize() const {
+    assert(pImpl);
+    return pImpl->getReceiveBufferSize();
+}
+
+int Socket::getSendBufferSize() const {
+    assert(pImpl);
+    return pImpl->getSendBufferSize();
+}
+
+bool Socket::getNoDelay() const {
+    assert(pImpl);
+    return pImpl->getNoDelay();
+}
+
 bool Socket::setKeepAlive(bool enable) {
     assert(pImpl);
     return pImpl->setKeepAlive(enable);
@@ -239,6 +284,26 @@ bool Socket::setLingerAbort(bool enable) {
 bool Socket::doSetBroadcast(bool enable) {
     assert(pImpl);
     return pImpl->setBroadcast(enable);
+}
+
+bool Socket::doSetMulticastTTL(int ttl) {
+    assert(pImpl);
+    return pImpl->setMulticastTTL(ttl);
+}
+
+int Socket::doGetReceiveBufferSize() const {
+    assert(pImpl);
+    return pImpl->getReceiveBufferSize();
+}
+
+int Socket::doGetSendBufferSize() const {
+    assert(pImpl);
+    return pImpl->getSendBufferSize();
+}
+
+bool Socket::doGetNoDelay() const {
+    assert(pImpl);
+    return pImpl->getNoDelay();
 }
 
 bool Socket::shutdown(ShutdownHow how) {

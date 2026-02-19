@@ -1026,6 +1026,28 @@ bool SocketImpl::setBroadcast(bool enable) {
 }
 
 // -----------------------------------------------------------------------
+// setMulticastTTL (IP_MULTICAST_TTL / IPV6_MULTICAST_HOPS)  limit multicast hops
+// -----------------------------------------------------------------------
+bool SocketImpl::setMulticastTTL(int ttl) {
+    if (!isValid()) {
+        setError(SocketError::InvalidSocket, "Socket is not valid");
+        return false;
+    }
+    if (addressFamily == AddressFamily::IPv6) {
+#ifdef _WIN32
+        return setBoolOpt(IPPROTO_IPV6, IPV6_MULTICAST_HOPS, ttl, 
+                         "Failed to set IPV6_MULTICAST_HOPS");
+#else
+        return setBoolOpt(IPPROTO_IPV6, IPV6_MULTICAST_HOPS, ttl, 
+                         "Failed to set IPV6_MULTICAST_HOPS");
+#endif
+    } else {
+        return setBoolOpt(IPPROTO_IP, IP_MULTICAST_TTL, ttl, 
+                         "Failed to set IP_MULTICAST_TTL");
+    }
+}
+
+// -----------------------------------------------------------------------
 // sendAll  loop until all bytes sent or error
 // -----------------------------------------------------------------------
 bool SocketImpl::sendAll(const void* data, size_t length) {
@@ -1212,6 +1234,39 @@ std::optional<Endpoint> SocketImpl::getPeerEndpoint() const {
         != 0)
         return std::nullopt;
     return endpointFromSockaddr(addr);
+}
+
+// -----------------------------------------------------------------------
+// Query socket options (getters)
+// -----------------------------------------------------------------------
+int SocketImpl::getReceiveBufferSize() const {
+    if (!isValid()) return -1;
+    int size = 0;
+    socklen_t len = static_cast<socklen_t>(sizeof(size));
+    if (getsockopt(socketHandle, SOL_SOCKET, SO_RCVBUF, 
+                   reinterpret_cast<char*>(&size), &len) != 0)
+        return -1;
+    return size;
+}
+
+int SocketImpl::getSendBufferSize() const {
+    if (!isValid()) return -1;
+    int size = 0;
+    socklen_t len = static_cast<socklen_t>(sizeof(size));
+    if (getsockopt(socketHandle, SOL_SOCKET, SO_SNDBUF, 
+                   reinterpret_cast<char*>(&size), &len) != 0)
+        return -1;
+    return size;
+}
+
+bool SocketImpl::getNoDelay() const {
+    if (!isValid()) return false;
+    int noDelay = 0;
+    socklen_t len = static_cast<socklen_t>(sizeof(noDelay));
+    if (getsockopt(socketHandle, IPPROTO_TCP, TCP_NODELAY, 
+                   reinterpret_cast<char*>(&noDelay), &len) != 0)
+        return false;
+    return noDelay != 0;
 }
 
 // Static utility methods
