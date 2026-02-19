@@ -7,6 +7,7 @@
 // contains HTTP framing logic.
 
 #include "ServerBase.h"
+#include <chrono>
 #include <iostream>
 #include <string>
 
@@ -30,8 +31,8 @@ bool requestComplete(const std::string& req) {
     return req.find("\r\n\r\n") != std::string::npos;
 }
 
-std::string makeResponse(const char* statusLine, const char* contentType,
-    const std::string& body) {
+std::string makeResponse(
+    const char* statusLine, const char* contentType, const std::string& body) {
     std::string r;
     r.reserve(256 + body.size());
     r += statusLine;
@@ -49,24 +50,30 @@ std::string makeResponse(const char* statusLine, const char* contentType,
 // ---------------------------------------------------------------------------
 // Per-connection state
 // ---------------------------------------------------------------------------
+using Clock = std::chrono::steady_clock;
+
+static constexpr size_t PAYLOAD_BYTES = 100 * 1024 * 1024; // 100 MB
+
 struct HttpClientState {
     std::string request;
     std::string response;
     size_t sent{0};
+    Clock::time_point startTime{};
+    bool timerStarted{false};
 };
 
 // ---------------------------------------------------------------------------
 // HttpServer -- derives from ServerBase, handles HTTP framing only
 // ---------------------------------------------------------------------------
 class HttpServer : public ServerBase<HttpClientState> {
-public:
+    public:
     explicit HttpServer(const ServerBind& bind)
         : ServerBase<HttpClientState>(bind) {
         std::cout << "Listening on " << bind.address << ":"
                   << static_cast<int>(bind.port) << "\n";
     }
 
-protected:
+    protected:
     bool onReadable(TcpSocket& sock, HttpClientState& s) override {
         char buf[4096];
         for (;;) {
@@ -101,6 +108,13 @@ protected:
     bool onWritable(TcpSocket& sock, HttpClientState& s) override {
         if (s.response.empty()) return true; // nothing to send yet
 
+        if (!s.timerStarted) {
+            s.startTime = Clock::now();
+            s.timerStarted = true;
+            std::cout << "Sending " << (PAYLOAD_BYTES / (1024 * 1024))
+                      << " MB...\n";
+        }
+
         while (s.sent < s.response.size()) {
             const char* out = s.response.data() + s.sent;
             const size_t left = s.response.size() - s.sent;
@@ -118,24 +132,26 @@ protected:
         }
 
         if (s.sent >= s.response.size()) {
+            const auto elapsed
+                = std::chrono::duration<double>(Clock::now() - s.startTime)
+                      .count();
+            const double mb
+                = static_cast<double>(PAYLOAD_BYTES) / (1024.0 * 1024.0);
+            std::cout << "Sent " << mb << " MB in " << elapsed << " s  ("
+                      << (mb / elapsed) << " MB/s)\n";
             sock.shutdown(ShutdownHow::Both);
             return false; // done -- remove client
         }
         return true;
     }
 
-private:
+    private:
     static void buildResponse(HttpClientState& s) {
         if (isHttpRequest(s.request)) {
-            const std::string body =
-                "<!DOCTYPE html>\n"
-                "<html><body>\n"
-                "<h1>HTTP Poll Server</h1>\n"
-                "<p>Server is running.</p>\n"
-                "</body></html>\n";
-            s.response =
-                makeResponse("HTTP/1.1 200 OK", "text/html; charset=utf-8",
-                    body);
+            // 100 MB of repeating 'A' bytes
+            std::string body(PAYLOAD_BYTES, 'A');
+            s.response = makeResponse(
+                "HTTP/1.1 200 OK", "application/octet-stream", body);
         } else {
             s.response = makeResponse("HTTP/1.1 400 Bad Request",
                 "text/plain; charset=utf-8",
@@ -152,10 +168,11 @@ int main() {
     try {
         HttpServer server(ServerBind{
             .address = "0.0.0.0",
-            .port    = Port{8080},
+            .port = Port{8080},
             .backlog = 64,
         });
         server.run();
+        std::cout << "\nShutting down cleanly.\n";
     } catch (const SocketException& e) {
         std::cerr << "Server error: " << e.what() << "\n";
         return 1;
