@@ -310,7 +310,7 @@ bool SocketImpl::connect(
                 "Failed to resolve '" + address + " port:" + std::to_string(port)+"'");
 #else
             setErrorDns(SocketError::ConnectFailed,
-                "Failed to resolve '" + address + " port:" + std::to_string(port)"'", gaiErr);
+                "Failed to resolve '" + address + " port:" + std::to_string(port) + "'", gaiErr);
 #endif
             return false;
         }
