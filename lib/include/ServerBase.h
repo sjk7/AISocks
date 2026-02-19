@@ -14,6 +14,13 @@
 
 namespace aiSocks {
 
+// Return values for ServerBase virtual functions
+enum class ServerResult {
+    KeepConnection = 1, // Keep the connection alive
+    Disconnect = 0, // Disconnect this client
+    StopServer = -1 // Stop the server gracefully
+};
+
 // ---------------------------------------------------------------------------
 // ServerBase<ClientData>  CRTP-free base for poll-driven TCP servers.
 //
@@ -110,7 +117,10 @@ template <typename ClientData> class ServerBase {
             && (accepting || !clients_.empty())) {
             auto ready = poller.wait(timeout);
             if (s_stop_.load(std::memory_order_relaxed)) break;
-            onIdle();
+            if (onIdle() == ServerResult::StopServer) {
+                s_stop_.store(true);
+                break;
+            }
             for (const auto& event : ready) {
                 if (event.socket == listener_.get()) {
                     if (!accepting) continue;
@@ -123,10 +133,22 @@ template <typename ClientData> class ServerBase {
 
                 bool keep = !hasFlag(event.events, PollEvent::Error);
                 if (keep && hasFlag(event.events, PollEvent::Readable)) {
-                    keep = onReadable(*it->second.socket, it->second.data);
+                    ServerResult result
+                        = onReadable(*it->second.socket, it->second.data);
+                    if (result == ServerResult::StopServer) {
+                        s_stop_.store(true);
+                        break;
+                    }
+                    keep = (result == ServerResult::KeepConnection);
                 }
                 if (keep && hasFlag(event.events, PollEvent::Writable)) {
-                    keep = onWritable(*it->second.socket, it->second.data);
+                    ServerResult result
+                        = onWritable(*it->second.socket, it->second.data);
+                    if (result == ServerResult::StopServer) {
+                        s_stop_.store(true);
+                        break;
+                    }
+                    keep = (result == ServerResult::KeepConnection);
                 }
 
                 if (!keep) {
@@ -185,20 +207,22 @@ template <typename ClientData> class ServerBase {
     protected:
     // -- Override in derived classes ------------------------------------------
 
-    // Called when the client socket is readable.  Return false to disconnect.
-    virtual bool onReadable(TcpSocket& sock, ClientData& data) = 0;
+    // Called when the client socket is readable.  Return 0 to disconnect.
+    virtual ServerResult onReadable(TcpSocket& sock, ClientData& data) = 0;
 
-    // Called when the client socket is writable.  Return false to disconnect.
-    virtual bool onWritable(TcpSocket& sock, ClientData& data) = 0;
+    // Called when the client socket is writable.  Return 0 to disconnect.
+    virtual ServerResult onWritable(TcpSocket& sock, ClientData& data) = 0;
 
     // Called just before a client is removed.  Default: no-op.
-    virtual void onDisconnect(ClientData& /*data*/) {}
+    virtual ServerResult onDisconnect(ClientData& /*data*/) {
+        return ServerResult::Disconnect;
+    }
 
     // Called on every loop iteration after poller.wait() returns, before
     // processing events. Use this to do periodic bookkeeping on the server
     // thread without spawning extra threads. For reliable periodic calls,
     // pass a bounded timeout to run() (e.g. Milliseconds{100}).
-    virtual void onIdle() {}
+    virtual ServerResult onIdle() { return ServerResult::KeepConnection; }
 
     private:
     struct ClientEntry {

@@ -42,27 +42,27 @@ class EchoServer : public ServerBase<EchoState> {
     }
 
     protected:
-    bool onReadable(TcpSocket& sock, EchoState& s) override {
+    ServerResult onReadable(TcpSocket& sock, EchoState& s) override {
         char tmp[1024];
         for (;;) {
             int n = sock.receive(tmp, sizeof(tmp));
             if (n > 0) {
                 s.buf.append(tmp, static_cast<size_t>(n));
             } else if (n == 0) {
-                return false; // peer closed
+                return ServerResult::Disconnect; // peer closed
             } else {
                 const auto err = sock.getLastError();
                 if (err == SocketError::WouldBlock
                     || err == SocketError::Timeout)
                     break;
-                return false;
+                return ServerResult::Disconnect;
             }
         }
-        return true;
+        return ServerResult::KeepConnection;
     }
 
-    bool onWritable(TcpSocket& sock, EchoState& s) override {
-        if (s.buf.empty()) return true;
+    ServerResult onWritable(TcpSocket& sock, EchoState& s) override {
+        if (s.buf.empty()) return ServerResult::KeepConnection;
         int n = sock.send(s.buf.data(), s.buf.size());
         if (n > 0) {
             s.buf.erase(0, static_cast<size_t>(n));
@@ -70,16 +70,20 @@ class EchoServer : public ServerBase<EchoState> {
         }
         // If buffer is empty after sending and we've sent data, close
         // connection
-        if (s.buf.empty() && s.hasSentData) return false;
-        return true;
+        if (s.buf.empty() && s.hasSentData) return ServerResult::Disconnect;
+        return ServerResult::KeepConnection;
     }
 
-    void onDisconnect(EchoState& s) override {
+    ServerResult onDisconnect(EchoState& s) override {
         s.disconnected = true;
         ++disconnectCalls;
+        return ServerResult::KeepConnection;
     }
 
-    void onIdle() override { ++idleCalls; }
+    ServerResult onIdle() override {
+        ++idleCalls;
+        return ServerResult::KeepConnection;
+    }
 };
 
 // ---------------------------------------------------------------------------
