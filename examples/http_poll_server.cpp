@@ -2,11 +2,11 @@
 // PVS-Studio Static Code Analyzer for C, C++, C#, and Java:
 // https://pvs-studio.com
 #include "SimpleServer.h"
-
 #include <cstring>
 #include <iostream>
 #include <string>
 #include <unordered_map>
+#include <cassert>
 
 using namespace aiSocks;
 
@@ -59,17 +59,20 @@ int main() {
 
         SimpleServer server(config);
         std::unordered_map<const Socket*, ClientState> states;
+        assert(!server.getSocket().isBlocking());
 
         server.pollClients([&states](TcpSocket& client, PollEvent events) {
             const Socket* key = &client;
             auto& state = states[key];
+            assert(!client.isBlocking());
 
             if (hasFlag(events, PollEvent::Readable)) {
                 char buffer[4096];
                 for (;;) {
                     int received = client.receive(buffer, sizeof(buffer));
                     if (received > 0) {
-                        state.request.append(buffer, static_cast<size_t>(received));
+                        state.request.append(
+                            buffer, static_cast<size_t>(received));
 
                         if (state.request.size() > 64 * 1024) {
                             state.response = makeHttpResponse(
@@ -79,22 +82,25 @@ int main() {
                             break;
                         }
 
-                        if (state.response.empty() && requestComplete(state.request)) {
+                        if (state.response.empty()
+                            && requestComplete(state.request)) {
                             if (isHttpRequest(state.request)) {
-                                const std::string body =
-                                    "<!DOCTYPE html>\n"
-                                    "<html><body>\n"
-                                    "<h1>HTTP Poll Server</h1>\n"
-                                    "<p>Server is running on port 8080.</p>\n"
-                                    "<p>This endpoint is HTTP-only.</p>\n"
-                                    "</body></html>\n";
-                                state.response = makeHttpResponse(
-                                    "HTTP/1.1 200 OK", "text/html; charset=utf-8", body);
+                                const std::string body
+                                    = "<!DOCTYPE html>\n"
+                                      "<html><body>\n"
+                                      "<h1>HTTP Poll Server</h1>\n"
+                                      "<p>Server is running on port 8080.</p>\n"
+                                      "<p>This endpoint is HTTP-only.</p>\n"
+                                      "</body></html>\n";
+                                state.response
+                                    = makeHttpResponse("HTTP/1.1 200 OK",
+                                        "text/html; charset=utf-8", body);
                             } else {
                                 state.response = makeHttpResponse(
                                     "HTTP/1.1 400 Bad Request",
                                     "text/plain; charset=utf-8",
-                                    "Bad Request: this server only accepts HTTP requests.\n");
+                                    "Bad Request: this server only accepts "
+                                    "HTTP requests.\n");
                             }
                             break;
                         }
@@ -103,7 +109,8 @@ int main() {
                         return false;
                     } else {
                         const auto err = client.getLastError();
-                        if (err == SocketError::WouldBlock || err == SocketError::Timeout) {
+                        if (err == SocketError::WouldBlock
+                            || err == SocketError::Timeout) {
                             break;
                         }
                         states.erase(key);
@@ -112,7 +119,8 @@ int main() {
                 }
             }
 
-            if (hasFlag(events, PollEvent::Writable) && !state.response.empty()) {
+            if (hasFlag(events, PollEvent::Writable)
+                && !state.response.empty()) {
                 while (state.sent < state.response.size()) {
                     const char* out = state.response.data() + state.sent;
                     const size_t left = state.response.size() - state.sent;
@@ -122,7 +130,8 @@ int main() {
                         state.sent += static_cast<size_t>(n);
                     } else {
                         const auto err = client.getLastError();
-                        if (err == SocketError::WouldBlock || err == SocketError::Timeout) {
+                        if (err == SocketError::WouldBlock
+                            || err == SocketError::Timeout) {
                             break;
                         }
                         states.erase(key);
