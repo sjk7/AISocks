@@ -147,6 +147,23 @@
             },
             "problemMatcher": [],
             "dependsOn": ["Build test_new_features"]
+        },
+        {
+            "label": "Build aiSocksGoogleClient",
+            "type": "shell",
+            "command": "cmake",
+            "args": [
+                "--build",
+                "${workspaceFolder}/build-ninja",
+                "--target",
+                "aiSocksGoogleClient"
+            ],
+            "group": "build",
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared"
+            },
+            "problemMatcher": "$msCompile"
         }
     ]
 }

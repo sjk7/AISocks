@@ -41,6 +41,10 @@ endif()
 if(MSVC)
     target_compile_options(aiSocksLib PRIVATE /W4 /WX /utf-8)
 else()
-    target_compile_options(aiSocksLib PRIVATE -Wall -Wextra -Wpedantic -Werror)
+    target_compile_options(aiSocksLib PRIVATE -Wall -Wextra -Wpedantic -Werror -Wno-shadow)
+    # Ensure debug symbols in Debug builds for Clang
+    if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+        target_compile_options(aiSocksLib PRIVATE -g -O0)
+    endif()
 endif()
 

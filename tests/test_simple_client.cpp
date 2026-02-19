@@ -40,31 +40,43 @@ int main() {
 
         // One-liner client
         bool callback_called = false;
-        SimpleClient client("127.0.0.1", Port{BASE}, [&](TcpSocket& sock) {
-            const char* msg = "Hello echo";
-            sock.sendAll(msg, std::strlen(msg));
-            
-            char buf[256] = {};
-            int n = sock.receive(buf, sizeof(buf) - 1);
-            callback_called = (n > 0 && std::string(buf, n) == "Hello echo");
-        });
+        try {
+            SimpleClient client(ConnectArgs{"127.0.0.1", Port{BASE}}, [&](TcpSocket& sock) {
+                const char* msg = "Hello echo";
+                sock.sendAll(msg, std::strlen(msg));
+                
+                char buf[256] = {};
+                int n = sock.receive(buf, sizeof(buf) - 1);
+                callback_called = (n > 0 && std::string(buf, n) == "Hello echo");
+            });
+
+            REQUIRE(client.isConnected());
+            REQUIRE(callback_called);
+        } catch (const SocketException& e) {
+            std::cerr << "  Exception: " << e.what() << "\n";
+            REQUIRE(false);  // Connection should succeed
+        }
 
         server_thread.join();
-
-        REQUIRE(client.isConnected());
-        REQUIRE(callback_called);
     }
 
-    // Test 2: Connection failure handling
-    BEGIN_TEST("SimpleClient: detects connection failure");
+    // Test 2: Connection failure handling (should throw)
+    BEGIN_TEST("SimpleClient: throws on connection failure");
     {
         bool callback_called = false;
-        SimpleClient client("127.0.0.1", Port{65432}, [&](TcpSocket&) {
-            callback_called = true; // Should not be called
-        }, Milliseconds{100});
+        bool exception_caught = false;
 
-        REQUIRE_MSG(!client.isConnected(),
-            "isConnected() returns false on failed connection");
+        try {
+            SimpleClient client(ConnectArgs{"127.0.0.1", Port{65432}, Milliseconds{100}}, 
+                [&](TcpSocket&) {
+                callback_called = true; // Should not be called
+            });
+        } catch (const SocketException& e) {
+            exception_caught = true;
+        }
+
+        REQUIRE_MSG(exception_caught,
+            "SocketException thrown on connection failure");
         REQUIRE_MSG(!callback_called,
             "callback not invoked on connection failure");
     }
@@ -80,14 +92,20 @@ int main() {
 
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
-        SimpleClient client("127.0.0.1", Port{BASE + 1}, [](TcpSocket& sock) {
-            // Verify we can query the socket
-            auto ep = sock.getPeerEndpoint();
-            REQUIRE_MSG(ep.has_value(), "getPeerEndpoint returns valid endpoint");
-        });
+        try {
+            SimpleClient client(ConnectArgs{"127.0.0.1", Port{BASE + 1}}, [](TcpSocket& sock) {
+                // Verify we can query the socket
+                auto ep = sock.getPeerEndpoint();
+                REQUIRE_MSG(ep.has_value(), "getPeerEndpoint returns valid endpoint");
+            });
+
+            REQUIRE(client.isConnected());
+        } catch (const SocketException& e) {
+            std::cerr << "  Exception: " << e.what() << "\n";
+            REQUIRE(false);  // Connection should succeed
+        }
 
         server_thread.join();
-        REQUIRE(client.isConnected());
     }
 
     return test_summary();
