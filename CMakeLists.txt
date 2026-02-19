@@ -52,7 +52,7 @@ if(BUILD_EXAMPLES)
         aiSocksTestMove         examples/test_move_semantics.cpp
         aiSocksPeerLogger       examples/peer_logger.cpp
         aiSocksGoogleClient     examples/google_client.cpp
-        aiSocksEchoServer       examples/http_poll_server.cpp
+        aiSocksHttpServer        examples/http_poll_server.cpp
     )
     list(LENGTH _EXAMPLES _len)
     math(EXPR _last "${_len} - 2")
@@ -62,6 +62,11 @@ if(BUILD_EXAMPLES)
         list(GET _EXAMPLES ${_j} _src)
         add_executable(${_tgt} ${_src})
         target_link_libraries(${_tgt} PRIVATE aiSocksLib)
+        
+        # Add PERFORMANCE_TEST definition for HTTP server
+        if(_tgt STREQUAL "aiSocksHttpServer")
+            target_compile_definitions(${_tgt} PRIVATE PERFORMANCE_TEST)
+        endif()
         if(MSVC)
             target_compile_options(${_tgt} PRIVATE /utf-8)
         else()

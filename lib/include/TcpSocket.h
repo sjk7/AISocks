@@ -66,7 +66,8 @@ class TcpSocket : public Socket {
     [[nodiscard]] std::unique_ptr<TcpSocket> accept();
 
     // --- Client operation ---
-    // Blocking connect: waits for the TCP handshake and returns true on success.
+    // Blocking connect: waits for the TCP handshake and returns true on
+    // success.
     //   defaultTimeout (30 s)  used when not specified.
     //   any positive duration  fail with Timeout if not connected in time.
     //
@@ -104,6 +105,10 @@ class TcpSocket : public Socket {
         return doReceiveAll(buffer, length);
     }
     bool receiveAll(Span<std::byte> buffer) { return doReceiveAll(buffer); }
+
+    // Zero-copy file transfer using sendfile system call (Linux/macOS)
+    // Returns bytes sent, or <0 on error
+    int sendfile(int fd, off_t offset, size_t count);
 
     // sendAll with a per-chunk progress callback.
     //

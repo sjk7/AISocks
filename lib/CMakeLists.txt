@@ -32,7 +32,7 @@ target_include_directories(aiSocksLib
 
 # Platform-specific libraries and compile definitions
 if(WIN32)
-    target_link_libraries(aiSocksLib PRIVATE ws2_32 iphlpapi)
+    target_link_libraries(aiSocksLib PRIVATE ws2_32 iphlpapi mswsock)
     # Prevent Windows.h from defining min/max macros and reduce header bloat
     target_compile_definitions(aiSocksLib PUBLIC NOMINMAX WIN32_LEAN_AND_MEAN)
 endif()
