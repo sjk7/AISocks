@@ -8,8 +8,9 @@
 #include "TcpSocket.h"
 #include "SimpleClient.h"
 #include "test_helpers.h"
-#include <thread>
+#include <cstring>
 #include <string>
+#include <thread>
 
 using namespace aiSocks;
 
