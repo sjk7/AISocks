@@ -58,6 +58,7 @@ using Milliseconds = std::chrono::milliseconds;
 
 // Default timeout applied to all optional timeout parameters.
 inline constexpr Milliseconds defaultTimeout{std::chrono::seconds{30}};
+inline constexpr Milliseconds defaultConnectTimeout{std::chrono::seconds{10}};
 
 // Strong port-number type.  Accepts integer literals and named well-known
 // ports interchangeably and converts back to uint16_t implicitly so all
@@ -222,10 +223,10 @@ struct ServerBind {
 // Note: connect() is always issued on a non-blocking fd internally.
 //       BlockingGuard saves the current OS blocking flag, sets O_NONBLOCK,
 //       issues connect(), then restores the original flag on all exit paths.
-struct ConnectTo {
+struct ConnectArgs {
     std::string address; // Remote address or hostname
     Port port{0};
-    Milliseconds connectTimeout{defaultTimeout};
+    Milliseconds connectTimeout{defaultConnectTimeout};
 };
 
 // ---------------------------------------------------------------------------
@@ -340,7 +341,7 @@ class Socket {
 
     // Client socket  socket()  connect().
     // Throws SocketException (with the failing step prepended) on any failure.
-    Socket(SocketType type, AddressFamily family, const ConnectTo& config);
+    Socket(SocketType type, AddressFamily family, const ConnectArgs& config);
 
     // Takes ownership of an already-constructed impl (used by TcpSocket::accept()).
     explicit Socket(std::unique_ptr<SocketImpl> impl);

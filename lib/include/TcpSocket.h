@@ -20,7 +20,7 @@ namespace aiSocks {
 //   auto client = srv.accept();   // returns unique_ptr<TcpSocket>
 //
 // Usage  client:
-//   TcpSocket c(AddressFamily::IPv4, ConnectTo{"example.com", Port{80}});
+//   TcpSocket c(AddressFamily::IPv4, ConnectArgs{"example.com", Port{80}});
 //   c.sendAll(buf, len);
 //
 // Destructor is public and non-virtual.  Socket's destructor is protected so
@@ -34,7 +34,7 @@ class TcpSocket : public Socket {
 
     // Client socket  socket()  connect().
     // Throws SocketException on any step failure.
-    TcpSocket(AddressFamily family, const ConnectTo& cfg);
+    TcpSocket(AddressFamily family, const ConnectArgs& cfg);
 
     // Public non-virtual destructor  chains to Socket::~Socket().
     ~TcpSocket() = default;
@@ -45,7 +45,7 @@ class TcpSocket : public Socket {
 
     // Creates a raw, unbound, unconnected TCP socket fd.
     //
-    // Prefer the ServerBind / ConnectTo constructors  they construct a
+    // Prefer the ServerBind / ConnectArgs constructors  they construct a
     // fully-ready socket in one step and uphold the correct-by-construction
     // invariant.  Use createRaw() only when you need an empty socket to test
     // socket options, error codes, or move semantics in isolation.

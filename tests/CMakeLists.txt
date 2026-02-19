@@ -21,6 +21,9 @@ foreach(TEST_NAME ${TEST_SOURCES})
     )
     add_test(NAME ${TEST_NAME} COMMAND ${TEST_NAME})
     set_tests_properties(${TEST_NAME} PROPERTIES TIMEOUT 30)
+    
+    # Windows: prevent min/max macro conflicts (inherited from aiSocksLib PUBLIC)
+    # Already defined as PUBLIC in aiSocksLib, but explicit here for clarity
 
     # ── -O1 in Release for test binaries ────────────────────────────────────
     # Tests don't need -O2/-O3.  Halves the LLVM backend time per test TU
@@ -51,22 +54,23 @@ set_tests_properties(test_tcp_socket PROPERTIES TIMEOUT 60)
 # ---------------------------------------------------------------------------
 # Post-build test runner
 # ---------------------------------------------------------------------------
-# Runs every test automatically after each successful compile.
-# The build fails (non-zero exit) if any test fails, and the failing test's
-# full output is printed so the problem is immediately visible.
+# Custom target to run all tests on demand (not automatically on every build).
+# Use: cmake --build build-ninja --target run_all_tests
+# Or invoke via the "Run all tests" task in VS Code.
 #
 # Works on Windows (MSVC / Ninja), Linux, and macOS.
 # -C $<CONFIG> is a no-op on single-config generators but required for MSVC.
 # ---------------------------------------------------------------------------
-# Only auto-run tests when building natively; skip when cross-compiling
+# Only add test runner when building natively; skip when cross-compiling
 # (the .exe binaries can't execute on a non-Windows host).
 if(NOT CMAKE_CROSSCOMPILING)
-    add_custom_target(run_all_tests ALL
+    add_custom_target(run_all_tests
         COMMAND ${CMAKE_CTEST_COMMAND}
             --output-on-failure
             --no-compress-output
             -C $<CONFIG>
             --timeout 60
+            -j 11
         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
         COMMENT "========== Running aiSocks tests =========="
         DEPENDS ${TEST_SOURCES}
