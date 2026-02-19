@@ -8,6 +8,7 @@
 #include "TcpSocket.h"
 #include <atomic>
 #include <csignal>
+#include <functional>
 #include <memory>
 #include <unordered_map>
 
@@ -109,6 +110,7 @@ template <typename ClientData> class ServerBase {
             && (accepting || !clients_.empty())) {
             auto ready = poller.wait(timeout);
             if (s_stop_.load(std::memory_order_relaxed)) break;
+            onIdle();
             for (const auto& event : ready) {
                 if (event.socket == listener_.get()) {
                     if (!accepting) continue;
@@ -116,7 +118,7 @@ template <typename ClientData> class ServerBase {
                     continue;
                 }
 
-                auto it = clients_.find(event.socket);
+                auto it = clients_.find(event.socket->getNativeHandle());
                 if (it == clients_.end()) continue;
 
                 bool keep = !hasFlag(event.events, PollEvent::Error);
@@ -134,6 +136,12 @@ template <typename ClientData> class ServerBase {
                 }
             }
         }
+
+        // Clean up any remaining clients when stopping
+        for (auto& [fd, entry] : clients_) {
+            onDisconnect(entry.data);
+        }
+        clients_.clear();
     }
 
     // Access the underlying listening socket (e.g. to set socket options).
@@ -142,6 +150,28 @@ template <typename ClientData> class ServerBase {
 
     // Current number of connected clients.
     size_t clientCount() const { return clients_.size(); }
+
+    // Optimized send with large chunks for better throughput
+    int sendOptimized(TcpSocket& sock, const char* data, size_t size) {
+        const size_t CHUNK_SIZE = 64 * 1024; // 64KB chunks
+        size_t sent = 0;
+
+        while (sent < size) {
+            size_t to_send = std::min(CHUNK_SIZE, size - sent);
+            int n = sock.send(data + sent, to_send);
+            if (n <= 0) {
+                return sent > 0 ? static_cast<int>(sent) : n;
+            }
+            sent += n;
+
+            // If we couldn't send the full chunk, socket buffer is full
+            if (n < static_cast<int>(to_send)) {
+                break;
+            }
+        }
+
+        return static_cast<int>(sent);
+    }
 
     // Request a graceful shutdown. Safe to call from a signal handler or any
     // thread. run() will exit after the current wait() returns.
@@ -164,6 +194,12 @@ template <typename ClientData> class ServerBase {
     // Called just before a client is removed.  Default: no-op.
     virtual void onDisconnect(ClientData& /*data*/) {}
 
+    // Called on every loop iteration after poller.wait() returns, before
+    // processing events. Use this to do periodic bookkeeping on the server
+    // thread without spawning extra threads. For reliable periodic calls,
+    // pass a bounded timeout to run() (e.g. Milliseconds{100}).
+    virtual void onIdle() {}
+
     private:
     struct ClientEntry {
         std::unique_ptr<TcpSocket> socket;
@@ -177,7 +213,7 @@ template <typename ClientData> class ServerBase {
     }
 
     std::unique_ptr<TcpSocket> listener_;
-    std::unordered_map<const Socket*, ClientEntry> clients_;
+    std::unordered_map<uintptr_t, ClientEntry> clients_;
 
     void drainAccept(
         Poller& poller, bool& accepting, size_t& accepted, size_t maxClients) {
@@ -191,7 +227,7 @@ template <typename ClientData> class ServerBase {
                 continue; // couldn't set non-blocking; drop this client
             }
 
-            const Socket* key = client.get();
+            uintptr_t key = client->getNativeHandle();
             if (!poller.add(*client,
                     PollEvent::Readable | PollEvent::Writable
                         | PollEvent::Error)) {

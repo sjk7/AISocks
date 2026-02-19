@@ -19,6 +19,7 @@ using namespace aiSocks;
 namespace {
 
 static constexpr size_t MAX_REQUEST_BYTES = 64 * 1024;
+static constexpr size_t LARGE_RECV_BUFFER = 64 * 1024; // Larger receive buffer
 
 bool isHttpRequest(const std::string& req) {
     return req.rfind("GET ", 0) == 0 || req.rfind("POST", 0) == 0
@@ -31,10 +32,11 @@ bool requestComplete(const std::string& req) {
     return req.find("\r\n\r\n") != std::string::npos;
 }
 
+// Optimized response building with pre-allocation
 std::string makeResponse(
     const char* statusLine, const char* contentType, const std::string& body) {
     std::string r;
-    r.reserve(256 + body.size());
+    r.reserve(256 + body.size()); // Pre-allocate to avoid reallocations
     r += statusLine;
     r += "\r\nContent-Type: ";
     r += contentType;
@@ -60,7 +62,11 @@ struct HttpClientState {
     size_t sent{0};
     Clock::time_point startTime{};
     bool timerStarted{false};
+    static std::string preallocated_payload; // Shared 100MB buffer
 };
+
+// Pre-allocate the 100MB payload once
+std::string HttpClientState::preallocated_payload;
 
 // ---------------------------------------------------------------------------
 // HttpServer -- derives from ServerBase, handles HTTP framing only
@@ -75,7 +81,7 @@ class HttpServer : public ServerBase<HttpClientState> {
 
     protected:
     bool onReadable(TcpSocket& sock, HttpClientState& s) override {
-        char buf[4096];
+        char buf[LARGE_RECV_BUFFER]; // Use larger 64KB buffer
         for (;;) {
             int n = sock.receive(buf, sizeof(buf));
             if (n > 0) {
@@ -108,30 +114,31 @@ class HttpServer : public ServerBase<HttpClientState> {
     bool onWritable(TcpSocket& sock, HttpClientState& s) override {
         if (s.response.empty()) return true; // nothing to send yet
 
+// Remove timing overhead for performance testing
+#ifndef PERFORMANCE_TEST
         if (!s.timerStarted) {
             s.startTime = Clock::now();
             s.timerStarted = true;
             std::cout << "Sending " << (PAYLOAD_BYTES / (1024 * 1024))
                       << " MB...\n";
         }
+#endif
 
-        while (s.sent < s.response.size()) {
-            const char* out = s.response.data() + s.sent;
-            const size_t left = s.response.size() - s.sent;
-            int n = sock.send(out, left);
-            if (n > 0) {
-                s.sent += static_cast<size_t>(n);
-            } else {
-                const auto err = sock.getLastError();
-                if (err == SocketError::WouldBlock
-                    || err == SocketError::Timeout) {
-                    break;
-                }
-                return false;
+        // Use optimized send from ServerBase
+        int sent = sendOptimized(
+            sock, s.response.data() + s.sent, s.response.size() - s.sent);
+        if (sent > 0) {
+            s.sent += static_cast<size_t>(sent);
+        } else {
+            const auto err = sock.getLastError();
+            if (err == SocketError::WouldBlock || err == SocketError::Timeout) {
+                return true; // Try again later
             }
+            return false; // Error
         }
 
         if (s.sent >= s.response.size()) {
+#ifndef PERFORMANCE_TEST
             const auto elapsed
                 = std::chrono::duration<double>(Clock::now() - s.startTime)
                       .count();
@@ -139,6 +146,7 @@ class HttpServer : public ServerBase<HttpClientState> {
                 = static_cast<double>(PAYLOAD_BYTES) / (1024.0 * 1024.0);
             std::cout << "Sent " << mb << " MB in " << elapsed << " s  ("
                       << (mb / elapsed) << " MB/s)\n";
+#endif
             sock.shutdown(ShutdownHow::Both);
             return false; // done -- remove client
         }
@@ -148,10 +156,16 @@ class HttpServer : public ServerBase<HttpClientState> {
     private:
     static void buildResponse(HttpClientState& s) {
         if (isHttpRequest(s.request)) {
-            // 100 MB of repeating 'A' bytes
-            std::string body(PAYLOAD_BYTES, 'A');
-            s.response = makeResponse(
-                "HTTP/1.1 200 OK", "application/octet-stream", body);
+            // Initialize the shared buffer if needed
+            if (HttpClientState::preallocated_payload.empty()) {
+                HttpClientState::preallocated_payload.assign(
+                    PAYLOAD_BYTES, 'A');
+            }
+
+            // Use pre-allocated buffer instead of creating new 100MB string
+            s.response
+                = makeResponse("HTTP/1.1 200 OK", "application/octet-stream",
+                    HttpClientState::preallocated_payload);
         } else {
             s.response = makeResponse("HTTP/1.1 400 Bad Request",
                 "text/plain; charset=utf-8",
