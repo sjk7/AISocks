@@ -395,7 +395,7 @@ static void test_bulk_throughput() {
         std::vector<char> recvBuf(DGRAM);
 
         // Receiver thread: drain until sender signals done then socket quiet.
-        std::thread recvThread([&] {
+        std::thread recvThread([&]() {
             Endpoint from;
             while (true) {
                 int r = srv.receiveFrom(recvBuf.data(), recvBuf.size(), from);
@@ -452,7 +452,7 @@ static void test_bulk_throughput() {
         std::atomic<size_t> recvTotal{0};
         std::atomic<bool> ready{false};
 
-        std::thread srvThread([&] {
+        std::thread srvThread([&]() {
             auto srv = TcpSocket::createRaw();
             srv.setReuseAddress(true);
             if (!srv.bind("127.0.0.1", Port{BASE + 61}) || !srv.listen(1)) {

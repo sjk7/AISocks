@@ -30,9 +30,11 @@ target_include_directories(aiSocksLib
         ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
-# Platform-specific libraries
+# Platform-specific libraries and compile definitions
 if(WIN32)
     target_link_libraries(aiSocksLib PRIVATE ws2_32 iphlpapi)
+    # Prevent Windows.h from defining min/max macros and reduce header bloat
+    target_compile_definitions(aiSocksLib PUBLIC NOMINMAX WIN32_LEAN_AND_MEAN)
 endif()
 
 # Compiler-specific settings

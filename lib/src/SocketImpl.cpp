@@ -307,10 +307,10 @@ bool SocketImpl::connect(
         if (r != SocketError::None) {
 #ifdef _WIN32
             setError(SocketError::ConnectFailed,
-                "Failed to resolve '" + address + "'");
+                "Failed to resolve '" + address + " port:" + std::to_string(port)+"'");
 #else
             setErrorDns(SocketError::ConnectFailed,
-                "Failed to resolve '" + address + "'", gaiErr);
+                "Failed to resolve '" + address + " port:" + std::to_string(port)"'", gaiErr);
 #endif
             return false;
         }

@@ -1,5 +1,22 @@
 {
-    "cmake.sourceDirectory": "/Users/stevekerr/Documents/AISocks",
+    "cmake.sourceDirectory": "${workspaceFolder}",
+    "cmake.buildDirectory": "${workspaceFolder}/build-ninja",
+    "cmake.generator": "Ninja",
+    "cmake.configureSettings": {
+        "BUILD_TESTS": "ON"
+    },
+    "cmake.buildBeforeRun": true,
+    "cmake.debugConfig": {
+        "MIMode": "gdb",
+        "miDebuggerPath": "gdb",
+        "stopAtEntry": false,
+        "externalConsole": false
+    },
+    "files.associations": {
+        "*.h": "cpp",
+        "*.cpp": "cpp"
+    },
+    "C_Cpp.default.configurationProvider": "ms-vscode.cmake-tools",
     "chat.tools.terminal.autoApprove": {
         "git check-ignore": true,
         "/^\\./tests/test_new_features 2>&1 \\| grep -A4 \"throughput\\\\\\|time:\"$/": {
