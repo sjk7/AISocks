@@ -94,7 +94,7 @@ std::vector<PollResult> Poller::wait(Milliseconds timeout) {
     for (;;) {
         int n = ::epoll_wait(pImpl_->epfd, events.data(), maxEvents, timeoutMs);
         if (n < 0) {
-            if (errno == EINTR) continue;
+            if (errno == EINTR) return {}; // signal received -- let caller check stop flag
             throw SocketException(SocketError::Unknown, "epoll_wait()",
                 "epoll_wait() failed", errno, false);
         }
