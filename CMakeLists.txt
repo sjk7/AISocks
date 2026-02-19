@@ -46,6 +46,7 @@ if(BUILD_EXAMPLES)
         aiSocksTestIPUtils      examples/test_ip_utils.cpp
         aiSocksTestMove         examples/test_move_semantics.cpp
         aiSocksPeerLogger       examples/peer_logger.cpp
+        aiSocksGoogleClient     examples/google_client.cpp
     )
     list(LENGTH _EXAMPLES _len)
     math(EXPR _last "${_len} - 2")
