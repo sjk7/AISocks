@@ -58,7 +58,7 @@ static void test_happy_construction() {
 
     std::this_thread::sleep_for(std::chrono::milliseconds(1));
 
-    BEGIN_TEST("TcpSocket: ConnectTo ctor creates a connected socket");
+    BEGIN_TEST("TcpSocket: ConnectArgs ctor creates a connected socket");
     {
         std::atomic<bool> ready{false};
         std::thread srvThread([&] {
@@ -79,7 +79,7 @@ static void test_happy_construction() {
         bool threw = false;
         try {
             TcpSocket c(
-                AddressFamily::IPv4, ConnectTo{"127.0.0.1", Port{BASE + 1}});
+                AddressFamily::IPv4, ConnectArgs{"127.0.0.1", Port{BASE + 1}});
             REQUIRE(c.isValid());
             auto peer = c.getPeerEndpoint();
             REQUIRE(peer.has_value());
@@ -354,7 +354,7 @@ static void test_sad_construction() {
 
     std::this_thread::sleep_for(std::chrono::milliseconds(1));
 
-    BEGIN_TEST("TcpSocket(ConnectTo): throws when nothing is listening");
+    BEGIN_TEST("TcpSocket(ConnectArgs): throws when nothing is listening");
     {
         bool threw = false;
         SocketError code = SocketError::None;
@@ -362,8 +362,8 @@ static void test_sad_construction() {
         try {
             // Port 21899 is in our exclusive range but nothing is listening
             TcpSocket c(AddressFamily::IPv4,
-                ConnectTo{
-                    "127.0.0.1", Port{21899}, std::chrono::milliseconds{500}});
+                ConnectArgs{
+                    "127.0.0.1", Port{21899}, std::chrono::milliseconds{100}});
         } catch (const SocketException& e) {
             threw = true;
             code = e.errorCode();
@@ -394,7 +394,7 @@ static void test_sad_operations() {
     {
         auto s = TcpSocket::createRaw();
         bool ok = s.connect(
-            "127.0.0.1", Port{21898}, std::chrono::milliseconds{500});
+            "127.0.0.1", Port{21898}, std::chrono::milliseconds{100});
         REQUIRE(!ok);
         REQUIRE((s.getLastError() == SocketError::ConnectFailed
             || s.getLastError() == SocketError::Timeout));
@@ -491,7 +491,7 @@ static void test_sad_timeout() {
         // Port 21898 has no listener  ECONNREFUSED arrives quickly.
         auto s = TcpSocket::createRaw();
         bool ok = s.connect(
-            "127.0.0.1", Port{21898}, std::chrono::milliseconds{2000});
+            "127.0.0.1", Port{21898}, std::chrono::milliseconds{100});
         REQUIRE(!ok);
         REQUIRE((s.getLastError() == SocketError::ConnectFailed
             || s.getLastError() == SocketError::Timeout));
@@ -565,17 +565,27 @@ static void test_happy_lifecycle() {
 int main() {
     std::cout << "=== TcpSocket: Happy and Sad Path Tests ===\n\n";
 
-    test_happy_construction();
-    test_happy_accept();
-    test_happy_send_receive();
-    test_happy_progress_callback();
-    test_happy_move();
-    test_happy_options();
-    test_sad_construction();
-    test_sad_operations();
-    test_sad_timeout();
-    test_happy_endpoints();
-    test_happy_lifecycle();
+    using clock = std::chrono::steady_clock;
+    auto time = [&](const char* name, auto fn) {
+        auto t0 = clock::now();
+        fn();
+        auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+            clock::now() - t0)
+                      .count();
+        std::cout << "  [timing] " << name << ": " << ms << " ms\n";
+    };
+
+    time("test_happy_construction", test_happy_construction);
+    time("test_happy_accept", test_happy_accept);
+    time("test_happy_send_receive", test_happy_send_receive);
+    time("test_happy_progress_callback", test_happy_progress_callback);
+    time("test_happy_move", test_happy_move);
+    time("test_happy_options", test_happy_options);
+    time("test_sad_construction", test_sad_construction);
+    time("test_sad_operations", test_sad_operations);
+    time("test_sad_timeout", test_sad_timeout);
+    time("test_happy_endpoints", test_happy_endpoints);
+    time("test_happy_lifecycle", test_happy_lifecycle);
 
     return test_summary();
 }

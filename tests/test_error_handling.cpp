@@ -35,7 +35,7 @@ int main() {
     {
         auto s = TcpSocket::createRaw();
         // Port 1 is almost certainly not listening
-        bool r = s.connect("127.0.0.1", Port{1});
+        bool r = s.connect("127.0.0.1", Port{1}, Milliseconds{100});
         REQUIRE(!r);
         REQUIRE(s.getLastError() != SocketError::None);
     }
@@ -44,7 +44,7 @@ int main() {
         "getErrorMessage returns non-empty string after a failed operation");
     {
         auto s = TcpSocket::createRaw();
-        (void)s.connect("127.0.0.1", Port{1}); // will fail
+        (void)s.connect("127.0.0.1", Port{1}, Milliseconds{100}); // will fail
         std::string msg = s.getErrorMessage();
         REQUIRE(!msg.empty());
     }
@@ -113,7 +113,7 @@ int main() {
     {
         auto s = TcpSocket::createRaw();
         REQUIRE(s.getLastError() == SocketError::None);
-        (void)s.connect("127.0.0.1", Port{1}); // forced failure
+        (void)s.connect("127.0.0.1", Port{1}, Milliseconds{100}); // forced failure
         REQUIRE(s.getLastError() != SocketError::None);
     }
 

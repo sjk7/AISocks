@@ -93,7 +93,7 @@ static void runEchoServer(Port port) {
 // ---------------------------------------------------------------------------
 static void runEchoClient(Port port) {
     TcpSocket client(
-        AddressFamily::IPv4, ConnectTo{.address = "127.0.0.1", .port = port});
+        AddressFamily::IPv4, ConnectArgs{.address = "127.0.0.1", .port = port});
 
     // Log immediately after connect  shows the kernel-assigned ephemeral port.
     logPeerInfo(client, "client-side connected");

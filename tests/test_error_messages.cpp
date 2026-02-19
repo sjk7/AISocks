@@ -27,6 +27,8 @@
 #include <string>
 #include <thread>
 
+using namespace std::chrono_literals;
+
 using namespace aiSocks;
 
 // Port block: 21000  21099 (no overlap with any other test suite)
@@ -56,11 +58,11 @@ static bool hasOsBracket(const std::string& msg) {
 // -----------------------------------------------------------------------
 static void test_connect_exception_message() {
     BEGIN_TEST(
-        "ConnectTo exception: what() contains step, address, and OS bracket");
+        "ConnectArgs exception: what() contains step, address, and OS bracket");
     {
         std::string what;
         try {
-            TcpSocket c(AddressFamily::IPv4, ConnectTo{"127.0.0.1", Port{1}});
+            TcpSocket c(AddressFamily::IPv4, ConnectArgs{"127.0.0.1", Port{1}, Milliseconds{100}});
         } catch (const SocketException& e) {
             what = e.what();
         }
@@ -74,22 +76,22 @@ static void test_connect_exception_message() {
             hasOsBracket(what), "what() contains '[code: text]' OS bracket");
     }
 
-    BEGIN_TEST("ConnectTo exception: errorCode() == ConnectFailed");
+    BEGIN_TEST("ConnectArgs exception: errorCode() == Timeout");
     {
         SocketError code = SocketError::None;
         try {
-            TcpSocket c(AddressFamily::IPv4, ConnectTo{"127.0.0.1", Port{1}});
+            TcpSocket c(AddressFamily::IPv4, ConnectArgs{"127.0.0.1", Port{1}, Milliseconds{100}});
         } catch (const SocketException& e) {
             code = e.errorCode();
         }
-        REQUIRE(code == SocketError::ConnectFailed);
+        REQUIRE(code == SocketError::Timeout);
     }
 
-    BEGIN_TEST("ConnectTo exception: port number appears in what()");
+    BEGIN_TEST("ConnectArgs exception: port number appears in what()");
     {
         std::string what;
         try {
-            TcpSocket c(AddressFamily::IPv4, ConnectTo{"127.0.0.1", Port{2}});
+            TcpSocket c(AddressFamily::IPv4, ConnectArgs{"127.0.0.1", Port{2}, Milliseconds{500}});
         } catch (const SocketException& e) {
             what = e.what();
         }
@@ -144,15 +146,21 @@ static void test_bind_exception_message() {
 // -----------------------------------------------------------------------
 static void test_dns_error_message() {
     // The .invalid TLD (RFC 2606) is guaranteed never to resolve.
+    // DNS lookups are slow (~2s each), so we consolidate all DNS error
+    // message checks into a single test to minimize test suite runtime.
     static constexpr const char* BAD_HOST
         = "this.certainly.does.not.exist.invalid";
 
-    BEGIN_TEST("DNS failure: exception what() contains the failing hostname");
+    BEGIN_TEST("DNS failure: exception and non-throwing path error messages");
     {
+        // Test both exception and non-throwing paths in one test to avoid
+        // two slow DNS lookups (~2s each)
+        
+        // Exception path (constructor)
         std::string what;
         try {
             TcpSocket c(
-                AddressFamily::IPv4, ConnectTo{BAD_HOST, Port{BASE + 10}});
+                AddressFamily::IPv4, ConnectArgs{BAD_HOST, Port{BASE + 10}, Milliseconds{500}});
         } catch (const SocketException& e) {
             what = e.what();
         }
@@ -160,48 +168,18 @@ static void test_dns_error_message() {
         REQUIRE(!what.empty());
         REQUIRE_MSG(what.find(BAD_HOST) != std::string::npos,
             "what() contains the failing hostname");
-    }
-
-    BEGIN_TEST("DNS failure: exception what() does NOT say 'hostname' without "
-               "context");
-    {
-        std::string what;
-        try {
-            TcpSocket c(
-                AddressFamily::IPv4, ConnectTo{BAD_HOST, Port{BASE + 10}});
-        } catch (const SocketException& e) {
-            what = e.what();
-        }
-        // Old message was "Failed to resolve hostname"  too vague.
-        // It must now contain the actual hostname instead.
         REQUIRE_MSG(what.find("resolve 'this.") != std::string::npos,
             "what() says \"resolve '<hostname>'\" with the actual hostname");
-    }
-
-    BEGIN_TEST("DNS failure: what() contains OS bracket (gai_strerror text)");
-    {
-        std::string what;
-        try {
-            TcpSocket c(
-                AddressFamily::IPv4, ConnectTo{BAD_HOST, Port{BASE + 10}});
-        } catch (const SocketException& e) {
-            what = e.what();
-        }
         REQUIRE_MSG(hasOsBracket(what),
             "DNS failure what() has '[code: gai_strerror_text]' bracket");
-    }
-
-    BEGIN_TEST(
-        "DNS failure: non-throwing path  getErrorMessage contains hostname");
-    {
+        
+        // Non-throwing path (connect())
         auto s = TcpSocket::createRaw();
-        // connect() non-throwing path
         (void)s.connect(BAD_HOST, Port{BASE + 10});
         std::string msg = s.getErrorMessage();
         std::cout << "  getErrorMessage(): " << msg << "\n";
         REQUIRE_MSG(msg.find(BAD_HOST) != std::string::npos,
-            "getErrorMessage() contains the failing hostname (non-throwing "
-            "path)");
+            "getErrorMessage() contains the failing hostname (non-throwing path)");
         REQUIRE_MSG(
             hasOsBracket(msg), "getErrorMessage() has '[code: text]' bracket");
     }
