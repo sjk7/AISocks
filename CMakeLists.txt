@@ -23,6 +23,11 @@ add_executable(aiSocksExample examples/main.cpp)
 target_link_libraries(aiSocksExample PRIVATE aiSocksLib)
 if(MSVC)
     target_compile_options(aiSocksExample PRIVATE /utf-8)
+else()
+    # Ensure debug symbols in Debug builds for Clang
+    if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+        target_compile_options(aiSocksExample PRIVATE -g -O0)
+    endif()
 endif()
 # Set the startup project for Visual Studio
 set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT aiSocksExample)
@@ -47,6 +52,7 @@ if(BUILD_EXAMPLES)
         aiSocksTestMove         examples/test_move_semantics.cpp
         aiSocksPeerLogger       examples/peer_logger.cpp
         aiSocksGoogleClient     examples/google_client.cpp
+        aiSocksEchoServer       examples/http_poll_server.cpp
     )
     list(LENGTH _EXAMPLES _len)
     math(EXPR _last "${_len} - 2")
@@ -58,6 +64,11 @@ if(BUILD_EXAMPLES)
         target_link_libraries(${_tgt} PRIVATE aiSocksLib)
         if(MSVC)
             target_compile_options(${_tgt} PRIVATE /utf-8)
+        else()
+            # Ensure debug symbols in Debug builds for Clang
+            if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+                target_compile_options(${_tgt} PRIVATE -g -O0)
+            endif()
         endif()
     endforeach()
 endif()
