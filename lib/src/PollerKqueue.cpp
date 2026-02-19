@@ -127,7 +127,8 @@ std::vector<PollResult> Poller::wait(Milliseconds timeout) {
     for (;;) {
         int n = ::kevent(pImpl_->kq, nullptr, 0, events.data(), maxEvents, tsp);
         if (n < 0) {
-            if (errno == EINTR) continue;
+            if (errno == EINTR)
+                return {}; // signal received -- let caller check stop flag
             throw SocketException(SocketError::Unknown, "kevent()",
                 "kevent() wait failed", errno, false);
         }

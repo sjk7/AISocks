@@ -6,6 +6,8 @@
 
 #include "Poller.h"
 #include "TcpSocket.h"
+#include <atomic>
+#include <csignal>
 #include <memory>
 #include <unordered_map>
 
@@ -80,6 +82,20 @@ template <typename ClientData> class ServerBase {
     // stopped, either because maxClients was reached or you stopped
     // externally).
     void run(size_t maxClients = 0, Milliseconds timeout = Milliseconds{-1}) {
+        s_stop_.store(false, std::memory_order_relaxed);
+
+        // Install SIGINT/SIGTERM for Ctrl+C shutdown; restore on exit.
+        auto prevInt = std::signal(SIGINT, handleSignal);
+        auto prevTerm = std::signal(SIGTERM, handleSignal);
+        struct SigGuard {
+            void (*pi)(int);
+            void (*pt)(int);
+            ~SigGuard() {
+                std::signal(SIGINT, pi);
+                std::signal(SIGTERM, pt);
+            }
+        } guard{prevInt, prevTerm};
+
         Poller poller;
         if (!poller.add(*listener_, PollEvent::Readable | PollEvent::Error)) {
             throw SocketException(listener_->getLastError(), "ServerBase::run",
@@ -89,8 +105,10 @@ template <typename ClientData> class ServerBase {
         bool accepting = true;
         size_t accepted = 0;
 
-        while (accepting || !clients_.empty()) {
+        while (!s_stop_.load(std::memory_order_relaxed)
+            && (accepting || !clients_.empty())) {
             auto ready = poller.wait(timeout);
+            if (s_stop_.load(std::memory_order_relaxed)) break;
             for (const auto& event : ready) {
                 if (event.socket == listener_.get()) {
                     if (!accepting) continue;
@@ -125,6 +143,15 @@ template <typename ClientData> class ServerBase {
     // Current number of connected clients.
     size_t clientCount() const { return clients_.size(); }
 
+    // Request a graceful shutdown. Safe to call from a signal handler or any
+    // thread. run() will exit after the current wait() returns.
+    static void requestStop() noexcept {
+        s_stop_.store(true, std::memory_order_relaxed);
+    }
+    static bool stopRequested() noexcept {
+        return s_stop_.load(std::memory_order_relaxed);
+    }
+
     protected:
     // -- Override in derived classes ------------------------------------------
 
@@ -142,6 +169,12 @@ template <typename ClientData> class ServerBase {
         std::unique_ptr<TcpSocket> socket;
         ClientData data{};
     };
+
+    inline static std::atomic<bool> s_stop_{false};
+
+    static void handleSignal(int) {
+        s_stop_.store(true, std::memory_order_relaxed);
+    }
 
     std::unique_ptr<TcpSocket> listener_;
     std::unordered_map<const Socket*, ClientEntry> clients_;

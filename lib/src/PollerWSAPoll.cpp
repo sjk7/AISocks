@@ -78,8 +78,13 @@ bool Poller::remove(const Socket& s) {
 std::vector<PollResult> Poller::wait(Milliseconds timeout) {
     if (pImpl_->fds.empty()) return {};
 
-    const int timeoutMs
-        = (timeout.count() < 0) ? -1 : static_cast<int>(timeout.count());
+    // On Windows, std::signal handlers fire on a separate thread, so WSAPoll
+    // with an infinite timeout will never be interrupted. Cap the wait at 100ms
+    // so the run() loop can check the stop flag and exit cleanly.
+    static constexpr int MAX_WAIT_MS = 100;
+    const int timeoutMs = (timeout.count() < 0)
+        ? MAX_WAIT_MS
+        : static_cast<int>(timeout.count());
 
     // WSAPoll modifies revents in-place; clear them first.
     for (auto& pfd : pImpl_->fds) {
