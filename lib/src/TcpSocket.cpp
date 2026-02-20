@@ -8,8 +8,17 @@
 // This does NOT create a second firewall  it uses the existing one in Socket.
 #include "TcpSocket.h"
 #include "SocketImpl.h"
+
+#ifdef _WIN32
+#include <winsock2.h>
+#include <windows.h>
+#include <mswsock.h>
+#include <io.h>
+#include <fcntl.h>
+#else
 #include <unistd.h>
 #include <fcntl.h>
+#endif
 
 #ifdef __linux__
 #include <sys/sendfile.h>
@@ -17,10 +26,6 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/uio.h>
-#elif _WIN32
-#include <winsock2.h>
-#include <windows.h>
-#include <mswsock.h>
 #endif
 
 namespace aiSocks {
