@@ -84,7 +84,9 @@
                 "--target",
                 "test_poller",
                 "--target",
-                "test_tcp_socket"
+                "test_tcp_socket",
+                "--target",
+                "test_server_base"
             ],
             "group": {
                 "kind": "test",
@@ -115,7 +117,9 @@
                 "panel": "shared"
             },
             "problemMatcher": [],
-            "dependsOn": ["Build Tests"]
+            "dependsOn": [
+                "Build Tests"
+            ]
         },
         {
             "label": "Build test_new_features",
@@ -146,7 +150,9 @@
                 "focus": true
             },
             "problemMatcher": [],
-            "dependsOn": ["Build test_new_features"]
+            "dependsOn": [
+                "Build test_new_features"
+            ]
         },
         {
             "label": "Build aiSocksGoogleClient",
@@ -157,6 +163,20 @@
                 "${workspaceFolder}/build-ninja",
                 "--target",
                 "aiSocksGoogleClient"
+            ],
+            "group": "build",
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared"
+            },
+            "problemMatcher": "$msCompile"
+        },
+        {
+            "label": "Build aiSocksHttpServer (mac)",
+            "type": "shell",
+            "command": "ninja",
+            "args": [
+                "aiSocksHttpServer"
             ],
             "group": "build",
             "presentation": {

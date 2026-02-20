@@ -194,6 +194,15 @@
             "preLaunchTask": "cmake: build"
         },
         {
+            "name": "(lldb) Debug aiSocksHttpServer",
+            "type": "lldb",
+            "request": "launch",
+            "program": "${workspaceFolder}/build-mac/aiSocksHttpServer",
+            "args": [],
+            "cwd": "${workspaceFolder}",
+            "preLaunchTask": "Build aiSocksHttpServer (mac)"
+        },
+        {
             "name": "(Windows) Debug aiSocksGoogleClient",
             "type": "cppvsdbg",
             "request": "launch",

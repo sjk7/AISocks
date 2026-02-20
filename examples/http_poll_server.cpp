@@ -5,20 +5,21 @@
 // Poll-driven HTTP/1.x server built on ServerBase.
 // ServerBase owns all client socket/state bookkeeping; this file only
 // contains HTTP framing logic.
+//
+// Compile with -DPERFORMANCE_TESTING to enable 100MB payload mode
+// (for performance testing instead of normal HTTP server behavior).
 
 #include "ServerBase.h"
 #include <chrono>
+#include <iomanip>
 #include <iostream>
 #include <string>
 #include <algorithm>
 #include <fcntl.h>
 #include <unistd.h>
 
-#ifdef _WIN32
-#include <windows.h>
-#include <io.h>
-#define mkstemp(template) _mktemp_s(template, strlen(template) + 1)
-#endif
+// Windows compatibility handled at compile time
+// Windows builds should define their own mkstemp implementation
 
 using namespace aiSocks;
 using Microseconds = std::chrono::microseconds;
@@ -43,8 +44,8 @@ bool requestComplete(const std::string& req) {
 }
 
 // Optimized response building with pre-allocation
-std::string makeResponse(
-    const char* statusLine, const char* contentType, const std::string& body) {
+std::string makeResponse(const char* statusLine, const char* contentType,
+    const std::string& body, bool keepAlive = true) {
     std::string r;
     r.reserve(256 + body.size()); // Pre-allocate to avoid reallocations
     r += statusLine;
@@ -52,7 +53,8 @@ std::string makeResponse(
     r += contentType;
     r += "\r\nContent-Length: ";
     r += std::to_string(body.size());
-    r += "\r\nConnection: keep-alive\r\n\r\n";
+    r += keepAlive ? "\r\nConnection: keep-alive\r\n\r\n"
+                   : "\r\nConnection: close\r\n\r\n";
     r += body;
     return r;
 }
@@ -67,6 +69,7 @@ using Clock = std::chrono::steady_clock;
 static constexpr size_t PAYLOAD_BYTES = 100 * 1024 * 1024; // 100 MB
 
 // Static 100MB buffer filled with 'A' characters at program startup
+#ifdef PERFORMANCE_TESTING
 static char preallocated_payload[PAYLOAD_BYTES];
 static const bool payload_initialized = []() {
     std::fill_n(preallocated_payload, PAYLOAD_BYTES, 'A');
@@ -93,6 +96,7 @@ static const bool payload_file_initialized = []() {
     }
     return payload_fd != -1;
 }();
+#endif // PERFORMANCE_TESTING
 
 struct HttpClientState {
     std::string request;
@@ -100,6 +104,7 @@ struct HttpClientState {
     size_t sent{0};
     Clock::time_point startTime{};
     bool timerStarted{false};
+    bool closeAfterSend{false};
 };
 
 // ---------------------------------------------------------------------------
@@ -114,11 +119,28 @@ class HttpServer : public ServerBase<HttpClientState> {
     }
 
     protected:
+    void onError(TcpSocket& sock, HttpClientState& /*s*/) override {
+        auto err = sock.getLastError();
+        std::cout << "[error] poll error on client socket: code="
+                  << static_cast<int>(err) << " msg=" << sock.getErrorMessage()
+                  << "\n";
+    }
+
+    private:
+    // Timing state for this instance
+    Clock::time_point last_call_ = Clock::now();
+    Clock::time_point last_print_ = Clock::now();
+    std::vector<double> intervals_;
+    int call_count_ = 0;
+    bool first_output_done_ = false;
+
+    protected:
     ServerResult onReadable(TcpSocket& sock, HttpClientState& s) override {
         char buf[LARGE_RECV_BUFFER]; // Use larger 64KB buffer
         for (;;) {
             int n = sock.receive(buf, sizeof(buf));
             if (n > 0) {
+                touchClient(sock);
                 s.request.append(buf, static_cast<size_t>(n));
 
                 if (s.request.size() > MAX_REQUEST_BYTES) {
@@ -129,7 +151,8 @@ class HttpServer : public ServerBase<HttpClientState> {
 
                 if (s.response.empty() && requestComplete(s.request)) {
                     buildResponse(s);
-                    return ServerResult::KeepConnection;
+                    setClientWritable(sock, true);
+                    return onWritable(sock, s);
                 }
             } else if (n == 0) {
                 return ServerResult::Disconnect;
@@ -149,8 +172,7 @@ class HttpServer : public ServerBase<HttpClientState> {
         if (s.response.empty())
             return ServerResult::KeepConnection; // nothing to send yet
 
-// Remove timing overhead for performance testing
-#ifndef PERFORMANCE_TEST
+#ifdef PERFORMANCE_TESTING
         if (!s.timerStarted) {
             s.startTime = Clock::now();
             s.timerStarted = true;
@@ -163,6 +185,7 @@ class HttpServer : public ServerBase<HttpClientState> {
         int sent = sendOptimized(
             sock, s.response.data() + s.sent, s.response.size() - s.sent);
         if (sent > 0) {
+            touchClient(sock);
             s.sent += static_cast<size_t>(sent);
         } else {
             const auto err = sock.getLastError();
@@ -173,7 +196,7 @@ class HttpServer : public ServerBase<HttpClientState> {
         }
 
         if (s.sent >= s.response.size()) {
-#ifndef PERFORMANCE_TEST
+#ifdef PERFORMANCE_TESTING
             const auto elapsed
                 = std::chrono::duration<double>(Clock::now() - s.startTime)
                       .count();
@@ -182,71 +205,92 @@ class HttpServer : public ServerBase<HttpClientState> {
             std::cout << "Sent " << mb << " MB in " << elapsed << " s  ("
                       << (mb / elapsed) << " MB/s)\n";
 #endif
-            // Reset for next request - keep connection alive
+            // Reset for next request
+            bool shouldClose = s.closeAfterSend;
             s.request.clear();
             s.response.clear();
             s.sent = 0;
             s.timerStarted = false;
-            return ServerResult::KeepConnection; // Keep connection for pooling
+            s.closeAfterSend = false;
+            setClientWritable(sock, false);
+            if (shouldClose) return ServerResult::Disconnect;
+            return ServerResult::KeepConnection;
         }
         return ServerResult::KeepConnection;
     }
 
-    private:
     ServerResult onIdle() override {
-        // Timing variables
-        static auto last_call = Clock::now();
-        static auto last_print = Clock::now();
-        static std::vector<double> intervals;
-        static int call_count = 0;
-        static bool first_output_done = false;
-
         auto now = Clock::now();
         auto interval
-            = std::chrono::duration<double, std::milli>(now - last_call)
+            = std::chrono::duration<double, std::milli>(now - last_call_)
                   .count();
-        last_call = now;
+        last_call_ = now;
 
-        intervals.push_back(interval);
-        call_count++;
+        intervals_.push_back(interval);
+        call_count_++;
 
         // Print first output after 500ms, then every 60 seconds
         auto since_last_print
-            = std::chrono::duration<double>(now - last_print).count();
-        auto print_interval = first_output_done ? 60.0 : 0.5;
+            = std::chrono::duration<double>(now - last_print_).count();
+        auto print_interval = first_output_done_ ? 60.0 : 0.5;
 
         if (since_last_print >= print_interval) {
-            if (!intervals.empty()) {
+            if (!intervals_.empty()) {
                 double sum = 0;
-                for (double i : intervals) {
+                for (double i : intervals_) {
                     sum += i;
                 }
-                double avg = sum / intervals.size();
-                std::cout << "onIdle() called " << call_count
-                          << " times, avg interval: " << avg << "ms ("
-                          << (1000.0 / avg) << " Hz)\n";
+                double avg = sum / intervals_.size();
+                std::cout << std::fixed << std::setprecision(1)
+                          << "onIdle() called " << call_count_
+                          << " times, avg interval: " << avg << "ms"
+                          << "  clients: " << clientCount()
+                          << "  peak: " << peakClientCount() << "\n";
             }
 
             // Reset for next period
-            intervals.clear();
-            call_count = 0;
-            last_print = now;
-            first_output_done = true;
+            intervals_.clear();
+            call_count_ = 0;
+            last_print_ = now;
+            first_output_done_ = true;
         }
 
-        return ServerResult::KeepConnection;
+        return ServerBase::onIdle();
     }
 
     static void buildResponse(HttpClientState& s) {
+        bool http10 = s.request.find("HTTP/1.0") != std::string::npos;
+        bool hasKeepAlive
+            = s.request.find("Connection: keep-alive") != std::string::npos
+            || s.request.find("connection: keep-alive") != std::string::npos
+            || s.request.find("Connection: Keep-Alive") != std::string::npos;
+        bool hasClose = s.request.find("Connection: close") != std::string::npos
+            || s.request.find("connection: close") != std::string::npos
+            || s.request.find("Connection: Close") != std::string::npos;
+        // HTTP/1.1: keep-alive by default unless client says close
+        // HTTP/1.0: close by default unless client explicitly requests
+        // keep-alive
+        bool keepAlive = http10 ? hasKeepAlive : !hasClose;
+        s.closeAfterSend = !keepAlive;
         if (isHttpRequest(s.request)) {
-            // Use static buffer for maximum performance
+#ifdef PERFORMANCE_TESTING
+            // Performance testing mode - send 100MB payload
+            s.response = makeResponse("HTTP/1.1 200 OK",
+                "application/octet-stream",
+                std::string(preallocated_payload, PAYLOAD_BYTES), keepAlive);
+#else
+            // Normal HTTP server behavior - simple response
             s.response
-                = makeResponse("HTTP/1.1 200 OK", "application/octet-stream",
-                    std::string(preallocated_payload, PAYLOAD_BYTES));
+                = makeResponse("HTTP/1.1 200 OK", "text/html; charset=utf-8",
+                    "<html><body><h1>Hello World!</h1><p>This is a normal HTTP "
+                    "server response.</p></body></html>",
+                    keepAlive);
+#endif
         } else {
             s.response = makeResponse("HTTP/1.1 400 Bad Request",
                 "text/plain; charset=utf-8",
-                "Bad Request: this server only accepts HTTP requests.\n");
+                "Bad Request: this server only accepts HTTP requests.\n",
+                keepAlive);
         }
     }
 };
@@ -260,7 +304,7 @@ int main() {
         HttpServer server(ServerBind{
             .address = "0.0.0.0",
             .port = Port{8080},
-            .backlog = 64,
+            .backlog = 1024,
         });
         server.run(0, Milliseconds{1}); // 1ms timeout
         std::cout << "\nShutting down cleanly.\n";
