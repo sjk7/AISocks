@@ -31,7 +31,9 @@ struct EchoState {
 class EchoServer : public ServerBase<EchoState> {
     public:
     explicit EchoServer(uint16_t port)
-        : ServerBase<EchoState>(ServerBind{"127.0.0.1", Port{port}, 5}) {}
+        : ServerBase<EchoState>(ServerBind{"127.0.0.1", Port{port}, 5}) {
+        setKeepAliveTimeout(std::chrono::seconds{1});
+    }
 
     std::atomic<int> idleCalls{0};
     std::atomic<int> disconnectCalls{0};
@@ -47,6 +49,7 @@ class EchoServer : public ServerBase<EchoState> {
         for (;;) {
             int n = sock.receive(tmp, sizeof(tmp));
             if (n > 0) {
+                touchClient(sock);
                 s.buf.append(tmp, static_cast<size_t>(n));
             } else if (n == 0) {
                 return ServerResult::Disconnect; // peer closed
@@ -65,6 +68,7 @@ class EchoServer : public ServerBase<EchoState> {
         if (s.buf.empty()) return ServerResult::KeepConnection;
         int n = sock.send(s.buf.data(), s.buf.size());
         if (n > 0) {
+            touchClient(sock);
             s.buf.erase(0, static_cast<size_t>(n));
             s.hasSentData = true; // Mark that we've sent data
         }
@@ -93,10 +97,13 @@ static void runClient(uint16_t port, const std::string& msg) {
     try {
         TcpSocket sock(
             AddressFamily::IPv4, ConnectArgs{"127.0.0.1", Port{port}});
+        if (!sock.setBlocking(false)) return; // Should not fail in test
         sock.sendAll(msg.data(), msg.size());
-        // drain until peer closes
+        // drain until peer closes or would block
         char buf[256];
-        while (sock.receive(buf, sizeof(buf)) > 0) {
+        while (true) {
+            int n = sock.receive(buf, sizeof(buf));
+            if (n <= 0) break;
         }
     } catch (...) {
     }
@@ -121,7 +128,7 @@ static void testRequestStop() {
 
     REQUIRE(!srv.stopRequested());
 
-    EchoServer::requestStop();
+    srv.requestStop();
 
     // Server should exit within a few hundred ms.
     auto deadline
@@ -173,7 +180,7 @@ static void testOnIdle() {
     });
 
     std::this_thread::sleep_for(std::chrono::milliseconds(200));
-    EchoServer::requestStop();
+    srv.requestStop();
     srvThread.join();
 
     // With a 20ms timeout over ~200ms we expect at least 5 idle calls.
@@ -207,7 +214,7 @@ static void testDisconnectCalledOnStop() {
     }
     REQUIRE(srv.clientCount() == 2);
 
-    EchoServer::requestStop();
+    srv.requestStop();
     srvThread.join();
 
     // Both clients should have triggered onDisconnect.
