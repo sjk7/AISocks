@@ -15,8 +15,14 @@
 #include <iostream>
 #include <string>
 #include <algorithm>
+
+#ifdef _WIN32
+#include <io.h>
+#include <fcntl.h>
+#else
 #include <fcntl.h>
 #include <unistd.h>
+#endif
 
 // Windows compatibility handled at compile time
 // Windows builds should define their own mkstemp implementation
@@ -79,8 +85,12 @@ static const bool payload_initialized = []() {
 // Global payload file for sendfile - created once at startup
 static int payload_fd = -1;
 static const bool payload_file_initialized = []() {
+#ifndef _WIN32
     char template_path[] = "/tmp/aisocks_payload_XXXXXX";
     payload_fd = mkstemp(template_path);
+#else
+    payload_fd = -1; // Not implemented on Windows
+#endif
     if (payload_fd != -1) {
         // Write 100MB of 'A' characters
         std::vector<char> buffer(64 * 1024, 'A'); // 64KB buffer
