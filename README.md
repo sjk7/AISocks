@@ -1,4 +1,7 @@
-# aiSocks - Cross-Platform Socket Library
+# aiSocks
+<!-- CI trigger: testing Windows build fixes -->
+
+Cross-Platform Socket Library
 
 A modern C++ socket library that abstracts platform differences between Windows, macOS, and Linux using the pimpl (Pointer to Implementation) idiom.
 
