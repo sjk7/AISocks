@@ -148,11 +148,10 @@ std::vector<PollResult> Poller::wait(Milliseconds timeout) {
                 if ((ev.flags & EV_EOF) != 0)
                     bits |= static_cast<uint8_t>(PollEvent::Readable);
             } else if (ev.filter == EVFILT_WRITE) {
-                // EV_EOF on a write filter: the peer has shut down their read
-                // side; flag as both Writable (buffer still available) and
-                // Error so callers detect the half-close.
-                if ((ev.flags & EV_EOF) != 0)
-                    bits |= static_cast<uint8_t>(PollEvent::Error);
+                // EV_EOF on a write filter means the peer shut down their read
+                // side, but we may still have data to send and the read side
+                // may still be open.  Just signal Writable and let onReadable
+                // detect the full close via a 0-byte read.
                 bits |= static_cast<uint8_t>(PollEvent::Writable);
             }
             ready[fd] = static_cast<PollEvent>(bits);

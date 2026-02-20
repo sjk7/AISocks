@@ -11,6 +11,7 @@ set(TEST_SOURCES
     test_poller
     test_tcp_socket
     test_simple_client
+    test_server_base
 )
 
 foreach(TEST_NAME ${TEST_SOURCES})
