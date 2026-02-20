@@ -56,7 +56,11 @@ int TcpSocket::sendfile(int fd, off_t offset, size_t count) {
     if (handle == 0) return -1;
 
     int sockfd = static_cast<int>(handle);
+#ifdef _WIN32
+    SSIZE_T sent = 0;
+#else
     ssize_t sent = 0;
+#endif
 
     // Use OS sendfile for zero-copy transfer
 #ifdef __linux__
@@ -76,14 +80,14 @@ int TcpSocket::sendfile(int fd, off_t offset, size_t count) {
     // TransmitFile parameters are different
     BOOL result = TransmitFile((SOCKET)sockfd, // socket
         hFile, // file handle
-        count, // number of bytes to send
+        static_cast<DWORD>(count), // number of bytes to send
         0, // block size (0 = default)
         nullptr, // overlapped structure
         nullptr, // transmit buffers
         0 // flags
     );
     if (result) {
-        sent = count; // Success
+        sent = static_cast<SSIZE_T>(count); // Success
     } else {
         sent = -1; // Failure
     }
