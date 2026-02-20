@@ -133,7 +133,6 @@ class HttpServer : public ServerBase<HttpClientState> {
     std::vector<double> intervals_;
     int call_count_ = 0;
     bool first_output_done_ = false;
-    size_t error8_count_ = 0;
 
     protected:
     ServerResult onReadable(TcpSocket& sock, HttpClientState& s) override {
@@ -161,22 +160,16 @@ class HttpServer : public ServerBase<HttpClientState> {
                 const auto err = sock.getLastError();
                 if (err == SocketError::WouldBlock
                     || err == SocketError::Timeout) {
-#ifdef 0
+#if 0
                     std::cout << "[debug] read WouldBlock/Timeout on client: "
                               << sock.getErrorMessage() << "\n";
 #endif
                     break; // no more data right now
                 }
                 if (err == SocketError::ConnectionReset) {
-                    error8_count_++;
-#ifdef 0
-                    std::cout << "[debug] read disconnect error: "
-                              << static_cast<int>(err) << " "
-                              << sock.getErrorMessage()
-                              << " (total: " << error8_count_ << ")\n";
-#endif
+                    // Normal client disconnect - no action needed
                 } else {
-#ifdef 0
+#if 0
                     std::cout << "[debug] read disconnect error: "
                               << static_cast<int>(err) << " "
                               << sock.getErrorMessage() << "\n";
@@ -210,13 +203,17 @@ class HttpServer : public ServerBase<HttpClientState> {
         } else {
             const auto err = sock.getLastError();
             if (err == SocketError::WouldBlock || err == SocketError::Timeout) {
+#if 0
                 std::cout << "[debug] write WouldBlock/Timeout on client: "
                           << sock.getErrorMessage() << "\n";
+#endif
                 return ServerResult::KeepConnection; // Try again later
             }
+#if 0
             std::cout << "[debug] write disconnect error: "
                       << static_cast<int>(err) << " " << sock.getErrorMessage()
                       << "\n";
+#endif
             return ServerResult::Disconnect; // Error
         }
 
@@ -270,8 +267,7 @@ class HttpServer : public ServerBase<HttpClientState> {
                           << "onIdle() called " << call_count_
                           << " times, avg interval: " << avg << "ms"
                           << "  clients: " << clientCount()
-                          << "  peak: " << peakClientCount()
-                          << "  error8: " << error8_count_ << "\n";
+                          << "  peak: " << peakClientCount() << "\n";
             }
 
             // Reset for next period
