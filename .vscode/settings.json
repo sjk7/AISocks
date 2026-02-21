@@ -1,9 +1,10 @@
 {
     "cmake.sourceDirectory": "${workspaceFolder}",
-    "cmake.buildDirectory": "${workspaceFolder}/build-ninja",
+    "cmake.buildDirectory": "${workspaceFolder}/build/${buildType}",
     "cmake.generator": "Ninja",
     "cmake.configureSettings": {
-        "BUILD_TESTS": "ON"
+        "BUILD_TESTS": "ON",
+        "BUILD_EXAMPLES": "ON"
     },
     "cmake.buildBeforeRun": true,
     "cmake.debugConfig": {
