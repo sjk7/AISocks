@@ -888,7 +888,10 @@ bool SocketImpl::waitReadable(std::chrono::milliseconds timeout) {
         ::close(evFd);
         
         if (nReady < 0) return false;
-        if (nReady == 0) return false; // Timeout
+        if (nReady == 0) {
+            setError(SocketError::Timeout, "waitWritable timed out");
+            return false; // Timeout
+        }
         return true;
         
 #elif defined(__linux__)
@@ -909,7 +912,10 @@ bool SocketImpl::waitReadable(std::chrono::milliseconds timeout) {
         ::close(evFd);
         
         if (nReady < 0) return false;
-        if (nReady == 0) return false; // Timeout
+        if (nReady == 0) {
+            setError(SocketError::Timeout, "waitWritable timed out");
+            return false; // Timeout
+        }
         return true;
         
 #elif defined(_WIN32)
@@ -919,7 +925,10 @@ bool SocketImpl::waitReadable(std::chrono::milliseconds timeout) {
         pfd.events = POLLIN;
         int nReady = ::WSAPoll(&pfd, 1, static_cast<int>(sliceMs));
         if (nReady < 0) return false;
-        if (nReady == 0) return false; // Timeout
+        if (nReady == 0) {
+            setError(SocketError::Timeout, "waitWritable timed out");
+            return false; // Timeout
+        }
         return true;
 #endif
     }
@@ -956,7 +965,10 @@ bool SocketImpl::waitWritable(std::chrono::milliseconds timeout) {
         ::close(evFd);
         
         if (nReady < 0) return false;
-        if (nReady == 0) return false; // Timeout
+        if (nReady == 0) {
+            setError(SocketError::Timeout, "waitWritable timed out");
+            return false; // Timeout
+        }
         return true;
         
 #elif defined(__linux__)
@@ -977,7 +989,10 @@ bool SocketImpl::waitWritable(std::chrono::milliseconds timeout) {
         ::close(evFd);
         
         if (nReady < 0) return false;
-        if (nReady == 0) return false; // Timeout
+        if (nReady == 0) {
+            setError(SocketError::Timeout, "waitWritable timed out");
+            return false; // Timeout
+        }
         return true;
         
 #elif defined(_WIN32)
@@ -987,7 +1002,10 @@ bool SocketImpl::waitWritable(std::chrono::milliseconds timeout) {
         pfd.events = POLLOUT;
         int nReady = ::WSAPoll(&pfd, 1, static_cast<int>(sliceMs));
         if (nReady < 0) return false;
-        if (nReady == 0) return false; // Timeout
+        if (nReady == 0) {
+            setError(SocketError::Timeout, "waitWritable timed out");
+            return false; // Timeout
+        }
         return true;
 #endif
     }
