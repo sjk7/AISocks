@@ -1,10 +1,10 @@
 // This is a personal academic project. Dear PVS-Studio, please check it.
-// PVS-Studio Static Code Analyzer for C, C++, C#, and Java:
 // https://pvs-studio.com
 
 // SocketImplHelpers.cpp - Helper functions for SocketImpl
 // Extracted for better code organization
 
+#include "SocketImplHelpers.h"
 #include "SocketImpl.h"
 #include <cstring>
 #include <vector>
@@ -152,12 +152,19 @@ std::string formatErrorContext(const ErrorContext& ctx) {
 }
 
 // -----------------------------------------------------------------------
-// Static utility methods
+// Network interface enumeration (extracted from SocketImpl.cpp)
 // -----------------------------------------------------------------------
 
-std::vector<NetworkInterface> SocketImpl::getLocalAddresses() {
+std::vector<NetworkInterface> getLocalAddresses() {
     std::vector<NetworkInterface> interfaces;
-    platformInit();
+    
+    // Initialize platform (for WSAStartup on Windows)
+#ifdef _WIN32
+    WSADATA wsaData;
+    if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
+        return interfaces;
+    }
+#endif
 
 #ifdef _WIN32
     // Windows implementation using GetAdaptersAddresses
@@ -230,7 +237,7 @@ std::vector<NetworkInterface> SocketImpl::getLocalAddresses() {
             iface.name = ifa->ifa_name;
 
             int family = ifa->ifa_addr->sa_family;
-            // Use IFF_LOOPBACK (POSIX) — reliable on macOS (lo0) and Linux (lo).
+            // Use IFF_LOOPBACK (POSIX)  reliable on macOS (lo0) and Linux (lo).
             const bool isLo = (ifa->ifa_flags & IFF_LOOPBACK) != 0;
             if (family == AF_INET) {
                 char buffer[INET_ADDRSTRLEN];
@@ -257,31 +264,6 @@ std::vector<NetworkInterface> SocketImpl::getLocalAddresses() {
 #endif
 
     return interfaces;
-}
-
-bool SocketImpl::isValidIPv4(const std::string& address) {
-    struct sockaddr_in sa;
-    return inet_pton(AF_INET, address.c_str(), &(sa.sin_addr)) == 1;
-}
-
-bool SocketImpl::isValidIPv6(const std::string& address) {
-    struct sockaddr_in6 sa;
-    return inet_pton(AF_INET6, address.c_str(), &(sa.sin6_addr)) == 1;
-}
-
-std::string SocketImpl::ipToString(const void* addr, AddressFamily family) {
-    if (family == AddressFamily::IPv4) {
-        char buffer[INET_ADDRSTRLEN];
-        if (inet_ntop(AF_INET, addr, buffer, INET_ADDRSTRLEN)) {
-            return std::string(buffer);
-        }
-    } else if (family == AddressFamily::IPv6) {
-        char buffer[INET6_ADDRSTRLEN];
-        if (inet_ntop(AF_INET6, addr, buffer, INET6_ADDRSTRLEN)) {
-            return std::string(buffer);
-        }
-    }
-    return "";
 }
 
 } // namespace aiSocks

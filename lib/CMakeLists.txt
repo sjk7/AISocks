@@ -8,6 +8,7 @@ add_library(aiSocksLib STATIC
     src/UdpSocket.cpp
     src/SocketImpl.cpp
     src/SocketImpl.h
+    src/SocketImplHelpers.cpp
 )
 
 # Platform-specific Poller backend (exactly one is compiled)
