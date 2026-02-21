@@ -25,6 +25,9 @@ SocketError resolveToSockaddr(const std::string& address, Port port,
 // Error message formatting
 std::string formatErrorContext(const ErrorContext& ctx);
 
+// Network interface enumeration
+std::vector<NetworkInterface> getLocalAddresses();
+
 } // namespace aiSocks
 
 #endif // AISOCKS_SOCKET_IMPL_HELPERS_H
