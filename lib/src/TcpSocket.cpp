@@ -6,6 +6,9 @@
 // Required here so that accept() can move a unique_ptr<SocketImpl> into a new
 // TcpSocket via the private Socket(unique_ptr<SocketImpl>) constructor.
 // This does NOT create a second firewall  it uses the existing one in Socket.
+#ifdef _WIN32
+#include "pch.h"
+#endif
 #include "TcpSocket.h"
 #include "SocketImpl.h"
 
