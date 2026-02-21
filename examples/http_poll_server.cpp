@@ -12,22 +12,22 @@
 using namespace aiSocks;
 
 class HttpServer : public HttpPollServer {
-public:
+    public:
     explicit HttpServer(const ServerBind& bind) : HttpPollServer(bind) {
         std::cout << "Listening on " << bind.address << ":"
                   << static_cast<int>(bind.port) << "\n";
     }
 
-protected:
+    protected:
     void buildResponse(HttpClientState& s) override {
         bool keepAlive = !s.closeAfterSend;
         if (isHttpRequest(s.request)) {
-            s.response = makeResponse("HTTP/1.1 200 OK",
-                "text/html; charset=utf-8",
-                "<html><body><h1>Hello World!</h1>"
-                "<p>This is a normal HTTP server response.</p>"
-                "</body></html>",
-                keepAlive);
+            s.response
+                = makeResponse("HTTP/1.1 200 OK", "text/html; charset=utf-8",
+                    "<html><body><h1>Hello World!</h1>"
+                    "<p>This is a normal HTTP server response.</p>"
+                    "</body></html>",
+                    keepAlive);
         } else {
             s.response = makeResponse("HTTP/1.1 400 Bad Request",
                 "text/plain; charset=utf-8",
@@ -39,6 +39,13 @@ protected:
 
 int main() {
     std::cout << "=== Poll-Driven HTTP Server ===\n";
+
+#ifdef NDEBUG
+    std::cout << "Build Type: Release\n";
+#else
+    std::cout << "Build Type: Debug\n";
+#endif
+
     try {
         HttpServer server(ServerBind{"0.0.0.0", Port{8080}, 1024});
         server.run(0, Milliseconds{1});
