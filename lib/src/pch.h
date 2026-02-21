@@ -1,52 +1,49 @@
-// pch.h  Precompiled header for aiSocksLib.
-//
-// Contains the subset of standard-library and platform headers that are
-// included by nearly every translation unit in the library.  Parsed once per
-// build type/compiler flags combination and reused by all TUs via
-//   target_precompile_headers(aiSocksLib PRIVATE src/pch.h)
-//
-// Rules:
-//    Only headers that are both LARGE and STABLE belong here.
-//    Project headers (Socket.h, SocketImpl.h, ) do NOT belong here 
-//     they change frequently and would invalidate the PCH on every edit.
-//    The #ifdef guards mirror what SocketImpl.h already includes so there
-//     is no double-parse penalty; clang/MSVC detect the guard and skip the
-//     file body when it was already seen via the PCH.
+// This is a personal academic project. Dear PVS-Studio, please check it.
+// PVS-Studio Static Code Analyzer for C, C++, C#, and Java:
+// https://pvs-studio.com
+// Precompiled header for aiSocksLib
+// Include expensive and frequently-used headers here to improve build times
 
-//  C++ standard library 
-#include <chrono>
-#include <cstring>
-#include <memory>
-#include <mutex>
-#include <optional>
-#include <string>
-#include <vector>
+#ifndef AISOCKS_PCH_H
+#define AISOCKS_PCH_H
+
+// Standard library headers used across multiple translation units
 #include <cstddef>
 #include <cstdint>
-#include <functional>
+#include <chrono>
+#include <string>
+#include <vector>
+#include <memory>
+#include <optional>
+#include <exception>
+#include <stdexcept>
+#include <system_error>
+#include <limits>
+#include <cassert>
+#include <cstring>
+#include <mutex>
 
-//  Platform socket / OS headers 
+// Platform-specific headers
 #ifdef _WIN32
-#  ifndef WIN32_LEAN_AND_MEAN
-#    define WIN32_LEAN_AND_MEAN
-#  endif
-#  ifndef NOMINMAX
-#    define NOMINMAX
-#  endif
-#  include <winsock2.h>
-#  include <ws2tcpip.h>
-#  include <iphlpapi.h>
+#include <winsock2.h>
+#include <windows.h>
+#include <ws2tcpip.h>
+#include <mswsock.h>
+#include <iphlpapi.h>
 #else
-#  include <sys/socket.h>
-#  include <sys/types.h>
-#  include <netinet/in.h>
-#  include <netinet/tcp.h>
-#  include <arpa/inet.h>
-#  include <unistd.h>
-#  include <fcntl.h>
-#  include <netdb.h>
-#  include <errno.h>
-#  include <ifaddrs.h>
-#  include <net/if.h>
-#  include <signal.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <netdb.h>
 #endif
+
+// Project headers included by most translation units
+// Include SocketTypes.h and Socket.h which are the most expensive project headers
+#include "SocketTypes.h"
+#include "Socket.h"
+#include "SocketImpl.h"
+
+#endif // AISOCKS_PCH_H
