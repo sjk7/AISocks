@@ -5,6 +5,8 @@
 // PollerEpoll.cpp  epoll backend for Linux.
 // Compiled only when CMAKE detects Linux.
 
+#ifdef __linux__
+
 #include "Poller.h"
 #include "SocketImpl.h"
 
@@ -113,9 +115,14 @@ std::vector<PollResult> Poller::wait(Milliseconds timeout) {
                 bits |= static_cast<uint8_t>(PollEvent::Readable);
             if ((ev.events & (EPOLLOUT | EPOLLWRNORM)) != 0)
                 bits |= static_cast<uint8_t>(PollEvent::Writable);
-            if ((ev.events & (EPOLLERR | EPOLLHUP)) != 0) {
+            if ((ev.events & EPOLLERR) != 0) {
                 bits |= static_cast<uint8_t>(PollEvent::Error);
                 // Let caller drain to detect the cause.
+                bits |= static_cast<uint8_t>(PollEvent::Readable);
+            }
+            if ((ev.events & EPOLLHUP) != 0) {
+                // EPOLLHUP = remote closed (TCP FIN) -- not a socket error,
+                // treat as readable so the read path sees n==0 and disconnects.
                 bits |= static_cast<uint8_t>(PollEvent::Readable);
             }
             results.push_back({it->second, static_cast<PollEvent>(bits)});
@@ -125,3 +132,5 @@ std::vector<PollResult> Poller::wait(Milliseconds timeout) {
 }
 
 } // namespace aiSocks
+
+#endif // __linux__
