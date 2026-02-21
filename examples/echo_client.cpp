@@ -12,11 +12,7 @@ int main() {
     std::cout << "Connecting to localhost:8080\n\n";
 
     try {
-        ConnectArgs args{
-            .address = "127.0.0.1",
-            .port = Port{8080},
-            .connectTimeout = Milliseconds{1000}
-        };
+        ConnectArgs args{"127.0.0.1", Port{8080}, Milliseconds{1000}};
 
         SimpleClient client(args, [](TcpSocket& sock) {
             std::cout << "Connected to echo server!\n";
