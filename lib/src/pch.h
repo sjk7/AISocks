@@ -8,9 +8,9 @@
 #define AISOCKS_PCH_H
 
 // Standard library headers used across multiple translation units
+// Note: Avoid <chrono> to prevent conflicts with aiSocks::Milliseconds
 #include <cstddef>
 #include <cstdint>
-#include <chrono>
 #include <string>
 #include <vector>
 #include <memory>
@@ -39,11 +39,5 @@
 #include <arpa/inet.h>
 #include <netdb.h>
 #endif
-
-// Project headers included by most translation units
-// Include SocketTypes.h and Socket.h which are the most expensive project headers
-#include "SocketTypes.h"
-#include "Socket.h"
-#include "SocketImpl.h"
 
 #endif // AISOCKS_PCH_H

@@ -7,6 +7,7 @@
 
 #ifdef _WIN32
 
+#include "pch.h"
 #include "Poller.h"
 #include "SocketImpl.h"
 
