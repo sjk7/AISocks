@@ -22,9 +22,6 @@ endif()
 # Set C++17 standard
 target_compile_features(aiSocksLib PUBLIC cxx_std_17)
 
-# Enable precompiled headers for faster builds
-target_precompile_headers(aiSocksLib PRIVATE src/pch.h)
-
 # Include directories
 target_include_directories(aiSocksLib
     PUBLIC
@@ -39,6 +36,9 @@ if(WIN32)
     target_link_libraries(aiSocksLib PRIVATE ws2_32 iphlpapi mswsock)
     # Prevent Windows.h from defining min/max macros and reduce header bloat
     target_compile_definitions(aiSocksLib PUBLIC NOMINMAX WIN32_LEAN_AND_MEAN)
+    
+    # Configure precompiled headers for MSVC
+    target_precompile_headers(aiSocksLib PRIVATE src/pch.h)
 endif()
 
 # Compiler-specific settings
