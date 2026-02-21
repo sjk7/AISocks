@@ -21,7 +21,6 @@
 #include <limits>
 #include <cassert>
 #include <cstring>
-#include <mutex>
 
 // Platform-specific headers
 #ifdef _WIN32
@@ -30,6 +29,7 @@
 #include <ws2tcpip.h>
 #include <mswsock.h>
 #include <iphlpapi.h>
+#include <mmsystem.h>
 #else
 #include <unistd.h>
 #include <fcntl.h>

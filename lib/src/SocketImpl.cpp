@@ -7,7 +7,6 @@
 #include "SocketImpl.h"
 #include <chrono>
 #include <cstring>
-#include <mutex>
 #ifndef _WIN32
 #include <signal.h>
 #endif
@@ -115,36 +114,39 @@ static SocketError resolveToSockaddr(const std::string& address, Port port,
 
 // Platform-specific initialization
 #ifdef _WIN32
-static std::once_flag sWsaInitFlag;
-static bool sWsaInitOk = false;
-
 bool SocketImpl::platformInit() {
-    std::call_once(sWsaInitFlag, []() {
+    static bool initialized = []() {
         WSADATA wsaData;
-        sWsaInitOk = (WSAStartup(MAKEWORD(2, 2), &wsaData) == 0);
-    });
-    return sWsaInitOk;
+        bool wsaOk = (WSAStartup(MAKEWORD(2, 2), &wsaData) == 0);
+        if (wsaOk) {
+            timeBeginPeriod(1);
+        }
+        return wsaOk;
+    }();
+    return initialized;
 }
 
 void SocketImpl::platformCleanup() {
-    if (sWsaInitOk) {
-        WSACleanup();
-    }
+    // Note: With Meyers singleton, we can't reliably cleanup
+    // as we don't know if initialization occurred
+    // This is a known limitation of Meyers singleton pattern
 }
 #else
-static std::once_flag sPlatformInitFlag;
-
 bool SocketImpl::platformInit() {
     // Suppress SIGPIPE process-wide.  Belt-and-suspenders with SO_NOSIGPIPE
     // (macOS, set per-socket) and MSG_NOSIGNAL (Linux, set per-call): this
     // catches any remaining path that bypasses those per-socket/per-call
     // guards.
-    std::call_once(sPlatformInitFlag, []() { ::signal(SIGPIPE, SIG_IGN); });
+    static bool initialized = []() {
+        ::signal(SIGPIPE, SIG_IGN);
+        return true;
+    }();
+    (void)initialized; // Suppress unused variable warning
     return true;
 }
 
 void SocketImpl::platformCleanup() {
-    // Unix systems don't need cleanup
+    // No cleanup needed for SIGPIPE handling
 }
 #endif
 
