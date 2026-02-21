@@ -5,6 +5,8 @@
 // PollerWSAPoll.cpp  WSAPoll backend for Windows.
 // Compiled only when CMAKE detects WIN32.
 
+#ifdef _WIN32
+
 #include "Poller.h"
 #include "SocketImpl.h"
 
@@ -108,10 +110,18 @@ std::vector<PollResult> Poller::wait(Milliseconds timeout) {
             bits |= static_cast<uint8_t>(PollEvent::Readable);
         if ((rev & (POLLWRNORM | POLLOUT)) != 0)
             bits |= static_cast<uint8_t>(PollEvent::Writable);
-        if ((rev & (POLLERR | POLLHUP | POLLNVAL)) != 0) {
-            bits |= static_cast<uint8_t>(PollEvent::Error);
+        // POLLHUP = remote closed cleanly (TCP FIN) -- treat as readable so
+        // the normal recv()==0 path handles the disconnect gracefully.
+        if ((rev & POLLHUP) != 0)
             bits |= static_cast<uint8_t>(PollEvent::Readable);
-        }
+        // POLLERR on Windows WSAPoll can fire with SO_ERROR==0 for connection
+        // resets -- treat as readable so recv() surfaces the actual condition
+        // rather than triggering a spurious onError(code=0) log.
+        // POLLNVAL is a genuine programming error (invalid fd).
+        if ((rev & POLLERR) != 0)
+            bits |= static_cast<uint8_t>(PollEvent::Readable);
+        if ((rev & POLLNVAL) != 0)
+            bits |= static_cast<uint8_t>(PollEvent::Error);
         if (bits != 0)
             results.push_back(
                 {pImpl_->sockets[i], static_cast<PollEvent>(bits)});
@@ -120,3 +130,5 @@ std::vector<PollResult> Poller::wait(Milliseconds timeout) {
 }
 
 } // namespace aiSocks
+
+#endif // _WIN32

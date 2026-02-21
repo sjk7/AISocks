@@ -5,6 +5,8 @@
 // PollerKqueue.cpp  kqueue backend for macOS / BSD.
 // Compiled only when CMAKE detects Apple or FreeBSD.
 
+#if defined(__APPLE__) || defined(__FreeBSD__)
+
 #include "Poller.h"
 #include "SocketImpl.h"
 
@@ -170,3 +172,5 @@ std::vector<PollResult> Poller::wait(Milliseconds timeout) {
 }
 
 } // namespace aiSocks
+
+#endif // defined(__APPLE__) || defined(__FreeBSD__)
