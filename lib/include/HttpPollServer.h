@@ -84,9 +84,13 @@ protected:
     // Default error handler: log and drop the connection.
     void onError(TcpSocket& sock, HttpClientState& /*s*/) override {
         auto err = sock.getLastError();
-        std::cout << "[error] poll error on client socket: code="
-                  << static_cast<int>(err) << " msg=" << sock.getErrorMessage()
-                  << "\n";
+        // Poll systems can report error events with SO_ERROR==0 for connection
+        // resets or other conditions. This is not a real error and should not be logged.
+        if (err != SocketError::None) {
+            std::cout << "[error] poll error on client socket: code="
+                      << static_cast<int>(err) << " msg=" << sock.getErrorMessage()
+                      << "\n";
+        }
     }
 
     // -------------------------------------------------------------------------
