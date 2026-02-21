@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.15)
 project(aiSocks VERSION 1.0.0 LANGUAGES CXX)
 
 # Set C++ standard
-set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
@@ -22,7 +22,7 @@ add_subdirectory(lib)
 add_executable(aiSocksExample examples/main.cpp)
 target_link_libraries(aiSocksExample PRIVATE aiSocksLib)
 if(MSVC)
-    target_compile_options(aiSocksExample PRIVATE /utf-8)
+    target_compile_options(aiSocksExample PRIVATE /utf-8 /MP)
 else()
     # Ensure debug symbols in Debug builds for Clang
     if(CMAKE_BUILD_TYPE STREQUAL "Debug")
@@ -68,7 +68,7 @@ if(BUILD_EXAMPLES)
         #     target_compile_definitions(${_tgt} PRIVATE SERVER_STATS)
         # endif()
         if(MSVC)
-            target_compile_options(${_tgt} PRIVATE /utf-8)
+            target_compile_options(${_tgt} PRIVATE /utf-8 /MP)
         else()
             # Ensure debug symbols in Debug builds for Clang
             if(CMAKE_BUILD_TYPE STREQUAL "Debug")
@@ -108,3 +108,5 @@ if(CMAKE_EXPORT_COMPILE_COMMANDS)
         VERBATIM
     )
 endif()
+
+

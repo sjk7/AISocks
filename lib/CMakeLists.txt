@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 3.15)
 
 # Library target
 add_library(aiSocksLib STATIC
+    src/pch.cpp
     src/Socket.cpp
     src/TcpSocket.cpp
     src/UdpSocket.cpp
@@ -21,6 +22,9 @@ endif()
 # Set C++17 standard
 target_compile_features(aiSocksLib PUBLIC cxx_std_17)
 
+# Enable precompiled headers for faster builds
+target_precompile_headers(aiSocksLib PRIVATE src/pch.h)
+
 # Include directories
 target_include_directories(aiSocksLib
     PUBLIC
@@ -39,7 +43,7 @@ endif()
 
 # Compiler-specific settings
 if(MSVC)
-    target_compile_options(aiSocksLib PRIVATE /W4 /WX /utf-8)
+    target_compile_options(aiSocksLib PRIVATE /W4 /WX /utf-8 /MP)
 else()
     target_compile_options(aiSocksLib PRIVATE -Wall -Wextra -Wpedantic -Werror -Wno-shadow)
     # Ensure debug symbols in Debug builds for Clang
@@ -47,4 +51,5 @@ else()
         target_compile_options(aiSocksLib PRIVATE -g -O0)
     endif()
 endif()
+
 
