@@ -8,6 +8,7 @@
 #include "SocketImpl.h"
 #include <cstring>
 #include <vector>
+#include <cassert>
 
 #ifdef _WIN32
 #include <winsock2.h>
@@ -264,6 +265,46 @@ std::vector<NetworkInterface> getLocalAddresses() {
 #endif
 
     return interfaces;
+}
+
+// Specialized timeout setter (platform-specific logic)
+bool setSocketOptionTimeout(SocketHandle socketHandle, int optname, std::chrono::milliseconds timeout, const char* errMsg) {
+    (void)errMsg; // Suppress unused parameter warning
+    const long long ms = timeout.count();
+    int result = 0;
+#ifdef _WIN32
+    DWORD tv = static_cast<DWORD>(ms);
+    result = setsockopt(socketHandle, SOL_SOCKET, optname,
+            reinterpret_cast<const char*>(&tv),
+            static_cast<socklen_t>(sizeof(tv)));
+#else
+    struct timeval tv;
+    tv.tv_sec = static_cast<time_t>(ms / 1000);
+    tv.tv_usec = static_cast<suseconds_t>((ms % 1000) * 1000);
+    result = setsockopt(socketHandle, SOL_SOCKET, optname,
+            reinterpret_cast<const char*>(&tv),
+            static_cast<socklen_t>(sizeof(tv)));
+#endif
+    assert(result == 0 && "setsockopt timeout failed - check socket handle and option parameters");
+    return result == 0;
+}
+
+} // namespace aiSocks
+
+// -----------------------------------------------------------------------
+// IP address validation utilities
+// -----------------------------------------------------------------------
+
+namespace aiSocks {
+
+bool isValidIPv4(const std::string& address) {
+    struct sockaddr_in sa;
+    return inet_pton(AF_INET, address.c_str(), &(sa.sin_addr)) == 1;
+}
+
+bool isValidIPv6(const std::string& address) {
+    struct sockaddr_in6 sa;
+    return inet_pton(AF_INET6, address.c_str(), &(sa.sin6_addr)) == 1;
 }
 
 } // namespace aiSocks

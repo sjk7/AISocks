@@ -23,10 +23,6 @@
 
 namespace aiSocks {
 
-// -----------------------------------------------------------------------
-// Static helpers (file-scope)
-// -----------------------------------------------------------------------
-
 // Platform-specific initialization
 #ifdef _WIN32
 static std::once_flag sWsaInitFlag;
@@ -555,82 +551,15 @@ bool SocketImpl::setBlocking(bool blocking) {
     return true;
 }
 
-bool SocketImpl::isBlocking() const noexcept {
-    return blockingMode;
-}
-
-// -----------------------------------------------------------------------
-// Private setsockopt helpers
-// -----------------------------------------------------------------------
-
-bool SocketImpl::setBoolOpt(
-    int level, int optname, bool val, const char* errMsg) {
-    int optval = val ? 1 : 0;
-    if (setsockopt(socketHandle, level, optname,
-            reinterpret_cast<const char*>(&optval),
-            static_cast<socklen_t>(sizeof(optval)))
-        == SOCKET_ERROR_CODE) {
-        setError(SocketError::SetOptionFailed, errMsg);
-        return false;
-    }
-    lastError = SocketError::None;
-    return true;
-}
-
-bool SocketImpl::setTimeoutOpt(
-    int optname, std::chrono::milliseconds timeout, const char* errMsg) {
-    const long long ms = timeout.count();
-#ifdef _WIN32
-    DWORD tv = static_cast<DWORD>(ms);
-    if (setsockopt(socketHandle, SOL_SOCKET, optname,
-            reinterpret_cast<const char*>(&tv),
-            static_cast<socklen_t>(sizeof(tv)))
-        == SOCKET_ERROR_CODE) {
-        setError(SocketError::SetOptionFailed, errMsg);
-        return false;
-    }
-#else
-    struct timeval tv;
-    tv.tv_sec = static_cast<decltype(tv.tv_sec)>(ms / 1000);
-    tv.tv_usec = static_cast<decltype(tv.tv_usec)>((ms % 1000) * 1000);
-    if (setsockopt(socketHandle, SOL_SOCKET, optname, &tv,
-            static_cast<socklen_t>(sizeof(tv)))
-        == SOCKET_ERROR_CODE) {
-        setError(SocketError::SetOptionFailed, errMsg);
-        return false;
-    }
-#endif
-    lastError = SocketError::None;
-    return true;
-}
-
-bool SocketImpl::setBufSizeOpt(int optname, int bytes, const char* errMsg) {
-    if (setsockopt(socketHandle, SOL_SOCKET, optname,
-            reinterpret_cast<const char*>(&bytes),
-            static_cast<socklen_t>(sizeof(bytes)))
-        == SOCKET_ERROR_CODE) {
-        setError(SocketError::SetOptionFailed, errMsg);
-        return false;
-    }
-    lastError = SocketError::None;
-    return true;
-}
-
 bool SocketImpl::setReuseAddress(bool reuse) {
-    if (!isValid()) {
-        setError(SocketError::InvalidSocket, "Socket is not valid");
-        return false;
-    }
-    return setBoolOpt(
-        SOL_SOCKET, SO_REUSEADDR, reuse, "Failed to set reuse address option");
+    RETURN_IF_INVALID();
+    int optval = reuse ? 1 : 0;
+    return setSocketOption(socketHandle, SOL_SOCKET, SO_REUSEADDR, optval, "Failed to set reuse address option");
 }
 
 bool SocketImpl::setTimeout(std::chrono::milliseconds timeout) {
-    if (!isValid()) {
-        setError(SocketError::InvalidSocket, "Socket is not valid");
-        return false;
-    }
-    return setTimeoutOpt(SO_RCVTIMEO, timeout, "Failed to set receive timeout");
+    RETURN_IF_INVALID();
+    return setSocketOptionTimeout(socketHandle, SO_RCVTIMEO, timeout, "Failed to set receive timeout");
 }
 
 void SocketImpl::close() noexcept {
@@ -724,9 +653,6 @@ int SocketImpl::getLastSystemError() const {
 #endif
 }
 
-// -----------------------------------------------------------------------
-// sendTo / receiveFrom (UDP)
-// -----------------------------------------------------------------------
 int SocketImpl::sendTo(
     const void* data, size_t length, const Endpoint& remote) {
     if (!isValid()) {
@@ -834,43 +760,25 @@ int SocketImpl::receiveFrom(void* buffer, size_t length, Endpoint& remote) {
     }
 }
 
-// -----------------------------------------------------------------------
-// setSendTimeout / setNoDelay / setKeepAlive / setLingerAbort / setReusePort
-// -----------------------------------------------------------------------
 bool SocketImpl::setSendTimeout(std::chrono::milliseconds timeout) {
-    if (!isValid()) {
-        setError(SocketError::InvalidSocket, "Socket is not valid");
-        return false;
-    }
-    return setTimeoutOpt(SO_SNDTIMEO, timeout, "Failed to set send timeout");
+    RETURN_IF_INVALID();
+    return setSocketOptionTimeout(socketHandle, SO_SNDTIMEO, timeout, "Failed to set send timeout");
 }
 
 bool SocketImpl::setNoDelay(bool noDelay) {
-    if (!isValid()) {
-        setError(SocketError::InvalidSocket, "Socket is not valid");
-        return false;
-    }
-    return setBoolOpt(
-        IPPROTO_TCP, TCP_NODELAY, noDelay, "Failed to set TCP_NODELAY");
+    RETURN_IF_INVALID();
+    int optval = noDelay ? 1 : 0;
+    return setSocketOption(socketHandle, IPPROTO_TCP, TCP_NODELAY, optval, "Failed to set TCP_NODELAY");
 }
 
 bool SocketImpl::setKeepAlive(bool enable) {
-    if (!isValid()) {
-        setError(SocketError::InvalidSocket, "Socket is not valid");
-        return false;
-    }
-    return setBoolOpt(
-        SOL_SOCKET, SO_KEEPALIVE, enable, "Failed to set SO_KEEPALIVE");
+    RETURN_IF_INVALID();
+    int optval = enable ? 1 : 0;
+    return setSocketOption(socketHandle, SOL_SOCKET, SO_KEEPALIVE, optval, "Failed to set SO_KEEPALIVE");
 }
 
-// -----------------------------------------------------------------------
-// setLingerAbort (SO_LINGER, l_linger=0  RST on close)
-// -----------------------------------------------------------------------
 bool SocketImpl::setLingerAbort(bool enable) {
-    if (!isValid()) {
-        setError(SocketError::InvalidSocket, "Socket is not valid");
-        return false;
-    }
+    RETURN_IF_INVALID();
     struct linger lg{};
     lg.l_onoff = enable ? 1 : 0;
     lg.l_linger = 0; // l_linger=0  RST on close
@@ -881,18 +789,15 @@ bool SocketImpl::setLingerAbort(bool enable) {
         setError(SocketError::SetOptionFailed, "Failed to set SO_LINGER");
         return false;
     }
-    lastError = SocketError::None;
+    SET_SUCCESS();
     return true;
 }
 
 bool SocketImpl::setReusePort(bool enable) {
-    if (!isValid()) {
-        setError(SocketError::InvalidSocket, "Socket is not valid");
-        return false;
-    }
+    RETURN_IF_INVALID();
 #ifdef SO_REUSEPORT
-    return setBoolOpt(
-        SOL_SOCKET, SO_REUSEPORT, enable, "Failed to set SO_REUSEPORT");
+    int optval = enable ? 1 : 0;
+    return setSocketOption(socketHandle, SOL_SOCKET, SO_REUSEPORT, optval, "Failed to set SO_REUSEPORT");
 #else
     (void)enable;
     setError(SocketError::SetOptionFailed,
@@ -901,43 +806,21 @@ bool SocketImpl::setReusePort(bool enable) {
 #endif
 }
 
-// -----------------------------------------------------------------------
-// setBroadcast (SO_BROADCAST)  required before sending to broadcast addrs
-// -----------------------------------------------------------------------
 bool SocketImpl::setBroadcast(bool enable) {
-    if (!isValid()) {
-        setError(SocketError::InvalidSocket, "Socket is not valid");
-        return false;
-    }
-    return setBoolOpt(
-        SOL_SOCKET, SO_BROADCAST, enable, "Failed to set SO_BROADCAST");
+    RETURN_IF_INVALID();
+    int optval = enable ? 1 : 0;
+    return setSocketOption(socketHandle, SOL_SOCKET, SO_BROADCAST, optval, "Failed to set SO_BROADCAST");
 }
 
-// -----------------------------------------------------------------------
-// setMulticastTTL (IP_MULTICAST_TTL / IPV6_MULTICAST_HOPS)  limit multicast hops
-// -----------------------------------------------------------------------
 bool SocketImpl::setMulticastTTL(int ttl) {
-    if (!isValid()) {
-        setError(SocketError::InvalidSocket, "Socket is not valid");
-        return false;
-    }
+    RETURN_IF_INVALID();
     if (addressFamily == AddressFamily::IPv6) {
-#ifdef _WIN32
-        return setBoolOpt(IPPROTO_IPV6, IPV6_MULTICAST_HOPS, ttl, 
-                         "Failed to set IPV6_MULTICAST_HOPS");
-#else
-        return setBoolOpt(IPPROTO_IPV6, IPV6_MULTICAST_HOPS, ttl, 
-                         "Failed to set IPV6_MULTICAST_HOPS");
-#endif
+        return setSocketOption(socketHandle, IPPROTO_IPV6, IPV6_MULTICAST_HOPS, ttl, "Failed to set IPV6_MULTICAST_HOPS");
     } else {
-        return setBoolOpt(IPPROTO_IP, IP_MULTICAST_TTL, ttl, 
-                         "Failed to set IP_MULTICAST_TTL");
+        return setSocketOption(socketHandle, IPPROTO_IP, IP_MULTICAST_TTL, ttl, "Failed to set IP_MULTICAST_TTL");
     }
 }
 
-// -----------------------------------------------------------------------
-// sendAll  loop until all bytes sent or error
-// -----------------------------------------------------------------------
 bool SocketImpl::sendAll(const void* data, size_t length) {
     const auto* ptr = static_cast<const char*>(data);
     size_t remaining = length;
@@ -953,8 +836,6 @@ bool SocketImpl::sendAll(const void* data, size_t length) {
     return true;
 }
 
-// receiveAll  loop until all bytes received, error, or EOF
-// -----------------------------------------------------------------------
 bool SocketImpl::receiveAll(void* buffer, size_t length) {
     auto* ptr = static_cast<char*>(buffer);
     size_t remaining = length;
@@ -976,89 +857,154 @@ bool SocketImpl::receiveAll(void* buffer, size_t length) {
     return true;
 }
 
-// -----------------------------------------------------------------------
-// waitReadable / waitWritable  single-fd select convenience
-// -----------------------------------------------------------------------
-bool SocketImpl::waitReady(bool forRead, std::chrono::milliseconds timeout) {
-    if (!isValid()) {
-        setError(SocketError::InvalidSocket, "Socket is not valid");
-        return false;
-    }
+bool SocketImpl::waitReadable(std::chrono::milliseconds timeout) {
+    RETURN_IF_INVALID();
+    // Use the same OS-specific polling logic as connect()
     auto deadline = std::chrono::steady_clock::now() + timeout;
 
     for (;;) {
-        auto rem = std::chrono::duration_cast<std::chrono::milliseconds>(
-            deadline - std::chrono::steady_clock::now())
-                       .count();
-        if (rem < 0) rem = 0;
+        auto sliceMs = std::chrono::duration_cast<std::chrono::milliseconds>(
+            deadline - std::chrono::steady_clock::now()).count();
+        if (sliceMs < 0) return false; // Timeout
 
-        struct timeval tv;
-        tv.tv_sec = static_cast<decltype(tv.tv_sec)>(rem / 1000);
-        tv.tv_usec = static_cast<decltype(tv.tv_usec)>((rem % 1000) * 1000);
-
-        fd_set fdSet;
-        FD_ZERO(&fdSet);
-        FD_SET(socketHandle, &fdSet);
-        fd_set* rd = forRead ? &fdSet : nullptr;
-        fd_set* wr = !forRead ? &fdSet : nullptr;
-
-        int sel = ::select(
-            static_cast<int>(socketHandle) + 1, rd, wr, nullptr, &tv);
-        if (sel < 0) {
-#ifndef _WIN32
-            if (errno == EINTR) continue;
-#endif
-            setError(SocketError::Unknown,
-                forRead ? "select() failed in waitReadable"
-                        : "select() failed in waitWritable");
+#ifdef __APPLE__
+        // Use kqueue for waitReadable
+        int evFd = ::kqueue();
+        if (evFd == -1) return false;
+        
+        struct kevent reg{};
+        EV_SET(&reg, static_cast<uintptr_t>(socketHandle), EVFILT_READ, EV_ADD | EV_ENABLE, 0, 0, nullptr);
+        if (::kevent(evFd, &reg, 1, nullptr, 0, nullptr) == -1) {
+            ::close(evFd);
             return false;
         }
-        if (sel == 0) {
-            setError(SocketError::Timeout,
-                forRead ? "waitReadable() timed out"
-                        : "waitWritable() timed out");
-            return false;
-        }
-        lastError = SocketError::None;
+        
+        struct timespec ts{};
+        ts.tv_sec = sliceMs / 1000;
+        ts.tv_nsec = (sliceMs % 1000) * 1000000;
+        
+        struct kevent out{};
+        int nReady = ::kevent(evFd, nullptr, 0, &out, 1, &ts);
+        ::close(evFd);
+        
+        if (nReady < 0) return false;
+        if (nReady == 0) return false; // Timeout
         return true;
+        
+#elif defined(__linux__)
+        // Use epoll for waitReadable
+        int evFd = ::epoll_create1(EPOLL_CLOEXEC);
+        if (evFd == -1) return false;
+        
+        struct epoll_event epev{};
+        epev.events = EPOLLIN | EPOLLERR;
+        epev.data.fd = socketHandle;
+        if (::epoll_ctl(evFd, EPOLL_CTL_ADD, socketHandle, &epev) == -1) {
+            ::close(evFd);
+            return false;
+        }
+        
+        struct epoll_event outev{};
+        int nReady = ::epoll_wait(evFd, &outev, 1, static_cast<int>(sliceMs));
+        ::close(evFd);
+        
+        if (nReady < 0) return false;
+        if (nReady == 0) return false; // Timeout
+        return true;
+        
+#elif defined(_WIN32)
+        // Use WSAPoll for waitReadable
+        WSAPOLLFD pfd{};
+        pfd.fd = socketHandle;
+        pfd.events = POLLIN;
+        int nReady = ::WSAPoll(&pfd, 1, static_cast<int>(sliceMs));
+        if (nReady < 0) return false;
+        if (nReady == 0) return false; // Timeout
+        return true;
+#endif
     }
-}
-
-bool SocketImpl::waitReadable(std::chrono::milliseconds timeout) {
-    return waitReady(true, timeout);
 }
 
 bool SocketImpl::waitWritable(std::chrono::milliseconds timeout) {
-    return waitReady(false, timeout);
+    RETURN_IF_INVALID();
+    // Use the same OS-specific polling logic as connect()
+    auto deadline = std::chrono::steady_clock::now() + timeout;
+
+    for (;;) {
+        auto sliceMs = std::chrono::duration_cast<std::chrono::milliseconds>(
+            deadline - std::chrono::steady_clock::now()).count();
+        if (sliceMs < 0) return false; // Timeout
+
+#ifdef __APPLE__
+        // Use kqueue for waitWritable
+        int evFd = ::kqueue();
+        if (evFd == -1) return false;
+        
+        struct kevent reg{};
+        EV_SET(&reg, static_cast<uintptr_t>(socketHandle), EVFILT_WRITE, EV_ADD | EV_ENABLE, 0, 0, nullptr);
+        if (::kevent(evFd, &reg, 1, nullptr, 0, nullptr) == -1) {
+            ::close(evFd);
+            return false;
+        }
+        
+        struct timespec ts{};
+        ts.tv_sec = sliceMs / 1000;
+        ts.tv_nsec = (sliceMs % 1000) * 1000000;
+        
+        struct kevent out{};
+        int nReady = ::kevent(evFd, nullptr, 0, &out, 1, &ts);
+        ::close(evFd);
+        
+        if (nReady < 0) return false;
+        if (nReady == 0) return false; // Timeout
+        return true;
+        
+#elif defined(__linux__)
+        // Use epoll for waitWritable
+        int evFd = ::epoll_create1(EPOLL_CLOEXEC);
+        if (evFd == -1) return false;
+        
+        struct epoll_event epev{};
+        epev.events = EPOLLOUT | EPOLLERR;
+        epev.data.fd = socketHandle;
+        if (::epoll_ctl(evFd, EPOLL_CTL_ADD, socketHandle, &epev) == -1) {
+            ::close(evFd);
+            return false;
+        }
+        
+        struct epoll_event outev{};
+        int nReady = ::epoll_wait(evFd, &outev, 1, static_cast<int>(sliceMs));
+        ::close(evFd);
+        
+        if (nReady < 0) return false;
+        if (nReady == 0) return false; // Timeout
+        return true;
+        
+#elif defined(_WIN32)
+        // Use WSAPoll for waitWritable
+        WSAPOLLFD pfd{};
+        pfd.fd = socketHandle;
+        pfd.events = POLLOUT;
+        int nReady = ::WSAPoll(&pfd, 1, static_cast<int>(sliceMs));
+        if (nReady < 0) return false;
+        if (nReady == 0) return false; // Timeout
+        return true;
+#endif
+    }
 }
 
-// -----------------------------------------------------------------------
-// setReceiveBufferSize / setSendBufferSize (SO_RCVBUF / SO_SNDBUF)
-// -----------------------------------------------------------------------
 bool SocketImpl::setReceiveBufferSize(int bytes) {
-    if (!isValid()) {
-        setError(SocketError::InvalidSocket, "Socket is not valid");
-        return false;
-    }
-    return setBufSizeOpt(SO_RCVBUF, bytes, "Failed to set SO_RCVBUF");
+    RETURN_IF_INVALID();
+    return setSocketOption(socketHandle, SOL_SOCKET, SO_RCVBUF, bytes, "Failed to set SO_RCVBUF");
 }
 
 bool SocketImpl::setSendBufferSize(int bytes) {
-    if (!isValid()) {
-        setError(SocketError::InvalidSocket, "Socket is not valid");
-        return false;
-    }
-    return setBufSizeOpt(SO_SNDBUF, bytes, "Failed to set SO_SNDBUF");
+    RETURN_IF_INVALID();
+    return setSocketOption(socketHandle, SOL_SOCKET, SO_SNDBUF, bytes, "Failed to set SO_SNDBUF");
 }
 
-// -----------------------------------------------------------------------
-// shutdown(ShutdownHow)
-// -----------------------------------------------------------------------
 bool SocketImpl::shutdown(ShutdownHow how) {
-    if (!isValid()) {
-        setError(SocketError::InvalidSocket, "Socket is not valid");
-        return false;
-    }
+    RETURN_IF_INVALID();
 #ifdef _WIN32
     int how_ = (how == ShutdownHow::Read) ? SD_RECEIVE
         : (how == ShutdownHow::Write)     ? SD_SEND
@@ -1073,8 +1019,12 @@ bool SocketImpl::shutdown(ShutdownHow how) {
         return false;
     }
     shutdownCalled_ = true;
-    lastError = SocketError::None;
+    SET_SUCCESS();
     return true;
+}
+
+bool SocketImpl::isBlocking() const noexcept {
+    return blockingMode;
 }
 
 // -----------------------------------------------------------------------
@@ -1163,13 +1113,11 @@ std::vector<NetworkInterface> SocketImpl::getLocalAddresses() {
 }
 
 bool SocketImpl::isValidIPv4(const std::string& address) {
-    struct sockaddr_in sa;
-    return inet_pton(AF_INET, address.c_str(), &(sa.sin_addr)) == 1;
+    return aiSocks::isValidIPv4(address);
 }
 
 bool SocketImpl::isValidIPv6(const std::string& address) {
-    struct sockaddr_in6 sa;
-    return inet_pton(AF_INET6, address.c_str(), &(sa.sin6_addr)) == 1;
+    return aiSocks::isValidIPv6(address);
 }
 
 std::string SocketImpl::ipToString(const void* addr, AddressFamily family) {
