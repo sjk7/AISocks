@@ -40,11 +40,7 @@ protected:
 int main() {
     std::cout << "=== Poll-Driven HTTP Server ===\n";
     try {
-        HttpServer server(ServerBind{
-            .address = "0.0.0.0",
-            .port    = Port{8080},
-            .backlog = 1024,
-        });
+        HttpServer server(ServerBind{"0.0.0.0", Port{8080}, 1024});
         server.run(0, Milliseconds{1});
         std::cout << "\nShutting down cleanly.\n";
     } catch (const SocketException& e) {
