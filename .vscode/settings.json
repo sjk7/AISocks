@@ -1,6 +1,8 @@
 {
     "cmake.sourceDirectory": "${workspaceFolder}",
     "cmake.buildDirectory": "${workspaceFolder}/build/${buildType}",
+    "cmake.ctestDirectory": "${workspaceFolder}/build/${buildType}",
+    "cmake.ctestPath": "/opt/homebrew/bin/ctest",
     "cmake.generator": "Ninja",
     "cmake.configureSettings": {
         "BUILD_TESTS": "ON",
