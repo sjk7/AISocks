@@ -195,12 +195,41 @@
         },
         {
             "name": "(lldb) Debug aiSocksHttpServer",
-            "type": "lldb",
+            "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/build-mac/aiSocksHttpServer",
+            "program": "${workspaceFolder}/build/aiSocksHttpServer",
             "args": [],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}/build",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "lldb",
+            "preLaunchTask": "build-debug"
+        },
+        {
+            "name": "(lldb) Debug aiSocksExample",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/aiSocksExample",
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}/build",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "lldb",
+            "preLaunchTask": "build-debug"
+        },
+        {
+            "name": "(lldb) Debug Current Target",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${command:cmake.launchTargetPath}",
+            "args": [],
+            "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
-            "preLaunchTask": "Build aiSocksHttpServer (mac)"
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "lldb"
         },
         {
             "name": "(Windows) Debug aiSocksGoogleClient",
