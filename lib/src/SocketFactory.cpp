@@ -127,7 +127,7 @@ Result<SocketType> SocketFactory::bindSocket(SocketType&& socket, const ServerBi
     if (!socket.bind(config.address, config.port)) {
         return Result<SocketType>::failure(
             socket.getLastError(),
-            ("bind(" + config.address + ":" + std::to_string(config.port.value) + ")").c_str(),
+            ("bind(" + config.address + ":" + std::to_string(config.port.value()) + ")").c_str(),
             SocketFactory::captureLastError(),
             false
         );
@@ -177,7 +177,7 @@ Result<TcpSocket> SocketFactory::connectSocket(TcpSocket&& socket, const Connect
     if (!socket.connect(config.address, config.port, config.connectTimeout)) {
         return Result<TcpSocket>::failure(
             socket.getLastError(),
-            ("connect(" + config.address + ":" + std::to_string(config.port.value) + ")").c_str(),
+            ("connect(" + config.address + ":" + std::to_string(config.port.value()) + ")").c_str(),
             SocketFactory::captureLastError(),
             false
         );
@@ -300,7 +300,7 @@ Result<bool> SocketFactory::isPortAvailable(AddressFamily family, const std::str
 }
 
 Result<Port> SocketFactory::findAvailablePort(AddressFamily family, const std::string& address, Port startPort, Port endPort) {
-    if (startPort.value > endPort.value) {
+    if (startPort.value() > endPort.value()) {
         return Result<Port>::failure(
             SocketError::Unknown,
             "findAvailablePort: startPort > endPort",
@@ -309,7 +309,7 @@ Result<Port> SocketFactory::findAvailablePort(AddressFamily family, const std::s
         );
     }
     
-    for (uint16_t port = startPort.value; port <= endPort.value; ++port) {
+    for (uint16_t port = startPort.value(); port <= endPort.value(); ++port) {
         auto available_result = isPortAvailable(family, address, Port{port});
         if (available_result.isError()) {
             return Result<Port>::failure(
@@ -380,16 +380,6 @@ template Result<TcpSocket> SocketFactory::bindSocket<TcpSocket>(
 template Result<UdpSocket> SocketFactory::bindSocket<UdpSocket>(
     UdpSocket&& socket,
     const ServerBind& config
-);
-
-template Result<TcpSocket> SocketFactory::listenSocket<TcpSocket>(
-    TcpSocket&& socket,
-    int backlog
-);
-
-template Result<TcpSocket> SocketFactory::connectSocket<TcpSocket>(
-    TcpSocket&& socket,
-    const ConnectArgs& config
 );
 
 } // namespace aiSocks
