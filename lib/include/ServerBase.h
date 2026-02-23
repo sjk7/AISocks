@@ -104,7 +104,12 @@ template <typename ClientData> class ServerBase {
         }
     }
 
-    virtual ~ServerBase() = default;
+    virtual ~ServerBase() {
+        // Clean up any remaining clients before destruction
+        // This prevents memory corruption during unordered_map destruction
+        clients_.clear();
+        current_poller_ = nullptr;
+    }
 
     // Non-copyable, movable.
     ServerBase(const ServerBase&) = delete;
