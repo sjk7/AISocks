@@ -24,6 +24,8 @@ struct Poller::Impl {
     int kq{-1};
     // Maps raw fd  borrowed Socket pointer (never owned).
     std::unordered_map<uintptr_t, const Socket*> sockets;
+    // Reusable result buffer to avoid per-call allocation in wait()
+    std::vector<PollResult> resultBuffer;
 };
 
 Poller::Poller() : pImpl_(std::make_unique<Impl>()) {
@@ -159,8 +161,9 @@ std::vector<PollResult> Poller::wait(Milliseconds timeout) {
             ready[fd] = static_cast<PollEvent>(bits);
         }
 
-        std::vector<PollResult> results;
-        results.reserve(ready.size());
+        pImpl_->resultBuffer.clear();
+        pImpl_->resultBuffer.reserve(ready.size());
+        auto& results = pImpl_->resultBuffer;
         for (const auto& kv : ready) {
             auto it = sockets.find(kv.first);
             if (it != sockets.end()) {

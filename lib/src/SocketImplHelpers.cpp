@@ -173,7 +173,7 @@ std::vector<NetworkInterface> getLocalAddresses() {
     PIP_ADAPTER_ADDRESSES addresses = nullptr;
     ULONG result;
 
-    do {
+    for (;;) {
         addresses = reinterpret_cast<PIP_ADAPTER_ADDRESSES>(malloc(bufferSize));
         if (!addresses) {
             break;
@@ -183,46 +183,51 @@ std::vector<NetworkInterface> getLocalAddresses() {
             nullptr, addresses, &bufferSize);
 
         if (result == ERROR_BUFFER_OVERFLOW) {
-            free(addresses);
+            ::free(addresses);
             addresses = nullptr;
+            bufferSize = bufferSize * 2;
+            continue;
         }
-    } while (result == ERROR_BUFFER_OVERFLOW);
 
-    if (result == NO_ERROR && addresses) {
-        for (PIP_ADAPTER_ADDRESSES adapter = addresses; adapter != nullptr;
-            adapter = adapter->Next) {
-            for (PIP_ADAPTER_UNICAST_ADDRESS unicast
-                = adapter->FirstUnicastAddress;
-                unicast != nullptr; unicast = unicast->Next) {
+        if (result == NO_ERROR) {
+            for (PIP_ADAPTER_ADDRESSES adapter = addresses; adapter != nullptr;
+                adapter = adapter->Next) {
+                for (PIP_ADAPTER_UNICAST_ADDRESS unicast
+                    = adapter->FirstUnicastAddress;
+                    unicast != nullptr; unicast = unicast->Next) {
 
-                NetworkInterface iface;
-                iface.name = std::string(adapter->AdapterName);
+                    NetworkInterface iface;
+                    iface.name = std::string(adapter->AdapterName);
 
-                // Convert address to string
-                sockaddr* sa = unicast->Address.lpSockaddr;
-                if (sa->sa_family == AF_INET) {
-                    char buffer[INET_ADDRSTRLEN];
-                    sockaddr_in* sin = reinterpret_cast<sockaddr_in*>(sa);
-                    inet_ntop(AF_INET, &sin->sin_addr, buffer, INET_ADDRSTRLEN);
-                    iface.address = buffer;
-                    iface.family = AddressFamily::IPv4;
-                } else if (sa->sa_family == AF_INET6) {
-                    char buffer[INET6_ADDRSTRLEN];
-                    sockaddr_in6* sin6 = reinterpret_cast<sockaddr_in6*>(sa);
-                    inet_ntop(
-                        AF_INET6, &sin6->sin6_addr, buffer, INET6_ADDRSTRLEN);
-                    iface.address = buffer;
-                    iface.family = AddressFamily::IPv6;
-                } else {
-                    continue;
+                    // Convert address to string
+                    sockaddr* sa = unicast->Address.lpSockaddr;
+                    if (sa->sa_family == AF_INET) {
+                        char buffer[INET_ADDRSTRLEN];
+                        sockaddr_in* sin = reinterpret_cast<sockaddr_in*>(sa);
+                        inet_ntop(AF_INET, &sin->sin_addr, buffer, INET_ADDRSTRLEN);
+                        iface.address = buffer;
+                        iface.family = AddressFamily::IPv4;
+                    } else if (sa->sa_family == AF_INET6) {
+                        char buffer[INET6_ADDRSTRLEN];
+                        sockaddr_in6* sin6 = reinterpret_cast<sockaddr_in6*>(sa);
+                        inet_ntop(
+                            AF_INET6, &sin6->sin6_addr, buffer, INET6_ADDRSTRLEN);
+                        iface.address = buffer;
+                        iface.family = AddressFamily::IPv6;
+                    } else {
+                        continue;
+                    }
+
+                    iface.isLoopback
+                        = (adapter->IfType == IF_TYPE_SOFTWARE_LOOPBACK);
+                    interfaces.push_back(iface);
                 }
-
-                iface.isLoopback
-                    = (adapter->IfType == IF_TYPE_SOFTWARE_LOOPBACK);
-                interfaces.push_back(iface);
             }
         }
-        free(addresses);
+
+        ::free(addresses);
+        addresses = nullptr;
+        break;
     }
 #else
     // Unix/Linux implementation using getifaddrs

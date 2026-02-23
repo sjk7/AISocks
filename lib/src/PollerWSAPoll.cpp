@@ -21,6 +21,8 @@ struct Poller::Impl {
     // Parallel vectors: fds[i] and sockets[i] refer to the same entry.
     std::vector<WSAPOLLFD> fds;
     std::vector<const Socket*> sockets;
+    // Reusable result buffer to avoid per-call allocation in wait()
+    std::vector<PollResult> resultBuffer;
 };
 
 Poller::Poller() : pImpl_(std::make_unique<Impl>()) {
@@ -102,7 +104,9 @@ std::vector<PollResult> Poller::wait(Milliseconds timeout) {
         return {};
     }
 
-    std::vector<PollResult> results;
+    pImpl_->resultBuffer.clear();
+    pImpl_->resultBuffer.reserve(pImpl_->fds.size());
+    auto& results = pImpl_->resultBuffer;
     for (size_t i = 0; i < pImpl_->fds.size(); ++i) {
         SHORT rev = pImpl_->fds[i].revents;
         if (rev == 0) continue;
