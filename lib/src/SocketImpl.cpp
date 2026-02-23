@@ -6,6 +6,7 @@
 #endif
 #include "SocketImpl.h"
 #include "SocketImplHelpers.h"
+#include "Result.h"
 #include <chrono>
 #include <cstring>
 #include <mutex>
@@ -1072,24 +1073,24 @@ Endpoint SocketImpl::endpointFromSockaddr(const sockaddr_storage& addr) {
     return ep;
 }
 
-std::optional<Endpoint> SocketImpl::getLocalEndpoint() const {
-    if (!isValid()) return std::nullopt;
+Result<Endpoint> SocketImpl::getLocalEndpoint() const {
+    if (!isValid()) return Result<Endpoint>::failure(SocketError::InvalidSocket, "getLocalEndpoint", 0, false);
     sockaddr_storage addr{};
     socklen_t len = static_cast<socklen_t>(sizeof(addr));
-    if (getsockname(socketHandle, reinterpret_cast<sockaddr*>(&addr), &len)
-        != 0)
-        return std::nullopt;
-    return endpointFromSockaddr(addr);
+    if (::getsockname(socketHandle, reinterpret_cast<sockaddr*>(&addr), &len) != 0) {
+        return Result<Endpoint>::failure(getLastError(), "getsockname", 0, false);
+    }
+    return Result<Endpoint>::success(endpointFromSockaddr(addr));
 }
 
-std::optional<Endpoint> SocketImpl::getPeerEndpoint() const {
-    if (!isValid()) return std::nullopt;
+Result<Endpoint> SocketImpl::getPeerEndpoint() const {
+    if (!isValid()) return Result<Endpoint>::failure(SocketError::InvalidSocket, "getPeerEndpoint", 0, false);
     sockaddr_storage addr{};
     socklen_t len = static_cast<socklen_t>(sizeof(addr));
-    if (getpeername(socketHandle, reinterpret_cast<sockaddr*>(&addr), &len)
-        != 0)
-        return std::nullopt;
-    return endpointFromSockaddr(addr);
+    if (::getpeername(socketHandle, reinterpret_cast<sockaddr*>(&addr), &len) != 0) {
+        return Result<Endpoint>::failure(getLastError(), "getpeername", 0, false);
+    }
+    return Result<Endpoint>::success(endpointFromSockaddr(addr));
 }
 
 // -----------------------------------------------------------------------
