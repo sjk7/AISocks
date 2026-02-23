@@ -334,14 +334,24 @@ std::string Socket::getErrorMessage() const {
     return pImpl->getErrorMessage();
 }
 
-std::optional<Endpoint> Socket::getLocalEndpoint() const {
-    if (!pImpl) return std::nullopt;
-    return pImpl->getLocalEndpoint();
+Result<Endpoint> Socket::getLocalEndpoint() const {
+    if (!pImpl) return Result<Endpoint>::failure(SocketError::InvalidSocket, "getLocalEndpoint", 0, false);
+    auto endpoint = pImpl->getLocalEndpoint();
+    if (endpoint) {
+        return Result<Endpoint>::success(*endpoint);
+    } else {
+        return Result<Endpoint>::failure(pImpl->getLastError(), "getLocalEndpoint", 0, false);
+    }
 }
 
-std::optional<Endpoint> Socket::getPeerEndpoint() const {
-    if (!pImpl) return std::nullopt;
-    return pImpl->getPeerEndpoint();
+Result<Endpoint> Socket::getPeerEndpoint() const {
+    if (!pImpl) return Result<Endpoint>::failure(SocketError::InvalidSocket, "getPeerEndpoint", 0, false);
+    auto endpoint = pImpl->getPeerEndpoint();
+    if (endpoint) {
+        return Result<Endpoint>::success(*endpoint);
+    } else {
+        return Result<Endpoint>::failure(pImpl->getLastError(), "getPeerEndpoint", 0, false);
+    }
 }
 
 // Static utility methods
