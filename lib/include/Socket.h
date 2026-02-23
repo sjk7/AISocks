@@ -58,6 +58,8 @@ public:
     constexpr T* begin() const noexcept { return ptr; }
     constexpr T* end() const noexcept { return ptr + len; }
     constexpr T& operator[](std::size_t i) const noexcept { return ptr[i]; }
+    
+    constexpr T* data() const noexcept { return ptr; }
 };
 } // namespace aiSocks
 #endif

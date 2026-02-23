@@ -5,6 +5,7 @@
 #define AISOCKS_SOCKET_IMPL_H
 
 #include "SocketTypes.h"
+#include "Result.h"
 #include <chrono>
 #include <vector>
 
@@ -90,6 +91,7 @@ class SocketImpl {
     bool setSendTimeout(Milliseconds timeout);
     bool setKeepAlive(bool enable);
     bool setLingerAbort(bool enable);
+    bool setNoDelay(bool noDelay);
     bool setReceiveBufferSize(int bytes);
     bool setSendBufferSize(int bytes);
     bool setBroadcast(bool enable);
