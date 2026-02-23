@@ -140,6 +140,9 @@ class Socket {
     bool setKeepAlive(bool enable);
     bool setLingerAbort(bool enable);
 
+    // Shutdown the socket (disable further sends/receives).
+    bool shutdown(ShutdownHow how);
+
     // Utility
     void close() noexcept;
     bool isValid() const noexcept;

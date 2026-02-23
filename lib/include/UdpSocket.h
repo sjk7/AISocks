@@ -97,12 +97,12 @@ class UdpSocket : public Socket {
 
     // Enable / disable SO_BROADCAST.  Required before sending to a
     // limited-broadcast address (255.255.255.255 or subnet broadcast).
-    bool setBroadcast(bool enable) { return doSetBroadcast(enable); }
+    bool setBroadcast(bool enable);
 
     // Set the TTL (Time To Live) for multicast datagrams.
     // Limits how many hops (routers) a multicast packet can traverse.
     // Typical values: 1 (local network), 32 (local organization), 255 (global).
-    bool setMulticastTTL(int ttl) { return doSetMulticastTTL(ttl); }
+    bool setMulticastTTL(int ttl);
 };
 
 } // namespace aiSocks
