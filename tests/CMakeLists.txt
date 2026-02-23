@@ -12,6 +12,9 @@ set(TEST_SOURCES
     test_tcp_socket
     test_simple_client
     test_server_base
+    test_socket_factory
+    test_server_base_simple
+    test_server_base_minimal
 )
 
 foreach(TEST_NAME ${TEST_SOURCES})
