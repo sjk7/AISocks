@@ -14,8 +14,15 @@
 
 namespace aiSocks {
 
-// Constant for unlimited client connections
-constexpr size_t UNLIMITED_CLIENTS = 0;
+// Client connection limits with sensible defaults and maximums
+enum class ClientLimit : size_t {
+    Unlimited = 0,           // Accept unlimited connections
+    Default = 1000,          // Default limit for production safety
+    Low = 100,              // Low resource environments
+    Medium = 500,           // Medium resource environments  
+    High = 2000,            // High performance servers
+    Maximum = 10000         // Reasonable maximum for most systems
+};
 
 // ---------------------------------------------------------------------------
 // SimpleServer  convenience wrapper for TCP server polling loops.
@@ -74,7 +81,7 @@ class SimpleServer {
     // Note: This accepts clients in non-blocking mode using Poller, but the
     // callback itself is responsible for any client I/O strategy.
     template <typename Callback>
-    void acceptClients(Callback&& onClient, size_t maxClients = UNLIMITED_CLIENTS) {
+    void acceptClients(Callback&& onClient, ClientLimit maxClients = ClientLimit::Default) {
         if (!socket_ || !socket_->isValid()) return;
         
         Poller poller;
@@ -83,7 +90,7 @@ class SimpleServer {
         }
 
         size_t count = 0;
-        while (maxClients == UNLIMITED_CLIENTS || count < maxClients) {
+        while (maxClients == ClientLimit::Unlimited || count < static_cast<size_t>(maxClients)) {
             auto ready = poller.wait(Milliseconds{-1});
             for (const auto& event : ready) {
                 if (event.socket != socket_.get()) continue;
@@ -108,7 +115,7 @@ class SimpleServer {
 
                     onClient(*client);
                     ++count;
-                    if (maxClients != UNLIMITED_CLIENTS && count >= maxClients) {
+                    if (maxClients != ClientLimit::Unlimited && count >= static_cast<size_t>(maxClients)) {
                         return;
                     }
                 }
@@ -124,11 +131,11 @@ class SimpleServer {
     //   false remove and close the client.
     //
     // maxClients semantics:
-    //   UNLIMITED_CLIENTS (0)  accept forever.
-    //   N > 0                  accept up to N clients, then stop accepting and keep
-    //                          polling existing clients until all disconnect.
+    //   ClientLimit::Unlimited (0)  accept forever.
+    //   N > 0                        accept up to N clients, then stop accepting and keep
+    //                                polling existing clients until all disconnect.
     template <typename Callback>
-    void pollClients(Callback&& onClientEvent, size_t maxClients = UNLIMITED_CLIENTS,
+    void pollClients(Callback&& onClientEvent, ClientLimit maxClients = ClientLimit::Default,
         Milliseconds timeout = Milliseconds{-1}) {
         if (!socket_ || !socket_->isValid()) return;
         
@@ -139,8 +146,8 @@ class SimpleServer {
 
         std::unordered_map<const Socket*, std::unique_ptr<TcpSocket>> clients;
         // Pre-reserve client map if maxClients is specified to eliminate hash table growth
-        if (maxClients > 0) {
-            clients.reserve(maxClients);
+        if (static_cast<size_t>(maxClients) > 0) {
+            clients.reserve(static_cast<size_t>(maxClients));
         }
         size_t accepted = 0;
         bool accepting = true;
@@ -177,7 +184,7 @@ class SimpleServer {
                         clients.emplace(key, std::move(client));
                         ++accepted;
 
-                        if (maxClients != 0 && accepted >= maxClients) {
+                        if (maxClients != ClientLimit::Unlimited && accepted >= static_cast<size_t>(maxClients)) {
                             (void)poller.remove(*socket_);
                             accepting = false;
                             break;

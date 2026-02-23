@@ -17,8 +17,15 @@
 
 namespace aiSocks {
 
-// Constant for unlimited client connections
-constexpr size_t UNLIMITED_CLIENTS = 0;
+// Client connection limits with sensible defaults and maximums
+enum class ClientLimit : size_t {
+    Unlimited = 0,           // Accept unlimited connections
+    Default = 1000,          // Default limit for production safety
+    Low = 100,              // Low resource environments
+    Medium = 500,           // Medium resource environments  
+    High = 2000,            // High performance servers
+    Maximum = 10000         // Reasonable maximum for most systems
+};
 
 // Return values for ServerBase virtual functions
 enum class ServerResult {
@@ -112,14 +119,14 @@ template <typename ClientData> class ServerBase {
 
     // Enter the poll loop.
     //
-    // maxClients: UNLIMITED_CLIENTS (0) = unlimited; N > 0 = stop accepting after N connections,
+    // maxClients: ClientLimit::Unlimited = unlimited; N > 0 = stop accepting after N connections,
     //             but continue serving existing clients until all disconnect.
     // timeout:    passed to Poller::wait(); -1 = block until an event.
     //
     // Returns when there are no remaining connected clients (and accepting is
     // stopped, either because maxClients was reached or you stopped
     // externally).
-    void run(size_t maxClients = UNLIMITED_CLIENTS, Milliseconds timeout = Milliseconds{-1}) {
+    void run(ClientLimit maxClients = ClientLimit::Default, Milliseconds timeout = Milliseconds{-1}) {
         if (!isValid()) return; // Server not valid, exit early
 
         s_stop_.store(false, std::memory_order_relaxed);
@@ -143,8 +150,8 @@ template <typename ClientData> class ServerBase {
         }
 
         // Pre-reserve client map if maxClients is specified to eliminate hash table growth
-        if (maxClients > 0) {
-            clients_.reserve(maxClients);
+        if (static_cast<size_t>(maxClients) > 0) {
+            clients_.reserve(static_cast<size_t>(maxClients));
         }
 
         bool accepting = true;
@@ -357,7 +364,7 @@ template <typename ClientData> class ServerBase {
     SteadyClock::time_point last_idle_check_{SteadyClock::now()};
 
     void drainAccept(
-        Poller& poller, bool& accepting, size_t& accepted, size_t maxClients) {
+        Poller& poller, bool& accepting, size_t& accepted, ClientLimit maxClients) {
         for (;;) {
             auto client = listener_->accept();
             if (!client) {
@@ -382,7 +389,7 @@ template <typename ClientData> class ServerBase {
             printf("[stats] clients: %zu  peak: %zu\n", clients_.size(), peak_clients_);
 #endif
 
-            if (maxClients != 0 && accepted >= maxClients) {
+            if (maxClients != ClientLimit::Unlimited && accepted >= static_cast<size_t>(maxClients)) {
                 (void)poller.remove(*listener_);
                 accepting = false;
                 break;
