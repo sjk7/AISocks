@@ -30,9 +30,6 @@ struct ErrorInfo {
 template<typename T>
 class Result {
 private:
-    // Small value optimization - store inline for small types
-    static constexpr bool is_small = sizeof(T) <= sizeof(ErrorInfo);
-    
     union {
         alignas(T) unsigned char value_storage_[sizeof(T)];
         ErrorInfo error_;
@@ -216,29 +213,91 @@ private:
         std::string buildMessage() const;
     };
     
-    std::optional<ErrorInfo> errorInfo_;
+    // Use union to avoid extra allocation when no error occurs
+    union {
+        ErrorInfo error_info_;
+        char empty_; // Used when no error
+    };
+    
+    bool has_error_;
     
 public:
-    Result() : error_(SocketError::None) {}
+    Result() : error_(SocketError::None), has_error_(false) {}
     
     Result(SocketError error, const char* description, int sysCode = 0, bool isDns = false)
-        : error_(error), errorInfo_(ErrorInfo{description, sysCode, isDns, {}}) {}
+        : error_(error), has_error_(true) {
+        new(&error_info_) ErrorInfo{description, sysCode, isDns, {}};
+    }
     
-    bool isSuccess() const noexcept { return error_ == SocketError::None; }
-    bool isError() const noexcept { return !isSuccess(); }
+    ~Result() {
+        if (has_error_) {
+            error_info_.~ErrorInfo();
+        }
+    }
+    
+    // Copy/move constructors
+    Result(const Result& other) : error_(other.error_), has_error_(other.has_error_) {
+        if (has_error_) {
+            new(&error_info_) ErrorInfo{other.error_info_.description, other.error_info_.sysCode, 
+                                        other.error_info_.isDns, 
+                                        other.error_info_.cachedMessage_};
+        }
+    }
+    
+    Result(Result&& other) noexcept : error_(other.error_), has_error_(other.has_error_) {
+        if (has_error_) {
+            new(&error_info_) ErrorInfo{other.error_info_.description, other.error_info_.sysCode, 
+                                        other.error_info_.isDns, 
+                                        std::move(other.error_info_.cachedMessage_)};
+        }
+    }
+    
+    // Assignment operators
+    Result& operator=(const Result& other) {
+        if (this != &other) {
+            if (has_error_) error_info_.~ErrorInfo();
+            if (other.has_error_) {
+                has_error_ = true;
+                new(&error_info_) ErrorInfo{other.error_info_.description, other.error_info_.sysCode, 
+                                            other.error_info_.isDns, 
+                                            other.error_info_.cachedMessage_};
+            } else {
+                has_error_ = false;
+            }
+        }
+        return *this;
+    }
+    
+    Result& operator=(Result&& other) noexcept {
+        if (this != &other) {
+            if (has_error_) error_info_.~ErrorInfo();
+            if (other.has_error_) {
+                has_error_ = true;
+                new(&error_info_) ErrorInfo{other.error_info_.description, other.error_info_.sysCode, 
+                                            other.error_info_.isDns, 
+                                            std::move(other.error_info_.cachedMessage_)};
+            } else {
+                has_error_ = false;
+            }
+        }
+        return *this;
+    }
+    
+    bool isSuccess() const noexcept { return !has_error_; }
+    bool isError() const noexcept { return has_error_; }
     
     SocketError error() const noexcept { return error_; }
     
     const std::string& message() const {
-        if (!errorInfo_.has_value()) {
+        if (!has_error_) {
             static const std::string empty = "";
             return empty;
         }
         
-        if (errorInfo_->cachedMessage_.empty()) {
-            errorInfo_->cachedMessage_ = errorInfo_->buildMessage();
+        if (error_info_.cachedMessage_.empty()) {
+            error_info_.cachedMessage_ = error_info_.buildMessage();
         }
-        return errorInfo_->cachedMessage_;
+        return error_info_.cachedMessage_;
     }
     
     explicit operator bool() const noexcept { return isSuccess(); }
@@ -255,9 +314,6 @@ public:
 template<>
 class Result<Endpoint> {
 private:
-    // Endpoint is small enough for SBO (typically ~32-64 bytes)
-    static constexpr bool use_sbo = sizeof(Endpoint) <= sizeof(ErrorInfo);
-    
     union {
         alignas(Endpoint) unsigned char endpoint_storage_[sizeof(Endpoint)];
         ErrorInfo error_;
