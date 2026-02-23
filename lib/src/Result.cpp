@@ -57,7 +57,7 @@ std::string ErrorInfo::buildMessage() const {
     }
     
     // If message fits in stack buffer, return cached copy
-    if (msg_len < SMALL_BUFFER_SIZE) {
+    if (static_cast<size_t>(msg_len) < SMALL_BUFFER_SIZE) {
         if (cachedMessage_.empty()) {
             cachedMessage_.assign(stack_buffer, msg_len);
         }
@@ -72,7 +72,6 @@ std::string ErrorInfo::buildMessage() const {
 }
 
 // Platform-specific error message implementation for Result<void>::ErrorInfo
-template<>
 std::string Result<void>::ErrorInfo::buildMessage() const {
     if (!description) return "Unknown error";
     
