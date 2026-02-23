@@ -5,8 +5,8 @@
 #define AISOCKS_SOCKET_IMPL_H
 
 #include "Socket.h"
+#include "Result.h"
 #include <chrono>
-#include <optional>
 #include <vector>
 
 #ifdef _WIN32
@@ -107,8 +107,8 @@ class SocketImpl {
     SocketError getLastError() const noexcept;
     std::string getErrorMessage() const;
     ErrorContext getErrorContext() const;
-    std::optional<Endpoint> getLocalEndpoint() const;
-    std::optional<Endpoint> getPeerEndpoint() const;
+    Result<Endpoint> getLocalEndpoint() const;
+    Result<Endpoint> getPeerEndpoint() const;
     SocketHandle getRawHandle() const noexcept { return socketHandle; }
 
     // Query socket options

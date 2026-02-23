@@ -4,12 +4,12 @@
 #ifndef AISOCKS_SOCKET_H
 #define AISOCKS_SOCKET_H
 
+#include "Result.h"
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <exception>
 #include <memory>
-#include <optional>
 #include <string>
 #include <vector>
 
@@ -303,10 +303,10 @@ class Socket {
     std::string getErrorMessage() const;
 
     // Query the local address/port assigned to this socket.
-    std::optional<Endpoint> getLocalEndpoint() const;
+    Result<Endpoint> getLocalEndpoint() const;
 
     // Query the remote address/port this socket is connected to.
-    std::optional<Endpoint> getPeerEndpoint() const;
+    Result<Endpoint> getPeerEndpoint() const;
 
     // Returns the underlying OS socket descriptor as an opaque integer.
     // Advanced use only (e.g. Poller integration).
