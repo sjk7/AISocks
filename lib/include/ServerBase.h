@@ -139,6 +139,11 @@ template <typename ClientData> class ServerBase {
             return; // Failed to register with poller
         }
 
+        // Pre-reserve client map if maxClients is specified to eliminate hash table growth
+        if (maxClients > 0) {
+            clients_.reserve(maxClients);
+        }
+
         bool accepting = true;
         size_t accepted = 0;
 
