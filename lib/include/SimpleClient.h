@@ -5,9 +5,9 @@
 #define AISOCKS_SIMPLE_CLIENT_H
 
 #include "TcpSocket.h"
+#include "SocketFactory.h"
 #include <functional>
 #include <memory>
-#include <stdexcept>
 #include <string>
 
 namespace aiSocks {
@@ -39,16 +39,22 @@ class SimpleClient {
     // Connect using ConnectArgs and invoke callback with the connected socket.
     // Callback signature: void(TcpSocket&)
     // 
-    // Throws SocketException if connection fails (lets it propagate from TcpSocket).
+    // Returns invalid client if connection fails - check isConnected().
     template <typename Callback>
     SimpleClient(const ConnectArgs& args, Callback&& onConnected,
         AddressFamily family = AddressFamily::IPv4) {
-        auto sock = std::make_unique<TcpSocket>(family, args);
-        // Set receive timeout to prevent indefinite blocking
-        // Use the connection timeout as the receive timeout
-        sock->setReceiveTimeout(args.connectTimeout);
-        socket_ = std::move(sock);
-        onConnected(*socket_);
+        // Use SocketFactory to create client without exceptions
+        auto result = SocketFactory::createTcpClient(family, args);
+        if (result.isSuccess()) {
+            socket_ = std::make_unique<TcpSocket>(std::move(result.value()));
+            // Set receive timeout to prevent indefinite blocking
+            // Use the connection timeout as the receive timeout
+            socket_->setReceiveTimeout(args.connectTimeout);
+            onConnected(*socket_);
+        } else {
+            // Connection failed - socket remains null
+            socket_.reset();
+        }
     }
 
     // Check if the connection was established (always true if constructor succeeded).
@@ -56,12 +62,18 @@ class SimpleClient {
 
     // Access the underlying socket for manual operations.
     TcpSocket& getSocket() {
-        if (!socket_) throw std::runtime_error("SimpleClient: socket not initialized");
+        if (!socket_) {
+            static TcpSocket dummy = TcpSocket::createRaw();
+            return dummy;
+        }
         return *socket_;
     }
 
     const TcpSocket& getSocket() const {
-        if (!socket_) throw std::runtime_error("SimpleClient: socket not initialized");
+        if (!socket_) {
+            static TcpSocket dummy = TcpSocket::createRaw();
+            return dummy;
+        }
         return *socket_;
     }
 
