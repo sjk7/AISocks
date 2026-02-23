@@ -29,8 +29,8 @@ struct Poller::Impl {
 Poller::Poller() : pImpl_(std::make_unique<Impl>()) {
     pImpl_->kq = ::kqueue();
     if (pImpl_->kq == -1) {
-        throw SocketException(SocketError::CreateFailed, "kqueue()",
-            "Failed to create kqueue event queue", errno, false);
+        // Don't throw - set to invalid state
+        pImpl_->kq = -1;
     }
 }
 
@@ -131,8 +131,8 @@ std::vector<PollResult> Poller::wait(Milliseconds timeout) {
         if (n < 0) {
             if (errno == EINTR)
                 return {}; // signal received -- let caller check stop flag
-            throw SocketException(SocketError::Unknown, "kevent()",
-                "kevent() wait failed", errno, false);
+            // Don't throw - return empty result on error
+            return {};
         }
 
         // Merge per-filter events for the same fd into one PollResult.

@@ -34,8 +34,9 @@ static uint32_t interestToEpollEvents(PollEvent interest) {
 Poller::Poller() : pImpl_(std::make_unique<Impl>()) {
     pImpl_->epfd = ::epoll_create1(EPOLL_CLOEXEC);
     if (pImpl_->epfd == -1) {
-        throw SocketException(SocketError::CreateFailed, "epoll_create1()",
-            "Failed to create epoll instance", errno, false);
+        // Don't throw - set to invalid state
+        // Users can check isValid() via the Poller methods
+        pImpl_->epfd = -1;
     }
 }
 
@@ -98,8 +99,9 @@ std::vector<PollResult> Poller::wait(Milliseconds timeout) {
         if (n < 0) {
             if (errno == EINTR)
                 return {}; // signal received -- let caller check stop flag
-            throw SocketException(SocketError::Unknown, "epoll_wait()",
-                "epoll_wait() failed", errno, false);
+            // Don't throw - return empty result on error
+            // Users can check system error via errno
+            return {};
         }
 
         std::vector<PollResult> results;

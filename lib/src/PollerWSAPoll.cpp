@@ -97,8 +97,9 @@ std::vector<PollResult> Poller::wait(Milliseconds timeout) {
     int rc = ::WSAPoll(
         pImpl_->fds.data(), static_cast<ULONG>(pImpl_->fds.size()), timeoutMs);
     if (rc == SOCKET_ERROR) {
-        throw SocketException(SocketError::Unknown, "WSAPoll()",
-            "WSAPoll() failed", WSAGetLastError(), false);
+        // Don't throw - return empty result on error
+        // Users can check error via WSAGetLastError()
+        return {};
     }
 
     std::vector<PollResult> results;

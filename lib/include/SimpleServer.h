@@ -6,6 +6,7 @@
 
 #include "Poller.h"
 #include "TcpSocket.h"
+#include "SocketFactory.h"
 #include <functional>
 #include <memory>
 #include <string>
@@ -46,16 +47,21 @@ namespace aiSocks {
 class SimpleServer {
     public:
     // Create a listening server socket.
-    // Does NOT start accepting connections yet - call acceptClients() to start.
-    // 
-    // Throws SocketException if bind or listen fails.
+    // Returns invalid socket if bind or listen fails - check isValid().
     SimpleServer(const ServerBind& args,
         AddressFamily family = AddressFamily::IPv4)
-        : socket_(std::make_unique<TcpSocket>(family, args)) {
-        if (!socket_->setBlocking(false)) {
-            throw SocketException(socket_->getLastError(),
-                "SimpleServer::SimpleServer",
-                "Failed to set server socket to non-blocking mode", 0, false);
+        : socket_(std::make_unique<TcpSocket>(TcpSocket::createRaw(family))) {
+        // Use SocketFactory to create server without exceptions
+        auto result = SocketFactory::createTcpServer(family, args);
+        if (result.isSuccess()) {
+            *socket_ = std::move(result.value());
+            if (!socket_->setBlocking(false)) {
+                // Failed to set non-blocking - invalidate socket
+                socket_.reset();
+            }
+        } else {
+            // Server creation failed - socket remains invalid
+            socket_.reset();
         }
     }
 
@@ -66,11 +72,11 @@ class SimpleServer {
     // callback itself is responsible for any client I/O strategy.
     template <typename Callback>
     void acceptClients(Callback&& onClient, size_t maxClients = 0) {
+        if (!socket_ || !socket_->isValid()) return;
+        
         Poller poller;
         if (!poller.add(*socket_, PollEvent::Readable | PollEvent::Error)) {
-            throw SocketException(socket_->getLastError(),
-                "SimpleServer::acceptClients",
-                "Failed to register listening socket with Poller", 0, false);
+            return; // Failed to register with poller
         }
 
         size_t count = 0;
@@ -121,11 +127,11 @@ class SimpleServer {
     template <typename Callback>
     void pollClients(Callback&& onClientEvent, size_t maxClients = 0,
         Milliseconds timeout = Milliseconds{-1}) {
+        if (!socket_ || !socket_->isValid()) return;
+        
         Poller poller;
         if (!poller.add(*socket_, PollEvent::Readable | PollEvent::Error)) {
-            throw SocketException(socket_->getLastError(),
-                "SimpleServer::pollClients",
-                "Failed to register listening socket with Poller", 0, false);
+            return; // Failed to register with poller
         }
 
         std::unordered_map<const Socket*, std::unique_ptr<TcpSocket>> clients;
@@ -189,13 +195,26 @@ class SimpleServer {
         }
     }
 
+    // Check if the server socket is valid and ready for use
+    bool isValid() const {
+        return socket_ && socket_->isValid();
+    }
+
     // Get access to the underlying server socket.
     // Useful for configuring socket options or checking socket state.
     TcpSocket& getSocket() {
+        if (!socket_) {
+            static TcpSocket dummy = TcpSocket::createRaw();
+            return dummy;
+        }
         return *socket_;
     }
 
     const TcpSocket& getSocket() const {
+        if (!socket_) {
+            static TcpSocket dummy = TcpSocket::createRaw();
+            return dummy;
+        }
         return *socket_;
     }
 

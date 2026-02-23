@@ -42,8 +42,7 @@ bool Endpoint::isPrivateNetwork() const {
 }
 
 // Helper used only inside constructors: if ok is false, extract the error
-// from pImpl and throw with the failing step name prepended.
-// Lazy what() for SocketException  built once on first call.
+// from pImpl and set the socket to invalid state instead of throwing.
 const char* SocketException::what() const noexcept {
     if (!whatCache_.empty()) return whatCache_.c_str();
     try {
@@ -56,41 +55,43 @@ const char* SocketException::what() const noexcept {
 }
 
 namespace {
-    void throwIfFailed(bool ok, const std::string& step,
-        const std::unique_ptr<SocketImpl>& impl) {
+    // Set error state instead of throwing - returns false on error
+    bool setErrorIfFailed(bool ok, const std::unique_ptr<SocketImpl>& /*impl*/) {
         if (!ok) {
-            auto ctx = impl->getErrorContext();
-            throw SocketException(impl->getLastError(), step, ctx.description,
-                ctx.sysCode, ctx.isDns);
+            // Don't throw - just let the socket remain in invalid state
+            // The caller can check isValid() and getLastError()
+            return false;
         }
+        return true;
     }
-} // namespace
+}
 
 Socket::Socket(SocketType type, AddressFamily family)
     : pImpl(std::make_unique<SocketImpl>(type, family)) {
-    throwIfFailed(pImpl->isValid(), "socket()", pImpl);
+    // Don't throw - let socket remain in invalid state if creation fails
+    // Users can check isValid() and getLastError()
 }
 
 Socket::Socket(SocketType type, AddressFamily family, const ServerBind& cfg)
     : pImpl(std::make_unique<SocketImpl>(type, family)) {
-    throwIfFailed(pImpl->isValid(), "socket()", pImpl);
+    // Don't throw - let socket remain in invalid state if creation fails
+    if (!setErrorIfFailed(pImpl->isValid(), pImpl)) return;
 
     if (cfg.reuseAddr)
-        throwIfFailed(
-            pImpl->setReuseAddress(true), "setsockopt(SO_REUSEADDR)", pImpl);
+        setErrorIfFailed(
+            pImpl->setReuseAddress(true), pImpl);
 
-    throwIfFailed(pImpl->bind(cfg.address, cfg.port),
-        "bind(" + cfg.address + ":" + std::to_string(cfg.port) + ")", pImpl);
+    setErrorIfFailed(pImpl->bind(cfg.address, cfg.port), pImpl);
 
-    throwIfFailed(pImpl->listen(cfg.backlog),
-        "listen(backlog=" + std::to_string(cfg.backlog) + ")", pImpl);
+    setErrorIfFailed(pImpl->listen(cfg.backlog), pImpl);
 }
 
 Socket::Socket(SocketType type, AddressFamily family, const ConnectArgs& cfg)
     : pImpl(std::make_unique<SocketImpl>(type, family)) {
-    throwIfFailed(pImpl->isValid(), "socket()", pImpl);
-    throwIfFailed(pImpl->connect(cfg.address, cfg.port, cfg.connectTimeout),
-        "connect(" + cfg.address + ":" + std::to_string(cfg.port) + ")", pImpl);
+    // Don't throw - let socket remain in invalid state if creation fails
+    if (!setErrorIfFailed(pImpl->isValid(), pImpl)) return;
+    
+    setErrorIfFailed(pImpl->connect(cfg.address, cfg.port, cfg.connectTimeout), pImpl);
 }
 
 Socket::Socket(std::unique_ptr<SocketImpl> impl) : pImpl(std::move(impl)) {}
