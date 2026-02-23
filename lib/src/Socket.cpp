@@ -11,7 +11,10 @@
 
 namespace aiSocks {
 
+// ---------------------------------------------------------------------------
 // Endpoint utility methods
+// ---------------------------------------------------------------------------
+
 bool Endpoint::isLoopback() const {
     if (family == AddressFamily::IPv4) {
         // Check for 127.x.x.x
@@ -52,6 +55,10 @@ namespace {
         return true;
     }
 }
+
+// ---------------------------------------------------------------------------
+// Socket class implementation
+// ---------------------------------------------------------------------------
 
 Socket::Socket(SocketType type, AddressFamily family)
     : pImpl(std::make_unique<SocketImpl>(type, family)) {
