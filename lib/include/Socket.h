@@ -14,6 +14,17 @@
 #include <vector>
 
 // ---------------------------------------------------------------------------
+// Platform-specific native handle types
+// ---------------------------------------------------------------------------
+#ifdef _WIN32
+using NativeHandle = SOCKET;
+constexpr NativeHandle INVALID_NATIVE_HANDLE = INVALID_SOCKET;
+#else
+using NativeHandle = int;
+constexpr NativeHandle INVALID_NATIVE_HANDLE = -1;
+#endif
+
+// ---------------------------------------------------------------------------
 // Span<T>  resolves to std::span on C++20; a minimal shim on C++17.
 //
 // Usage (same on both standards):
@@ -308,9 +319,9 @@ class Socket {
     // Query the remote address/port this socket is connected to.
     Result<Endpoint> getPeerEndpoint() const;
 
-    // Returns the underlying OS socket descriptor as an opaque integer.
+    // Returns the underlying OS socket descriptor as a platform-specific handle.
     // Advanced use only (e.g. Poller integration).
-    uintptr_t getNativeHandle() const noexcept;
+    NativeHandle getNativeHandle() const noexcept;
 
     // Static utility methods
     static std::vector<NetworkInterface> getLocalAddresses();
