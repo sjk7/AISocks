@@ -564,6 +564,14 @@ bool SocketImpl::setTimeout(Milliseconds timeout) {
         std::chrono::milliseconds(timeout.count), "Failed to set receive timeout");
 }
 
+bool SocketImpl::setReceiveTimeout(Milliseconds timeout) {
+    if (!isValid()) {
+        return false;
+    }
+    return setSocketOptionTimeout(socketHandle, SO_RCVTIMEO, 
+        std::chrono::milliseconds(timeout.count), "Failed to set receive timeout");
+}
+
 void SocketImpl::close() noexcept {
     if (isValid()) {
         // Only call ::shutdown() if the user hasn't already done so.
@@ -929,7 +937,7 @@ bool SocketImpl::waitReadable(std::chrono::milliseconds timeout) {
         int nReady = ::WSAPoll(&pfd, 1, static_cast<int>(sliceMs));
         if (nReady < 0) return false;
         if (nReady == 0) {
-            setError(SocketError::Timeout, "waitWritable timed out");
+            setError(SocketError::Timeout, "waitReadable timed out");
             return false; // Timeout
         }
         return true;

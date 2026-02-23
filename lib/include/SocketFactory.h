@@ -120,7 +120,7 @@ private:
     );
     
     // Platform-specific error code extraction
-    static int getLastSystemError();
+    static int captureLastError();
     
     // Helper for binding operations
     template<typename SocketType>
@@ -152,14 +152,6 @@ inline Result<TcpSocket> SocketFactory::createTcpSocket(AddressFamily family) {
 
 inline Result<UdpSocket> SocketFactory::createUdpSocket(AddressFamily family) {
     return createUdpSocketRaw(family);
-}
-
-inline int SocketFactory::getLastSystemError() {
-#ifdef _WIN32
-    return WSAGetLastError();
-#else
-    return errno;
-#endif
 }
 
 } // namespace aiSocks
