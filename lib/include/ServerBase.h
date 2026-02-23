@@ -204,6 +204,7 @@ template <typename ClientData> class ServerBase {
 #endif
                 }
             }
+            
             if (onIdle() == ServerResult::StopServer) {
                 s_stop_.store(true);
                 break;
@@ -294,9 +295,7 @@ template <typename ClientData> class ServerBase {
     virtual ServerResult onWritable(TcpSocket& sock, ClientData& data) = 0;
 
     // Called just before a client is removed.  Default: no-op.
-    virtual ServerResult onDisconnect(ClientData& /*data*/) {
-        return ServerResult::Disconnect;
-    }
+    virtual void onDisconnect(ClientData& /*data*/) {}
 
     // Called when a poll error event fires on a client socket.
     // sock is still valid at this point. Default: no-op.
@@ -314,6 +313,8 @@ template <typename ClientData> class ServerBase {
     // pass a bounded timeout to run() (e.g. Milliseconds{100}).
     // Derived classes should call ServerBase::onIdle() to retain keep-alive
     // timeout behaviour.
+    // NOTE: This method is read-only - derived classes should NOT modify
+    // client state or remove clients to prevent race conditions.
     virtual ServerResult onIdle() {
         if (!current_poller_ || keepAliveTimeout_.count() == 0)
             return ServerResult::KeepConnection;
@@ -321,20 +322,20 @@ template <typename ClientData> class ServerBase {
         if (now - last_idle_check_ < std::chrono::seconds{1})
             return ServerResult::KeepConnection;
         last_idle_check_ = now;
+        
+        // Just count timed out clients for reporting - actual cleanup is handled
+        // by the main event loop to prevent race conditions.
         size_t timedOut = 0;
-        for (auto it = clients_.begin(); it != clients_.end();) {
-            auto idle = std::chrono::duration_cast<std::chrono::seconds>(
-                now - it->second.lastActivity);
-            if (idle >= keepAliveTimeout_) {
-                onDisconnect(it->second.data);
-                it->second.socket->shutdown(ShutdownHow::Write);
-                (void)current_poller_->remove(*it->second.socket);
-                it = clients_.erase(it);
-                ++timedOut;
-            } else {
-                ++it;
+        if (keepAliveTimeout_.count() > 0) {
+            for (const auto& [fd, entry] : clients_) {
+                auto idle = std::chrono::duration_cast<std::chrono::seconds>(
+                    now - entry.lastActivity);
+                if (idle >= keepAliveTimeout_) {
+                    ++timedOut;
+                }
             }
         }
+        
         if (timedOut > 0) onClientsTimedOut(timedOut);
         return ServerResult::KeepConnection;
     }
