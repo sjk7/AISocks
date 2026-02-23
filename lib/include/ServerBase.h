@@ -6,11 +6,12 @@
 
 #include "Poller.h"
 #include "TcpSocket.h"
+#include "SocketFactory.h"
 #include <atomic>
-#include <csignal>
+#include <chrono>
+#include <cstdint>
 #include <functional>
 #include <memory>
-#include <iostream>
 #include <unordered_map>
 
 namespace aiSocks {
@@ -74,14 +75,21 @@ enum class ServerResult {
 template <typename ClientData> class ServerBase {
     public:
     // Construct and start listening.  Does not accept until run() is called.
-    // Throws SocketException on failure.
+    // Returns invalid server if bind or listen fails - check isValid().
     explicit ServerBase(
         const ServerBind& args, AddressFamily family = AddressFamily::IPv4)
-        : listener_(std::make_unique<TcpSocket>(family, args)) {
-        if (!listener_->setBlocking(false)) {
-            throw SocketException(listener_->getLastError(),
-                "ServerBase::ServerBase",
-                "Failed to set listening socket to non-blocking", 0, false);
+        : listener_(std::make_unique<TcpSocket>(TcpSocket::createRaw(family))) {
+        // Use SocketFactory to create server without exceptions
+        auto result = SocketFactory::createTcpServer(family, args);
+        if (result.isSuccess()) {
+            *listener_ = std::move(result.value());
+            if (!listener_->setBlocking(false)) {
+                // Failed to set non-blocking - invalidate socket
+                listener_.reset();
+            }
+        } else {
+            // Server creation failed - socket remains invalid
+            listener_.reset();
         }
     }
 
@@ -93,6 +101,11 @@ template <typename ClientData> class ServerBase {
     ServerBase(ServerBase&&) = default;
     ServerBase& operator=(ServerBase&&) = default;
 
+    // Check if the server is valid and ready for use
+    bool isValid() const {
+        return listener_ && listener_->isValid();
+    }
+
     // Enter the poll loop.
     //
     // maxClients: 0 = unlimited; N > 0 = stop accepting after N connections,
@@ -103,6 +116,8 @@ template <typename ClientData> class ServerBase {
     // stopped, either because maxClients was reached or you stopped
     // externally).
     void run(size_t maxClients = 0, Milliseconds timeout = Milliseconds{-1}) {
+        if (!isValid()) return; // Server not valid, exit early
+
         s_stop_.store(false, std::memory_order_relaxed);
 
         // Install SIGINT/SIGTERM for Ctrl+C shutdown; restore on exit.
@@ -120,8 +135,7 @@ template <typename ClientData> class ServerBase {
         Poller poller;
         current_poller_ = &poller;
         if (!poller.add(*listener_, PollEvent::Readable | PollEvent::Error)) {
-            throw SocketException(listener_->getLastError(), "ServerBase::run",
-                "Failed to register listening socket with Poller", 0, false);
+            return; // Failed to register with poller
         }
 
         bool accepting = true;
