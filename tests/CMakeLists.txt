@@ -38,11 +38,21 @@ foreach(TEST_NAME ${TEST_SOURCES})
         target_compile_options(${TEST_NAME} PRIVATE
             $<$<CONFIG:Release>:-O1>
             $<$<CONFIG:Release>:-fno-lto>
+            $<$<CONFIG:Debug>:-g>
+            $<$<CONFIG:Debug>:-O0>
+        )
+        target_link_options(${TEST_NAME} PRIVATE
+            $<$<CONFIG:Debug>:-g>
         )
     else()
         target_compile_options(${TEST_NAME} PRIVATE
             /utf-8          # treat source as UTF-8 (handles em dashes in comments)
             $<$<CONFIG:Release>:/O1>
+            $<$<CONFIG:Debug>:/Zi>
+            $<$<CONFIG:Debug>:/Od>
+        )
+        target_link_options(${TEST_NAME} PRIVATE
+            $<$<CONFIG:Debug>:/DEBUG>
         )
     endif()
 

@@ -182,16 +182,34 @@
             "preLaunchTask": "Build Tests"
         },
         {
-            "name": "(Windows) Debug aiSocksExample",
+            "name": "(Windows) Debug test_server_base (build-debug)",
             "type": "cppvsdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/build-ninja/aiSocksExample.exe",
+            "program": "${workspaceFolder}/build-debug/tests/Debug/test_server_base.exe",
             "args": [],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
             "environment": [],
-            "console": "integratedTerminal",
-            "preLaunchTask": "cmake: build"
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "(lldb) Debug test_server_base (build-debug)",
+            "type": "lldb",
+            "request": "launch",
+            "program": "${workspaceFolder}/build-debug/tests/Debug/test_server_base.exe",
+            "args": [],
+            "cwd": "${workspaceFolder}",
+            "preLaunchTask": "Build test_server_base (debug)"
+        },
+        {
+            "name": "Build test_server_base (debug)",
+            "type": "shell",
+            "command": "cmake --build build-debug --target test_server_base",
+            "problemMatcher": [],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
         },
         {
             "name": "(lldb) Debug aiSocksHttpServer",
