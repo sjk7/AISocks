@@ -9,6 +9,7 @@
 #include "SocketFactory.h"
 #include <atomic>
 #include <chrono>
+#include <csignal>
 #include <cstdint>
 #include <functional>
 #include <memory>
@@ -184,8 +185,7 @@ template <typename ClientData> class ServerBase {
                     (void)poller.remove(*it->second.socket);
                     clients_.erase(it);
 #ifdef SERVER_STATS
-                    std::cout << "[stats] clients: " << clients_.size()
-                              << "  max: " << max_clients_ << "\n";
+                    printf("[stats] clients: %zu  max: %zu\n", clients_.size(), max_clients_);
 #endif
                 }
             }
@@ -290,8 +290,7 @@ template <typename ClientData> class ServerBase {
     // Called after the keep-alive sweep closes one or more idle connections.
     // Default: prints the count to stdout.
     virtual void onClientsTimedOut(size_t count) {
-        std::cout << "[keepalive] closed " << count << " idle connection"
-                  << (count == 1 ? "" : "s") << "\n";
+        printf("[keepalive] closed %zu idle connection%s\n", count, count == 1 ? "" : "s");
     }
 
     // Called on every loop iteration after poller.wait() returns, before
@@ -372,8 +371,7 @@ template <typename ClientData> class ServerBase {
             if (clients_.size() > peak_clients_)
                 peak_clients_ = clients_.size();
 #ifdef SERVER_STATS
-            std::cout << "[stats] clients: " << clients_.size()
-                      << "  peak: " << peak_clients_ << "\n";
+            printf("[stats] clients: %zu  peak: %zu\n", clients_.size(), peak_clients_);
 #endif
 
             if (maxClients != 0 && accepted >= maxClients) {
