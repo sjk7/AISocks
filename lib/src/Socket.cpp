@@ -371,9 +371,9 @@ std::string Socket::ipToString(const void* addr, AddressFamily family) {
     return SocketImpl::ipToString(addr, family);
 }
 
-uintptr_t Socket::getNativeHandle() const noexcept {
-    if (!pImpl) return static_cast<uintptr_t>(-1);
-    return static_cast<uintptr_t>(pImpl->getRawHandle());
+NativeHandle Socket::getNativeHandle() const noexcept {
+    if (!pImpl) return INVALID_NATIVE_HANDLE;
+    return static_cast<NativeHandle>(pImpl->getRawHandle());
 }
 
 } // namespace aiSocks
