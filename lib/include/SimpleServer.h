@@ -14,6 +14,9 @@
 
 namespace aiSocks {
 
+// Constant for unlimited client connections
+constexpr size_t UNLIMITED_CLIENTS = 0;
+
 // ---------------------------------------------------------------------------
 // SimpleServer  convenience wrapper for TCP server polling loops.
 //
@@ -71,7 +74,7 @@ class SimpleServer {
     // Note: This accepts clients in non-blocking mode using Poller, but the
     // callback itself is responsible for any client I/O strategy.
     template <typename Callback>
-    void acceptClients(Callback&& onClient, size_t maxClients = 0) {
+    void acceptClients(Callback&& onClient, size_t maxClients = UNLIMITED_CLIENTS) {
         if (!socket_ || !socket_->isValid()) return;
         
         Poller poller;
@@ -80,7 +83,7 @@ class SimpleServer {
         }
 
         size_t count = 0;
-        while (maxClients == 0 || count < maxClients) {
+        while (maxClients == UNLIMITED_CLIENTS || count < maxClients) {
             auto ready = poller.wait(Milliseconds{-1});
             for (const auto& event : ready) {
                 if (event.socket != socket_.get()) continue;
@@ -105,7 +108,7 @@ class SimpleServer {
 
                     onClient(*client);
                     ++count;
-                    if (maxClients != 0 && count >= maxClients) {
+                    if (maxClients != UNLIMITED_CLIENTS && count >= maxClients) {
                         return;
                     }
                 }
@@ -121,11 +124,11 @@ class SimpleServer {
     //   false remove and close the client.
     //
     // maxClients semantics:
-    //   0              accept forever.
-    //   N > 0          accept up to N clients, then stop accepting and keep
-    //                  polling existing clients until all disconnect.
+    //   UNLIMITED_CLIENTS (0)  accept forever.
+    //   N > 0                  accept up to N clients, then stop accepting and keep
+    //                          polling existing clients until all disconnect.
     template <typename Callback>
-    void pollClients(Callback&& onClientEvent, size_t maxClients = 0,
+    void pollClients(Callback&& onClientEvent, size_t maxClients = UNLIMITED_CLIENTS,
         Milliseconds timeout = Milliseconds{-1}) {
         if (!socket_ || !socket_->isValid()) return;
         
