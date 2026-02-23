@@ -12,6 +12,17 @@
 namespace aiSocks {
 
 // ---------------------------------------------------------------------------
+// Platform-specific system error retrieval
+// ---------------------------------------------------------------------------
+int SocketFactory::captureLastError() {
+#ifdef _WIN32
+    return WSAGetLastError();
+#else
+    return errno;
+#endif
+}
+
+// ---------------------------------------------------------------------------
 // Template method implementations
 // ---------------------------------------------------------------------------
 
@@ -52,7 +63,7 @@ Result<SocketType> SocketFactory::createSocketFromImpl(
                 return Result<SocketType>::failure(
                     socket.getLastError(),
                     operation,
-                    getLastSystemError(),
+                    SocketFactory::captureLastError(),
                     false
                 );
             }
@@ -61,7 +72,7 @@ Result<SocketType> SocketFactory::createSocketFromImpl(
             return Result<SocketType>::failure(
                 SocketError::CreateFailed,
                 operation,
-                getLastSystemError(),
+                SocketFactory::captureLastError(),
                 false
             );
         }
@@ -80,7 +91,7 @@ Result<void> SocketFactory::checkSocketError(const Socket& socket, const char* o
         return Result<void>::failure(
             socket.getLastError(),
             operation,
-            getLastSystemError(),
+            SocketFactory::captureLastError(),
             false
         );
     }
@@ -106,7 +117,7 @@ Result<SocketType> SocketFactory::bindSocket(SocketType&& socket, const ServerBi
             return Result<SocketType>::failure(
                 socket.getLastError(),
                 "setsockopt(SO_REUSEADDR)",
-                getLastSystemError(),
+                SocketFactory::captureLastError(),
                 false
             );
         }
@@ -117,7 +128,7 @@ Result<SocketType> SocketFactory::bindSocket(SocketType&& socket, const ServerBi
         return Result<SocketType>::failure(
             socket.getLastError(),
             ("bind(" + config.address + ":" + std::to_string(config.port.value) + ")").c_str(),
-            getLastSystemError(),
+            SocketFactory::captureLastError(),
             false
         );
     }
@@ -142,7 +153,7 @@ Result<TcpSocket> SocketFactory::listenSocket(TcpSocket&& socket, int backlog) {
         return Result<TcpSocket>::failure(
             socket.getLastError(),
             ("listen(backlog=" + std::to_string(backlog) + ")").c_str(),
-            getLastSystemError(),
+            SocketFactory::captureLastError(),
             false
         );
     }
@@ -167,7 +178,7 @@ Result<TcpSocket> SocketFactory::connectSocket(TcpSocket&& socket, const Connect
         return Result<TcpSocket>::failure(
             socket.getLastError(),
             ("connect(" + config.address + ":" + std::to_string(config.port.value) + ")").c_str(),
-            getLastSystemError(),
+            SocketFactory::captureLastError(),
             false
         );
     }
@@ -187,7 +198,7 @@ Result<TcpSocket> SocketFactory::createTcpSocketRaw(AddressFamily family) {
         return Result<TcpSocket>::failure(
             SocketError::CreateFailed,
             "socket()",
-            getLastSystemError(),
+            SocketFactory::captureLastError(),
             false
         );
     }
@@ -201,7 +212,7 @@ Result<UdpSocket> SocketFactory::createUdpSocketRaw(AddressFamily family) {
         return Result<UdpSocket>::failure(
             SocketError::CreateFailed,
             "socket()",
-            getLastSystemError(),
+            SocketFactory::captureLastError(),
             false
         );
     }
@@ -346,6 +357,39 @@ template Result<TcpSocket> SocketFactory::bindSocket<TcpSocket>(
 template Result<UdpSocket> SocketFactory::bindSocket<UdpSocket>(
     UdpSocket&& socket,
     const ServerBind& config
+);
+
+// Explicit template instantiations
+template Result<TcpSocket> SocketFactory::createSocketFromImpl<TcpSocket>(
+    std::unique_ptr<SocketImpl> impl,
+    const char* operation,
+    AddressFamily family
+);
+
+template Result<UdpSocket> SocketFactory::createSocketFromImpl<UdpSocket>(
+    std::unique_ptr<SocketImpl> impl,
+    const char* operation,
+    AddressFamily family
+);
+
+template Result<TcpSocket> SocketFactory::bindSocket<TcpSocket>(
+    TcpSocket&& socket,
+    const ServerBind& config
+);
+
+template Result<UdpSocket> SocketFactory::bindSocket<UdpSocket>(
+    UdpSocket&& socket,
+    const ServerBind& config
+);
+
+template Result<TcpSocket> SocketFactory::listenSocket<TcpSocket>(
+    TcpSocket&& socket,
+    int backlog
+);
+
+template Result<TcpSocket> SocketFactory::connectSocket<TcpSocket>(
+    TcpSocket&& socket,
+    const ConnectArgs& config
 );
 
 } // namespace aiSocks
