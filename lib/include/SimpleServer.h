@@ -135,6 +135,10 @@ class SimpleServer {
         }
 
         std::unordered_map<const Socket*, std::unique_ptr<TcpSocket>> clients;
+        // Pre-reserve client map if maxClients is specified to eliminate hash table growth
+        if (maxClients > 0) {
+            clients.reserve(maxClients);
+        }
         size_t accepted = 0;
         bool accepting = true;
 
