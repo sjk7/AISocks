@@ -17,6 +17,9 @@
 
 namespace aiSocks {
 
+// Constant for unlimited client connections
+constexpr size_t UNLIMITED_CLIENTS = 0;
+
 // Return values for ServerBase virtual functions
 enum class ServerResult {
     KeepConnection = 1, // Keep the connection alive
@@ -109,14 +112,14 @@ template <typename ClientData> class ServerBase {
 
     // Enter the poll loop.
     //
-    // maxClients: 0 = unlimited; N > 0 = stop accepting after N connections,
+    // maxClients: UNLIMITED_CLIENTS (0) = unlimited; N > 0 = stop accepting after N connections,
     //             but continue serving existing clients until all disconnect.
     // timeout:    passed to Poller::wait(); -1 = block until an event.
     //
     // Returns when there are no remaining connected clients (and accepting is
     // stopped, either because maxClients was reached or you stopped
     // externally).
-    void run(size_t maxClients = 0, Milliseconds timeout = Milliseconds{-1}) {
+    void run(size_t maxClients = UNLIMITED_CLIENTS, Milliseconds timeout = Milliseconds{-1}) {
         if (!isValid()) return; // Server not valid, exit early
 
         s_stop_.store(false, std::memory_order_relaxed);
