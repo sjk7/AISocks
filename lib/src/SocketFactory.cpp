@@ -207,7 +207,7 @@ Result<TcpSocket> SocketFactory::createTcpSocketRaw(AddressFamily family) {
 Result<UdpSocket> SocketFactory::createUdpSocketRaw(AddressFamily family) {
     try {
         auto impl = std::make_unique<SocketImpl>(SocketType::UDP, family);
-        return createSocketFromImpl<UdpSocket>(std::move(impl), "socket()");
+        return createSocketFromImpl<UdpSocket>(std::move(impl), "socket()", family);
     } catch (...) {
         return Result<UdpSocket>::failure(
             SocketError::CreateFailed,
