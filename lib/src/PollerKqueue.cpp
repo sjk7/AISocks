@@ -22,10 +22,20 @@ namespace aiSocks {
 
 struct Poller::Impl {
     int kq{-1};
-    // Maps raw fd  borrowed Socket pointer (never owned).
-    std::unordered_map<uintptr_t, const Socket*> sockets;
+    // Sparse array for O(1) direct fd->Socket lookup instead of unordered_map
+    std::vector<const Socket*> socketArray;
+    std::vector<bool> socketValid;
     // Reusable result buffer to avoid per-call allocation in wait()
     std::vector<PollResult> resultBuffer;
+    
+    // Helper to ensure array is large enough for fd
+    void ensureCapacity(int fd) {
+        size_t required = static_cast<size_t>(fd) + 1;
+        if (socketArray.size() < required) {
+            socketArray.resize(required, nullptr);
+            socketValid.resize(required, false);
+        }
+    }
 };
 
 Poller::Poller() : pImpl_(std::make_unique<Impl>()) {
@@ -62,7 +72,10 @@ bool Poller::add(const Socket& s, PollEvent interest) {
     if (::kevent(pImpl_->kq, changes, n, nullptr, 0, nullptr) == -1) {
         return false;
     }
-    pImpl_->sockets[static_cast<uintptr_t>(fd)] = &s;
+    auto fd = s.getNativeHandle();
+    pImpl_->ensureCapacity(fd);
+    pImpl_->socketArray[fd] = &s;
+    pImpl_->socketValid[fd] = true;
     return true;
 }
 
@@ -93,7 +106,9 @@ bool Poller::modify(const Socket& s, PollEvent interest) {
     }
     // kevent() returns ENOENT for filters that were not registered  benign.
     ::kevent(pImpl_->kq, changes, n, nullptr, 0, nullptr);
-    pImpl_->sockets[static_cast<uintptr_t>(fd)] = &s;
+    pImpl_->ensureCapacity(fd);
+    pImpl_->socketArray[fd] = &s;
+    pImpl_->socketValid[fd] = true;
     return true;
 }
 
@@ -109,7 +124,10 @@ bool Poller::remove(const Socket& s) {
     // Ignore errors  filters that weren't registered return ENOENT.
     ::kevent(pImpl_->kq, changes, 2, nullptr, 0, nullptr);
 
-    pImpl_->sockets.erase(static_cast<uintptr_t>(fd));
+    if (fd < static_cast<int>(pImpl_->socketArray.size())) {
+        pImpl_->socketArray[fd] = nullptr;
+        pImpl_->socketValid[fd] = false;
+    }
     return true;
 }
 
@@ -165,9 +183,10 @@ std::vector<PollResult> Poller::wait(Milliseconds timeout) {
         pImpl_->resultBuffer.reserve(ready.size());
         auto& results = pImpl_->resultBuffer;
         for (const auto& kv : ready) {
-            auto it = sockets.find(kv.first);
-            if (it != sockets.end()) {
-                results.push_back({it->second, kv.second});
+            auto fd = static_cast<int>(kv.first);
+            if (fd < static_cast<int>(pImpl_->socketArray.size()) && 
+                pImpl_->socketValid[fd] && pImpl_->socketArray[fd]) {
+                results.push_back({pImpl_->socketArray[fd], kv.second});
             }
         }
         return results;
