@@ -27,6 +27,9 @@ namespace aiSocks {
 // delete-through-Socket* is a compile-time error outside the hierarchy.
 // ---------------------------------------------------------------------------
 class TcpSocket : public Socket {
+    // Allow SocketFactory to access private constructor
+    friend class SocketFactory;
+    
     public:
     // Server socket  socket()  [SO_REUSEADDR]  bind()  listen().
     // Throws SocketException on any step failure.
