@@ -13,11 +13,16 @@ namespace aiSocks {
 std::string ErrorInfo::buildMessage() const {
     if (!description) return "Unknown error";
     
-    std::string msg = description;
+    // Small string optimization - use stack buffer for short messages
+    static constexpr size_t SMALL_BUFFER_SIZE = 128;
+    char stack_buffer[SMALL_BUFFER_SIZE];
+    
+    // Build message in stack buffer first
+    int msg_len = snprintf(stack_buffer, SMALL_BUFFER_SIZE, "%s", description);
+    
     if (sysCode != 0) {
-        msg += " [";
-        msg += std::to_string(sysCode);
-        msg += ": ";
+        msg_len += snprintf(stack_buffer + msg_len, SMALL_BUFFER_SIZE - msg_len, 
+                          " [%d: ", sysCode);
         
         // Platform-specific error string
         char sysErrBuf[256] = {0};
@@ -47,10 +52,23 @@ std::string ErrorInfo::buildMessage() const {
             --end;
         }
         
-        msg += sysErrBuf;
-        msg += "]";
+        msg_len += snprintf(stack_buffer + msg_len, SMALL_BUFFER_SIZE - msg_len, 
+                          "%s]", sysErrBuf);
     }
-    return msg;
+    
+    // If message fits in stack buffer, return cached copy
+    if (msg_len < SMALL_BUFFER_SIZE) {
+        if (cachedMessage_.empty()) {
+            cachedMessage_.assign(stack_buffer, msg_len);
+        }
+        return cachedMessage_;
+    }
+    
+    // For long messages, use heap allocation
+    if (cachedMessage_.empty()) {
+        cachedMessage_ = std::string(stack_buffer, msg_len);
+    }
+    return cachedMessage_;
 }
 
 // Platform-specific error message implementation for Result<void>::ErrorInfo
