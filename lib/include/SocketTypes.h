@@ -132,6 +132,51 @@ enum class ShutdownHow {
     Both, // both directions                                   (SHUT_RDWR)
 };
 
+struct NetworkInterface {
+    std::string name; // Interface name (e.g., "eth0", "Ethernet")
+    std::string address; // IP address
+    AddressFamily family; // IPv4 or IPv6
+    bool isLoopback; // True if loopback interface
+};
+
+// Creates a server socket: socket()  [SO_REUSEADDR]  bind()  listen()
+// Returns invalid socket if any step fails - check isValid().
+struct ServerBind {
+    std::string address; // e.g. "0.0.0.0", "127.0.0.1", "::1"
+    Port port{0};
+    int backlog = 10;
+    bool reuseAddr = true;
+};
+
+// Creates a connected client socket: socket()  connect()
+// Returns invalid socket if connection fails - check isValid().
+//
+// connectTimeout controls how long to wait for the TCP handshake:
+//   defaultTimeout (30 s)  used when not specified.
+//   any positive duration  fails with SocketError::Timeout if not connected
+//                           within that duration.
+//   Milliseconds{0}        initiate the connect and return immediately with
+//                           getLastError() == WouldBlock (connect in progress).
+//                           The socket is left in whatever blocking mode it
+//                           was in before the call (BlockingGuard restores it).
+//                           For a Poller-driven async connect:
+//                             1. Call setBlocking(false) on the socket first.
+//                             2. Use connectTimeout = Milliseconds{0}.
+//                             3. Expect WouldBlock  that is not an error.
+//                             4. Register with a Poller (PollEvent::Writable).
+//                             5. Call getPeerEndpoint() after writable fires
+//                                to confirm success.
+//
+// Note: DNS resolution is synchronous and not covered by this timeout.
+// Note: connect() is always issued on a non-blocking fd internally.
+//       BlockingGuard saves the current OS blocking flag, sets O_NONBLOCK,
+//       issues connect(), then restores the original flag on all exit paths.
+struct ConnectArgs {
+    std::string address; // Remote address or hostname
+    Port port{0};
+    Milliseconds connectTimeout{defaultConnectTimeout};
+};
+
 } // namespace aiSocks
 
 #endif // AISOCKS_SOCKET_TYPES_H

@@ -4,8 +4,7 @@
 #ifndef AISOCKS_SOCKET_IMPL_H
 #define AISOCKS_SOCKET_IMPL_H
 
-#include "Socket.h"
-#include "Result.h"
+#include "SocketTypes.h"
 #include <chrono>
 #include <vector>
 
@@ -71,7 +70,7 @@ class SocketImpl {
     // timeout == 0: blocking (OS default). >0: fail with Timeout if the
     // TCP handshake takes longer than timeout (DNS resolution is not covered).
     bool connect(const std::string& address, Port port,
-        std::chrono::milliseconds timeout = defaultTimeout);
+        Milliseconds timeout = defaultConnectTimeout);
 
     // Data transfer
     int send(const void* data, size_t length);
@@ -82,12 +81,13 @@ class SocketImpl {
     // Socket options
     bool setBlocking(bool blocking);
     bool isBlocking() const noexcept;
+    bool waitReadable(Milliseconds timeout);
+    bool waitWritable(Milliseconds timeout);
     bool setReuseAddress(bool reuse);
     bool setReusePort(bool enable);
-    bool setTimeout(
-        std::chrono::milliseconds timeout); // used by setReceiveTimeout
-    bool setSendTimeout(std::chrono::milliseconds timeout);
-    bool setNoDelay(bool noDelay);
+    bool setTimeout(Milliseconds timeout); // used by setReceiveTimeout
+    bool setReceiveTimeout(Milliseconds timeout);
+    bool setSendTimeout(Milliseconds timeout);
     bool setKeepAlive(bool enable);
     bool setLingerAbort(bool enable);
     bool setReceiveBufferSize(int bytes);
