@@ -14,15 +14,10 @@
 #include <vector>
 
 // ---------------------------------------------------------------------------
-// Platform-specific native handle types
+// Platform-specific native handle types - opaque to prevent platform leaks
 // ---------------------------------------------------------------------------
-#ifdef _WIN32
-using NativeHandle = SOCKET;
-constexpr NativeHandle INVALID_NATIVE_HANDLE = INVALID_SOCKET;
-#else
-using NativeHandle = int;
-constexpr NativeHandle INVALID_NATIVE_HANDLE = -1;
-#endif
+using NativeHandle = uintptr_t;
+constexpr NativeHandle INVALID_NATIVE_HANDLE = 0;
 
 // ---------------------------------------------------------------------------
 // Span<T>  resolves to std::span on C++20; a minimal shim on C++17.
