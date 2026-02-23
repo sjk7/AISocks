@@ -174,32 +174,6 @@ enum class SocketError {
     Unknown
 };
 
-// Thrown only from constructors when socket setup cannot be completed.
-// Ingredients are captured eagerly at throw time; the formatted string is
-// built once, on the first call to what(), and cached.
-// Format: "<step>: <description> [<sysCode>: <system text>]"
-class SocketException : public std::exception {
-    public:
-    SocketException(SocketError code, std::string step, std::string description,
-        int sysCode, bool isDns)
-        : errorCode_(code)
-        , step_(std::move(step))
-        , description_(std::move(description))
-        , sysCode_(sysCode)
-        , isDns_(isDns) {}
-
-    SocketError errorCode() const noexcept { return errorCode_; }
-    const char* what() const noexcept override; // defined in Socket.cpp
-
-    private:
-    SocketError errorCode_;
-    std::string step_;
-    std::string description_; // SocketImpl step description
-    int sysCode_{0}; // errno / WSAGetLastError / EAI_*
-    bool isDns_{false}; // true  translate with gai_strerror
-    mutable std::string whatCache_;
-};
-
 // -----------------------------------------------------------------------
 // Configuration structs for correct-by-construction sockets.
 // Pass one of these to the Socket constructor instead of calling
@@ -207,7 +181,7 @@ class SocketException : public std::exception {
 // -----------------------------------------------------------------------
 
 // Creates a server socket: socket()  [SO_REUSEADDR]  bind()  listen()
-// Throws SocketException with context if any step fails.
+// Returns invalid socket if any step fails - check isValid().
 struct ServerBind {
     std::string address; // e.g. "0.0.0.0", "127.0.0.1", "::1"
     Port port{0};
@@ -216,11 +190,11 @@ struct ServerBind {
 };
 
 // Creates a connected client socket: socket()  connect()
-// Throws SocketException with context if any step fails.
+// Returns invalid socket if connection fails - check isValid().
 //
 // connectTimeout controls how long to wait for the TCP handshake:
 //   defaultTimeout (30 s)  used when not specified.
-//   any positive duration  throw SocketException(Timeout) if not connected
+//   any positive duration  fails with SocketError::Timeout if not connected
 //                           within that duration.
 //   Milliseconds{0}        initiate the connect and return immediately with
 //                           getLastError() == WouldBlock (connect in progress).
@@ -355,16 +329,15 @@ class Socket {
     // -----------------------------------------------------------------
 
     // Basic constructor  creates the underlying socket fd.
-    // Throws SocketException(SocketError::CreateFailed, ...) if the OS call
-    // fails.
+    // Returns invalid socket if the OS call fails - check isValid().
     Socket(SocketType type, AddressFamily family);
 
     // Server socket  socket()  [SO_REUSEADDR]  bind()  listen().
-    // Throws SocketException (with the failing step prepended) on any failure.
+    // Returns invalid socket if any step fails - check isValid().
     Socket(SocketType type, AddressFamily family, const ServerBind& config);
 
     // Client socket  socket()  connect().
-    // Throws SocketException (with the failing step prepended) on any failure.
+    // Returns invalid socket if connection fails - check isValid().
     Socket(SocketType type, AddressFamily family, const ConnectArgs& config);
 
     // Takes ownership of an already-constructed impl (used by TcpSocket::accept()).

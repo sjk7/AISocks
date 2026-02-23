@@ -41,19 +41,6 @@ bool Endpoint::isPrivateNetwork() const {
     }
 }
 
-// Helper used only inside constructors: if ok is false, extract the error
-// from pImpl and set the socket to invalid state instead of throwing.
-const char* SocketException::what() const noexcept {
-    if (!whatCache_.empty()) return whatCache_.c_str();
-    try {
-        whatCache_ = step_ + ": "
-            + formatErrorContext({description_.c_str(), sysCode_, isDns_});
-    } catch (...) {
-        return "SocketException (error formatting failed)";
-    }
-    return whatCache_.c_str();
-}
-
 namespace {
     // Set error state instead of throwing - returns false on error
     bool setErrorIfFailed(bool ok, const std::unique_ptr<SocketImpl>& /*impl*/) {
