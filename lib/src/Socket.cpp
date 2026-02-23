@@ -320,22 +320,18 @@ bool Socket::isValid() const noexcept {
 }
 
 AddressFamily Socket::getAddressFamily() const noexcept {
-    if (!pImpl) return AddressFamily::IPv4; // Default for moved-from state
     return pImpl->getAddressFamily();
 }
 
 SocketError Socket::getLastError() const noexcept {
-    if (!pImpl) return SocketError::InvalidSocket;
     return pImpl->getLastError();
 }
 
 std::string Socket::getErrorMessage() const {
-    if (!pImpl) return "Invalid socket (moved-from state)";
     return pImpl->getErrorMessage();
 }
 
 Result<Endpoint> Socket::getLocalEndpoint() const {
-    if (!pImpl) return Result<Endpoint>::failure(SocketError::InvalidSocket, "getLocalEndpoint", 0, false);
     auto endpoint = pImpl->getLocalEndpoint();
     if (endpoint) {
         return Result<Endpoint>::success(*endpoint);
@@ -345,7 +341,6 @@ Result<Endpoint> Socket::getLocalEndpoint() const {
 }
 
 Result<Endpoint> Socket::getPeerEndpoint() const {
-    if (!pImpl) return Result<Endpoint>::failure(SocketError::InvalidSocket, "getPeerEndpoint", 0, false);
     auto endpoint = pImpl->getPeerEndpoint();
     if (endpoint) {
         return Result<Endpoint>::success(*endpoint);
@@ -372,7 +367,6 @@ std::string Socket::ipToString(const void* addr, AddressFamily family) {
 }
 
 NativeHandle Socket::getNativeHandle() const noexcept {
-    if (!pImpl) return INVALID_NATIVE_HANDLE;
     return static_cast<NativeHandle>(pImpl->getRawHandle());
 }
 
