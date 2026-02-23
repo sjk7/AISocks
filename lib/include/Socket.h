@@ -5,6 +5,7 @@
 #define AISOCKS_SOCKET_H
 
 #include "Result.h"
+#include "SocketTypes.h"
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
@@ -82,44 +83,8 @@ namespace Timeouts {
 //   Port p{8080};                    // from integer literal
 //   Port p = Port::Known::HTTPS;     // named constant
 //   ServerBind{ .port = Port::Known::HTTP };   // in config structs
-struct Port {
-    enum class Known : uint16_t {
-        FTP_DATA = 20,
-        FTP = 21,
-        SSH = 22,
-        TELNET = 23,
-        SMTP = 25,
-        DNS = 53,
-        HTTP = 80,
-        POP3 = 110,
-        IMAP = 143,
-        HTTPS = 443,
-        SMTPS = 465,
-        IMAPS = 993,
-        POP3S = 995,
-        MQTT = 1883,
-        HTTP_ALT = 8080,
-        MQTTS = 8883,
-    };
 
-    uint16_t value{0};
-
-    constexpr Port() noexcept = default;
-    constexpr explicit Port(uint16_t v) noexcept : value(v) {}
-    constexpr explicit Port(int v) noexcept : value(static_cast<uint16_t>(v)) {}
-    constexpr Port(Known k) noexcept : value(static_cast<uint16_t>(k)) {}
-
-    constexpr operator uint16_t() const noexcept { return value; }
-
-    constexpr bool operator==(Port other) const noexcept {
-        return value == other.value;
-    }
-    constexpr bool operator!=(Port other) const noexcept {
-        return value != other.value;
-    }
-};
-
-enum class AddressFamily { IPv4, IPv6 };
+// enum class AddressFamily { IPv4, IPv6 };
 
 // Network endpoint: an (address, port, family) triple returned by
 // getLocalEndpoint() and getPeerEndpoint(), and passed to sendTo().

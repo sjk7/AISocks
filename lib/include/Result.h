@@ -4,7 +4,7 @@
 #ifndef AISOCKS_RESULT_H
 #define AISOCKS_RESULT_H
 
-#include "Socket.h"
+#include "SocketTypes.h"
 #include <string>
 #include <optional>
 #include <utility>
