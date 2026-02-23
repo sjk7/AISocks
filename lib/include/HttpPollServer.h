@@ -87,9 +87,8 @@ protected:
         // Poll systems can report error events with SO_ERROR==0 for connection
         // resets or other conditions. This is not a real error and should not be logged.
         if (err != SocketError::None) {
-            std::cout << "[error] poll error on client socket: code="
-                      << static_cast<int>(err) << " msg=" << sock.getErrorMessage()
-                      << "\n";
+            printf("[error] poll error on client socket: code=%d msg=%s\n", 
+                   static_cast<int>(err), sock.getErrorMessage().c_str());
         }
     }
 
@@ -239,12 +238,9 @@ private:
             if (!intervals_.empty()) {
                 double sum = 0;
                 for (double v : intervals_) sum += v;
-                std::cout << std::fixed << std::setprecision(1)
-                          << "onIdle() called " << call_count_
-                          << " times, avg interval: "
-                          << (sum / static_cast<double>(intervals_.size()))
-                          << "ms  clients: " << clientCount()
-                          << "  peak: " << peakClientCount() << "\n";
+                printf("onIdle() called %zu times, avg interval: %.1fms  clients: %zu  peak: %zu\n", 
+                       call_count_, sum / static_cast<double>(intervals_.size()),
+                       static_cast<size_t>(clientCount()), static_cast<size_t>(peakClientCount()));
             }
             intervals_.clear();
             call_count_        = 0;
