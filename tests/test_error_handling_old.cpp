@@ -1,0 +1,121 @@
+// This is a personal academic project. Dear PVS-Studio, please check it.
+// PVS-Studio Static Code Analyzer for C, C++, C#, and Java:
+// https://pvs-studio.com Tests: Error reporting and graceful failure for
+// invalid/misused operations. Checks observable behaviour only.
+
+#include "TcpSocket.h"
+#include "test_helpers.h"
+#include <thread>
+#include <chrono>
+
+using namespace aiSocks;
+
+int main() {
+    std::cout << "=== Error Handling Tests ===\n";
+
+    BEGIN_TEST("bind() on invalid socket returns false");
+    {
+        auto s = TcpSocket::createRaw();
+        s.close(); // invalidate
+        REQUIRE(!s.bind("127.0.0.1", Port{19700}));
+    }
+
+    BEGIN_TEST("listen() without bind returns false");
+    {
+        auto s = TcpSocket::createRaw();
+        // listen without prior bind should fail
+        bool result = s.listen(5);
+        // Not guaranteed to fail on every OS, but getLastError must not be None
+        // when it does fail; if it succeeds that's also acceptable (OS
+        // behaviour)
+        REQUIRE_MSG(true, "listen() without bind completed without crash");
+    }
+
+    BEGIN_TEST("connect() to a refused port returns false");
+    {
+        auto s = TcpSocket::createRaw();
+        // Port 1 is almost certainly not listening
+        bool r = s.connect("127.0.0.1", Port{1}, Milliseconds{100});
+        REQUIRE(!r);
+        REQUIRE(s.getLastError() != SocketError::None);
+    }
+
+    BEGIN_TEST(
+        "getErrorMessage returns non-empty string after a failed operation");
+    {
+        auto s = TcpSocket::createRaw();
+        (void)s.connect("127.0.0.1", Port{1}, Milliseconds{100}); // will fail
+        std::string msg = s.getErrorMessage();
+        REQUIRE(!msg.empty());
+    }
+
+    BEGIN_TEST("send() on unconnected socket returns <= 0");
+    {
+        auto s = TcpSocket::createRaw();
+        int r = s.send("hello", 5);
+        REQUIRE(r <= 0);
+    }
+
+    BEGIN_TEST("receive() on unconnected socket returns <= 0");
+    {
+        auto s = TcpSocket::createRaw();
+        char buf[64];
+        int r = s.receive(buf, sizeof(buf));
+        REQUIRE(r <= 0);
+    }
+
+    BEGIN_TEST(
+        "bind() to the same address/port twice returns false on second call");
+    {
+        auto s1 = TcpSocket::createRaw();
+        auto s2 = TcpSocket::createRaw();
+        s1.setReuseAddress(false);
+        s2.setReuseAddress(false);
+
+        bool first = s1.bind("127.0.0.1", Port{19701});
+        if (!first) {
+            // Port may already be in use; skip gracefully
+            REQUIRE_MSG(true, "SKIP - port 19701 unavailable");
+        } else {
+            REQUIRE(s1.listen(1));
+            bool second = s2.bind("127.0.0.1", Port{19701});
+            REQUIRE(!second);
+        }
+    }
+
+    BEGIN_TEST("connect() on closed socket returns false and sets an error");
+    {
+        auto s = TcpSocket::createRaw();
+        s.close();
+        bool r = s.connect("127.0.0.1", Port{19702});
+        REQUIRE(!r);
+    }
+
+    BEGIN_TEST("accept() on a socket that is not listening returns nullptr");
+    {
+        auto s = TcpSocket::createRaw();
+        // Not bound or listening - accept should fail/return null quickly
+        // Set non-blocking to avoid hanging
+        (void)s.setBlocking(false);
+        auto accepted = s.accept();
+        REQUIRE(accepted == nullptr);
+    }
+
+    BEGIN_TEST("setReceiveTimeout does not crash and returns bool");
+    {
+        auto s = TcpSocket::createRaw();
+        bool r = s.setReceiveTimeout(std::chrono::seconds{1});
+        (void)r;
+        REQUIRE_MSG(true, "setReceiveTimeout() returned without crash");
+    }
+
+    BEGIN_TEST("SocketError::None on fresh socket, error set after failure");
+    {
+        auto s = TcpSocket::createRaw();
+        REQUIRE(s.getLastError() == SocketError::None);
+        (void)s.connect("127.0.0.1", Port{1}, Milliseconds{100}); // forced failure
+        REQUIRE(s.getLastError() != SocketError::None);
+    }
+
+    return test_summary();
+}

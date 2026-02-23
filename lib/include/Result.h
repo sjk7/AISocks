@@ -30,9 +30,11 @@ struct ErrorInfo {
 template<typename T>
 class Result {
 private:
+    // Union storage - uses placement new to construct objects in raw memory
+    // This enables zero-allocation Result with same size as T + bool
     union {
-        alignas(T) unsigned char value_storage_[sizeof(T)];
-        ErrorInfo error_;
+        alignas(T) unsigned char value_storage_[sizeof(T)];  // Raw bytes for T (placement new target)
+        ErrorInfo error_;                                   // ErrorInfo object (placement new target)
     };
     
     bool has_value_;
@@ -56,9 +58,10 @@ private:
     }
     
 public:
-    // Success constructor
+    // Success constructor - placement new constructs T in raw storage
+    // No heap allocation - constructs T directly in value_storage_ bytes
     explicit Result(T&& value) : has_value_(true) {
-        new(value_storage_) T(std::move(value));
+        new(value_storage_) T(std::move(value));  // ← Placement new: construct T in raw memory
     }
     
     // Error constructor - takes error info for lazy message construction
@@ -67,14 +70,15 @@ public:
         new(&error_ref()) ErrorInfo{error, description, sysCode, isDns, {}};
     }
     
-    // Copy/move constructors
+    // Copy constructor - placement new constructs objects in union storage
+    // No heap allocation - constructs T or ErrorInfo directly in union memory
     Result(const Result& other) : has_value_(other.has_value_) {
         if (has_value_) {
-            new(value_storage_) T(other.value_ref());
+            new(value_storage_) T(other.value_ref());  // ← Placement new: copy construct T in raw memory
         } else {
             new(&error_ref()) ErrorInfo{other.error_ref().error, other.error_ref().description, 
                                         other.error_ref().sysCode, other.error_ref().isDns, 
-                                        other.error_ref().cachedMessage_};
+                                        other.error_ref().cachedMessage_};  // ← Placement new: copy construct ErrorInfo
         }
     }
     
@@ -88,18 +92,19 @@ public:
         }
     }
     
-    // Assignment operators
+    // Assignment operator - manual destructor + placement new for object lifetime management
+    // Critical: Must manually destroy old object before placement new over same memory
     Result& operator=(const Result& other) {
         if (this != &other) {
-            if (has_value_) value_ref().~T();
+            if (has_value_) value_ref().~T();  // ← Manual destructor call required!
             if (other.has_value_) {
                 has_value_ = true;
-                new(value_storage_) T(other.value_ref());
+                new(value_storage_) T(other.value_ref());  // ← Placement new: copy construct T
             } else {
                 has_value_ = false;
                 new(&error_ref()) ErrorInfo{other.error_ref().error, other.error_ref().description, 
                                             other.error_ref().sysCode, other.error_ref().isDns, 
-                                            other.error_ref().cachedMessage_};
+                                            other.error_ref().cachedMessage_};  // ← Placement new: copy construct ErrorInfo
             }
         }
         return *this;
@@ -121,12 +126,13 @@ public:
         return *this;
     }
     
-    // Destructor
+    // Destructor - manual object destruction required for union with placement new
+    // Must explicitly destroy the object that was placement new constructed
     ~Result() {
         if (has_value_) {
-            value_ref().~T();
+            value_ref().~T();  // ← Manual destructor call for placement new object
         } else {
-            error_ref().~ErrorInfo();
+            error_ref().~ErrorInfo();  // ← Manual destructor call for placement new object
         }
     }
     

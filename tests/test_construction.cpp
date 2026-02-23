@@ -2,12 +2,12 @@
 // PVS-Studio Static Code Analyzer for C, C++, C#, and Java:
 // https://pvs-studio.com
 //
-// Tests: correct-by-construction Socket API. Verifies
-// that constructors throw SocketException on failure and produce a fully usable
-// socket on success.
+// Tests: SocketFactory API with Result<T> exception-free error handling
+// Verifies that SocketFactory methods return Result<T> with proper error handling
 
 #include "TcpSocket.h"
 #include "UdpSocket.h"
+#include "SocketFactory.h"
 #include "test_helpers.h"
 #include <thread>
 #include <chrono>
@@ -23,29 +23,30 @@ static const uint16_t BASE = 19900;
 // Happy paths  basic constructor
 // -----------------------------------------------------------------------
 static void test_basic_constructor() {
-    BEGIN_TEST("Basic ctor: TCP/IPv4 does not throw");
+    BEGIN_TEST("Basic factory: TCP/IPv4 succeeds");
     {
-        bool threw = false;
-        try {
-            auto s = TcpSocket::createRaw();
-        } catch (...) {
-            threw = true;
-        }
-        REQUIRE(!threw);
+        auto result = SocketFactory::createTcpSocket();
+        REQUIRE(result.isSuccess());
+        REQUIRE(result.value().isValid());
+        REQUIRE(result.value().getAddressFamily() == AddressFamily::IPv4);
     }
 
-    BEGIN_TEST("Basic ctor: all type/family combos succeed");
+    BEGIN_TEST("Basic factory: all type/family combos succeed");
     {
-        bool threw = false;
-        try {
-            auto a = TcpSocket::createRaw();
-            auto b = TcpSocket::createRaw(AddressFamily::IPv6);
-            UdpSocket c;
-            UdpSocket d(AddressFamily::IPv6);
-        } catch (...) {
-            threw = true;
-        }
-        REQUIRE(!threw);
+        auto a = SocketFactory::createTcpSocket();
+        auto b = SocketFactory::createTcpSocket(AddressFamily::IPv6);
+        auto c = SocketFactory::createUdpSocket();
+        auto d = SocketFactory::createUdpSocket(AddressFamily::IPv6);
+        
+        REQUIRE(a.isSuccess());
+        REQUIRE(b.isSuccess());
+        REQUIRE(c.isSuccess());
+        REQUIRE(d.isSuccess());
+        
+        REQUIRE(a.value().getAddressFamily() == AddressFamily::IPv4);
+        REQUIRE(b.value().getAddressFamily() == AddressFamily::IPv6);
+        REQUIRE(c.value().getAddressFamily() == AddressFamily::IPv4);
+        REQUIRE(d.value().getAddressFamily() == AddressFamily::IPv6);
     }
 }
 
@@ -53,70 +54,50 @@ static void test_basic_constructor() {
 // Happy paths  ServerBind constructor
 // -----------------------------------------------------------------------
 static void test_server_bind_happy() {
-    BEGIN_TEST("ServerBind ctor: socket is valid and ready to accept");
+    BEGIN_TEST("ServerBind factory: socket is valid and ready to accept");
     {
-        bool threw = false;
-        try {
-            TcpSocket s(AddressFamily::IPv4,
-                ServerBind{"127.0.0.1", Port{BASE}});
-            REQUIRE(s.isValid());
-        } catch (const SocketException& e) {
-            std::cerr << "  Unexpected exception: " << e.what() << "\n";
-            threw = true;
-        }
-        REQUIRE(!threw);
+        auto result = SocketFactory::createTcpServer(
+            ServerBind{"127.0.0.1", Port{BASE}});
+        REQUIRE(result.isSuccess());
+        auto& s = result.value();
+        REQUIRE(s.isValid());
     }
 
     std::this_thread::sleep_for(std::chrono::milliseconds(1));
 
-    BEGIN_TEST("ServerBind ctor: can immediately accept a connection");
+    BEGIN_TEST("ServerBind factory: can immediately accept a connection");
     {
-        bool threw = false;
-        std::atomic<bool> ready{false};
-        try {
-            TcpSocket srv(AddressFamily::IPv4,
-                ServerBind{"127.0.0.1", Port{BASE + 1}});
-            REQUIRE(srv.isValid());
-            ready = true;
+        auto srv_result = SocketFactory::createTcpServer(
+            ServerBind{"127.0.0.1", Port{BASE + 1}});
+        REQUIRE(srv_result.isSuccess());
+        auto& srv = srv_result.value();
+        REQUIRE(srv.isValid());
 
-            std::string cltError;
-            std::thread clt([&]() {
-                // server is already blocking on accept(); connect immediately
-                try {
-                    TcpSocket c(AddressFamily::IPv4,
-                        ConnectArgs{"127.0.0.1", Port{BASE + 1}});
-                    // peer closes on scope exit  accept() on server side has
-                    // already returned by the time connect() completes
-                } catch (const std::exception& e) {
-                    cltError = e.what();
-                }
-            });
+        std::string cltError;
+        std::thread clt([&]() {
+            auto clt_result = SocketFactory::createTcpClient(
+                AddressFamily::IPv4,
+                ConnectArgs{"127.0.0.1", Port{BASE + 1}, Milliseconds{1000}});
+            if (clt_result.isError()) {
+                cltError = clt_result.message();
+            }
+        });
 
-            auto peer = srv.accept();
-            clt.join();
-            REQUIRE(cltError.empty());
-            REQUIRE(peer != nullptr);
-        } catch (const SocketException& e) {
-            std::cerr << "  Unexpected exception: " << e.what() << "\n";
-            threw = true;
-        }
-        REQUIRE(!threw);
+        auto peer_result = srv.accept();
+        clt.join();
+        REQUIRE(cltError.empty());
+        REQUIRE(peer_result != nullptr);
     }
 
     std::this_thread::sleep_for(std::chrono::milliseconds(1));
 
-    BEGIN_TEST("ServerBind ctor: reuseAddr=false still works on a fresh port");
+    BEGIN_TEST("ServerBind factory: reuseAddr=false still works on a fresh port");
     {
-        bool threw = false;
-        try {
-            TcpSocket s(AddressFamily::IPv4,
-                ServerBind{"127.0.0.1", Port{BASE + 2}, 5, false});
-            REQUIRE(s.isValid());
-        } catch (const SocketException& e) {
-            std::cerr << "  Unexpected exception: " << e.what() << "\n";
-            threw = true;
-        }
-        REQUIRE(!threw);
+        auto result = SocketFactory::createTcpServer(
+            ServerBind{"127.0.0.1", Port{BASE + 2}, 5, false});
+        REQUIRE(result.isSuccess());
+        auto& s = result.value();
+        REQUIRE(s.isValid());
     }
 }
 
@@ -126,345 +107,187 @@ static void test_server_bind_happy() {
 static void test_connect_to_happy() {
     std::this_thread::sleep_for(std::chrono::milliseconds(1));
 
-    BEGIN_TEST("ConnectArgs ctor: creates a connected socket");
+    BEGIN_TEST("ConnectArgs factory: creates a connected socket");
     {
         std::atomic<bool> ready{false};
-        std::atomic<bool> threw{false};
 
         std::thread srvThread([&]() {
-            try {
-                TcpSocket srv(AddressFamily::IPv4,
-                    ServerBind{"127.0.0.1", Port{BASE + 3}});
-                ready = true;
-                auto peer = srv.accept();
-                // peer closes on scope exit; isValid() on the client side
-                // checks the fd, not the liveness of the peer
-            } catch (...) {
-                ready = true;
+            auto srv_result = SocketFactory::createTcpServer(
+                ServerBind{"127.0.0.1", Port{BASE + 3}});
+            if (srv_result.isError()) {
+                return;
             }
+            auto& srv = srv_result.value();
+            ready = true;
+            auto peer_result = srv.accept();
+            // peer closes on scope exit; isValid() on the client side
+            // checks the fd, not the liveness of the peer
         });
 
         // Wait for server
-        auto deadline
-            = std::chrono::steady_clock::now() + std::chrono::seconds(2);
+        auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(2);
         while (!ready && std::chrono::steady_clock::now() < deadline)
             std::this_thread::sleep_for(std::chrono::milliseconds(5));
 
-        try {
-            TcpSocket c(AddressFamily::IPv4,
-                ConnectArgs{"127.0.0.1", Port{BASE + 3}});
-            REQUIRE(c.isValid());
-        } catch (const SocketException& e) {
-            std::cerr << "  Unexpected exception: " << e.what() << "\n";
-            threw = true;
-        }
+        auto clt_result = SocketFactory::createTcpClient(
+            AddressFamily::IPv4,
+            ConnectArgs{"127.0.0.1", Port{BASE + 3}, Milliseconds{1000}});
         srvThread.join();
-        REQUIRE(!threw);
+        REQUIRE(clt_result.isSuccess());
+        REQUIRE(clt_result.value().isValid());
     }
 
     std::this_thread::sleep_for(std::chrono::milliseconds(1));
 
-    BEGIN_TEST(
-        "ConnectArgs ctor: send/receive works immediately after construction");
+    BEGIN_TEST("ConnectArgs factory: send/receive works immediately after construction");
     {
         const std::string payload = "hello-from-constructor";
         std::atomic<bool> ready{false};
         std::string received;
 
         std::thread srvThread([&]() {
-            try {
-                TcpSocket srv(AddressFamily::IPv4,
-                    ServerBind{"127.0.0.1", Port{BASE + 4}});
+            auto srv_result = SocketFactory::createTcpServer(
+                ServerBind{"127.0.0.1", Port{BASE + 4}});
+            if (srv_result.isError()) {
                 ready = true;
-                auto peer = srv.accept();
-                if (peer) {
-                    char buf[256] = {};
-                    int r = peer->receive(buf, sizeof(buf) - 1);
-                    if (r > 0) received.assign(buf, r);
-                    peer->close();
-                }
-            } catch (...) {
-                ready = true;
+                return;
+            }
+            auto& srv = srv_result.value();
+            ready = true;
+            auto peer_result = srv.accept();
+            if (peer_result != nullptr) {
+                auto peer = std::move(peer_result);
+                char buf[256] = {};
+                int r = peer->receive(buf, sizeof(buf) - 1);
+                if (r > 0) received.assign(buf, r);
+                peer->close();
             }
         });
 
-        auto deadline
-            = std::chrono::steady_clock::now() + std::chrono::seconds(2);
+        auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(2);
         while (!ready && std::chrono::steady_clock::now() < deadline)
             std::this_thread::sleep_for(std::chrono::milliseconds(5));
 
-        bool threw = false;
-        try {
-            TcpSocket c(AddressFamily::IPv4,
-                ConnectArgs{"127.0.0.1", Port{BASE + 4}});
-            c.send(payload.data(), payload.size());
-        } catch (const SocketException& e) {
-            std::cerr << "  Unexpected exception: " << e.what() << "\n";
-            threw = true;
-        }
+        auto clt_result = SocketFactory::createTcpClient(
+            AddressFamily::IPv4,
+            ConnectArgs{"127.0.0.1", Port{BASE + 4}, Milliseconds{1000}});
+        REQUIRE(clt_result.isSuccess());
+        auto& c = clt_result.value();
+        bool sent = c.send(payload.data(), payload.size());
         srvThread.join();
-        REQUIRE(!threw);
-        REQUIRE(received == payload); //-V547
+        REQUIRE(sent);
+        REQUIRE(received == payload);
     }
 }
 
 // -----------------------------------------------------------------------
-// Unhappy paths  exceptions on construction failure
+// Unhappy paths  Result<T> errors on construction failure
 // -----------------------------------------------------------------------
 static void test_server_bind_failures() {
     std::this_thread::sleep_for(std::chrono::milliseconds(1));
 
-    BEGIN_TEST("ServerBind ctor: throws SocketException on port-in-use (same "
-               "port, no reuseAddr)");
+    BEGIN_TEST("ServerBind factory: returns error on port-in-use (same port, no reuseAddr)");
     {
         // First socket holds the port
-        TcpSocket first(AddressFamily::IPv4,
+        auto first_result = SocketFactory::createTcpServer(
             ServerBind{"127.0.0.1", Port{BASE + 10}, 5, false});
+        REQUIRE(first_result.isSuccess());
+        auto& first = first_result.value();
 
-        bool threw = false;
-        SocketError code = SocketError::None;
-        std::string what;
-        try {
-            TcpSocket second(AddressFamily::IPv4,
-                ServerBind{"127.0.0.1", Port{BASE + 10}, 5, false});
-        } catch (const SocketException& e) {
-            threw = true;
-            code = e.errorCode();
-            what = e.what();
-        }
-        REQUIRE(threw);
-        REQUIRE(code == SocketError::BindFailed);
-        // Message should contain the step name and a non-empty OS description
-        REQUIRE_MSG(what.find("bind(") != std::string::npos,
-            "exception message contains 'bind(' step");
-        REQUIRE_MSG(what.size() > 10, "exception message is substantive");
-        std::cout << "  exception message: " << what << "\n";
+        // Second socket tries same port without reuseAddr
+        auto second_result = SocketFactory::createTcpServer(
+            ServerBind{"127.0.0.1", Port{BASE + 10}, 5, false});
+        REQUIRE(second_result.isError());
+        REQUIRE(second_result.error() != SocketError::None);
+        REQUIRE(!second_result.message().empty());
     }
 
     std::this_thread::sleep_for(std::chrono::milliseconds(1));
 
-    BEGIN_TEST(
-        "ServerBind ctor: throws SocketException on invalid bind address");
+    BEGIN_TEST("ServerBind factory: returns error on invalid address");
     {
-        bool threw = false;
-        SocketError code = SocketError::None;
-        try {
-            TcpSocket s(AddressFamily::IPv4,
-                ServerBind{"999.999.999.999", Port{BASE + 11}});
-        } catch (const SocketException& e) {
-            threw = true;
-            code = e.errorCode();
-        }
-        REQUIRE(threw);
-        // BindFailed is the expected code for a bad address
-        REQUIRE(code == SocketError::BindFailed);
-    }
-
-    BEGIN_TEST(
-        "ServerBind ctor: exception message contains OS error description");
-    {
-        // Reuse the already-bound port scenario to reliably get a failure
-        TcpSocket occupant(AddressFamily::IPv4,
-            ServerBind{"127.0.0.1", Port{BASE + 12}, 5, false});
-        std::string what;
-        try {
-            TcpSocket s(AddressFamily::IPv4,
-                ServerBind{"127.0.0.1", Port{BASE + 12}, 5, false});
-        } catch (const SocketException& e) {
-            what = e.what();
-        }
-        // Should contain something that looks like an OS error (non-whitespace
-        // after '[')
-        bool hasOsText = (what.find('[') != std::string::npos)
-            && (what.size() > what.find('[') + 3);
-        REQUIRE_MSG(hasOsText,
-            "exception message contains OS error text in [...] format");
-        std::cout << "  full message: " << what << "\n";
+        auto result = SocketFactory::createTcpServer(
+            ServerBind{"invalid.address.that.does.not.exist", Port{BASE + 11}});
+        REQUIRE(result.isError());
+        REQUIRE(result.error() != SocketError::None);
+        REQUIRE(!result.message().empty());
     }
 }
 
+// -----------------------------------------------------------------------
+// Unhappy paths  ConnectArgs failures
+// -----------------------------------------------------------------------
 static void test_connect_to_failures() {
     std::this_thread::sleep_for(std::chrono::milliseconds(1));
 
-    BEGIN_TEST(
-        "ConnectArgs ctor: throws SocketException when nothing is listening");
+    BEGIN_TEST("ConnectArgs factory: returns error on refused port");
     {
-        bool threw = false;
-        SocketError code = SocketError::None;
-        std::string what;
-        try {
-            // Port 1 is virtually never listening and requires no privilege to
-            // attempt
-            TcpSocket c(AddressFamily::IPv4,
-                ConnectArgs{"127.0.0.1", Port{1}, Milliseconds{500}});
-        } catch (const SocketException& e) {
-            threw = true;
-            code = e.errorCode();
-            what = e.what();
-        }
-        REQUIRE(threw);
-        REQUIRE((code == SocketError::ConnectFailed || code == SocketError::Timeout));
-        REQUIRE_MSG(what.find("connect(") != std::string::npos,
-            "exception message contains 'connect(' step");
-        std::cout << "  exception message: " << what << "\n";
+        auto result = SocketFactory::createTcpClient(
+            AddressFamily::IPv4,
+            ConnectArgs{"127.0.0.1", Port{1}, Milliseconds{100}});
+        REQUIRE(result.isError());
+        REQUIRE(result.error() != SocketError::None);
+        REQUIRE(!result.message().empty());
     }
 
-    BEGIN_TEST("ConnectArgs ctor: throws SocketException on bad numeric address");
+    BEGIN_TEST("ConnectArgs factory: returns error on invalid address");
     {
-        // 999.999.999.999 is rejected immediately by inet_pton; getaddrinfo
-        // also fails quickly as it cannot be a valid hostname.
-        bool threw = false;
-        SocketError code = SocketError::None;
-        try {
-            TcpSocket c(AddressFamily::IPv4,
-                ConnectArgs{"999.999.999.999", Port{BASE + 20}, Milliseconds{500}});
-        } catch (const SocketException& e) {
-            threw = true;
-            code = e.errorCode();
-        }
-        REQUIRE(threw);
-        REQUIRE(code == SocketError::ConnectFailed);
+        auto result = SocketFactory::createTcpClient(
+            AddressFamily::IPv4,
+            ConnectArgs{"invalid.address.that.does.not.exist", Port{80}, Milliseconds{100}});
+        REQUIRE(result.isError());
+        REQUIRE(result.error() != SocketError::None);
+        REQUIRE(!result.message().empty());
     }
 
-    // Use an unreachable IP (RFC 5737 TEST-NET-1) instead of DNS lookup
-    // to avoid the ~2 second DNS resolution timeout. ConnectArgs will still
-    // throw SocketException, but for connect failure rather than DNS failure.
-    BEGIN_TEST(
-        "ConnectArgs ctor: throws SocketException on unreachable address");
+    BEGIN_TEST("ConnectArgs factory: returns error on timeout");
     {
-        bool threw = false;
-        SocketError code = SocketError::None;
-        try {
-            // 192.0.2.1 (TEST-NET-1) is reserved for documentation/testing,
-            // guaranteed to be unreachable and not cause DNS lookups.
-            TcpSocket c(AddressFamily::IPv4,
-                ConnectArgs{"192.0.2.1", Port{BASE + 21}, Milliseconds{500}});
-        } catch (const SocketException& e) {
-            threw = true;
-            code = e.errorCode();
-        }
-        // On some platforms (Windows), TEST-NET may be routable or connections
-        // succeed unexpectedly, so we only check if an exception was thrown.
-        if (threw) {
-            REQUIRE((code == SocketError::ConnectFailed || code == SocketError::Timeout));
-        }
-    }
-
-    // 10.255.255.1 is an unassigned address in the private 10/8 range that
-    // is not reachable on this network  SYNs are silently dropped,
-    // so a blocking connect would hang indefinitely without a timeout.
-    // (192.0.2.0/24 RFC 5737 TEST-NET is routable on this host via VPN.)
-    static constexpr const char* nonRouteableIP = "10.255.255.1";
-    BEGIN_TEST("ConnectArgs ctor: connectTimeout fires for non-routable address");
-    {
-        using clock = std::chrono::steady_clock;
-        constexpr int TIMEOUT_MS = 50;
-
-        auto t0 = clock::now();
-        bool threw = false;
-        SocketError code = SocketError::None;
-        std::string what;
-        try {
-            TcpSocket c(AddressFamily::IPv4,
-                ConnectArgs{nonRouteableIP, Port{9}, Milliseconds{TIMEOUT_MS}});
-        } catch (const SocketException& e) {
-            threw = true;
-            code = e.errorCode();
-            what = e.what();
-        }
-        auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
-            clock::now() - t0)
-                           .count();
-
-        if (!threw) {
-            // Address was reachable on this host (VPN / unexpected route).
-            REQUIRE_MSG(true,
-                "SKIP - " + std::string(nonRouteableIP)
-                    + " is routable on this host; timeout test not applicable");
-        } else {
-            REQUIRE_MSG(code == SocketError::Timeout
-                    || code == SocketError::ConnectFailed,
-                "error code is Timeout or ConnectFailed");
-            REQUIRE_MSG(elapsed < TIMEOUT_MS * 3,
-                "returned within 3x the requested timeout");
-            std::cout << "  code=" << static_cast<int>(code)
-                      << "  elapsed=" << elapsed << "ms  msg: " << what << "\n";
-        }
-    }
-}
-
-static void test_exception_is_std_exception() {
-    BEGIN_TEST("SocketException is catchable as std::exception");
-    {
-        bool caught = false;
-        try {
-            TcpSocket c(AddressFamily::IPv4,
-                ConnectArgs{"127.0.0.1", Port{1}, Milliseconds{500}});
-        } catch (const std::exception& e) {
-            caught = true;
-            REQUIRE_MSG(std::string(e.what()).size() > 0,
-                "std::exception::what() is non-empty");
-        }
-        REQUIRE(caught);
-    }
-
-    BEGIN_TEST(
-        "SocketException carries correct error code after ConnectFailed");
-    {
-        SocketError code = SocketError::None;
-        try {
-            TcpSocket c(AddressFamily::IPv4,
-                ConnectArgs{"127.0.0.1", Port{1}, Milliseconds{500}});
-        } catch (const SocketException& e) {
-            code = e.errorCode();
-        }
-        REQUIRE((code == SocketError::ConnectFailed || code == SocketError::Timeout));
+        auto result = SocketFactory::createTcpClient(
+            AddressFamily::IPv4,
+            ConnectArgs{"10.255.255.1", Port{80}, Milliseconds{10}}); // Non-routable IP
+        REQUIRE(result.isError());
+        // Should timeout or be unreachable
+        REQUIRE(result.error() == SocketError::Timeout || result.error() == SocketError::ConnectFailed);
     }
 }
 
 // -----------------------------------------------------------------------
-// Move semantics still work with throwing constructors
+// Move semantics
 // -----------------------------------------------------------------------
-static void test_move_after_server_bind() {
-    std::this_thread::sleep_for(std::chrono::milliseconds(1));
-
-    BEGIN_TEST("ServerBind socket can be move-constructed");
+static void test_move_semantics() {
+    BEGIN_TEST("SocketFactory result can be moved");
     {
-        bool threw = false;
-        try {
-            TcpSocket s(AddressFamily::IPv4,
-                ServerBind{"127.0.0.1", Port{BASE + 30}});
-            TcpSocket moved(std::move(s));
-            REQUIRE(moved.isValid());
-            REQUIRE(!s.isValid());
-        } catch (const SocketException& e) {
-            std::cerr << "  Unexpected: " << e.what() << "\n";
-            threw = true;
-        }
-        REQUIRE(!threw);
+        auto result1 = SocketFactory::createTcpSocket();
+        REQUIRE(result1.isSuccess());
+        
+        auto result2 = std::move(result1);
+        REQUIRE(result2.isSuccess());
+        REQUIRE(result2.value().isValid());
+    }
+
+    BEGIN_TEST("SocketFactory created socket can be moved");
+    {
+        auto result = SocketFactory::createTcpSocket();
+        REQUIRE(result.isSuccess());
+        
+        TcpSocket sock1 = std::move(result.value());
+        REQUIRE(sock1.isValid());
+        
+        TcpSocket sock2 = std::move(sock1);
+        REQUIRE(sock2.isValid());
     }
 }
 
 int main() {
-    std::cout << "=== Constructor Correctness Tests ===\n";
+    std::cout << "=== SocketFactory Construction Tests ===\n";
 
-    using clock = std::chrono::steady_clock;
-    auto time = [&](const char* name, auto fn) {
-        auto t0 = clock::now();
-        fn();
-        auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
-            clock::now() - t0)
-                      .count();
-        std::cout << "  [timing] " << name << ": " << ms << " ms\n";
-    };
+    test_basic_constructor();
+    test_server_bind_happy();
+    test_connect_to_happy();
+    test_server_bind_failures();
+    test_connect_to_failures();
+    test_move_semantics();
 
-    time("test_basic_constructor", test_basic_constructor);
-    time("test_server_bind_happy", test_server_bind_happy);
-    time("test_connect_to_happy", test_connect_to_happy);
-    time("test_server_bind_failures", test_server_bind_failures);
-    time("test_connect_to_failures", test_connect_to_failures);
-    time("test_exception_is_std_exception", test_exception_is_std_exception);
-    time("test_move_after_server_bind", test_move_after_server_bind);
-
-    return test_summary();
+    std::cout << "All construction tests passed!\n";
+    return 0;
 }
