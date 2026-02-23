@@ -106,6 +106,13 @@ struct Endpoint {
     bool operator!=(const Endpoint& other) const noexcept {
         return !(*this == other);
     }
+    
+    // Check if this endpoint is a loopback address (127.x.x.x or ::1).
+    bool isLoopback() const;
+
+    // Check if this endpoint is on a private/reserved network
+    // (10.x.x.x, 172.16-31.x.x, 192.168.x.x, fc00::/7, etc.).
+    bool isPrivateNetwork() const;
 };
 
 enum class SocketError {
