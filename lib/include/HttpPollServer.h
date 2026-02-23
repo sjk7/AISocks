@@ -238,7 +238,7 @@ private:
             if (!intervals_.empty()) {
                 double sum = 0;
                 for (double v : intervals_) sum += v;
-                printf("onIdle() called %zu times, avg interval: %.1fms  clients: %zu  peak: %zu\n", 
+                printf("onIdle() called %d times, avg interval: %.1fms  clients: %zu  peak: %zu\n", 
                        call_count_, sum / static_cast<double>(intervals_.size()),
                        static_cast<size_t>(clientCount()), static_cast<size_t>(peakClientCount()));
             }

@@ -7,15 +7,15 @@
 // application-level response logic.
 
 #include "HttpPollServer.h"
-#include <iostream>
+#include <cstdio>
+#include <cstdlib>
 
 using namespace aiSocks;
 
 class HttpServer : public HttpPollServer {
 public:
     explicit HttpServer(const ServerBind& bind) : HttpPollServer(bind) {
-        std::cout << "Listening on " << bind.address << ":"
-                  << static_cast<int>(bind.port) << "\n";
+        printf("Listening on %s:%d\n", bind.address.c_str(), static_cast<int>(bind.port));
     }
 
 protected:
@@ -38,14 +38,15 @@ protected:
 };
 
 int main() {
-    std::cout << "=== Poll-Driven HTTP Server ===\n";
-    try {
-        HttpServer server(ServerBind{"0.0.0.0", Port{8080}, 1024});
-        server.run(0, Milliseconds{1});
-        std::cout << "\nShutting down cleanly.\n";
-    } catch (const SocketException& e) {
-        std::cerr << "Server error: " << e.what() << "\n";
+    printf("=== Poll-Driven HTTP Server ===\n");
+    
+    HttpServer server(ServerBind{"0.0.0.0", Port{8080}, 1024});
+    if (!server.isValid()) {
+        printf("Server failed to start\n");
         return 1;
     }
+    
+    server.run(ClientLimit::Unlimited, Milliseconds{1});
+    printf("\nShutting down cleanly.\n");
     return 0;
 }
