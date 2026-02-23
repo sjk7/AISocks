@@ -20,48 +20,8 @@ struct ErrorInfo {
     bool isDns{false};
     mutable std::string cachedMessage_;  // built once on first access
     
-    std::string buildMessage() const {
-        if (!description) return "Unknown error";
-        
-        std::string msg = description;
-        if (sysCode != 0) {
-            msg += " [";
-            msg += std::to_string(sysCode);
-            msg += ": ";
-            
-            // Platform-specific error string
-            char sysErrBuf[256] = {0};
-#ifdef _WIN32
-            FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
-                         nullptr, sysCode, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
-                         sysErrBuf, sizeof(sysErrBuf), nullptr);
-#else
-            if (isDns) {
-                // DNS errors use gai_strerror
-                const char* gaiMsg = gai_strerror(sysCode);
-                if (gaiMsg) {
-                    strncpy(sysErrBuf, gaiMsg, sizeof(sysErrBuf) - 1);
-                }
-            } else {
-                // Regular errno errors
-                const char* errnoMsg = strerror(sysCode);
-                if (errnoMsg) {
-                    strncpy(sysErrBuf, errnoMsg, sizeof(sysErrBuf) - 1);
-                }
-            }
-#endif
-            // Trim trailing whitespace/newlines
-            char* end = sysErrBuf + strlen(sysErrBuf) - 1;
-            while (end >= sysErrBuf && (*end == '\n' || *end == '\r' || *end == ' ')) {
-                *end = '\0';
-                --end;
-            }
-            
-            msg += sysErrBuf;
-            msg += "]";
-        }
-        return msg;
-    }
+    // Platform-agnostic message building - delegates to implementation
+    std::string buildMessage() const;
 };
 
 // ---------------------------------------------------------------------------
@@ -252,44 +212,8 @@ private:
         bool isDns{false};
         mutable std::string cachedMessage_;
         
-        std::string buildMessage() const {
-            if (!description) return "Unknown error";
-            
-            std::string msg = description;
-            if (sysCode != 0) {
-                msg += " [";
-                msg += std::to_string(sysCode);
-                msg += ": ";
-                
-                char sysErrBuf[256] = {0};
-#ifdef _WIN32
-                FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
-                             nullptr, static_cast<DWORD>(sysCode), MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
-                             sysErrBuf, sizeof(sysErrBuf), nullptr);
-#else
-                if (isDns) {
-                    const char* gaiMsg = gai_strerror(sysCode);
-                    if (gaiMsg) {
-                        strncpy(sysErrBuf, gaiMsg, sizeof(sysErrBuf) - 1);
-                    }
-                } else {
-                    const char* errnoMsg = strerror(sysCode);
-                    if (errnoMsg) {
-                        strncpy(sysErrBuf, errnoMsg, sizeof(sysErrBuf) - 1);
-                    }
-                }
-#endif
-                char* end = sysErrBuf + strlen(sysErrBuf) - 1;
-                while (end >= sysErrBuf && (*end == '\n' || *end == '\r' || *end == ' ')) {
-                    *end = '\0';
-                    --end;
-                }
-                
-                msg += sysErrBuf;
-                msg += "]";
-            }
-            return msg;
-        }
+        // Platform-agnostic message building - delegates to implementation
+        std::string buildMessage() const;
     };
     
     std::optional<ErrorInfo> errorInfo_;

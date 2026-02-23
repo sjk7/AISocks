@@ -91,7 +91,7 @@ class Socket {
     // -----------------------------------------------------------------
 
     // Blocking mode
-    [[nodiscard]] bool setBlocking(bool blocking);
+    Result<void> setBlocking(bool blocking);
     bool isBlocking() const noexcept;
 
     // Block until the socket has readable data (or EOF) within the given
@@ -103,8 +103,8 @@ class Socket {
     bool waitWritable(Milliseconds timeout);
 
     // SO_REUSEADDR / SO_REUSEPORT
-    bool setReuseAddress(bool reuse);
-    bool setReusePort(bool enable);
+    Result<void> setReuseAddress(bool reuse);
+    Result<void> setReusePort(bool enable);
 
     // Set SO_RCVTIMEO on the socket.
     //   defaultTimeout (30 s)  used when not specified.
@@ -112,20 +112,20 @@ class Socket {
     //                           indefinitely until data arrives.
     //   any positive duration  recv() returns SocketError::Timeout after
     //                           waiting this long with no data.
-    bool setReceiveTimeout(Milliseconds timeout);
+    Result<void> setReceiveTimeout(Milliseconds timeout);
 
     // Set SO_SNDTIMEO on the socket (same semantics as setReceiveTimeout).
-    bool setSendTimeout(Milliseconds timeout);
+    Result<void> setSendTimeout(Milliseconds timeout);
 
     // Disable/enable Nagle's algorithm (TCP only).
-    bool setNoDelay(bool noDelay);
+    Result<void> setNoDelay(bool noDelay);
     bool getNoDelay() const;
 
     // Set the kernel receive / send socket buffer sizes (SO_RCVBUF /
     // SO_SNDBUF). `bytes` is the requested buffer size in bytes; the kernel
     // may round it up or clamp it. Returns false on setsockopt() failure.
-    bool setReceiveBufferSize(int bytes);
-    bool setSendBufferSize(int bytes);
+    Result<void> setReceiveBufferSize(int bytes);
+    Result<void> setSendBufferSize(int bytes);
 
     // Query the current kernel receive / send socket buffer sizes.
     // Returns -1 on getsockopt() failure.
@@ -133,12 +133,12 @@ class Socket {
     int getSendBufferSize() const;
 
     // UDP-only options (no-op on TCP).  Returns false if called on TCP.
-    bool setBroadcast(bool enable);
-    bool setMulticastTTL(int ttl);
+    Result<void> setBroadcast(bool enable);
+    Result<void> setMulticastTTL(int ttl);
 
     // TCP-only options (no-op on UDP).  Returns false if called on UDP.
-    bool setKeepAlive(bool enable);
-    bool setLingerAbort(bool enable);
+    Result<void> setKeepAlive(bool enable);
+    Result<void> setLingerAbort(bool enable);
 
     // Shutdown the socket (disable further sends/receives).
     bool shutdown(ShutdownHow how);
