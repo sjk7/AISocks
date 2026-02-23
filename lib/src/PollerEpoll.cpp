@@ -22,6 +22,8 @@ namespace aiSocks {
 struct Poller::Impl {
     int epfd{-1};
     std::unordered_map<uintptr_t, const Socket*> sockets;
+    // Reusable result buffer to avoid per-call allocation in wait()
+    std::vector<PollResult> resultBuffer;
 };
 
 static uint32_t interestToEpollEvents(PollEvent interest) {
@@ -104,8 +106,9 @@ std::vector<PollResult> Poller::wait(Milliseconds timeout) {
             return {};
         }
 
-        std::vector<PollResult> results;
-        results.reserve(static_cast<size_t>(n));
+        pImpl_->resultBuffer.clear();
+        pImpl_->resultBuffer.reserve(static_cast<size_t>(n));
+        auto& results = pImpl_->resultBuffer;
         for (int i = 0; i < n; ++i) {
             const struct epoll_event& ev = events[static_cast<size_t>(i)];
             auto fd = static_cast<uintptr_t>(ev.data.fd);
