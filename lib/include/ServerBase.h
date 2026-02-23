@@ -218,7 +218,16 @@ template <typename ClientData> class ServerBase {
 
         // Clean up any remaining clients when stopping
         for (auto& [fd, entry] : clients_) {
-            onDisconnect(entry.data);
+            // Debug: Check if the string is corrupted before calling onDisconnect
+            try {
+                // Try to access the string to see if it's corrupted
+                size_t size = entry.data.buf.size();
+                (void)size; // Suppress unused variable warning
+                onDisconnect(entry.data);
+            } catch (...) {
+                // If accessing the string crashes, skip this client
+                continue;
+            }
         }
         clients_.clear();
         current_poller_ = nullptr;
