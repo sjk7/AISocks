@@ -6,7 +6,6 @@
 
 #include "SocketTypes.h"
 #include <string>
-#include <optional>
 #include <utility>
 
 namespace aiSocks {
@@ -15,7 +14,7 @@ namespace aiSocks {
 // Error information structure for lazy message construction
 // ---------------------------------------------------------------------------
 struct ErrorInfo {
-    SocketError error{SocketError::None}; // Add missing error field
+    SocketError error{SocketError::None};
     const char* description{nullptr};  // string literal, never owned
     int sysCode{0};                    // errno / WSAGetLastError
     bool isDns{false};
@@ -213,7 +212,11 @@ public:
             return empty;
         }
         
-        return error_ref().buildMessage();
+        // Build and cache the message
+        if (error_ref().cachedMessage_.empty()) {
+            error_ref().cachedMessage_ = error_ref().buildMessage();
+        }
+        return error_ref().cachedMessage_;
     }
     
     // Convenience methods
@@ -292,13 +295,10 @@ private:
     std::optional<ErrorInfo> errorInfo_;
     
 public:
-    // Success constructor
     Result() : error_(SocketError::None) {}
     
-    // Error constructor
     Result(SocketError error, const char* description, int sysCode = 0, bool isDns = false)
-        : error_(error)
-        , errorInfo_(ErrorInfo{description, sysCode, isDns, {}}) {}
+        : error_(error), errorInfo_(ErrorInfo{description, sysCode, isDns, {}}) {}
     
     bool isSuccess() const noexcept { return error_ == SocketError::None; }
     bool isError() const noexcept { return !isSuccess(); }
@@ -331,107 +331,159 @@ public:
 template<>
 class Result<Endpoint> {
 private:
-    SocketError error_;
-    Endpoint value_;
+    // Endpoint is small enough for SBO (typically ~32-64 bytes)
+    static constexpr bool use_sbo = sizeof(Endpoint) <= sizeof(ErrorInfo);
     
-    struct ErrorInfo {
-        const char* description{nullptr};
-        int sysCode{0};
-        bool isDns{false};
-        mutable std::string cachedMessage_;
-        
-        std::string buildMessage() const {
-            if (!description) return "Unknown error";
-            
-            std::string msg = description;
-            if (sysCode != 0) {
-                msg += " [";
-                msg += std::to_string(sysCode);
-                msg += ": ";
-                
-                char sysErrBuf[256] = {0};
-#ifdef _WIN32
-                FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
-                             nullptr, static_cast<DWORD>(sysCode), MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
-                             sysErrBuf, sizeof(sysErrBuf), nullptr);
-#else
-                if (isDns) {
-                    const char* gaiMsg = gai_strerror(sysCode);
-                    if (gaiMsg) {
-                        strncpy(sysErrBuf, gaiMsg, sizeof(sysErrBuf) - 1);
-                    }
-                } else {
-                    const char* errnoMsg = strerror(sysCode);
-                    if (errnoMsg) {
-                        strncpy(sysErrBuf, errnoMsg, sizeof(sysErrBuf) - 1);
-                    }
-                }
-#endif
-                char* end = sysErrBuf + strlen(sysErrBuf) - 1;
-                while (end >= sysErrBuf && (*end == '\n' || *end == '\r' || *end == ' ')) {
-                    *end = '\0';
-                    --end;
-                }
-                
-                msg += sysErrBuf;
-                msg += "]";
-            }
-            return msg;
-        }
+    union {
+        alignas(Endpoint) unsigned char endpoint_storage_[sizeof(Endpoint)];
+        ErrorInfo error_;
     };
     
-    std::optional<ErrorInfo> errorInfo_;
+    bool has_value_;
+    
+    // Helper to get endpoint reference
+    Endpoint& endpoint_ref() {
+        return *reinterpret_cast<Endpoint*>(endpoint_storage_);
+    }
+    
+    const Endpoint& endpoint_ref() const {
+        return *reinterpret_cast<const Endpoint*>(endpoint_storage_);
+    }
+    
+    // Helper to get error reference
+    ErrorInfo& error_ref() {
+        return error_;
+    }
+    
+    const ErrorInfo& error_ref() const {
+        return error_;
+    }
     
 public:
     // Success constructor
-    Result(Endpoint value) : error_(SocketError::None), value_(std::move(value)) {}
+    Result(Endpoint value) : has_value_(true) {
+        new(endpoint_storage_) Endpoint(std::move(value));
+    }
     
     // Error constructor
     Result(SocketError error, const char* description, int sysCode = 0, bool isDns = false)
-        : error_(error), value_{}, errorInfo_(ErrorInfo{description, sysCode, isDns, {}}) {}
+        : has_value_(false) {
+        new(&error_ref()) ErrorInfo{error, description, sysCode, isDns, {}};
+    }
     
-    bool isSuccess() const noexcept { return error_ == SocketError::None; }
-    bool isError() const noexcept { return !isSuccess(); }
+    // Copy/move constructors
+    Result(const Result& other) : has_value_(other.has_value_) {
+        if (has_value_) {
+            new(endpoint_storage_) Endpoint(other.endpoint_ref());
+        } else {
+            new(&error_ref()) ErrorInfo{other.error_ref().error, other.error_ref().description, 
+                                        other.error_ref().sysCode, other.error_ref().isDns, 
+                                        other.error_ref().cachedMessage_};
+        }
+    }
     
-    SocketError error() const noexcept { return error_; }
+    Result(Result&& other) noexcept : has_value_(other.has_value_) {
+        if (has_value_) {
+            new(endpoint_storage_) Endpoint(std::move(other.endpoint_ref()));
+        } else {
+            new(&error_ref()) ErrorInfo{other.error_ref().error, other.error_ref().description, 
+                                        other.error_ref().sysCode, other.error_ref().isDns, 
+                                        std::move(other.error_ref().cachedMessage_)};
+        }
+    }
+    
+    // Assignment operators
+    Result& operator=(const Result& other) {
+        if (this != &other) {
+            if (has_value_) endpoint_ref().~Endpoint();
+            if (other.has_value_) {
+                has_value_ = true;
+                new(endpoint_storage_) Endpoint(other.endpoint_ref());
+            } else {
+                has_value_ = false;
+                new(&error_ref()) ErrorInfo{other.error_ref().error, other.error_ref().description, 
+                                            other.error_ref().sysCode, other.error_ref().isDns, 
+                                            other.error_ref().cachedMessage_};
+            }
+        }
+        return *this;
+    }
+    
+    Result& operator=(Result&& other) noexcept {
+        if (this != &other) {
+            if (has_value_) endpoint_ref().~Endpoint();
+            if (other.has_value_) {
+                has_value_ = true;
+                new(endpoint_storage_) Endpoint(std::move(other.endpoint_ref()));
+            } else {
+                has_value_ = false;
+                new(&error_ref()) ErrorInfo{other.error_ref().error, other.error_ref().description, 
+                                            other.error_ref().sysCode, other.error_ref().isDns, 
+                                            std::move(other.error_ref().cachedMessage_)};
+            }
+        }
+        return *this;
+    }
+    
+    // Destructor
+    ~Result() {
+        if (has_value_) {
+            endpoint_ref().~Endpoint();
+        } else {
+            error_ref().~ErrorInfo();
+        }
+    }
+    
+    bool isSuccess() const noexcept { return has_value_; }
+    bool isError() const noexcept { return !has_value_; }
+    
+    SocketError error() const noexcept { 
+        return has_value_ ? SocketError::None : error_ref().error; 
+    }
     
     const Endpoint& value() const & { 
-        if (!isSuccess()) {
+        if (!has_value_) {
             throw std::runtime_error("Attempted to access value of error Result<Endpoint>");
         }
-        return value_; 
+        return endpoint_ref(); 
     }
     
     Endpoint& value() & { 
-        if (!isSuccess()) {
+        if (!has_value_) {
             throw std::runtime_error("Attempted to access value of error Result<Endpoint>");
         }
-        return value_; 
+        return endpoint_ref(); 
     }
     
     Endpoint&& value() && { 
-        if (!isSuccess()) {
+        if (!has_value_) {
             throw std::runtime_error("Attempted to access value of error Result<Endpoint>");
         }
-        return std::move(value_); 
+        return std::move(endpoint_ref()); 
     }
     
     const std::string& message() const {
-        if (!errorInfo_.has_value()) {
+        if (has_value_) {
             static const std::string empty = "";
             return empty;
         }
         
-        if (errorInfo_->cachedMessage_.empty()) {
-            errorInfo_->cachedMessage_ = errorInfo_->buildMessage();
+        // Build and cache the message
+        if (error_ref().cachedMessage_.empty()) {
+            error_ref().cachedMessage_ = error_ref().buildMessage();
         }
-        return errorInfo_->cachedMessage_;
+        return error_ref().cachedMessage_;
     }
     
-    explicit operator bool() const noexcept { return isSuccess(); }
+    explicit operator bool() const noexcept { return has_value_; }
     
-    static Result<Endpoint> success(Endpoint value) { return Result(std::move(value)); }
-    static Result<Endpoint> failure(SocketError error, const char* description, int sysCode = 0, bool isDns = false) {
+    template<typename U>
+    Endpoint value_or(U&& default_value) const {
+        return has_value_ ? endpoint_ref() : std::forward<U>(default_value);
+    }
+    
+    static Result success(Endpoint value) { return Result(std::move(value)); }
+    static Result failure(SocketError error, const char* description, int sysCode = 0, bool isDns = false) {
         return Result(error, description, sysCode, isDns);
     }
 };
