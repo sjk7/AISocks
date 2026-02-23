@@ -334,7 +334,7 @@ std::string Socket::getErrorMessage() const {
 Result<Endpoint> Socket::getLocalEndpoint() const {
     auto endpoint = pImpl->getLocalEndpoint();
     if (endpoint) {
-        return Result<Endpoint>::success(*endpoint);
+        return Result<Endpoint>::success(endpoint.value());
     } else {
         return Result<Endpoint>::failure(pImpl->getLastError(), "getLocalEndpoint", 0, false);
     }
@@ -343,7 +343,7 @@ Result<Endpoint> Socket::getLocalEndpoint() const {
 Result<Endpoint> Socket::getPeerEndpoint() const {
     auto endpoint = pImpl->getPeerEndpoint();
     if (endpoint) {
-        return Result<Endpoint>::success(*endpoint);
+        return Result<Endpoint>::success(endpoint.value());
     } else {
         return Result<Endpoint>::failure(pImpl->getLastError(), "getPeerEndpoint", 0, false);
     }

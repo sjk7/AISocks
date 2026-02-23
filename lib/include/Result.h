@@ -298,7 +298,7 @@ public:
     
     // Error constructor
     Result(SocketError error, const char* description, int sysCode = 0, bool isDns = false)
-        : error_(error), errorInfo_(ErrorInfo{description, sysCode, isDns, {}}) {}
+        : error_(error), value_{}, errorInfo_(ErrorInfo{description, sysCode, isDns, {}}) {}
     
     bool isSuccess() const noexcept { return error_ == SocketError::None; }
     bool isError() const noexcept { return !isSuccess(); }
