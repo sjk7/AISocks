@@ -106,38 +106,31 @@ Socket& Socket::operator=(Socket&& other) noexcept {
 }
 
 bool Socket::doBind(const std::string& address, Port port) {
-    assert(pImpl);
     return pImpl->bind(address, port);
 }
 
 bool Socket::doListen(int backlog) {
-    assert(pImpl);
     return pImpl->listen(backlog);
 }
 
 std::unique_ptr<SocketImpl> Socket::doAccept() {
-    assert(pImpl);
     return pImpl->accept();
 }
 
 bool Socket::doConnect(
     const std::string& address, Port port, Milliseconds timeout) {
-    assert(pImpl);
     return pImpl->connect(address, port, timeout);
 }
 
 int Socket::doSend(const void* data, size_t length) {
-    assert(pImpl);
     return pImpl->send(data, length);
 }
 
 int Socket::doReceive(void* buffer, size_t length) {
-    assert(pImpl);
     return pImpl->receive(buffer, length);
 }
 
 bool Socket::doSendAll(const void* data, size_t length) {
-    assert(pImpl);
     return pImpl->sendAll(data, length);
 }
 
@@ -146,7 +139,6 @@ bool Socket::doSendAll(Span<const std::byte> data) {
 }
 
 bool Socket::doReceiveAll(void* buffer, size_t length) {
-    assert(pImpl);
     return pImpl->receiveAll(buffer, length);
 }
 
@@ -155,7 +147,6 @@ bool Socket::doReceiveAll(Span<std::byte> buffer) {
 }
 
 bool Socket::doSendAllProgress(const void* data, size_t length, SendProgressSink& progress) {
-    assert(pImpl);
     const auto* ptr = static_cast<const char*>(data);
     size_t sent = 0;
     while (sent < length) {
@@ -172,12 +163,10 @@ bool Socket::doSendAllProgress(const void* data, size_t length, SendProgressSink
 }
 
 int Socket::doSendTo(const void* data, size_t length, const Endpoint& remote) {
-    assert(pImpl);
     return pImpl->sendTo(data, length, remote);
 }
 
 int Socket::doReceiveFrom(void* buffer, size_t length, Endpoint& remote) {
-    assert(pImpl);
     return pImpl->receiveFrom(buffer, length, remote);
 }
 
@@ -190,87 +179,78 @@ int Socket::doReceiveFrom(Span<std::byte> buffer, Endpoint& remote) {
 }
 
 bool Socket::setBlocking(bool blocking) {
-    assert(pImpl);
     return pImpl->setBlocking(blocking);
 }
 
 bool Socket::isBlocking() const noexcept {
-    assert(pImpl);
     return pImpl->isBlocking();
 }
 
 bool Socket::waitReadable(Milliseconds timeout) {
-    assert(pImpl);
     return pImpl->waitReadable(timeout);
 }
 
 bool Socket::waitWritable(Milliseconds timeout) {
-    assert(pImpl);
     return pImpl->waitWritable(timeout);
 }
 
 bool Socket::setReuseAddress(bool reuse) {
-    assert(pImpl);
     return pImpl->setReuseAddress(reuse);
 }
 
 bool Socket::setReusePort(bool enable) {
-    assert(pImpl);
     return pImpl->setReusePort(enable);
 }
 
 bool Socket::setReceiveTimeout(Milliseconds timeout) {
-    assert(pImpl);
     return pImpl->setReceiveTimeout(timeout);
 }
 
 bool Socket::setSendTimeout(Milliseconds timeout) {
-    assert(pImpl);
     return pImpl->setSendTimeout(timeout);
 }
 
 bool Socket::setNoDelay(bool noDelay) {
-    assert(pImpl);
     return pImpl->setNoDelay(noDelay);
 }
 
 bool Socket::getNoDelay() const {
-    assert(pImpl);
     return pImpl->getNoDelay();
 }
 
 bool Socket::setKeepAlive(bool enable) {
-    assert(pImpl);
     return pImpl->setKeepAlive(enable);
 }
 
 bool Socket::setLingerAbort(bool enable) {
-    assert(pImpl);
     return pImpl->setLingerAbort(enable);
 }
 
 bool Socket::setBroadcast(bool enable) {
-    assert(pImpl);
     return pImpl->setBroadcast(enable);
 }
 
 bool Socket::setMulticastTTL(int ttl) {
-    assert(pImpl);
     return pImpl->setMulticastTTL(ttl);
 }
 
+bool Socket::setReceiveBufferSize(int bytes) {
+    return pImpl->setReceiveBufferSize(bytes);
+}
+
+bool Socket::setSendBufferSize(int bytes) {
+    return pImpl->setSendBufferSize(bytes);
+}
+
 int Socket::getReceiveBufferSize() const {
-    assert(pImpl);
     return pImpl->getReceiveBufferSize();
 }
 
 int Socket::getSendBufferSize() const {
-    assert(pImpl);
     return pImpl->getSendBufferSize();
 }
 
 bool Socket::shutdown(ShutdownHow how) {
-    assert(pImpl);
     return pImpl->shutdown(how);
 }
 

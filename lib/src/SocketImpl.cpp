@@ -204,7 +204,7 @@ std::unique_ptr<SocketImpl> SocketImpl::accept() {
 }
 
 bool SocketImpl::connect(
-    const std::string& address, Port port, std::chrono::milliseconds timeout) {
+    const std::string& address, Port port, Milliseconds timeout) {
     if (!isValid()) {
         setError(SocketError::InvalidSocket, "Socket is not valid");
         return false;
@@ -305,7 +305,7 @@ bool SocketImpl::connect(
     // timeout <= 0: caller wants non-blocking initiation  return WouldBlock.
     // The guard restores the original blocking mode (which was already
     // non-blocking if the caller set it, so this is a no-op in that case).
-    if (timeout.count() <= 0) {
+    if (timeout.count <= 0) {
         setError(SocketError::WouldBlock,
             "connect() in progress (non-blocking socket)");
         return false;
@@ -366,7 +366,7 @@ bool SocketImpl::connect(
 
     // Deadline loop: each iteration waits at most 100 ms so the monotonic
     // clock check stays responsive; EINTR restarts with the remaining slice.
-    auto deadline = std::chrono::steady_clock::now() + timeout;
+    auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(timeout.count);
 
     for (;;) {
         auto remaining = std::chrono::duration_cast<std::chrono::milliseconds>(
@@ -374,7 +374,7 @@ bool SocketImpl::connect(
                              .count();
         if (remaining <= 0) {
             setError(SocketError::Timeout,
-                "connect() timed out after " + std::to_string(timeout.count())
+                "connect() timed out after " + std::to_string(timeout.count)
                     + " ms");
             return false;
         }
@@ -558,9 +558,10 @@ bool SocketImpl::setReuseAddress(bool reuse) {
     return setSocketOption(socketHandle, SOL_SOCKET, SO_REUSEADDR, optval, "Failed to set reuse address option");
 }
 
-bool SocketImpl::setTimeout(std::chrono::milliseconds timeout) {
+bool SocketImpl::setTimeout(Milliseconds timeout) {
     RETURN_IF_INVALID();
-    return setSocketOptionTimeout(socketHandle, SO_RCVTIMEO, timeout, "Failed to set receive timeout");
+    return setSocketOptionTimeout(socketHandle, SO_RCVTIMEO, 
+        std::chrono::milliseconds(timeout.count), "Failed to set receive timeout");
 }
 
 void SocketImpl::close() noexcept {
@@ -761,9 +762,10 @@ int SocketImpl::receiveFrom(void* buffer, size_t length, Endpoint& remote) {
     }
 }
 
-bool SocketImpl::setSendTimeout(std::chrono::milliseconds timeout) {
+bool SocketImpl::setSendTimeout(Milliseconds timeout) {
     RETURN_IF_INVALID();
-    return setSocketOptionTimeout(socketHandle, SO_SNDTIMEO, timeout, "Failed to set send timeout");
+    return setSocketOptionTimeout(socketHandle, SO_SNDTIMEO, 
+        std::chrono::milliseconds(timeout.count), "Failed to set send timeout");
 }
 
 bool SocketImpl::setNoDelay(bool noDelay) {
