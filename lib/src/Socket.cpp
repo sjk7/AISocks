@@ -6,10 +6,23 @@
 #endif
 #include "Socket.h"
 #include "SocketImpl.h"
+#include "SocketHelpers.h"
 #include <cassert>
 #include <string>
 
 namespace aiSocks {
+
+namespace {
+    // Set error state instead of throwing - returns false on error
+    bool setErrorIfFailed(bool ok, const std::unique_ptr<SocketImpl>& /*impl*/) {
+        if (!ok) {
+            // Don't throw - just let the socket remain in invalid state
+            // The caller can check isValid() and getLastError()
+            return false;
+        }
+        return true;
+    }
+}
 
 // ---------------------------------------------------------------------------
 // Endpoint utility methods
@@ -41,18 +54,6 @@ bool Endpoint::isPrivateNetwork() const {
         // IPv6 ULA: fc00::/7 or fd00::/8
         return (address.size() >= 2) && (address[0] == 'f') && 
                (address[1] == 'c' || address[1] == 'd');
-    }
-}
-
-namespace {
-    // Set error state instead of throwing - returns false on error
-    bool setErrorIfFailed(bool ok, const std::unique_ptr<SocketImpl>& /*impl*/) {
-        if (!ok) {
-            // Don't throw - just let the socket remain in invalid state
-            // The caller can check isValid() and getLastError()
-            return false;
-        }
-        return true;
     }
 }
 
@@ -144,8 +145,16 @@ bool Socket::doSendAll(Span<const std::byte> data) {
     return doSendAll(data.data(), data.size());
 }
 
-bool Socket::doSendAllProgress(
-    const void* data, size_t length, SendProgressSink& progress) {
+bool Socket::doReceiveAll(void* buffer, size_t length) {
+    assert(pImpl);
+    return pImpl->receiveAll(buffer, length);
+}
+
+bool Socket::doReceiveAll(Span<std::byte> buffer) {
+    return doReceiveAll(buffer.data(), buffer.size());
+}
+
+bool Socket::doSendAllProgress(const void* data, size_t length, SendProgressSink& progress) {
     assert(pImpl);
     const auto* ptr = static_cast<const char*>(data);
     size_t sent = 0;
@@ -162,24 +171,6 @@ bool Socket::doSendAllProgress(
     return true;
 }
 
-bool Socket::doReceiveAll(void* buffer, size_t length) {
-    assert(pImpl);
-    return pImpl->receiveAll(buffer, length);
-}
-
-bool Socket::doReceiveAll(Span<std::byte> buffer) {
-    return doReceiveAll(buffer.data(), buffer.size());
-}
-
-// Span overloads  delegate to the raw-pointer implementations.
-int Socket::doSend(Span<const std::byte> data) {
-    return doSend(data.data(), data.size());
-}
-
-int Socket::doReceive(Span<std::byte> buffer) {
-    return doReceive(buffer.data(), buffer.size());
-}
-
 int Socket::doSendTo(const void* data, size_t length, const Endpoint& remote) {
     assert(pImpl);
     return pImpl->sendTo(data, length, remote);
@@ -190,7 +181,6 @@ int Socket::doReceiveFrom(void* buffer, size_t length, Endpoint& remote) {
     return pImpl->receiveFrom(buffer, length, remote);
 }
 
-// Span overloads for UDP sendTo / receiveFrom.
 int Socket::doSendTo(Span<const std::byte> data, const Endpoint& remote) {
     return doSendTo(data.data(), data.size(), remote);
 }
@@ -231,7 +221,7 @@ bool Socket::setReusePort(bool enable) {
 
 bool Socket::setReceiveTimeout(Milliseconds timeout) {
     assert(pImpl);
-    return pImpl->setTimeout(timeout);
+    return pImpl->setReceiveTimeout(timeout);
 }
 
 bool Socket::setSendTimeout(Milliseconds timeout) {
@@ -242,26 +232,6 @@ bool Socket::setSendTimeout(Milliseconds timeout) {
 bool Socket::setNoDelay(bool noDelay) {
     assert(pImpl);
     return pImpl->setNoDelay(noDelay);
-}
-
-bool Socket::setReceiveBufferSize(int bytes) {
-    assert(pImpl);
-    return pImpl->setReceiveBufferSize(bytes);
-}
-
-bool Socket::setSendBufferSize(int bytes) {
-    assert(pImpl);
-    return pImpl->setSendBufferSize(bytes);
-}
-
-int Socket::getReceiveBufferSize() const {
-    assert(pImpl);
-    return pImpl->getReceiveBufferSize();
-}
-
-int Socket::getSendBufferSize() const {
-    assert(pImpl);
-    return pImpl->getSendBufferSize();
 }
 
 bool Socket::getNoDelay() const {
@@ -279,29 +249,24 @@ bool Socket::setLingerAbort(bool enable) {
     return pImpl->setLingerAbort(enable);
 }
 
-bool Socket::doSetBroadcast(bool enable) {
+bool Socket::setBroadcast(bool enable) {
     assert(pImpl);
     return pImpl->setBroadcast(enable);
 }
 
-bool Socket::doSetMulticastTTL(int ttl) {
+bool Socket::setMulticastTTL(int ttl) {
     assert(pImpl);
     return pImpl->setMulticastTTL(ttl);
 }
 
-int Socket::doGetReceiveBufferSize() const {
+int Socket::getReceiveBufferSize() const {
     assert(pImpl);
     return pImpl->getReceiveBufferSize();
 }
 
-int Socket::doGetSendBufferSize() const {
+int Socket::getSendBufferSize() const {
     assert(pImpl);
     return pImpl->getSendBufferSize();
-}
-
-bool Socket::doGetNoDelay() const {
-    assert(pImpl);
-    return pImpl->getNoDelay();
 }
 
 bool Socket::shutdown(ShutdownHow how) {
@@ -349,6 +314,10 @@ Result<Endpoint> Socket::getPeerEndpoint() const {
     }
 }
 
+NativeHandle Socket::getNativeHandle() const noexcept {
+    return static_cast<NativeHandle>(pImpl->getRawHandle());
+}
+
 // Static utility methods
 std::vector<NetworkInterface> Socket::getLocalAddresses() {
     return SocketImpl::getLocalAddresses();
@@ -364,10 +333,6 @@ bool Socket::isValidIPv6(const std::string& address) {
 
 std::string Socket::ipToString(const void* addr, AddressFamily family) {
     return SocketImpl::ipToString(addr, family);
-}
-
-NativeHandle Socket::getNativeHandle() const noexcept {
-    return static_cast<NativeHandle>(pImpl->getRawHandle());
 }
 
 } // namespace aiSocks
