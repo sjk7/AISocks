@@ -424,3 +424,8 @@ build/
 
 # CMake compile commands (build artifact, machine-specific)
 compile_commands.json
+*.exe
+windows-test/*.exe
+windows-test/lib/*.a
+windows-test/lib/CMakeFiles/
+build-mingw/

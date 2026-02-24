@@ -3,12 +3,14 @@
 // https://pvs-studio.com
 
 // Tests: SocketFactory API with Result<T> exception-free error handling
-// Verifies that SocketFactory methods return Result<T> with proper error handling
+// Verifies that SocketFactory methods return Result<T> with proper error
+// handling
 
 #include "TcpSocket.h"
 #include "UdpSocket.h"
 #include "SocketFactory.h"
 #include "test_helpers.h"
+#include <cstring>
 #include <thread>
 #include <chrono>
 
@@ -52,7 +54,7 @@ int main() {
         REQUIRE(result.isSuccess());
         auto& server = result.value();
         REQUIRE(server.isValid());
-        
+
         // Server should be bound and listening
         auto endpoint = server.getLocalEndpoint();
         REQUIRE(endpoint.isSuccess());
@@ -63,8 +65,7 @@ int main() {
     // Test 5: Client socket creation
     BEGIN_TEST("SocketFactory::createTcpClient fails on refused port");
     {
-        auto result = SocketFactory::createTcpClient(
-            AddressFamily::IPv4,
+        auto result = SocketFactory::createTcpClient(AddressFamily::IPv4,
             ConnectArgs{"127.0.0.1", Port{1}, Milliseconds{100}});
         REQUIRE(result.isError());
         REQUIRE(result.error() != SocketError::None);
@@ -95,8 +96,7 @@ int main() {
         // Give server time to start
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
-        auto clt_result = SocketFactory::createTcpClient(
-            AddressFamily::IPv4,
+        auto clt_result = SocketFactory::createTcpClient(AddressFamily::IPv4,
             ConnectArgs{"127.0.0.1", Port{19901}, Milliseconds{1000}});
         REQUIRE(clt_result.isSuccess());
         auto& client = clt_result.value();
@@ -118,9 +118,9 @@ int main() {
     // Test 7: Error handling with invalid address
     BEGIN_TEST("SocketFactory::createTcpClient fails on invalid address");
     {
-        auto result = SocketFactory::createTcpClient(
-            AddressFamily::IPv4,
-            ConnectArgs{"invalid.address.that.does.not.exist", Port{80}, Milliseconds{100}});
+        auto result = SocketFactory::createTcpClient(AddressFamily::IPv4,
+            ConnectArgs{"invalid.address.that.does.not.exist", Port{80},
+                Milliseconds{100}});
         REQUIRE(result.isError());
         REQUIRE(result.error() != SocketError::None);
     }
