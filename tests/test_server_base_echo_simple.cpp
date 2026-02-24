@@ -15,11 +15,11 @@ struct SimpleEchoState {
 };
 
 class SimpleEchoServer : public ServerBase<SimpleEchoState> {
-public:
+    public:
     explicit SimpleEchoServer(uint16_t port)
         : ServerBase<SimpleEchoState>(ServerBind{"127.0.0.1", Port{port}, 5}) {}
 
-protected:
+    protected:
     ServerResult onReadable(TcpSocket& sock, SimpleEchoState& s) override {
         char buf[256];
         int n = sock.receive(buf, sizeof(buf));
@@ -45,13 +45,9 @@ protected:
         return ServerResult::KeepConnection;
     }
 
-    ServerResult onIdle() override {
-        return ServerResult::KeepConnection;
-    }
+    ServerResult onIdle() override { return ServerResult::KeepConnection; }
 
-    ServerResult onDisconnect(SimpleEchoState& s) override {
-        return ServerResult::KeepConnection;
-    }
+    void onDisconnect(SimpleEchoState& /*s*/) override {}
 };
 
 int main() {
@@ -61,7 +57,7 @@ int main() {
     {
         SimpleEchoServer server(21002);
         std::atomic<bool> ready{false};
-        
+
         // Start server with limited clients
         std::thread([&server, &ready]() {
             ready = true;
@@ -69,41 +65,44 @@ int main() {
         }).detach();
 
         // Wait for server to be ready
-        while (!ready) std::this_thread::sleep_for(std::chrono::milliseconds{10});
+        while (!ready)
+            std::this_thread::sleep_for(std::chrono::milliseconds{10});
 
         // Connect one client
-        auto result = SocketFactory::createTcpClient(
-            AddressFamily::IPv4,
+        auto result = SocketFactory::createTcpClient(AddressFamily::IPv4,
             ConnectArgs{"127.0.0.1", Port{21002}, Milliseconds{1000}});
-        
+
         if (result.isSuccess()) {
             std::cout << "Client connected successfully\n";
-            auto client = std::make_unique<TcpSocket>(std::move(result.value()));
-            
+            auto client
+                = std::make_unique<TcpSocket>(std::move(result.value()));
+
             // Send some data
             const char* msg = "Hello Echo!";
             bool sent = client->send(msg, std::strlen(msg));
             if (sent) {
                 std::cout << "Data sent successfully\n";
-                
+
                 // Give server time to process
                 std::this_thread::sleep_for(std::chrono::milliseconds{100});
-                
+
                 // Receive echo
                 char buf[256];
                 int received = client->receive(buf, sizeof(buf));
                 if (received > 0) {
-                    std::cout << "Received echo: " << std::string(buf, received) << "\n";
+                    std::cout << "Received echo: " << std::string(buf, received)
+                              << "\n";
                 }
             }
-            
-            std::cout << "Server client count: " << server.clientCount() << "\n";
+
+            std::cout << "Server client count: " << server.clientCount()
+                      << "\n";
         }
 
         // Stop server
         SimpleEchoServer::requestStop();
         std::this_thread::sleep_for(std::chrono::milliseconds{100});
-        
+
         std::cout << "Simple echo test completed\n";
     }
 

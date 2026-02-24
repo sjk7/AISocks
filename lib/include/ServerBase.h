@@ -19,12 +19,12 @@ namespace aiSocks {
 
 // Client connection limits with sensible defaults and maximums
 enum class ClientLimit : size_t {
-    Unlimited = 0,           // Accept unlimited connections
-    Default = 1000,          // Default limit for production safety
-    Low = 100,              // Low resource environments
-    Medium = 500,           // Medium resource environments  
-    High = 2000,            // High performance servers
-    Maximum = 10000         // Reasonable maximum for most systems
+    Unlimited = 0, // Accept unlimited connections
+    Default = 1000, // Default limit for production safety
+    Low = 100, // Low resource environments
+    Medium = 500, // Medium resource environments
+    High = 2000, // High performance servers
+    Maximum = 10000 // Reasonable maximum for most systems
 };
 
 // Return values for ServerBase virtual functions
@@ -118,20 +118,20 @@ template <typename ClientData> class ServerBase {
     ServerBase& operator=(ServerBase&&) = default;
 
     // Check if the server is valid and ready for use
-    bool isValid() const {
-        return listener_ && listener_->isValid();
-    }
+    bool isValid() const { return listener_ && listener_->isValid(); }
 
     // Enter the poll loop.
     //
-    // maxClients: ClientLimit::Unlimited = unlimited; N > 0 = stop accepting after N connections,
+    // maxClients: ClientLimit::Unlimited = unlimited; N > 0 = stop accepting
+    // after N connections,
     //             but continue serving existing clients until all disconnect.
     // timeout:    passed to Poller::wait(); -1 = block until an event.
     //
     // Returns when there are no remaining connected clients (and accepting is
     // stopped, either because maxClients was reached or you stopped
     // externally).
-    void run(ClientLimit maxClients = ClientLimit::Default, Milliseconds timeout = Milliseconds{-1}) {
+    void run(ClientLimit maxClients = ClientLimit::Default,
+        Milliseconds timeout = Milliseconds{-1}) {
         if (!isValid()) return; // Server not valid, exit early
 
         s_stop_.store(false, std::memory_order_relaxed);
@@ -154,7 +154,8 @@ template <typename ClientData> class ServerBase {
             return; // Failed to register with poller
         }
 
-        // Pre-reserve client map if maxClients is specified to eliminate hash table growth
+        // Pre-reserve client map if maxClients is specified to eliminate hash
+        // table growth
         if (static_cast<size_t>(maxClients) > 0) {
             clients_.reserve(static_cast<size_t>(maxClients));
         }
@@ -205,11 +206,12 @@ template <typename ClientData> class ServerBase {
                     (void)poller.remove(*it->second.socket);
                     clients_.erase(it);
 #ifdef SERVER_STATS
-                    printf("[stats] clients: %zu  max: %zu\n", clients_.size(), max_clients_);
+                    printf("[stats] clients: %zu  max: %zu\n", clients_.size(),
+                        max_clients_);
 #endif
                 }
             }
-            
+
             if (onIdle() == ServerResult::StopServer) {
                 s_stop_.store(true);
                 break;
@@ -218,16 +220,7 @@ template <typename ClientData> class ServerBase {
 
         // Clean up any remaining clients when stopping
         for (auto& [fd, entry] : clients_) {
-            // Debug: Check if the string is corrupted before calling onDisconnect
-            try {
-                // Try to access the string to see if it's corrupted
-                size_t size = entry.data.buf.size();
-                (void)size; // Suppress unused variable warning
-                onDisconnect(entry.data);
-            } catch (...) {
-                // If accessing the string crashes, skip this client
-                continue;
-            }
+            onDisconnect(entry.data);
         }
         clients_.clear();
         current_poller_ = nullptr;
@@ -318,7 +311,8 @@ template <typename ClientData> class ServerBase {
     // Called after the keep-alive sweep closes one or more idle connections.
     // Default: prints the count to stdout.
     virtual void onClientsTimedOut(size_t count) {
-        printf("[keepalive] closed %zu idle connection%s\n", count, count == 1 ? "" : "s");
+        printf("[keepalive] closed %zu idle connection%s\n", count,
+            count == 1 ? "" : "s");
     }
 
     // Called on every loop iteration after poller.wait() returns, before
@@ -336,9 +330,9 @@ template <typename ClientData> class ServerBase {
         if (now - last_idle_check_ < std::chrono::seconds{1})
             return ServerResult::KeepConnection;
         last_idle_check_ = now;
-        
-        // Just count timed out clients for reporting - actual cleanup is handled
-        // by the main event loop to prevent race conditions.
+
+        // Just count timed out clients for reporting - actual cleanup is
+        // handled by the main event loop to prevent race conditions.
         size_t timedOut = 0;
         if (keepAliveTimeout_.count() > 0) {
             for (const auto& [fd, entry] : clients_) {
@@ -349,7 +343,7 @@ template <typename ClientData> class ServerBase {
                 }
             }
         }
-        
+
         if (timedOut > 0) onClientsTimedOut(timedOut);
         return ServerResult::KeepConnection;
     }
@@ -378,8 +372,8 @@ template <typename ClientData> class ServerBase {
     size_t peak_clients_{0};
     SteadyClock::time_point last_idle_check_{SteadyClock::now()};
 
-    void drainAccept(
-        Poller& poller, bool& accepting, size_t& accepted, ClientLimit maxClients) {
+    void drainAccept(Poller& poller, bool& accepting, size_t& accepted,
+        ClientLimit maxClients) {
         for (;;) {
             auto client = listener_->accept();
             if (!client) {
@@ -401,10 +395,12 @@ template <typename ClientData> class ServerBase {
             if (clients_.size() > peak_clients_)
                 peak_clients_ = clients_.size();
 #ifdef SERVER_STATS
-            printf("[stats] clients: %zu  peak: %zu\n", clients_.size(), peak_clients_);
+            printf("[stats] clients: %zu  peak: %zu\n", clients_.size(),
+                peak_clients_);
 #endif
 
-            if (maxClients != ClientLimit::Unlimited && accepted >= static_cast<size_t>(maxClients)) {
+            if (maxClients != ClientLimit::Unlimited
+                && accepted >= static_cast<size_t>(maxClients)) {
                 (void)poller.remove(*listener_);
                 accepting = false;
                 break;

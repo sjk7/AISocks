@@ -26,7 +26,7 @@ struct Poller::Impl {
     std::vector<bool> socketValid;
     // Reusable result buffer to avoid per-call allocation in wait()
     std::vector<PollResult> resultBuffer;
-    
+
     // Helper to ensure array is large enough for fd
     void ensureCapacity(int fd) {
         size_t required = static_cast<size_t>(fd) + 1;
@@ -107,7 +107,7 @@ bool Poller::remove(const Socket& s) {
 
 std::vector<PollResult> Poller::wait(Milliseconds timeout) {
     const int timeoutMs
-        = (timeout.count() < 0) ? -1 : static_cast<int>(timeout.count());
+        = (timeout.count < 0) ? -1 : static_cast<int>(timeout.count);
 
     const int maxEvents = static_cast<int>(pImpl_->socketArray.size()) + 1;
     std::vector<struct epoll_event> events(static_cast<size_t>(maxEvents));
@@ -128,9 +128,9 @@ std::vector<PollResult> Poller::wait(Milliseconds timeout) {
         for (int i = 0; i < n; ++i) {
             const struct epoll_event& ev = events[static_cast<size_t>(i)];
             auto fd = static_cast<int>(ev.data.fd);
-            if (fd < static_cast<int>(pImpl_->socketArray.size()) && 
-                pImpl_->socketValid[fd] && pImpl_->socketArray[fd]) {
-                
+            if (fd < static_cast<int>(pImpl_->socketArray.size())
+                && pImpl_->socketValid[fd] && pImpl_->socketArray[fd]) {
+
                 uint8_t bits = 0;
                 if ((ev.events & (EPOLLIN | EPOLLRDNORM | EPOLLRDHUP)) != 0)
                     bits |= static_cast<uint8_t>(PollEvent::Readable);
@@ -143,10 +143,12 @@ std::vector<PollResult> Poller::wait(Milliseconds timeout) {
                 }
                 if ((ev.events & EPOLLHUP) != 0) {
                     // EPOLLHUP = remote closed (TCP FIN) -- not a socket error,
-                    // treat as readable so the read path sees n==0 and disconnects.
+                    // treat as readable so the read path sees n==0 and
+                    // disconnects.
                     bits |= static_cast<uint8_t>(PollEvent::Readable);
                 }
-                results.push_back({pImpl_->socketArray[fd], static_cast<PollEvent>(bits)});
+                results.push_back(
+                    {pImpl_->socketArray[fd], static_cast<PollEvent>(bits)});
             }
         }
         return results;

@@ -27,7 +27,7 @@ struct Poller::Impl {
     std::vector<bool> socketValid;
     // Reusable result buffer to avoid per-call allocation in wait()
     std::vector<PollResult> resultBuffer;
-    
+
     // Helper to ensure array is large enough for fd
     void ensureCapacity(int fd) {
         size_t required = static_cast<size_t>(fd) + 1;
@@ -72,7 +72,6 @@ bool Poller::add(const Socket& s, PollEvent interest) {
     if (::kevent(pImpl_->kq, changes, n, nullptr, 0, nullptr) == -1) {
         return false;
     }
-    auto fd = s.getNativeHandle();
     pImpl_->ensureCapacity(fd);
     pImpl_->socketArray[fd] = &s;
     pImpl_->socketValid[fd] = true;
@@ -135,15 +134,14 @@ std::vector<PollResult> Poller::wait(Milliseconds timeout) {
     // Convert timeout: -1 means block forever (nullptr timespec).
     struct timespec ts{};
     struct timespec* tsp = nullptr;
-    if (timeout.count() >= 0) {
-        ts.tv_sec = static_cast<time_t>(timeout.count() / 1000);
-        ts.tv_nsec = static_cast<long>((timeout.count() % 1000) * 1000000L);
+    if (timeout.count >= 0) {
+        ts.tv_sec = static_cast<time_t>(timeout.count / 1000);
+        ts.tv_nsec = static_cast<long>((timeout.count % 1000) * 1000000L);
         tsp = &ts;
     }
 
     // Allocate enough room for two events per registered socket (READ+WRITE).
-    auto& sockets = pImpl_->sockets;
-    const int maxEvents = static_cast<int>(sockets.size() * 2) + 1;
+    const int maxEvents = static_cast<int>(pImpl_->socketArray.size() * 2) + 1;
     std::vector<struct kevent> events(static_cast<size_t>(maxEvents));
 
     for (;;) {
@@ -184,8 +182,8 @@ std::vector<PollResult> Poller::wait(Milliseconds timeout) {
         auto& results = pImpl_->resultBuffer;
         for (const auto& kv : ready) {
             auto fd = static_cast<int>(kv.first);
-            if (fd < static_cast<int>(pImpl_->socketArray.size()) && 
-                pImpl_->socketValid[fd] && pImpl_->socketArray[fd]) {
+            if (fd < static_cast<int>(pImpl_->socketArray.size())
+                && pImpl_->socketValid[fd] && pImpl_->socketArray[fd]) {
                 results.push_back({pImpl_->socketArray[fd], kv.second});
             }
         }
