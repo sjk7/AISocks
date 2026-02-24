@@ -19,9 +19,10 @@ struct Milliseconds {
     constexpr explicit Milliseconds(int64_t ms) noexcept : count(ms) {}
 
     // Implicit conversion from std::chrono::duration types
-    template<typename Rep, typename Period>
+    template <typename Rep, typename Period>
     constexpr Milliseconds(std::chrono::duration<Rep, Period> d) noexcept
-        : count(std::chrono::duration_cast<std::chrono::milliseconds>(d).count()) {}
+        : count(std::chrono::duration_cast<std::chrono::milliseconds>(d)
+                  .count()) {}
 
     constexpr int64_t milliseconds() const noexcept { return count; }
 
@@ -55,7 +56,7 @@ namespace Timeouts {
     inline constexpr Milliseconds Short{1000};
     inline constexpr Milliseconds Medium{5000};
     inline constexpr Milliseconds Long{30000};
-}
+} // namespace Timeouts
 
 enum class AddressFamily { IPv4, IPv6 };
 
@@ -72,21 +73,30 @@ enum class SocketType { TCP, UDP };
 //   socket.bind("0.0.0.0", 8080);   // implicit conversion
 class Port {
     uint16_t value_;
-public:
+
+    public:
     constexpr Port() noexcept : value_(0) {}
     constexpr explicit Port(uint16_t value) noexcept : value_(value) {}
-    
+
     // Allow implicit conversion from integer literals
-    template<typename T, typename = std::enable_if_t<std::is_integral_v<T>>>
+    template <typename T, typename = std::enable_if_t<std::is_integral_v<T>>>
     constexpr Port(T value) noexcept : value_(static_cast<uint16_t>(value)) {}
-    
+
     constexpr uint16_t value() const noexcept { return value_; }
     constexpr operator uint16_t() const noexcept { return value_; }
-    
-    constexpr bool operator==(Port other) const noexcept { return value_ == other.value_; }
-    constexpr bool operator!=(Port other) const noexcept { return value_ != other.value_; }
-    constexpr bool operator<(Port other) const noexcept { return value_ < other.value_; }
-    constexpr bool operator>(Port other) const noexcept { return value_ > other.value_; }
+
+    constexpr bool operator==(Port other) const noexcept {
+        return value_ == other.value_;
+    }
+    constexpr bool operator!=(Port other) const noexcept {
+        return value_ != other.value_;
+    }
+    constexpr bool operator<(Port other) const noexcept {
+        return value_ < other.value_;
+    }
+    constexpr bool operator>(Port other) const noexcept {
+        return value_ > other.value_;
+    }
 };
 
 // Network endpoint: an (address, port, family) triple returned by
@@ -95,18 +105,24 @@ struct Endpoint {
     std::string address; // dotted-decimal or colon-hex string
     Port port{0}; // port number
     AddressFamily family{}; // IPv4 or IPv6
-    
+
     Endpoint() = default;
     Endpoint(const std::string& addr, Port p, AddressFamily fam)
         : address(addr), port(p), family(fam) {}
-    
+
     bool operator==(const Endpoint& other) const noexcept {
-        return address == other.address && port == other.port && family == other.family;
+        return address == other.address && port == other.port
+            && family == other.family;
     }
     bool operator!=(const Endpoint& other) const noexcept {
         return !(*this == other);
     }
-    
+
+    // Format as "address:port" string for logging/display.
+    std::string toString() const {
+        return address + ":" + std::to_string(static_cast<uint16_t>(port));
+    }
+
     // Check if this endpoint is a loopback address (127.x.x.x or ::1).
     bool isLoopback() const;
 

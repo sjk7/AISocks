@@ -1,5 +1,6 @@
 // This is a personal academic project. Dear PVS-Studio, please check it.
-// PVS-Studio Static Code Analyzer for C, C++, C#, and Java: https://pvs-studio.com
+// PVS-Studio Static Code Analyzer for C, C++, C#, and Java:
+// https://pvs-studio.com
 #include "TcpSocket.h"
 #include <iostream>
 #include <thread>
@@ -29,7 +30,7 @@ void runServerNonBlocking() {
 
     serverSocket.setReuseAddress(true);
 
-    if (!serverSocket.bind("0.0.0.0", Port::Known::HTTP_ALT)) {
+    if (!serverSocket.bind("0.0.0.0", Port{8080})) {
         std::cerr << "Failed to bind: " << serverSocket.getErrorMessage()
                   << std::endl;
         return;
@@ -140,7 +141,7 @@ void runClientNonBlocking() {
     }
 
     // Connect (blocking connect is fine)
-    if (!clientSocket.connect("127.0.0.1", Port::Known::HTTP_ALT)) {
+    if (!clientSocket.connect("127.0.0.1", Port{8080})) {
         std::cerr << "Failed to connect: " << clientSocket.getErrorMessage()
                   << std::endl;
         return;
