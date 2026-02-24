@@ -106,8 +106,15 @@ bool Poller::remove(const Socket& s) {
 }
 
 std::vector<PollResult> Poller::wait(Milliseconds timeout) {
+    // Convert 0ms to 0.5ms minimum to prevent CPU spinning
+    int64_t effectiveTimeout = timeout.count;
+    if (effectiveTimeout == 0) {
+        effectiveTimeout
+            = 1; // epoll only supports millisecond precision, so 0ms -> 1ms
+    }
+
     const int timeoutMs
-        = (timeout.count < 0) ? -1 : static_cast<int>(timeout.count);
+        = (effectiveTimeout < 0) ? -1 : static_cast<int>(effectiveTimeout);
 
     const int maxEvents = static_cast<int>(pImpl_->socketArray.size()) + 1;
     std::vector<struct epoll_event> events(static_cast<size_t>(maxEvents));
