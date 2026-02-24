@@ -74,6 +74,17 @@ if(BUILD_EXAMPLES)
             if(CMAKE_BUILD_TYPE STREQUAL "Debug")
                 target_compile_options(${_tgt} PRIVATE -g -O0)
             endif()
+            # On macOS with Homebrew LLVM: link against its libc++ so template
+            # instantiations resolve symbols like __hash_memory.
+            if(APPLE)
+                get_filename_component(_EX_COMPILER_DIR "${CMAKE_CXX_COMPILER}" DIRECTORY)
+                get_filename_component(_EX_LLVM_ROOT "${_EX_COMPILER_DIR}" DIRECTORY)
+                if(EXISTS "${_EX_LLVM_ROOT}/lib/c++")
+                    target_link_directories(${_tgt} PRIVATE "${_EX_LLVM_ROOT}/lib/c++")
+                    set_target_properties(${_tgt} PROPERTIES
+                        BUILD_RPATH "${_EX_LLVM_ROOT}/lib/c++")
+                endif()
+            endif()
         endif()
     endforeach()
 endif()
