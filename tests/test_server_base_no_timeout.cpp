@@ -11,6 +11,7 @@ using namespace aiSocks;
 
 struct NoTimeoutState {
     bool dummy{false};
+    std::string buf; // Required by ServerBase for debugging
 };
 
 class NoTimeoutServer : public ServerBase<NoTimeoutState> {

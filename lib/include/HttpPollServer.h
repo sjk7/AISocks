@@ -47,6 +47,7 @@ namespace aiSocks {
 struct HttpClientState {
     std::string request;
     std::string response;
+    std::string buf; // Required by ServerBase for debugging
     size_t sent{0};
     std::chrono::steady_clock::time_point startTime{};
     bool responseStarted{false}; // true once onResponseBegin has been called
