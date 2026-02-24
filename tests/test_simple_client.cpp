@@ -9,6 +9,7 @@
 #include "SimpleClient.h"
 #include "SocketFactory.h"
 #include "test_helpers.h"
+#include <chrono>
 #include <cstring>
 #include <string>
 #include <thread>
@@ -58,7 +59,7 @@ int main() {
                     REQUIRE(std::string(buf, n) == msg);
                 }
             });
-        
+
         REQUIRE(client.isConnected());
         REQUIRE(callback_called);
         server_thread.join();
@@ -68,38 +69,38 @@ int main() {
     BEGIN_TEST("SimpleClient: returns invalid client on refused connection");
     {
         SimpleClient client(
-            ConnectArgs{"127.0.0.1", Port{1}, Milliseconds{100}}, 
+            ConnectArgs{"127.0.0.1", Port{1}, Milliseconds{100}},
             [](TcpSocket& sock) {
                 // This callback should not be called
                 REQUIRE(false);
             });
-        
+
         REQUIRE(!client.isConnected());
     }
 
     // Test 3: Error handling with invalid address
     BEGIN_TEST("SimpleClient: returns invalid client on invalid address");
     {
-        SimpleClient client(
-            ConnectArgs{"invalid.address.that.does.not.exist", Port{80}, Milliseconds{100}},
+        SimpleClient client(ConnectArgs{"invalid.address.that.does.not.exist",
+                                Port{80}, Milliseconds{100}},
             [](TcpSocket& sock) {
                 // This callback should not be called
                 REQUIRE(false);
             });
-        
+
         REQUIRE(!client.isConnected());
     }
 
     // Test 4: Timeout handling
     BEGIN_TEST("SimpleClient: returns invalid client on timeout");
     {
-        SimpleClient client(
-            ConnectArgs{"10.255.255.1", Port{80}, Milliseconds{10}}, // Non-routable IP
+        SimpleClient client(ConnectArgs{"10.255.255.1", Port{80},
+                                Milliseconds{10}}, // Non-routable IP
             [](TcpSocket& sock) {
                 // This callback should not be called
                 REQUIRE(false);
             });
-        
+
         REQUIRE(!client.isConnected());
     }
 
@@ -132,7 +133,7 @@ int main() {
         for (int i = 0; i < 3; ++i) {
             std::string msg = "Message " + std::to_string(i);
             bool callback_called = false;
-            
+
             SimpleClient client(
                 ConnectArgs{"127.0.0.1", Port{BASE + 1}}, [&](TcpSocket& sock) {
                     callback_called = true;
@@ -144,7 +145,7 @@ int main() {
                         REQUIRE(std::string(buf, n) == msg);
                     }
                 });
-            
+
             REQUIRE(client.isConnected());
             REQUIRE(callback_called);
         }
@@ -180,7 +181,7 @@ int main() {
                 callback_called = true;
                 // Move the socket out of the callback
                 auto& moved_socket = sock; // Reference to the socket
-                
+
                 const char* msg = "Moved socket test";
                 moved_socket.sendAll(msg, std::strlen(msg));
 
@@ -190,10 +191,10 @@ int main() {
                     REQUIRE(std::string(buf, n) == msg);
                 }
             });
-        
+
         REQUIRE(client.isConnected());
         REQUIRE(callback_called);
-        
+
         server_thread.join();
     }
 
