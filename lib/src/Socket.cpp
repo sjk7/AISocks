@@ -14,7 +14,8 @@ namespace aiSocks {
 
 namespace {
     // Set error state instead of throwing - returns false on error
-    bool setErrorIfFailed(bool ok, const std::unique_ptr<SocketImpl>& /*impl*/) {
+    bool setErrorIfFailed(
+        bool ok, const std::unique_ptr<SocketImpl>& /*impl*/) {
         if (!ok) {
             // Don't throw - just let the socket remain in invalid state
             // The caller can check isValid() and getLastError()
@@ -22,7 +23,7 @@ namespace {
         }
         return true;
     }
-}
+} // namespace
 
 // ---------------------------------------------------------------------------
 // Endpoint utility methods
@@ -34,7 +35,8 @@ bool Endpoint::isLoopback() const {
         return address.substr(0, 4) == "127.";
     } else {
         // IPv6: check for ::1
-        return address == "::1" || address == "::" || address == "0000:0000:0000:0000:0000:0000:0000:0001";
+        return address == "::1" || address == "::"
+            || address == "0000:0000:0000:0000:0000:0000:0000:0001";
     }
 }
 
@@ -52,8 +54,8 @@ bool Endpoint::isPrivateNetwork() const {
         return false;
     } else {
         // IPv6 ULA: fc00::/7 or fd00::/8
-        return (address.size() >= 2) && (address[0] == 'f') && 
-               (address[1] == 'c' || address[1] == 'd');
+        return (address.size() >= 2) && (address[0] == 'f')
+            && (address[1] == 'c' || address[1] == 'd');
     }
 }
 
@@ -72,9 +74,7 @@ Socket::Socket(SocketType type, AddressFamily family, const ServerBind& cfg)
     // Don't throw - let socket remain in invalid state if creation fails
     if (!setErrorIfFailed(pImpl->isValid(), pImpl)) return;
 
-    if (cfg.reuseAddr)
-        setErrorIfFailed(
-            pImpl->setReuseAddress(true), pImpl);
+    if (cfg.reuseAddr) setErrorIfFailed(pImpl->setReuseAddress(true), pImpl);
 
     setErrorIfFailed(pImpl->bind(cfg.address, cfg.port), pImpl);
 
@@ -85,8 +85,9 @@ Socket::Socket(SocketType type, AddressFamily family, const ConnectArgs& cfg)
     : pImpl(std::make_unique<SocketImpl>(type, family)) {
     // Don't throw - let socket remain in invalid state if creation fails
     if (!setErrorIfFailed(pImpl->isValid(), pImpl)) return;
-    
-    setErrorIfFailed(pImpl->connect(cfg.address, cfg.port, cfg.connectTimeout), pImpl);
+
+    setErrorIfFailed(
+        pImpl->connect(cfg.address, cfg.port, cfg.connectTimeout), pImpl);
 }
 
 Socket::Socket(std::unique_ptr<SocketImpl> impl) : pImpl(std::move(impl)) {}
@@ -156,7 +157,8 @@ bool Socket::doReceiveAll(Span<std::byte> buffer) {
     return doReceiveAll(buffer.data(), buffer.size());
 }
 
-bool Socket::doSendAllProgress(const void* data, size_t length, SendProgressSink& progress) {
+bool Socket::doSendAllProgress(
+    const void* data, size_t length, SendProgressSink& progress) {
     const auto* ptr = static_cast<const char*>(data);
     size_t sent = 0;
     while (sent < length) {
@@ -190,7 +192,8 @@ int Socket::doReceiveFrom(Span<std::byte> buffer, Endpoint& remote) {
 
 Result<void> Socket::setBlocking(bool blocking) {
     if (!pImpl->setBlocking(blocking)) {
-        return Result<void>::failure(pImpl->getLastError(), "setBlocking", 0, false);
+        return Result<void>::failure(
+            pImpl->getLastError(), "setBlocking", 0, false);
     }
     return Result<void>::success();
 }
@@ -209,35 +212,40 @@ bool Socket::waitWritable(Milliseconds timeout) {
 
 Result<void> Socket::setReuseAddress(bool reuse) {
     if (!pImpl->setReuseAddress(reuse)) {
-        return Result<void>::failure(pImpl->getLastError(), "setReuseAddress", 0, false);
+        return Result<void>::failure(
+            pImpl->getLastError(), "setReuseAddress", 0, false);
     }
     return Result<void>::success();
 }
 
 Result<void> Socket::setReusePort(bool enable) {
     if (!pImpl->setReusePort(enable)) {
-        return Result<void>::failure(pImpl->getLastError(), "setReusePort", 0, false);
+        return Result<void>::failure(
+            pImpl->getLastError(), "setReusePort", 0, false);
     }
     return Result<void>::success();
 }
 
 Result<void> Socket::setReceiveTimeout(Milliseconds timeout) {
     if (!pImpl->setReceiveTimeout(timeout)) {
-        return Result<void>::failure(pImpl->getLastError(), "setReceiveTimeout", 0, false);
+        return Result<void>::failure(
+            pImpl->getLastError(), "setReceiveTimeout", 0, false);
     }
     return Result<void>::success();
 }
 
 Result<void> Socket::setSendTimeout(Milliseconds timeout) {
     if (!pImpl->setSendTimeout(timeout)) {
-        return Result<void>::failure(pImpl->getLastError(), "setSendTimeout", 0, false);
+        return Result<void>::failure(
+            pImpl->getLastError(), "setSendTimeout", 0, false);
     }
     return Result<void>::success();
 }
 
 Result<void> Socket::setNoDelay(bool noDelay) {
     if (!pImpl->setNoDelay(noDelay)) {
-        return Result<void>::failure(pImpl->getLastError(), "setNoDelay", 0, false);
+        return Result<void>::failure(
+            pImpl->getLastError(), "setNoDelay", 0, false);
     }
     return Result<void>::success();
 }
@@ -246,44 +254,58 @@ bool Socket::getNoDelay() const {
     return pImpl->getNoDelay();
 }
 
+bool Socket::getLastErrorIsDns() const {
+    return pImpl->getLastErrorIsDns();
+}
+
+int Socket::getLastErrorSysCode() const {
+    return pImpl->getLastErrorSysCode();
+}
+
 Result<void> Socket::setKeepAlive(bool enable) {
     if (!pImpl->setKeepAlive(enable)) {
-        return Result<void>::failure(pImpl->getLastError(), "setKeepAlive", 0, false);
+        return Result<void>::failure(
+            pImpl->getLastError(), "setKeepAlive", 0, false);
     }
     return Result<void>::success();
 }
 
 Result<void> Socket::setLingerAbort(bool enable) {
     if (!pImpl->setLingerAbort(enable)) {
-        return Result<void>::failure(pImpl->getLastError(), "setLingerAbort", 0, false);
+        return Result<void>::failure(
+            pImpl->getLastError(), "setLingerAbort", 0, false);
     }
     return Result<void>::success();
 }
 
 Result<void> Socket::setBroadcast(bool enable) {
     if (!pImpl->setBroadcast(enable)) {
-        return Result<void>::failure(pImpl->getLastError(), "setBroadcast", 0, false);
+        return Result<void>::failure(
+            pImpl->getLastError(), "setBroadcast", 0, false);
     }
     return Result<void>::success();
 }
 
 Result<void> Socket::setMulticastTTL(int ttl) {
     if (!pImpl->setMulticastTTL(ttl)) {
-        return Result<void>::failure(pImpl->getLastError(), "setMulticastTTL", 0, false);
+        return Result<void>::failure(
+            pImpl->getLastError(), "setMulticastTTL", 0, false);
     }
     return Result<void>::success();
 }
 
 Result<void> Socket::setReceiveBufferSize(int bytes) {
     if (!pImpl->setReceiveBufferSize(bytes)) {
-        return Result<void>::failure(pImpl->getLastError(), "setReceiveBufferSize", 0, false);
+        return Result<void>::failure(
+            pImpl->getLastError(), "setReceiveBufferSize", 0, false);
     }
     return Result<void>::success();
 }
 
 Result<void> Socket::setSendBufferSize(int bytes) {
     if (!pImpl->setSendBufferSize(bytes)) {
-        return Result<void>::failure(pImpl->getLastError(), "setSendBufferSize", 0, false);
+        return Result<void>::failure(
+            pImpl->getLastError(), "setSendBufferSize", 0, false);
     }
     return Result<void>::success();
 }
@@ -327,7 +349,8 @@ Result<Endpoint> Socket::getLocalEndpoint() const {
     if (endpoint) {
         return Result<Endpoint>::success(endpoint.value());
     } else {
-        return Result<Endpoint>::failure(pImpl->getLastError(), "getLocalEndpoint", 0, false);
+        return Result<Endpoint>::failure(
+            pImpl->getLastError(), "getLocalEndpoint", 0, false);
     }
 }
 
@@ -336,7 +359,8 @@ Result<Endpoint> Socket::getPeerEndpoint() const {
     if (endpoint) {
         return Result<Endpoint>::success(endpoint.value());
     } else {
-        return Result<Endpoint>::failure(pImpl->getLastError(), "getPeerEndpoint", 0, false);
+        return Result<Endpoint>::failure(
+            pImpl->getLastError(), "getPeerEndpoint", 0, false);
     }
 }
 

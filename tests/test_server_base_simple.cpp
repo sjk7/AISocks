@@ -15,11 +15,11 @@ struct SimpleState {
 };
 
 class SimpleServer : public ServerBase<SimpleState> {
-public:
+    public:
     explicit SimpleServer(uint16_t port)
         : ServerBase<SimpleState>(ServerBind{"127.0.0.1", Port{port}, 5}) {}
 
-protected:
+    protected:
     ServerResult onReadable(TcpSocket& sock, SimpleState& s) override {
         char buf[256];
         int n = sock.receive(buf, sizeof(buf));
@@ -34,13 +34,9 @@ protected:
         return ServerResult::KeepConnection;
     }
 
-    ServerResult onIdle() override {
-        return ServerResult::KeepConnection;
-    }
+    ServerResult onIdle() override { return ServerResult::KeepConnection; }
 
-    void onDisconnect(SimpleState& s) override {
-        s.disconnected = true;
-    }
+    void onDisconnect(SimpleState& s) override { s.disconnected = true; }
 };
 
 int main() {
@@ -50,39 +46,43 @@ int main() {
     {
         SimpleServer server(21000);
         std::atomic<bool> ready{false};
-        
+
         // Start server with limited clients
         std::thread([&server, &ready]() {
             ready = true;
-            server.run(ClientLimit{2}, Milliseconds{100});
+            server.run(ClientLimit{2}, Milliseconds{10});
         }).detach();
 
         // Wait for server to be ready
-        while (!ready) std::this_thread::sleep_for(std::chrono::milliseconds{10});
+        while (!ready)
+            std::this_thread::sleep_for(std::chrono::milliseconds{10});
 
         // Connect one client
-        auto result = SocketFactory::createTcpClient(
-            AddressFamily::IPv4,
+        auto result = SocketFactory::createTcpClient(AddressFamily::IPv4,
             ConnectArgs{"127.0.0.1", Port{21000}, Milliseconds{1000}});
-        
+
         if (result.isSuccess()) {
             std::cout << "Client connected successfully\n";
-            auto client = std::make_unique<TcpSocket>(std::move(result.value()));
-            
+            auto client
+                = std::make_unique<TcpSocket>(std::move(result.value()));
+
             // Give server time to process
             std::this_thread::sleep_for(std::chrono::milliseconds{200});
-            
-            std::cout << "Server client count: " << server.clientCount() << "\n";
-            
+
+            std::cout << "Server client count: " << server.clientCount()
+                      << "\n";
+
             // Disconnect client
             client.reset();
-            
+
             // Give server time to process disconnection
             std::this_thread::sleep_for(std::chrono::milliseconds{200});
-            
-            std::cout << "Server client count after disconnect: " << server.clientCount() << "\n";
+
+            std::cout << "Server client count after disconnect: "
+                      << server.clientCount() << "\n";
         } else {
-            std::cout << "Client connection failed: " << result.message() << "\n";
+            std::cout << "Client connection failed: " << result.message()
+                      << "\n";
         }
 
         // Stop server
