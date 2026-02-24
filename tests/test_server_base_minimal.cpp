@@ -11,6 +11,7 @@ using namespace aiSocks;
 
 struct MinimalState {
     bool dummy{false};
+    std::string buf; // Required by ServerBase for debugging
 };
 
 class MinimalServer : public ServerBase<MinimalState> {
@@ -31,8 +32,8 @@ protected:
         return ServerResult::KeepConnection;
     }
 
-    ServerResult onDisconnect(MinimalState& s) override {
-        return ServerResult::KeepConnection;
+    void onDisconnect(MinimalState& s) override {
+        (void)s; // Suppress unused parameter warning
     }
 };
 

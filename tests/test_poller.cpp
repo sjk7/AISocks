@@ -25,8 +25,8 @@ static void test_poller_construct() {
     try {
         Poller p;
         REQUIRE(true); // reached here  no exception thrown
-    } catch (const SocketException& e) {
-        REQUIRE_MSG(false, std::string("SocketException: ") + e.what());
+    } catch (...) {
+        REQUIRE_MSG(false, "Unexpected exception thrown");
     }
 }
 
