@@ -5,6 +5,7 @@
 #define AISOCKS_RESULT_H
 
 #include "SocketTypes.h"
+#include <stdexcept>
 #include <string>
 #include <utility>
 

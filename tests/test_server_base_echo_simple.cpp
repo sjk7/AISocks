@@ -6,6 +6,7 @@
 #include "test_helpers.h"
 #include <thread>
 #include <chrono>
+#include <cstring>
 
 using namespace aiSocks;
 

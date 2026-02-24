@@ -12,9 +12,9 @@
 #include "TcpSocket.h"
 #include "SocketFactory.h"
 #include "test_helpers.h"
-
 #include <atomic>
 #include <chrono>
+#include <cstring>
 #include <string>
 #include <thread>
 
