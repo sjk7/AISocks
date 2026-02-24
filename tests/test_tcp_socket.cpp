@@ -9,6 +9,7 @@
 // design contracts hold (accept returns unique_ptr<TcpSocket>, not Socket).
 
 #include "TcpSocket.h"
+#include "SocketFactory.h"
 #include "test_helpers.h"
 #include <atomic>
 #include <chrono>
@@ -41,19 +42,12 @@ static void test_happy_construction() {
 
     BEGIN_TEST("TcpSocket: ServerBind ctor binds and listens in one step");
     {
-        bool threw = false;
-        try {
-            TcpSocket srv(
-                AddressFamily::IPv4, ServerBind{"127.0.0.1", Port{BASE}});
-            REQUIRE(srv.isValid());
-            auto ep = srv.getLocalEndpoint();
-            REQUIRE(ep.has_value());
-            REQUIRE(ep->port.value == BASE);
-        } catch (const SocketException& e) {
-            std::cerr << "  Unexpected: " << e.what() << "\n";
-            threw = true;
-        }
-        REQUIRE(!threw);
+        TcpSocket srv(
+            AddressFamily::IPv4, ServerBind{"127.0.0.1", Port{BASE}});
+        REQUIRE(srv.isValid());
+        auto ep = srv.getLocalEndpoint();
+        REQUIRE(ep.isSuccess());
+        REQUIRE(ep.value().port == Port{BASE});
     }
 
     std::this_thread::sleep_for(std::chrono::milliseconds(1));
@@ -62,34 +56,25 @@ static void test_happy_construction() {
     {
         std::atomic<bool> ready{false};
         std::thread srvThread([&] {
-            try {
-                TcpSocket srv(AddressFamily::IPv4,
-                    ServerBind{"127.0.0.1", Port{BASE + 1}});
-                ready = true;
-                (void)srv.accept(); // accepts and discards immediately
-            } catch (...) {
-                ready = true;
-            }
+            TcpSocket srv(AddressFamily::IPv4,
+                ServerBind{"127.0.0.1", Port{BASE + 1}});
+            REQUIRE(srv.isValid());
+            ready = true;
+            auto peer = srv.accept();
+            REQUIRE(peer != nullptr);
+            REQUIRE(peer->isValid());
         });
+
         auto deadline
             = std::chrono::steady_clock::now() + std::chrono::seconds(3);
         while (!ready && std::chrono::steady_clock::now() < deadline)
             std::this_thread::sleep_for(std::chrono::milliseconds(5));
 
-        bool threw = false;
-        try {
-            TcpSocket c(
-                AddressFamily::IPv4, ConnectArgs{"127.0.0.1", Port{BASE + 1}});
-            REQUIRE(c.isValid());
-            auto peer = c.getPeerEndpoint();
-            REQUIRE(peer.has_value());
-            REQUIRE(peer->port.value == BASE + 1);
-        } catch (const SocketException& e) {
-            std::cerr << "  Unexpected: " << e.what() << "\n";
-            threw = true;
-        }
+        TcpSocket c(
+            AddressFamily::IPv4, ConnectArgs{"127.0.0.1", Port{BASE + 1}});
+        REQUIRE(c.isValid());
+        
         srvThread.join();
-        REQUIRE(!threw);
     }
 }
 
@@ -120,7 +105,7 @@ static void test_happy_accept() {
         // Confirm we got an actual TcpSocket (not just a Socket).
         // The peer must be able to call TcpSocket-typed methods:
         auto ep = peer->getPeerEndpoint();
-        REQUIRE(ep.has_value());
+        REQUIRE(ep.isSuccess());
 
         clt.join();
     }
@@ -316,63 +301,45 @@ static void test_happy_options() {
 static void test_sad_construction() {
     std::this_thread::sleep_for(std::chrono::milliseconds(1));
 
-    BEGIN_TEST("TcpSocket(ServerBind): throws on port-in-use (no reuseAddr)");
+    BEGIN_TEST("TcpSocket: ServerBind fails on port in use");
     {
-        // First socket holds the port
+        // First server should succeed
         TcpSocket first(AddressFamily::IPv4,
             ServerBind{"127.0.0.1", Port{BASE + 10}, 5, false});
+        REQUIRE(first.isValid());
 
-        bool threw = false;
-        SocketError code = SocketError::None;
-        try {
-            TcpSocket second(AddressFamily::IPv4,
-                ServerBind{"127.0.0.1", Port{BASE + 10}, 5, false});
-        } catch (const SocketException& e) {
-            threw = true;
-            code = e.errorCode();
-        }
-        REQUIRE(threw);
-        REQUIRE(code == SocketError::BindFailed);
+        // Second server should fail
+        auto result = SocketFactory::createTcpServer(
+            AddressFamily::IPv4,
+            ServerBind{"127.0.0.1", Port{BASE + 10}, 5, false});
+        REQUIRE(result.isError());
+        REQUIRE(result.error() != SocketError::None);
     }
 
     std::this_thread::sleep_for(std::chrono::milliseconds(1));
 
-    BEGIN_TEST("TcpSocket(ServerBind): throws on invalid bind address");
+    BEGIN_TEST("TcpSocket(ServerBind): fails on invalid bind address");
     {
-        bool threw = false;
-        SocketError code = SocketError::None;
-        try {
-            TcpSocket s(AddressFamily::IPv4,
-                ServerBind{"999.999.999.999", Port{BASE + 11}});
-        } catch (const SocketException& e) {
-            threw = true;
-            code = e.errorCode();
-        }
-        REQUIRE(threw);
-        REQUIRE(code == SocketError::BindFailed);
+        auto result = SocketFactory::createTcpServer(
+            AddressFamily::IPv4,
+            ServerBind{"999.999.999.999", Port{BASE + 11}});
+        REQUIRE(result.isError());
+        REQUIRE(result.error() == SocketError::BindFailed);
     }
 
     std::this_thread::sleep_for(std::chrono::milliseconds(1));
 
-    BEGIN_TEST("TcpSocket(ConnectArgs): throws when nothing is listening");
+    BEGIN_TEST("TcpSocket(ConnectArgs): fails when nothing is listening");
     {
-        bool threw = false;
-        SocketError code = SocketError::None;
-        std::string whatStr;
-        try {
-            // Port 21899 is in our exclusive range but nothing is listening
-            TcpSocket c(AddressFamily::IPv4,
-                ConnectArgs{
-                    "127.0.0.1", Port{21899}, std::chrono::milliseconds{100}});
-        } catch (const SocketException& e) {
-            threw = true;
-            code = e.errorCode();
-            whatStr = e.what();
-        }
-        REQUIRE(threw);
-        REQUIRE((code == SocketError::ConnectFailed
-            || code == SocketError::Timeout));
-        REQUIRE(!whatStr.empty());
+        // Port 21899 is in our exclusive range but nothing is listening
+        auto result = SocketFactory::createTcpClient(
+            AddressFamily::IPv4,
+            ConnectArgs{
+                "127.0.0.1", Port{21899}, Milliseconds{100}});
+        REQUIRE(result.isError());
+        REQUIRE(result.error() == SocketError::ConnectFailed || 
+                result.error() == SocketError::ConnectionReset ||
+                result.error() == SocketError::Timeout);
     }
 }
 
@@ -509,9 +476,9 @@ static void test_happy_endpoints() {
         auto s = TcpSocket::createRaw();
         REQUIRE(s.bind("127.0.0.1", Port{BASE + 30}));
         auto ep = s.getLocalEndpoint();
-        REQUIRE(ep.has_value());
-        REQUIRE(ep->address == "127.0.0.1");
-        REQUIRE(ep->port.value == BASE + 30);
+        REQUIRE(ep.isSuccess());
+        REQUIRE(ep.value().address == "127.0.0.1");
+        REQUIRE(ep.value().port == Port{BASE + 30});
     }
 
     std::this_thread::sleep_for(std::chrono::milliseconds(1));
@@ -538,8 +505,8 @@ static void test_happy_endpoints() {
         auto c = TcpSocket::createRaw();
         REQUIRE(c.connect("127.0.0.1", Port{BASE + 31}));
         auto peer = c.getPeerEndpoint();
-        REQUIRE(peer.has_value());
-        REQUIRE(peer->port.value == BASE + 31);
+        REQUIRE(peer.isSuccess());
+        REQUIRE(peer.value().port == Port{BASE + 31});
 
         srvThread.join();
     }

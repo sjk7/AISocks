@@ -50,6 +50,7 @@ struct ErrorContext {
 class SocketImpl {
     public:
     SocketImpl(SocketType type, AddressFamily family);
+    SocketImpl(); // Creates an invalid socket (INVALID_SOCKET_HANDLE)
     ~SocketImpl();
 
     // Platform initialization/cleanup

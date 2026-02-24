@@ -11,6 +11,7 @@ using namespace aiSocks;
 
 struct SimpleState {
     bool disconnected{false};
+    std::string buf; // Required by ServerBase for debugging
 };
 
 class SimpleServer : public ServerBase<SimpleState> {
@@ -37,8 +38,8 @@ protected:
         return ServerResult::KeepConnection;
     }
 
-    ServerResult onDisconnect(SimpleState& s) override {
-        return ServerResult::KeepConnection;
+    void onDisconnect(SimpleState& s) override {
+        s.disconnected = true;
     }
 };
 

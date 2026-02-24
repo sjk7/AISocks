@@ -87,6 +87,15 @@ SocketImpl::SocketImpl(SocketType type, AddressFamily family)
 #endif
 }
 
+SocketImpl::SocketImpl()
+    : socketHandle(INVALID_SOCKET_HANDLE)
+    , socketType(SocketType::TCP)
+    , addressFamily(AddressFamily::IPv4)
+    , lastError(SocketError::InvalidSocket)
+    , blockingMode(true) {
+    // This creates an explicitly invalid socket for moved-from objects
+}
+
 SocketImpl::SocketImpl(
     SocketHandle handle, SocketType type, AddressFamily family)
     : socketHandle(handle)

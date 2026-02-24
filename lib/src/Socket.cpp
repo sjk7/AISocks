@@ -94,13 +94,15 @@ Socket::Socket(std::unique_ptr<SocketImpl> impl) : pImpl(std::move(impl)) {}
 Socket::~Socket() = default;
 
 Socket::Socket(Socket&& other) noexcept : pImpl(std::move(other.pImpl)) {
-    // other.pImpl is now nullptr (moved-from state)
+    // Set moved-from object to an explicitly invalid socket
+    other.pImpl = std::make_unique<SocketImpl>();
 }
 
 Socket& Socket::operator=(Socket&& other) noexcept {
     if (this != &other) {
         pImpl = std::move(other.pImpl);
-        // other.pImpl is now nullptr (moved-from state)
+        // Set moved-from object to an explicitly invalid socket
+        other.pImpl = std::make_unique<SocketImpl>();
     }
     return *this;
 }
@@ -126,8 +128,16 @@ int Socket::doSend(const void* data, size_t length) {
     return pImpl->send(data, length);
 }
 
+int Socket::doSend(Span<const std::byte> data) {
+    return doSend(data.data(), data.size());
+}
+
 int Socket::doReceive(void* buffer, size_t length) {
     return pImpl->receive(buffer, length);
+}
+
+int Socket::doReceive(Span<std::byte> buffer) {
+    return doReceive(buffer.data(), buffer.size());
 }
 
 bool Socket::doSendAll(const void* data, size_t length) {
