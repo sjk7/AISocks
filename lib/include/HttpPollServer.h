@@ -50,19 +50,25 @@ struct HttpClientState {
     size_t sent{0};
     std::chrono::steady_clock::time_point startTime{};
     bool responseStarted{false}; // true once onResponseBegin has been called
-    bool closeAfterSend{false};  // set by keep-alive negotiation; derived
-                                 // class may override in buildResponse()
+    bool closeAfterSend{false}; // set by keep-alive negotiation; derived
+                                // class may override in buildResponse()
+
+    // Pre-allocated buffer for better performance
+    HttpClientState() {
+        request.reserve(4096); // Pre-allocate for typical HTTP request
+        response.reserve(1024); // Pre-allocate for typical HTTP response
+    }
 };
 
 // ---------------------------------------------------------------------------
 // HttpPollServer
 // ---------------------------------------------------------------------------
 class HttpPollServer : public ServerBase<HttpClientState> {
-public:
+    public:
     explicit HttpPollServer(const ServerBind& bind)
         : ServerBase<HttpClientState>(bind) {}
 
-protected:
+    protected:
     // -------------------------------------------------------------------------
     // Must override: fill s.response from s.request.
     // s.closeAfterSend is already set according to HTTP/1.0 vs 1.1 keep-alive
@@ -85,10 +91,11 @@ protected:
     void onError(TcpSocket& sock, HttpClientState& /*s*/) override {
         auto err = sock.getLastError();
         // Poll systems can report error events with SO_ERROR==0 for connection
-        // resets or other conditions. This is not a real error and should not be logged.
+        // resets or other conditions. This is not a real error and should not
+        // be logged.
         if (err != SocketError::None) {
-            printf("[error] poll error on client socket: code=%d msg=%s\n", 
-                   static_cast<int>(err), sock.getErrorMessage().c_str());
+            printf("[error] poll error on client socket: code=%d msg=%s\n",
+                static_cast<int>(err), sock.getErrorMessage().c_str());
         }
     }
 
@@ -132,23 +139,23 @@ protected:
             = s.request.find("Connection: keep-alive") != std::string::npos
             || s.request.find("connection: keep-alive") != std::string::npos
             || s.request.find("Connection: Keep-Alive") != std::string::npos;
-        bool hasClose
-            = s.request.find("Connection: close") != std::string::npos
+        bool hasClose = s.request.find("Connection: close") != std::string::npos
             || s.request.find("connection: close") != std::string::npos
             || s.request.find("Connection: Close") != std::string::npos;
         // HTTP/1.1: keep-alive by default unless client says close.
-        // HTTP/1.0: close by default unless client explicitly requests keep-alive.
+        // HTTP/1.0: close by default unless client explicitly requests
+        // keep-alive.
         s.closeAfterSend = http10 ? !hasKeepAlive : hasClose;
         buildResponse(s);
     }
 
-private:
+    private:
     // -------------------------------------------------------------------------
     // ServerBase overrides (final: HTTP framing is not further overridable)
     // -------------------------------------------------------------------------
 
     static constexpr size_t MAX_REQUEST_BYTES = 64 * 1024;
-    static constexpr size_t RECV_BUF_SIZE    = 64 * 1024;
+    static constexpr size_t RECV_BUF_SIZE = 64 * 1024;
 
     ServerResult onReadable(TcpSocket& sock, HttpClientState& s) final {
         char buf[RECV_BUF_SIZE];
@@ -187,8 +194,7 @@ private:
     }
 
     ServerResult onWritable(TcpSocket& sock, HttpClientState& s) final {
-        if (s.response.empty())
-            return ServerResult::KeepConnection;
+        if (s.response.empty()) return ServerResult::KeepConnection;
 
         if (!s.responseStarted) {
             s.responseStarted = true;
@@ -212,9 +218,9 @@ private:
             bool shouldClose = s.closeAfterSend;
             s.request.clear();
             s.response.clear();
-            s.sent          = 0;
+            s.sent = 0;
             s.responseStarted = false;
-            s.closeAfterSend  = false;
+            s.closeAfterSend = false;
             setClientWritable(sock, false);
             return shouldClose ? ServerResult::Disconnect
                                : ServerResult::KeepConnection;
@@ -223,38 +229,43 @@ private:
     }
 
     ServerResult onIdle() override {
-        auto now      = std::chrono::steady_clock::now();
-        auto interval = std::chrono::duration<double, std::milli>(
-            now - last_call_).count();
+        auto now = std::chrono::steady_clock::now();
+        auto interval
+            = std::chrono::duration<double, std::milli>(now - last_call_)
+                  .count();
         last_call_ = now;
         intervals_.push_back(interval);
         ++call_count_;
 
-        auto since_print = std::chrono::duration<double>(
-            now - last_print_).count();
+        auto since_print
+            = std::chrono::duration<double>(now - last_print_).count();
         double print_interval = first_output_done_ ? 60.0 : 0.5;
 
         if (since_print >= print_interval) {
             if (!intervals_.empty()) {
                 double sum = 0;
                 for (double v : intervals_) sum += v;
-                printf("onIdle() called %d times, avg interval: %.1fms  clients: %zu  peak: %zu\n", 
-                       call_count_, sum / static_cast<double>(intervals_.size()),
-                       static_cast<size_t>(clientCount()), static_cast<size_t>(peakClientCount()));
+                printf("onIdle() called %d times, avg interval: %.1fms  "
+                       "clients: %zu  peak: %zu\n",
+                    call_count_, sum / static_cast<double>(intervals_.size()),
+                    static_cast<size_t>(clientCount()),
+                    static_cast<size_t>(peakClientCount()));
             }
             intervals_.clear();
-            call_count_        = 0;
-            last_print_        = now;
+            call_count_ = 0;
+            last_print_ = now;
             first_output_done_ = true;
         }
 
         return ServerBase::onIdle();
     }
 
-    std::chrono::steady_clock::time_point last_call_  = std::chrono::steady_clock::now();
-    std::chrono::steady_clock::time_point last_print_ = std::chrono::steady_clock::now();
+    std::chrono::steady_clock::time_point last_call_
+        = std::chrono::steady_clock::now();
+    std::chrono::steady_clock::time_point last_print_
+        = std::chrono::steady_clock::now();
     std::vector<double> intervals_;
-    int  call_count_        = 0;
+    int call_count_ = 0;
     bool first_output_done_ = false;
 };
 

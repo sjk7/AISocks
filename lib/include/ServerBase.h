@@ -98,6 +98,11 @@ template <typename ClientData> class ServerBase {
                 // Failed to set non-blocking - invalidate socket
                 listener_.reset();
             }
+            // Enable TCP_NODELAY for lower latency
+            if (!listener_->setNoDelay(true)) {
+                // Failed to set TCP_NODELAY - continue but log warning
+                printf("Warning: Failed to set TCP_NODELAY on server socket\n");
+            }
         } else {
             // Server creation failed - socket remains invalid
             listener_.reset();
@@ -209,6 +214,24 @@ template <typename ClientData> class ServerBase {
                     printf("[stats] clients: %zu  max: %zu\n", clients_.size(),
                         max_clients_);
 #endif
+                }
+            }
+
+            // Clean up timed-out clients detected by onIdle()
+            if (keepAliveTimeout_.count() > 0) {
+                auto now = std::chrono::steady_clock::now();
+                for (auto it = clients_.begin(); it != clients_.end();) {
+                    auto idle
+                        = std::chrono::duration_cast<std::chrono::seconds>(
+                            now - it->second.lastActivity);
+                    if (idle >= keepAliveTimeout_) {
+                        onDisconnect(it->second.data);
+                        it->second.socket->shutdown(ShutdownHow::Both);
+                        (void)poller.remove(*it->second.socket);
+                        it = clients_.erase(it);
+                    } else {
+                        ++it;
+                    }
                 }
             }
 
