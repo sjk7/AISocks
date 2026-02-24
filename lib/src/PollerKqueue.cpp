@@ -135,8 +135,17 @@ std::vector<PollResult> Poller::wait(Milliseconds timeout) {
     struct timespec ts{};
     struct timespec* tsp = nullptr;
     if (timeout.count >= 0) {
-        ts.tv_sec = static_cast<time_t>(timeout.count / 1000);
-        ts.tv_nsec = static_cast<long>((timeout.count % 1000) * 1000000L);
+        // Convert 0ms to 0.5ms minimum to prevent CPU spinning
+        int64_t effectiveTimeout = timeout.count;
+        if (effectiveTimeout == 0) {
+            // 0ms requested -> use 0.5ms (500 microseconds)
+            ts.tv_sec = 0;
+            ts.tv_nsec = 500000L; // 500 microseconds = 0.5ms
+        } else {
+            ts.tv_sec = static_cast<time_t>(effectiveTimeout / 1000);
+            ts.tv_nsec
+                = static_cast<long>((effectiveTimeout % 1000) * 1000000L);
+        }
         tsp = &ts;
     }
 
