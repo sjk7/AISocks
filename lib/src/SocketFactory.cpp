@@ -142,11 +142,15 @@ Result<TcpSocket> SocketFactory::connectSocket(
 
     // Attempt connection
     if (!socket.connect(config.address, config.port, config.connectTimeout)) {
-        return Result<TcpSocket>::failure(socket.getLastError(),
-            ("connect(" + config.address + ":"
-                + std::to_string(config.port.value()) + ")")
-                .c_str(),
-            SocketFactory::captureLastError(), false);
+        const char* desc = socket.getLastErrorIsDns() ? "DNS resolution failed"
+                                                      : "connect() failed";
+
+        // Get the correct system error code (DNS errors use gai code, not
+        // errno)
+        int sysCode = socket.getLastErrorSysCode();
+
+        return Result<TcpSocket>::failure(
+            socket.getLastError(), desc, sysCode, socket.getLastErrorIsDns());
     }
 
     return Result<TcpSocket>::success(std::move(socket));

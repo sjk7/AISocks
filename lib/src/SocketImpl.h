@@ -119,6 +119,12 @@ class SocketImpl {
     int getSendBufferSize() const;
     bool getNoDelay() const;
 
+    // Check if last error was DNS-related
+    bool getLastErrorIsDns() const;
+
+    // Get the system error code for the last error
+    int getLastErrorSysCode() const;
+
     // Constructor for accepted connections (public for make_unique)
     SocketImpl(SocketHandle handle, SocketType type, AddressFamily family);
 

@@ -6,6 +6,9 @@
 
 #include "Result.h"
 #include "SocketTypes.h"
+
+// Forward declaration
+struct ErrorContext;
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
@@ -32,33 +35,32 @@ constexpr NativeHandle INVALID_NATIVE_HANDLE = 0;
 // ---------------------------------------------------------------------------
 #if defined(__cpp_lib_span)
 namespace aiSocks {
-template<typename T>
-using Span = std::span<T>;
+template <typename T> using Span = std::span<T>;
 }
 #else
 namespace aiSocks {
-template<typename T>
-class Span {
+template <typename T> class Span {
     T* ptr;
     std::size_t len;
 
-public:
+    public:
     constexpr Span() noexcept : ptr(nullptr), len(0) {}
     constexpr Span(T* p, std::size_t n) noexcept : ptr(p), len(n) {}
-    
-    template<typename Container>
+
+    template <typename Container>
     constexpr Span(Container& c) noexcept : ptr(c.data()), len(c.size()) {}
-    
-    template<typename Container>
-    constexpr Span(const Container& c) noexcept : ptr(c.data()), len(c.size()) {}
-    
+
+    template <typename Container>
+    constexpr Span(const Container& c) noexcept
+        : ptr(c.data()), len(c.size()) {}
+
     constexpr std::size_t size() const noexcept { return len; }
     constexpr bool empty() const noexcept { return len == 0; }
 
     constexpr T* begin() const noexcept { return ptr; }
     constexpr T* end() const noexcept { return ptr + len; }
     constexpr T& operator[](std::size_t i) const noexcept { return ptr[i]; }
-    
+
     constexpr T* data() const noexcept { return ptr; }
 };
 } // namespace aiSocks
@@ -77,7 +79,8 @@ class SocketImpl;
 // through a base pointer directly.  Use TcpSocket or UdpSocket instead.
 //
 // All socket-option and query methods remain public so that code holding a
-// reference to the base class can still call setReceiveTimeout(), setSendTimeout(), setNoDelay(), etc.
+// reference to the base class can still call setReceiveTimeout(),
+// setSendTimeout(), setNoDelay(), etc.
 //
 // The protected do*() bridge methods expose the underlying SocketImpl
 // operations to derived classes without leaking SocketImpl.h into their
@@ -121,6 +124,12 @@ class Socket {
     Result<void> setNoDelay(bool noDelay);
     bool getNoDelay() const;
 
+    // Check if last error was DNS-related
+    bool getLastErrorIsDns() const;
+
+    // Get the system error code for the last error
+    int getLastErrorSysCode() const;
+
     // Set the kernel receive / send socket buffer sizes (SO_RCVBUF /
     // SO_SNDBUF). `bytes` is the requested buffer size in bytes; the kernel
     // may round it up or clamp it. Returns false on setsockopt() failure.
@@ -156,8 +165,8 @@ class Socket {
     // Query the remote address/port this socket is connected to.
     Result<Endpoint> getPeerEndpoint() const;
 
-    // Returns the underlying OS socket descriptor as a platform-specific handle.
-    // Advanced use only (e.g. Poller integration).
+    // Returns the underlying OS socket descriptor as a platform-specific
+    // handle. Advanced use only (e.g. Poller integration).
     NativeHandle getNativeHandle() const noexcept;
 
     // Static utility methods
@@ -188,7 +197,8 @@ class Socket {
     // Returns invalid socket if connection fails - check isValid().
     Socket(SocketType type, AddressFamily family, const ConnectArgs& config);
 
-    // Takes ownership of an already-constructed impl (used by TcpSocket::accept()).
+    // Takes ownership of an already-constructed impl (used by
+    // TcpSocket::accept()).
     explicit Socket(std::unique_ptr<SocketImpl> impl);
 
     // Non-virtual protected destructor: no vtable; delete-through-Socket* is a
@@ -222,11 +232,12 @@ class Socket {
 
     // Send all with progress callback (returns false if callback returns <0).
     class SendProgressSink {
-    public:
+        public:
         virtual ~SendProgressSink() = default;
         virtual int operator()(size_t bytesSent, size_t totalBytes) = 0;
     };
-    bool doSendAllProgress(const void* data, size_t length, SendProgressSink& progress);
+    bool doSendAllProgress(
+        const void* data, size_t length, SendProgressSink& progress);
 
     // UDP-only: send/receive to/from specific endpoint.
     int doSendTo(const void* data, size_t length, const Endpoint& remote);
