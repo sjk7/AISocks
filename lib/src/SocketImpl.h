@@ -4,9 +4,9 @@
 #ifndef AISOCKS_SOCKET_IMPL_H
 #define AISOCKS_SOCKET_IMPL_H
 
-#include "Socket.h"
+#include "SocketTypes.h"
+#include "Result.h"
 #include <chrono>
-#include <optional>
 #include <vector>
 
 #ifdef _WIN32
@@ -50,6 +50,7 @@ struct ErrorContext {
 class SocketImpl {
     public:
     SocketImpl(SocketType type, AddressFamily family);
+    SocketImpl(); // Creates an invalid socket (INVALID_SOCKET_HANDLE)
     ~SocketImpl();
 
     // Platform initialization/cleanup
@@ -71,7 +72,7 @@ class SocketImpl {
     // timeout == 0: blocking (OS default). >0: fail with Timeout if the
     // TCP handshake takes longer than timeout (DNS resolution is not covered).
     bool connect(const std::string& address, Port port,
-        std::chrono::milliseconds timeout = defaultTimeout);
+        Milliseconds timeout = defaultConnectTimeout);
 
     // Data transfer
     int send(const void* data, size_t length);
@@ -82,14 +83,16 @@ class SocketImpl {
     // Socket options
     bool setBlocking(bool blocking);
     bool isBlocking() const noexcept;
+    bool waitReadable(Milliseconds timeout);
+    bool waitWritable(Milliseconds timeout);
     bool setReuseAddress(bool reuse);
     bool setReusePort(bool enable);
-    bool setTimeout(
-        std::chrono::milliseconds timeout); // used by setReceiveTimeout
-    bool setSendTimeout(std::chrono::milliseconds timeout);
-    bool setNoDelay(bool noDelay);
+    bool setTimeout(Milliseconds timeout); // used by setReceiveTimeout
+    bool setReceiveTimeout(Milliseconds timeout);
+    bool setSendTimeout(Milliseconds timeout);
     bool setKeepAlive(bool enable);
     bool setLingerAbort(bool enable);
+    bool setNoDelay(bool noDelay);
     bool setReceiveBufferSize(int bytes);
     bool setSendBufferSize(int bytes);
     bool setBroadcast(bool enable);
@@ -107,14 +110,20 @@ class SocketImpl {
     SocketError getLastError() const noexcept;
     std::string getErrorMessage() const;
     ErrorContext getErrorContext() const;
-    std::optional<Endpoint> getLocalEndpoint() const;
-    std::optional<Endpoint> getPeerEndpoint() const;
+    Result<Endpoint> getLocalEndpoint() const;
+    Result<Endpoint> getPeerEndpoint() const;
     SocketHandle getRawHandle() const noexcept { return socketHandle; }
 
     // Query socket options
     int getReceiveBufferSize() const;
     int getSendBufferSize() const;
     bool getNoDelay() const;
+
+    // Check if last error was DNS-related
+    bool getLastErrorIsDns() const;
+
+    // Get the system error code for the last error
+    int getLastErrorSysCode() const;
 
     // Constructor for accepted connections (public for make_unique)
     SocketImpl(SocketHandle handle, SocketType type, AddressFamily family);

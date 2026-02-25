@@ -34,13 +34,13 @@ static void logPeerInfo(const Socket& s, const std::string& role) {
     std::cout << "[" << role << "] ";
 
     if (local) {
-        std::cout << "local=" << local->toString();
+        std::cout << "local=" << local.value().toString();
     } else {
         std::cout << "local=<unknown>";
     }
 
     if (peer) {
-        std::cout << "  peer=" << peer->toString();
+        std::cout << "  peer=" << peer.value().toString();
     } else {
         std::cout << "  peer=<not connected>";
     }
@@ -60,12 +60,11 @@ static void logAcceptedPeer(const TcpSocket& accepted) {
 // Runs on the provided port, handles one connection, then exits.
 // ---------------------------------------------------------------------------
 static void runEchoServer(Port port) {
-    TcpSocket server(AddressFamily::IPv4,
-        ServerBind{"127.0.0.1", port, 1});
+    TcpSocket server(AddressFamily::IPv4, ServerBind{"127.0.0.1", port, 1});
 
     auto localEp = server.getLocalEndpoint();
     std::cout << "[server] listening on "
-              << (localEp ? localEp->toString() : "?") << "\n";
+              << (localEp ? localEp.value().toString() : "?") << "\n";
 
     auto conn = server.accept();
     if (!conn) {
@@ -92,8 +91,7 @@ static void runEchoServer(Port port) {
 // A minimal TCP echo client that logs its own endpoint after connect.
 // ---------------------------------------------------------------------------
 static void runEchoClient(Port port) {
-    TcpSocket client(
-        AddressFamily::IPv4, ConnectArgs{"127.0.0.1", port});
+    TcpSocket client(AddressFamily::IPv4, ConnectArgs{"127.0.0.1", port});
 
     // Log immediately after connect  shows the kernel-assigned ephemeral port.
     logPeerInfo(client, "client-side connected");

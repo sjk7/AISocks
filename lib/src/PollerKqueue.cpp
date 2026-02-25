@@ -22,15 +22,27 @@ namespace aiSocks {
 
 struct Poller::Impl {
     int kq{-1};
-    // Maps raw fd  borrowed Socket pointer (never owned).
-    std::unordered_map<uintptr_t, const Socket*> sockets;
+    // Sparse array for O(1) direct fd->Socket lookup instead of unordered_map
+    std::vector<const Socket*> socketArray;
+    std::vector<bool> socketValid;
+    // Reusable result buffer to avoid per-call allocation in wait()
+    std::vector<PollResult> resultBuffer;
+
+    // Helper to ensure array is large enough for fd
+    void ensureCapacity(int fd) {
+        size_t required = static_cast<size_t>(fd) + 1;
+        if (socketArray.size() < required) {
+            socketArray.resize(required, nullptr);
+            socketValid.resize(required, false);
+        }
+    }
 };
 
 Poller::Poller() : pImpl_(std::make_unique<Impl>()) {
     pImpl_->kq = ::kqueue();
     if (pImpl_->kq == -1) {
-        throw SocketException(SocketError::CreateFailed, "kqueue()",
-            "Failed to create kqueue event queue", errno, false);
+        // Don't throw - set to invalid state
+        pImpl_->kq = -1;
     }
 }
 
@@ -60,7 +72,9 @@ bool Poller::add(const Socket& s, PollEvent interest) {
     if (::kevent(pImpl_->kq, changes, n, nullptr, 0, nullptr) == -1) {
         return false;
     }
-    pImpl_->sockets[static_cast<uintptr_t>(fd)] = &s;
+    pImpl_->ensureCapacity(fd);
+    pImpl_->socketArray[fd] = &s;
+    pImpl_->socketValid[fd] = true;
     return true;
 }
 
@@ -91,7 +105,9 @@ bool Poller::modify(const Socket& s, PollEvent interest) {
     }
     // kevent() returns ENOENT for filters that were not registered  benign.
     ::kevent(pImpl_->kq, changes, n, nullptr, 0, nullptr);
-    pImpl_->sockets[static_cast<uintptr_t>(fd)] = &s;
+    pImpl_->ensureCapacity(fd);
+    pImpl_->socketArray[fd] = &s;
+    pImpl_->socketValid[fd] = true;
     return true;
 }
 
@@ -107,7 +123,10 @@ bool Poller::remove(const Socket& s) {
     // Ignore errors  filters that weren't registered return ENOENT.
     ::kevent(pImpl_->kq, changes, 2, nullptr, 0, nullptr);
 
-    pImpl_->sockets.erase(static_cast<uintptr_t>(fd));
+    if (fd < static_cast<int>(pImpl_->socketArray.size())) {
+        pImpl_->socketArray[fd] = nullptr;
+        pImpl_->socketValid[fd] = false;
+    }
     return true;
 }
 
@@ -115,15 +134,23 @@ std::vector<PollResult> Poller::wait(Milliseconds timeout) {
     // Convert timeout: -1 means block forever (nullptr timespec).
     struct timespec ts{};
     struct timespec* tsp = nullptr;
-    if (timeout.count() >= 0) {
-        ts.tv_sec = static_cast<time_t>(timeout.count() / 1000);
-        ts.tv_nsec = static_cast<long>((timeout.count() % 1000) * 1000000L);
+    if (timeout.count >= 0) {
+        // Convert 0ms to 0.5ms minimum to prevent CPU spinning
+        int64_t effectiveTimeout = timeout.count;
+        if (effectiveTimeout == 0) {
+            // 0ms requested -> use 0.5ms (500 microseconds)
+            ts.tv_sec = 0;
+            ts.tv_nsec = 500000L; // 500 microseconds = 0.5ms
+        } else {
+            ts.tv_sec = static_cast<time_t>(effectiveTimeout / 1000);
+            ts.tv_nsec
+                = static_cast<long>((effectiveTimeout % 1000) * 1000000L);
+        }
         tsp = &ts;
     }
 
     // Allocate enough room for two events per registered socket (READ+WRITE).
-    auto& sockets = pImpl_->sockets;
-    const int maxEvents = static_cast<int>(sockets.size() * 2) + 1;
+    const int maxEvents = static_cast<int>(pImpl_->socketArray.size() * 2) + 1;
     std::vector<struct kevent> events(static_cast<size_t>(maxEvents));
 
     for (;;) {
@@ -131,8 +158,8 @@ std::vector<PollResult> Poller::wait(Milliseconds timeout) {
         if (n < 0) {
             if (errno == EINTR)
                 return {}; // signal received -- let caller check stop flag
-            throw SocketException(SocketError::Unknown, "kevent()",
-                "kevent() wait failed", errno, false);
+            // Don't throw - return empty result on error
+            return {};
         }
 
         // Merge per-filter events for the same fd into one PollResult.
@@ -159,12 +186,14 @@ std::vector<PollResult> Poller::wait(Milliseconds timeout) {
             ready[fd] = static_cast<PollEvent>(bits);
         }
 
-        std::vector<PollResult> results;
-        results.reserve(ready.size());
+        pImpl_->resultBuffer.clear();
+        pImpl_->resultBuffer.reserve(ready.size());
+        auto& results = pImpl_->resultBuffer;
         for (const auto& kv : ready) {
-            auto it = sockets.find(kv.first);
-            if (it != sockets.end()) {
-                results.push_back({it->second, kv.second});
+            auto fd = static_cast<int>(kv.first);
+            if (fd < static_cast<int>(pImpl_->socketArray.size())
+                && pImpl_->socketValid[fd] && pImpl_->socketArray[fd]) {
+                results.push_back({pImpl_->socketArray[fd], kv.second});
             }
         }
         return results;

@@ -6,12 +6,23 @@
 
 #include "Poller.h"
 #include "TcpSocket.h"
+#include "SocketFactory.h"
 #include <functional>
 #include <memory>
 #include <string>
 #include <unordered_map>
 
 namespace aiSocks {
+
+// Client connection limits with sensible defaults and maximums
+enum class ClientLimit : size_t {
+    Unlimited = 0,           // Accept unlimited connections
+    Default = 1000,          // Default limit for production safety
+    Low = 100,              // Low resource environments
+    Medium = 500,           // Medium resource environments  
+    High = 2000,            // High performance servers
+    Maximum = 10000         // Reasonable maximum for most systems
+};
 
 // ---------------------------------------------------------------------------
 // SimpleServer  convenience wrapper for TCP server polling loops.
@@ -46,16 +57,21 @@ namespace aiSocks {
 class SimpleServer {
     public:
     // Create a listening server socket.
-    // Does NOT start accepting connections yet - call acceptClients() to start.
-    // 
-    // Throws SocketException if bind or listen fails.
+    // Returns invalid socket if bind or listen fails - check isValid().
     SimpleServer(const ServerBind& args,
         AddressFamily family = AddressFamily::IPv4)
-        : socket_(std::make_unique<TcpSocket>(family, args)) {
-        if (!socket_->setBlocking(false)) {
-            throw SocketException(socket_->getLastError(),
-                "SimpleServer::SimpleServer",
-                "Failed to set server socket to non-blocking mode", 0, false);
+        : socket_(std::make_unique<TcpSocket>(TcpSocket::createRaw(family))) {
+        // Use SocketFactory to create server without exceptions
+        auto result = SocketFactory::createTcpServer(family, args);
+        if (result.isSuccess()) {
+            *socket_ = std::move(result.value());
+            if (!socket_->setBlocking(false)) {
+                // Failed to set non-blocking - invalidate socket
+                socket_.reset();
+            }
+        } else {
+            // Server creation failed - socket remains invalid
+            socket_.reset();
         }
     }
 
@@ -65,16 +81,16 @@ class SimpleServer {
     // Note: This accepts clients in non-blocking mode using Poller, but the
     // callback itself is responsible for any client I/O strategy.
     template <typename Callback>
-    void acceptClients(Callback&& onClient, size_t maxClients = 0) {
+    void acceptClients(Callback&& onClient, ClientLimit maxClients = ClientLimit::Default) {
+        if (!socket_ || !socket_->isValid()) return;
+        
         Poller poller;
         if (!poller.add(*socket_, PollEvent::Readable | PollEvent::Error)) {
-            throw SocketException(socket_->getLastError(),
-                "SimpleServer::acceptClients",
-                "Failed to register listening socket with Poller", 0, false);
+            return; // Failed to register with poller
         }
 
         size_t count = 0;
-        while (maxClients == 0 || count < maxClients) {
+        while (maxClients == ClientLimit::Unlimited || count < static_cast<size_t>(maxClients)) {
             auto ready = poller.wait(Milliseconds{-1});
             for (const auto& event : ready) {
                 if (event.socket != socket_.get()) continue;
@@ -99,7 +115,7 @@ class SimpleServer {
 
                     onClient(*client);
                     ++count;
-                    if (maxClients != 0 && count >= maxClients) {
+                    if (maxClients != ClientLimit::Unlimited && count >= static_cast<size_t>(maxClients)) {
                         return;
                     }
                 }
@@ -115,20 +131,24 @@ class SimpleServer {
     //   false remove and close the client.
     //
     // maxClients semantics:
-    //   0              accept forever.
-    //   N > 0          accept up to N clients, then stop accepting and keep
-    //                  polling existing clients until all disconnect.
+    //   ClientLimit::Unlimited (0)  accept forever.
+    //   N > 0                        accept up to N clients, then stop accepting and keep
+    //                                polling existing clients until all disconnect.
     template <typename Callback>
-    void pollClients(Callback&& onClientEvent, size_t maxClients = 0,
+    void pollClients(Callback&& onClientEvent, ClientLimit maxClients = ClientLimit::Default,
         Milliseconds timeout = Milliseconds{-1}) {
+        if (!socket_ || !socket_->isValid()) return;
+        
         Poller poller;
         if (!poller.add(*socket_, PollEvent::Readable | PollEvent::Error)) {
-            throw SocketException(socket_->getLastError(),
-                "SimpleServer::pollClients",
-                "Failed to register listening socket with Poller", 0, false);
+            return; // Failed to register with poller
         }
 
         std::unordered_map<const Socket*, std::unique_ptr<TcpSocket>> clients;
+        // Pre-reserve client map if maxClients is specified to eliminate hash table growth
+        if (static_cast<size_t>(maxClients) > 0) {
+            clients.reserve(static_cast<size_t>(maxClients));
+        }
         size_t accepted = 0;
         bool accepting = true;
 
@@ -164,7 +184,7 @@ class SimpleServer {
                         clients.emplace(key, std::move(client));
                         ++accepted;
 
-                        if (maxClients != 0 && accepted >= maxClients) {
+                        if (maxClients != ClientLimit::Unlimited && accepted >= static_cast<size_t>(maxClients)) {
                             (void)poller.remove(*socket_);
                             accepting = false;
                             break;
@@ -189,13 +209,26 @@ class SimpleServer {
         }
     }
 
+    // Check if the server socket is valid and ready for use
+    bool isValid() const {
+        return socket_ && socket_->isValid();
+    }
+
     // Get access to the underlying server socket.
     // Useful for configuring socket options or checking socket state.
     TcpSocket& getSocket() {
+        if (!socket_) {
+            static TcpSocket dummy = TcpSocket::createRaw();
+            return dummy;
+        }
         return *socket_;
     }
 
     const TcpSocket& getSocket() const {
+        if (!socket_) {
+            static TcpSocket dummy = TcpSocket::createRaw();
+            return dummy;
+        }
         return *socket_;
     }
 

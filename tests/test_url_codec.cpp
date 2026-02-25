@@ -24,7 +24,6 @@
 // 15. Space encodes to %20 (not +)
 // 16. Mixed plain+encoded input round-trip
 
-#include "HttpRequest.h"
 #include "UrlCodec.h"
 #include "test_helpers.h"
 #include <iostream>
@@ -33,21 +32,25 @@
 using namespace aiSocks;
 
 // ── helpers ────────────────────────────────────────────────────────────────
-static std::string enc(const std::string& s) { return aiSocks::urlEncode(s); }
-static std::string dec(const std::string& s) { return aiSocks::urlDecode(s); }
+static std::string enc(const std::string& s) {
+    return aiSocks::urlEncode(s);
+}
+static std::string dec(const std::string& s) {
+    return aiSocks::urlDecode(s);
+}
 
 // Check encode result and print it so failures are easy to diagnose.
 static void CHECK_ENC(const std::string& input, const std::string& expected) {
     const std::string got = enc(input);
     REQUIRE_MSG(got == expected,
-        "urlEncode(\"" + input + "\") == \"" + expected
-            + "\"  (got \"" + got + "\")");
+        "urlEncode(\"" + input + "\") == \"" + expected + "\"  (got \"" + got
+            + "\")");
 }
 static void CHECK_DEC(const std::string& input, const std::string& expected) {
     const std::string got = dec(input);
     REQUIRE_MSG(got == expected,
-        "urlDecode(\"" + input + "\") == \"" + expected
-            + "\"  (got \"" + got + "\")");
+        "urlDecode(\"" + input + "\") == \"" + expected + "\"  (got \"" + got
+            + "\")");
 }
 static void CHECK_ROUNDTRIP(const std::string& original) {
     const std::string got = dec(enc(original));
@@ -74,7 +77,7 @@ static void test_unreserved_chars() {
     CHECK_ENC("-", "-");
     CHECK_ENC("_", "_");
     CHECK_ENC(".", ".");
-    CHECK_ENC("~", "~");  // historical bug target — must NOT be encoded
+    CHECK_ENC("~", "~"); // historical bug target — must NOT be encoded
 
     // All at once
     CHECK_ENC("Hello-World_1.0~", "Hello-World_1.0~");
@@ -90,7 +93,7 @@ static void test_space_and_common() {
     CHECK_ENC("!", "%21");
     CHECK_ENC("#", "%23");
     CHECK_ENC("$", "%24");
-    CHECK_ENC("%", "%25");   // percent itself
+    CHECK_ENC("%", "%25"); // percent itself
     CHECK_ENC("&", "%26");
     CHECK_ENC("+", "%2B");
     CHECK_ENC(",", "%2C");
@@ -110,8 +113,8 @@ static void test_uppercase_hex_output() {
     // 0x0a → must be %0A, not %0a
     std::string s(1, '\x0a');
     const std::string got = enc(s);
-    REQUIRE_MSG(got == "%0A",
-        "urlEncode(\"\\x0a\") == \"%0A\"  (got \"" + got + "\")");
+    REQUIRE_MSG(
+        got == "%0A", "urlEncode(\"\\x0a\") == \"%0A\"  (got \"" + got + "\")");
 
     // 0xfe → must be %FE
     s = std::string(1, '\xfe');
@@ -126,7 +129,7 @@ static void test_decoder_case_insensitive() {
     CHECK_DEC("%2F", "/");
     CHECK_DEC("%2e", ".");
     CHECK_DEC("%2E", ".");
-    CHECK_DEC("%61", "a");   // 'a' — lower hex
+    CHECK_DEC("%61", "a"); // 'a' — lower hex
     CHECK_DEC("%61%62%63", "abc");
 }
 
@@ -150,13 +153,13 @@ static void test_invalid_percent_sequences() {
 
     // Only one hex digit after '%'
     CHECK_DEC("abc%4", "abc%4");
-    CHECK_DEC("%4",    "%4");
+    CHECK_DEC("%4", "%4");
 
     // Non-hex digits
     CHECK_DEC("%GG", "%GG");
     CHECK_DEC("%ZZ", "%ZZ");
-    CHECK_DEC("%1G", "%1G");  // second digit invalid
-    CHECK_DEC("%G1", "%G1");  // first digit invalid
+    CHECK_DEC("%1G", "%1G"); // second digit invalid
+    CHECK_DEC("%G1", "%G1"); // first digit invalid
 
     // Valid sandwiched between invalid
     CHECK_DEC("%GG%20%ZZ", "%GG %ZZ");
@@ -169,7 +172,7 @@ static void test_null_byte() {
     CHECK_DEC("%00", nul);
     // Round-trip through a larger string
     std::string mixed = "a\x00z";
-    mixed[1] = '\0';  // suppress string-literal truncation warnings
+    mixed[1] = '\0'; // suppress string-literal truncation warnings
     CHECK_ROUNDTRIP(mixed);
 }
 
@@ -203,7 +206,7 @@ static void test_round_trips() {
     CHECK_ROUNDTRIP("https://example.com/path?q=1#frag");
     CHECK_ROUNDTRIP("~unreserved-chars_are.fine");
     CHECK_ROUNDTRIP("100% done!");
-    CHECK_ROUNDTRIP("上海+中國");      // UTF-8 multi-byte
+    CHECK_ROUNDTRIP("上海+中國"); // UTF-8 multi-byte
     CHECK_ROUNDTRIP("\x01\x7F\x80\xFF");
     CHECK_ROUNDTRIP("a/b/c?x=1&y=2");
     CHECK_ROUNDTRIP("");
@@ -237,10 +240,13 @@ static void test_all_bytes_encode_decode() {
     BEGIN_TEST("every byte value (0x00-0xFF) round-trips");
     for (int c = 0; c <= 0xFF; ++c) {
         std::string s(1, static_cast<char>(c));
-        REQUIRE_MSG(dec(enc(s)) == s,
-            "encode-decode round-trip for byte 0x"
-                + [&]{ std::string h; h+= "0123456789ABCDEF"[c>>4];
-                                     h+= "0123456789ABCDEF"[c&15]; return h; }());
+        REQUIRE_MSG(
+            dec(enc(s)) == s, "encode-decode round-trip for byte 0x" + [&] {
+                std::string h;
+                h += "0123456789ABCDEF"[c >> 4];
+                h += "0123456789ABCDEF"[c & 15];
+                return h;
+            }());
     }
 }
 

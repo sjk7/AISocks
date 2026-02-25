@@ -12,9 +12,25 @@ set(TEST_SOURCES
     test_tcp_socket
     test_simple_client
     test_server_base
-    test_http_request
+test_http_request
     test_url_codec
+    test_socket_factory
+    test_server_base_simple
+    test_server_base_minimal
+    test_server_base_echo_simple
+    test_server_base_no_timeout
 )
+
+# On macOS with Homebrew LLVM, the compiler's libc++ headers may reference
+# symbols (e.g. __hash_memory) not present in Apple's system libc++.
+# Detect and link against Homebrew LLVM's own libc++ when available.
+if(APPLE AND NOT MSVC)
+    get_filename_component(_COMPILER_DIR "${CMAKE_CXX_COMPILER}" DIRECTORY)
+    get_filename_component(_LLVM_ROOT "${_COMPILER_DIR}" DIRECTORY)
+    if(EXISTS "${_LLVM_ROOT}/lib/c++")
+        set(_LLVM_LIBCXX_DIR "${_LLVM_ROOT}/lib/c++")
+    endif()
+endif()
 
 foreach(TEST_NAME ${TEST_SOURCES})
     add_executable(${TEST_NAME} ${TEST_NAME}.cpp)
@@ -37,16 +53,34 @@ foreach(TEST_NAME ${TEST_SOURCES})
         target_compile_options(${TEST_NAME} PRIVATE
             $<$<CONFIG:Release>:-O1>
             $<$<CONFIG:Release>:-fno-lto>
+            $<$<CONFIG:Debug>:-g>
+            $<$<CONFIG:Debug>:-O0>
+        )
+        target_link_options(${TEST_NAME} PRIVATE
+            $<$<CONFIG:Debug>:-g>
         )
     else()
         target_compile_options(${TEST_NAME} PRIVATE
             /utf-8          # treat source as UTF-8 (handles em dashes in comments)
             $<$<CONFIG:Release>:/O1>
+            $<$<CONFIG:Debug>:/Zi>
+            $<$<CONFIG:Debug>:/Od>
+        )
+        target_link_options(${TEST_NAME} PRIVATE
+            $<$<CONFIG:Debug>:/DEBUG>
         )
     endif()
 
     # Note: UNITY_BUILD is intentionally omitted.  Each test binary has
     # exactly one .cpp, so unity merging is a no-op and only adds confusion.
+
+    # On macOS with Homebrew LLVM: link against its libc++ so template
+    # instantiations (e.g. unordered_map) resolve symbols like __hash_memory.
+    if(DEFINED _LLVM_LIBCXX_DIR)
+        target_link_directories(${TEST_NAME} PRIVATE "${_LLVM_LIBCXX_DIR}")
+        set_target_properties(${TEST_NAME} PROPERTIES
+            BUILD_RPATH "${_LLVM_LIBCXX_DIR}")
+    endif()
 endforeach()
 
 # test_construction spins up server threads; give it more room
