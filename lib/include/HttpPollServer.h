@@ -56,20 +56,51 @@ struct HttpClientState {
     // Pre-allocated buffer for better performance
     HttpClientState() 
         : request(), response(), startTime(std::chrono::steady_clock::now()) {
+        std::cout << "DEBUG: HttpClientState() constructor called at " << this << std::endl;
+        std::cout << "DEBUG:   request ptr: " << (void*)&request << std::endl;
+        std::cout << "DEBUG:   response ptr: " << (void*)&response << std::endl;
+        std::cout << "DEBUG:   request data ptr: " << (void*)request.c_str() << std::endl;
+        std::cout << "DEBUG:   response data ptr: " << (void*)response.c_str() << std::endl;
         request.reserve(4096); // Pre-allocate for typical HTTP request
         response.reserve(1024); // Pre-allocate for typical HTTP response
+        std::cout << "DEBUG:   request capacity: " << request.capacity() << std::endl;
+        std::cout << "DEBUG:   response capacity: " << response.capacity() << std::endl;
     }
     
     // Explicit copy/move constructors to ensure proper initialization
     HttpClientState(const HttpClientState& other) 
         : request(other.request), response(other.response), 
           sent(other.sent), startTime(other.startTime),
-          responseStarted(other.responseStarted), closeAfterSend(other.closeAfterSend) {}
+          responseStarted(other.responseStarted), closeAfterSend(other.closeAfterSend) {
+        std::cout << "DEBUG: HttpClientState() COPY constructor called at " << this << " from " << &other << std::endl;
+        std::cout << "DEBUG:   request ptr: " << (void*)&request << std::endl;
+        std::cout << "DEBUG:   response ptr: " << (void*)&response << std::endl;
+        std::cout << "DEBUG:   request data ptr: " << (void*)request.c_str() << std::endl;
+        std::cout << "DEBUG:   response data ptr: " << (void*)response.c_str() << std::endl;
+    }
           
     HttpClientState(HttpClientState&& other) noexcept
         : request(std::move(other.request)), response(std::move(other.response)),
           sent(other.sent), startTime(other.startTime),
-          responseStarted(other.responseStarted), closeAfterSend(other.closeAfterSend) {}
+          responseStarted(other.responseStarted), closeAfterSend(other.closeAfterSend) {
+        std::cout << "DEBUG: HttpClientState() MOVE constructor called at " << this << " from " << &other << std::endl;
+        std::cout << "DEBUG:   request ptr: " << (void*)&request << std::endl;
+        std::cout << "DEBUG:   response ptr: " << (void*)&response << std::endl;
+        std::cout << "DEBUG:   request data ptr: " << (void*)request.c_str() << std::endl;
+        std::cout << "DEBUG:   response data ptr: " << (void*)response.c_str() << std::endl;
+        std::cout << "DEBUG:   other request ptr after move: " << (void*)&other.request << std::endl;
+        std::cout << "DEBUG:   other response ptr after move: " << (void*)&other.response << std::endl;
+    }
+    
+    ~HttpClientState() {
+        std::cout << "DEBUG: HttpClientState() destructor called at " << this << std::endl;
+        std::cout << "DEBUG:   request ptr: " << (void*)&request << std::endl;
+        std::cout << "DEBUG:   response ptr: " << (void*)&response << std::endl;
+        std::cout << "DEBUG:   request data ptr: " << (void*)request.c_str() << std::endl;
+        std::cout << "DEBUG:   response data ptr: " << (void*)response.c_str() << std::endl;
+        std::cout << "DEBUG:   request size: " << request.size() << std::endl;
+        std::cout << "DEBUG:   response size: " << response.size() << std::endl;
+    }
 };
 
 // ---------------------------------------------------------------------------
