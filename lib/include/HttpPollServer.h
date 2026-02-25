@@ -55,14 +55,15 @@ struct HttpClientState {
 
     // Pre-allocated buffer for better performance
     HttpClientState() 
-        : request(), response(), startTime(std::chrono::steady_clock::now()) {
+        : request(""), response(""), startTime(std::chrono::steady_clock::now()) {
         request.reserve(4096); // Pre-allocate for typical HTTP request
         response.reserve(1024); // Pre-allocate for typical HTTP response
     }
     
     // Explicit copy/move constructors to ensure proper initialization
     HttpClientState(const HttpClientState& other) 
-        : request(other.request), response(other.response), 
+        : request(other.request.empty() ? "" : other.request), 
+          response(other.response.empty() ? "" : other.response), 
           sent(other.sent), startTime(other.startTime),
           responseStarted(other.responseStarted), closeAfterSend(other.closeAfterSend) {}
           
