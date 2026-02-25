@@ -12,6 +12,8 @@ set(TEST_SOURCES
     test_tcp_socket
     test_simple_client
     test_server_base
+    test_http_request
+    test_url_codec
 )
 
 foreach(TEST_NAME ${TEST_SOURCES})
