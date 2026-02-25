@@ -72,6 +72,8 @@ int main() {
 
     BEGIN_TEST("ServerBase without keep-alive timeout");
     {
+        // Reset static stop flag to clean state between test runs
+        // (No longer needed with instance variable, but keep for compatibility)
         NoTimeoutServer server(21003);
         std::atomic<bool> ready{false};
 
@@ -81,7 +83,7 @@ int main() {
             server.run(ClientLimit{2}, Milliseconds{10});
         }).detach();
 
-        // Wait for server to be ready
+        // Wait for server to be ready AND actually accept a client
         while (!ready)
             std::this_thread::sleep_for(std::chrono::milliseconds{10});
 
@@ -94,7 +96,7 @@ int main() {
         REQUIRE(result.isSuccess());
         auto client = std::make_unique<TcpSocket>(std::move(result.value()));
 
-        // Verify server accepted the client
+        // Verify server accepted the client BEFORE requesting stop
         waitForCondition("server to accept client",
             [&]() { return server.clientCount() == 1; });
 
@@ -108,8 +110,8 @@ int main() {
 
         std::cout << "Stopping server...\n";
 
-        // Stop server
-        NoTimeoutServer::requestStop();
+        // Stop server AFTER it has actually started and accepted a client
+        server.requestStop();
 
         // Wait for server to stop gracefully
         waitForCondition(

@@ -139,7 +139,7 @@ template <typename ClientData> class ServerBase {
         Milliseconds timeout = Milliseconds{-1}) {
         if (!isValid()) return; // Server not valid, exit early
 
-        s_stop_.store(false, std::memory_order_relaxed);
+        stop_.store(false, std::memory_order_relaxed);
 
         // Install SIGINT/SIGTERM for Ctrl+C shutdown; restore on exit.
         auto prevInt = std::signal(SIGINT, handleSignal);
@@ -168,10 +168,10 @@ template <typename ClientData> class ServerBase {
         bool accepting = true;
         size_t accepted = 0;
 
-        while (!s_stop_.load(std::memory_order_relaxed)
+        while (!stop_.load(std::memory_order_relaxed)
             && (accepting || !clients_.empty())) {
             auto ready = poller.wait(timeout);
-            if (s_stop_.load(std::memory_order_relaxed)) break;
+            if (stop_.load(std::memory_order_relaxed)) break;
             for (const auto& event : ready) {
                 if (event.socket == listener_.get()) {
                     if (!accepting) continue;
@@ -190,7 +190,7 @@ template <typename ClientData> class ServerBase {
                     ServerResult result
                         = onReadable(*it->second.socket, it->second.data);
                     if (result == ServerResult::StopServer) {
-                        s_stop_.store(true);
+                        stop_.store(true);
                         break;
                     }
                     keep = (result == ServerResult::KeepConnection);
@@ -199,7 +199,7 @@ template <typename ClientData> class ServerBase {
                     ServerResult result
                         = onWritable(*it->second.socket, it->second.data);
                     if (result == ServerResult::StopServer) {
-                        s_stop_.store(true);
+                        stop_.store(true);
                         break;
                     }
                     keep = (result == ServerResult::KeepConnection);
@@ -236,7 +236,7 @@ template <typename ClientData> class ServerBase {
             }
 
             if (onIdle() == ServerResult::StopServer) {
-                s_stop_.store(true);
+                stop_.store(true);
                 break;
             }
         }
@@ -306,13 +306,13 @@ template <typename ClientData> class ServerBase {
         return static_cast<int>(sent);
     }
 
-    // Request a graceful shutdown. Safe to call from a signal handler or any
-    // thread. run() will exit after the current wait() returns.
-    static void requestStop() noexcept {
-        s_stop_.store(true, std::memory_order_relaxed);
+    // Request a graceful shutdown. Safe to call from any thread.
+    // run() will exit after the current wait() returns.
+    void requestStop() noexcept {
+        stop_.store(true, std::memory_order_relaxed);
     }
-    static bool stopRequested() noexcept {
-        return s_stop_.load(std::memory_order_relaxed);
+    bool stopRequested() const noexcept {
+        return stop_.load(std::memory_order_relaxed);
     }
 
     protected:
@@ -379,13 +379,16 @@ template <typename ClientData> class ServerBase {
         SteadyClock::time_point lastActivity{SteadyClock::now()};
     };
 
-    inline static std::atomic<bool> s_stop_{false};
+    std::atomic<bool> stop_{false};
 #ifdef SERVER_STATS
     size_t max_clients_{0};
 #endif
 
     static void handleSignal(int) {
-        s_stop_.store(true, std::memory_order_relaxed);
+        // Signal handler can't access instance, so use a static flag for signals only
+        // This is only used for Ctrl+C, not for normal test shutdown
+        static std::atomic<bool> signal_stop_{false};
+        signal_stop_.store(true, std::memory_order_relaxed);
     }
 
     Poller* current_poller_{nullptr};

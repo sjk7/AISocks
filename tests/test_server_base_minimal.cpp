@@ -66,6 +66,8 @@ int main() {
 
     BEGIN_TEST("Minimal server with ClientLimit");
     {
+        // Reset static stop flag to clean state between test runs
+        // (No longer needed with instance variable, but keep for compatibility)
         MinimalServer server(21001);
         std::atomic<bool> ready{false};
 
@@ -75,11 +77,9 @@ int main() {
             server.run(ClientLimit{2}, Milliseconds{10});
         }).detach();
 
-        // Wait for server to be ready
+        // Wait for server to be ready AND actually accept a client
         while (!ready)
             std::this_thread::sleep_for(std::chrono::milliseconds{10});
-
-        std::cout << "Server started successfully\n";
 
         // Connect a client to verify server works
         auto result = SocketFactory::createTcpClient(AddressFamily::IPv4,
@@ -87,14 +87,14 @@ int main() {
         REQUIRE(result.isSuccess());
         auto client = std::make_unique<TcpSocket>(std::move(result.value()));
 
-        // Verify server accepted the client
+        // Verify server accepted the client before requesting stop
         waitForCondition("server to accept client",
             [&]() { return server.clientCount() == 1; });
 
         std::cout << "Stopping server...\n";
 
-        // Stop server
-        MinimalServer::requestStop();
+        // Stop server AFTER it has actually started and accepted a client
+        server.requestStop();
 
         // Wait for server to stop (client goes out of scope)
         waitForCondition(

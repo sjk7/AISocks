@@ -86,7 +86,7 @@ int main() {
         }
 
         // Stop server
-        SimpleServer::requestStop();
+        server.requestStop();
         std::this_thread::sleep_for(std::chrono::milliseconds{100});
     }
 
