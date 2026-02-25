@@ -44,6 +44,7 @@ namespace aiSocks {
 // ---------------------------------------------------------------------------
 // Per-connection HTTP state
 // ---------------------------------------------------------------------------
+// HTTP client state for tracking request/response data
 struct HttpClientState {
     std::string request;
     std::string response;
@@ -55,14 +56,11 @@ struct HttpClientState {
 
     // Pre-allocated buffer for better performance
     HttpClientState() 
-        : request(""), response(""), startTime(std::chrono::steady_clock::now()) {
-        // Removed reserve() calls as they may trigger MemorySanitizer issues
-    }
+        : request(), response(), startTime(std::chrono::steady_clock::now()) {}
     
     // Explicit copy/move constructors to ensure proper initialization
     HttpClientState(const HttpClientState& other) 
-        : request(other.request.empty() ? "" : other.request), 
-          response(other.response.empty() ? "" : other.response), 
+        : request(other.request), response(other.response), 
           sent(other.sent), startTime(other.startTime),
           responseStarted(other.responseStarted), closeAfterSend(other.closeAfterSend) {}
           
