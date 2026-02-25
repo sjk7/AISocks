@@ -446,7 +446,9 @@ template <typename ClientData> class ServerBase {
             std::cout << "DEBUG: ClientData created" << std::endl;
             
             std::cout << "DEBUG: About to emplace ClientEntry..." << std::endl;
-            clients_.emplace(key, ClientEntry{std::move(client), std::move(tempData)});
+            clients_.emplace(key, std::piecewise_construct,
+                std::forward_as_tuple(),
+                std::forward_as_tuple(std::move(client), std::move(tempData)));
             std::cout << "DEBUG: ClientEntry emplaced successfully" << std::endl;
             ++accepted;
             if (clients_.size() > peak_clients_)
