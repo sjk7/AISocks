@@ -380,7 +380,9 @@ template <typename ClientData> class ServerBase {
         ClientData data;
         SteadyClock::time_point lastActivity{SteadyClock::now()};
         
-        ClientEntry() : data() {}  // Ensure proper constructor is called
+        ClientEntry() = default;
+        ClientEntry(std::unique_ptr<TcpSocket> sock, ClientData clientData) 
+            : socket(std::move(sock)), data(std::move(clientData)) {}
     };
 
     std::atomic<bool> stop_{false};
