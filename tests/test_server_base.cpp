@@ -155,7 +155,7 @@ int main() {
         // Request stop from another thread
         std::thread stopper([&server]() {
             std::this_thread::sleep_for(std::chrono::milliseconds{50});
-            EchoServer::requestStop();
+            server.requestStop();
         });
 
         // Run server (should stop quickly)
@@ -199,7 +199,7 @@ int main() {
         // Should have accepted the maximum number of clients
         REQUIRE(server.clientCount() == static_cast<size_t>(maxClients));
 
-        EchoServer::requestStop();
+        server.requestStop();
         serverThread.join();
     }
 
@@ -217,7 +217,7 @@ int main() {
         // onIdle() should have been called
         REQUIRE(server.idleCalls.load() > 0);
 
-        EchoServer::requestStop();
+        server.requestStop();
         serverThread.join();
     }
 
@@ -273,7 +273,7 @@ int main() {
         // disconnection) disconnection) disconnection)
         REQUIRE(server.clientCount() <= 1);
 
-        EchoServer::requestStop();
+        server.requestStop();
         serverThread.join();
     }
 
@@ -324,7 +324,7 @@ int main() {
         clients.clear();
 
         std::cout << "DEBUG: About to call requestStop\n";
-        EchoServer::requestStop();
+        server.requestStop();
         std::cout << "DEBUG: Called requestStop\n";
 
         // CRITICAL: Wait for server thread to finish before destructor
@@ -368,7 +368,7 @@ int main() {
         REQUIRE(
             server.clientCount() <= static_cast<size_t>(ClientLimit::Default));
 
-        EchoServer::requestStop();
+        server.requestStop();
         serverThread.join();
     }
 
@@ -385,7 +385,7 @@ int main() {
             ConnectArgs{"127.0.0.1", Port{20006}, Milliseconds{200}});
         REQUIRE(result.isSuccess());
 
-        EchoServer::requestStop();
+        server1.requestStop();
         serverThread1.join();
 
         // Create a new server on the same port
@@ -399,7 +399,7 @@ int main() {
             ConnectArgs{"127.0.0.1", Port{20006}, Milliseconds{200}});
         REQUIRE(result2.isSuccess());
 
-        EchoServer::requestStop();
+        server2.requestStop();
         serverThread2.join();
     }
 
