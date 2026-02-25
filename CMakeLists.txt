@@ -65,7 +65,7 @@ if(BUILD_EXAMPLES)
         aiSocksTestMove         examples/test_move_semantics.cpp
         aiSocksPeerLogger       examples/peer_logger.cpp
         aiSocksGoogleClient     examples/google_client.cpp
-        aiSocksHttpServer        examples/http_poll_server.cpp
+        http_server             examples/http_poll_server.cpp
     )
     list(LENGTH _EXAMPLES _len)
     math(EXPR _last "${_len} - 2")
@@ -77,7 +77,7 @@ if(BUILD_EXAMPLES)
         target_link_libraries(${_tgt} PRIVATE aiSocksLib)
         
         # Uncomment to enable connection stats logging (impacts performance)
-        # if(_tgt STREQUAL "aiSocksHttpServer")
+        # if(_tgt STREQUAL "http_server")
         #     target_compile_definitions(${_tgt} PRIVATE SERVER_STATS)
         # endif()
         if(MSVC)
@@ -86,6 +86,17 @@ if(BUILD_EXAMPLES)
             # Ensure debug symbols in Debug builds for Clang
             if(CMAKE_BUILD_TYPE STREQUAL "Debug")
                 target_compile_options(${_tgt} PRIVATE -g -O0)
+            endif()
+            # On macOS with Homebrew LLVM: link against its libc++ so template
+            # instantiations resolve symbols like __hash_memory.
+            if(APPLE)
+                get_filename_component(_EX_COMPILER_DIR "${CMAKE_CXX_COMPILER}" DIRECTORY)
+                get_filename_component(_EX_LLVM_ROOT "${_EX_COMPILER_DIR}" DIRECTORY)
+                if(EXISTS "${_EX_LLVM_ROOT}/lib/c++")
+                    target_link_directories(${_tgt} PRIVATE "${_EX_LLVM_ROOT}/lib/c++")
+                    set_target_properties(${_tgt} PROPERTIES
+                        BUILD_RPATH "${_EX_LLVM_ROOT}/lib/c++")
+                endif()
             endif()
         endif()
     endforeach()

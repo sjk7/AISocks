@@ -6,14 +6,26 @@
 
 #include "Poller.h"
 #include "TcpSocket.h"
+#include "SocketFactory.h"
 #include <atomic>
+#include <chrono>
 #include <csignal>
+#include <cstdint>
 #include <functional>
 #include <memory>
-#include <iostream>
 #include <unordered_map>
 
 namespace aiSocks {
+
+// Client connection limits with sensible defaults and maximums
+enum class ClientLimit : size_t {
+    Unlimited = 0, // Accept unlimited connections
+    Default = 1000, // Default limit for production safety
+    Low = 100, // Low resource environments
+    Medium = 500, // Medium resource environments
+    High = 2000, // High performance servers
+    Maximum = 10000 // Reasonable maximum for most systems
+};
 
 // Return values for ServerBase virtual functions
 enum class ServerResult {
@@ -74,18 +86,35 @@ enum class ServerResult {
 template <typename ClientData> class ServerBase {
     public:
     // Construct and start listening.  Does not accept until run() is called.
-    // Throws SocketException on failure.
+    // Returns invalid server if bind or listen fails - check isValid().
     explicit ServerBase(
         const ServerBind& args, AddressFamily family = AddressFamily::IPv4)
-        : listener_(std::make_unique<TcpSocket>(family, args)) {
-        if (!listener_->setBlocking(false)) {
-            throw SocketException(listener_->getLastError(),
-                "ServerBase::ServerBase",
-                "Failed to set listening socket to non-blocking", 0, false);
+        : listener_(std::make_unique<TcpSocket>(TcpSocket::createRaw(family))) {
+        // Use SocketFactory to create server without exceptions
+        auto result = SocketFactory::createTcpServer(family, args);
+        if (result.isSuccess()) {
+            *listener_ = std::move(result.value());
+            if (!listener_->setBlocking(false)) {
+                // Failed to set non-blocking - invalidate socket
+                listener_.reset();
+            }
+            // Enable TCP_NODELAY for lower latency
+            if (!listener_->setNoDelay(true)) {
+                // Failed to set TCP_NODELAY - continue but log warning
+                printf("Warning: Failed to set TCP_NODELAY on server socket\n");
+            }
+        } else {
+            // Server creation failed - socket remains invalid
+            listener_.reset();
         }
     }
 
-    virtual ~ServerBase() = default;
+    virtual ~ServerBase() {
+        // Clean up any remaining clients before destruction
+        // This prevents memory corruption during unordered_map destruction
+        clients_.clear();
+        current_poller_ = nullptr;
+    }
 
     // Non-copyable, movable.
     ServerBase(const ServerBase&) = delete;
@@ -93,16 +122,23 @@ template <typename ClientData> class ServerBase {
     ServerBase(ServerBase&&) = default;
     ServerBase& operator=(ServerBase&&) = default;
 
+    // Check if the server is valid and ready for use
+    bool isValid() const { return listener_ && listener_->isValid(); }
+
     // Enter the poll loop.
     //
-    // maxClients: 0 = unlimited; N > 0 = stop accepting after N connections,
+    // maxClients: ClientLimit::Unlimited = unlimited; N > 0 = stop accepting
+    // after N connections,
     //             but continue serving existing clients until all disconnect.
     // timeout:    passed to Poller::wait(); -1 = block until an event.
     //
     // Returns when there are no remaining connected clients (and accepting is
     // stopped, either because maxClients was reached or you stopped
     // externally).
-    void run(size_t maxClients = 0, Milliseconds timeout = Milliseconds{-1}) {
+    void run(ClientLimit maxClients = ClientLimit::Default,
+        Milliseconds timeout = Milliseconds{-1}) {
+        if (!isValid()) return; // Server not valid, exit early
+
         s_stop_.store(false, std::memory_order_relaxed);
 
         // Install SIGINT/SIGTERM for Ctrl+C shutdown; restore on exit.
@@ -120,8 +156,13 @@ template <typename ClientData> class ServerBase {
         Poller poller;
         current_poller_ = &poller;
         if (!poller.add(*listener_, PollEvent::Readable | PollEvent::Error)) {
-            throw SocketException(listener_->getLastError(), "ServerBase::run",
-                "Failed to register listening socket with Poller", 0, false);
+            return; // Failed to register with poller
+        }
+
+        // Pre-reserve client map if maxClients is specified to eliminate hash
+        // table growth
+        if (static_cast<size_t>(maxClients) > 0) {
+            clients_.reserve(static_cast<size_t>(maxClients));
         }
 
         bool accepting = true;
@@ -170,11 +211,30 @@ template <typename ClientData> class ServerBase {
                     (void)poller.remove(*it->second.socket);
                     clients_.erase(it);
 #ifdef SERVER_STATS
-                    std::cout << "[stats] clients: " << clients_.size()
-                              << "  max: " << max_clients_ << "\n";
+                    printf("[stats] clients: %zu  max: %zu\n", clients_.size(),
+                        max_clients_);
 #endif
                 }
             }
+
+            // Clean up timed-out clients detected by onIdle()
+            if (keepAliveTimeout_.count() > 0) {
+                auto now = std::chrono::steady_clock::now();
+                for (auto it = clients_.begin(); it != clients_.end();) {
+                    auto idle
+                        = std::chrono::duration_cast<std::chrono::seconds>(
+                            now - it->second.lastActivity);
+                    if (idle >= keepAliveTimeout_) {
+                        onDisconnect(it->second.data);
+                        it->second.socket->shutdown(ShutdownHow::Both);
+                        (void)poller.remove(*it->second.socket);
+                        it = clients_.erase(it);
+                    } else {
+                        ++it;
+                    }
+                }
+            }
+
             if (onIdle() == ServerResult::StopServer) {
                 s_stop_.store(true);
                 break;
@@ -265,9 +325,7 @@ template <typename ClientData> class ServerBase {
     virtual ServerResult onWritable(TcpSocket& sock, ClientData& data) = 0;
 
     // Called just before a client is removed.  Default: no-op.
-    virtual ServerResult onDisconnect(ClientData& /*data*/) {
-        return ServerResult::Disconnect;
-    }
+    virtual void onDisconnect(ClientData& /*data*/) {}
 
     // Called when a poll error event fires on a client socket.
     // sock is still valid at this point. Default: no-op.
@@ -276,8 +334,8 @@ template <typename ClientData> class ServerBase {
     // Called after the keep-alive sweep closes one or more idle connections.
     // Default: prints the count to stdout.
     virtual void onClientsTimedOut(size_t count) {
-        std::cout << "[keepalive] closed " << count << " idle connection"
-                  << (count == 1 ? "" : "s") << "\n";
+        printf("[keepalive] closed %zu idle connection%s\n", count,
+            count == 1 ? "" : "s");
     }
 
     // Called on every loop iteration after poller.wait() returns, before
@@ -286,6 +344,8 @@ template <typename ClientData> class ServerBase {
     // pass a bounded timeout to run() (e.g. Milliseconds{100}).
     // Derived classes should call ServerBase::onIdle() to retain keep-alive
     // timeout behaviour.
+    // NOTE: This method is read-only - derived classes should NOT modify
+    // client state or remove clients to prevent race conditions.
     virtual ServerResult onIdle() {
         if (!current_poller_ || keepAliveTimeout_.count() == 0)
             return ServerResult::KeepConnection;
@@ -293,20 +353,20 @@ template <typename ClientData> class ServerBase {
         if (now - last_idle_check_ < std::chrono::seconds{1})
             return ServerResult::KeepConnection;
         last_idle_check_ = now;
+
+        // Just count timed out clients for reporting - actual cleanup is
+        // handled by the main event loop to prevent race conditions.
         size_t timedOut = 0;
-        for (auto it = clients_.begin(); it != clients_.end();) {
-            auto idle = std::chrono::duration_cast<std::chrono::seconds>(
-                now - it->second.lastActivity);
-            if (idle >= keepAliveTimeout_) {
-                onDisconnect(it->second.data);
-                it->second.socket->shutdown(ShutdownHow::Write);
-                (void)current_poller_->remove(*it->second.socket);
-                it = clients_.erase(it);
-                ++timedOut;
-            } else {
-                ++it;
+        if (keepAliveTimeout_.count() > 0) {
+            for (const auto& [fd, entry] : clients_) {
+                auto idle = std::chrono::duration_cast<std::chrono::seconds>(
+                    now - entry.lastActivity);
+                if (idle >= keepAliveTimeout_) {
+                    ++timedOut;
+                }
             }
         }
+
         if (timedOut > 0) onClientsTimedOut(timedOut);
         return ServerResult::KeepConnection;
     }
@@ -335,8 +395,8 @@ template <typename ClientData> class ServerBase {
     size_t peak_clients_{0};
     SteadyClock::time_point last_idle_check_{SteadyClock::now()};
 
-    void drainAccept(
-        Poller& poller, bool& accepting, size_t& accepted, size_t maxClients) {
+    void drainAccept(Poller& poller, bool& accepting, size_t& accepted,
+        ClientLimit maxClients) {
         for (;;) {
             auto client = listener_->accept();
             if (!client) {
@@ -358,11 +418,12 @@ template <typename ClientData> class ServerBase {
             if (clients_.size() > peak_clients_)
                 peak_clients_ = clients_.size();
 #ifdef SERVER_STATS
-            std::cout << "[stats] clients: " << clients_.size()
-                      << "  peak: " << peak_clients_ << "\n";
+            printf("[stats] clients: %zu  peak: %zu\n", clients_.size(),
+                peak_clients_);
 #endif
 
-            if (maxClients != 0 && accepted >= maxClients) {
+            if (maxClients != ClientLimit::Unlimited
+                && accepted >= static_cast<size_t>(maxClients)) {
                 (void)poller.remove(*listener_);
                 accepting = false;
                 break;

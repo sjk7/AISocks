@@ -18,63 +18,62 @@ using namespace aiSocks;
 int httpConnect(const ConnectArgs& args, const char* httpRequest) {
     unsigned long totalBytesRead = 0;
 
-    try {
-        // One-liner: connect and read until closed
-        SimpleClient client(args, [&](TcpSocket& sock) {
-            assert(sock.isBlocking());
-            std::cout << "Connected! Socket is valid.\n";
+    // One-liner: connect and read until closed
+    SimpleClient client(args, [&](TcpSocket& sock) {
+        assert(sock.isBlocking());
+        std::cout << "Connected! Socket is valid.\n";
 
-            std::cout << "Sending HTTP request...\n";
-            if (!sock.sendAll(httpRequest, std::strlen(httpRequest))) {
-                std::cerr << "Failed to send request\n";
-                return;
+        std::cout << "Sending HTTP request...\n";
+        if (!sock.sendAll(httpRequest, std::strlen(httpRequest))) {
+            std::cerr << "Failed to send request\n";
+            return;
+        }
+
+        // Read response data until connection closes (receive returns 0 or -1)
+        char buffer[4096];
+        int bytesRead;
+        bool isFirstChunk = true;
+        int retval = 0;
+        std::cout << "Reading response...\n";
+        std::cout << "─────────────────────────────────────────\n\n";
+
+        while ((retval = (bytesRead = sock.receive(buffer, sizeof(buffer) - 1)))
+            > 0) {
+            buffer[bytesRead] = '\0';
+
+            // Print first 2KB to console, show stats for rest
+            if (totalBytesRead < 2048) {
+                int toPrint = std::min(
+                    static_cast<int>(sizeof(buffer) - 1 - totalBytesRead),
+                    bytesRead);
+                std::cout.write(buffer, toPrint);
+                std::cout.flush();
+            } else if (isFirstChunk && totalBytesRead > 0) {
+                std::cout << "\n... (response truncated, showing stats) ...\n";
+                isFirstChunk = false;
             }
 
-            // Read response data until connection closes (receive returns 0 or -1)
-            char buffer[4096];
-            int bytesRead;
-            bool isFirstChunk = true;
-            int retval = 0;
-            std::cout << "Reading response...\n";
-            std::cout << "─────────────────────────────────────────\n\n";
+            totalBytesRead += bytesRead;
+        }
 
-            while ((retval = (bytesRead = sock.receive(buffer, sizeof(buffer) - 1))) > 0) {
-                buffer[bytesRead] = '\0';
+        if (totalBytesRead == 0 && retval < 0) {
+            std::cout
+                << "\nConnection closed by server, after sending zero bytes\n";
+            std::cout << "Last error: " << static_cast<int>(sock.getLastError())
+                      << " - " << sock.getErrorMessage() << "\n";
+        }
 
-                // Print first 2KB to console, show stats for rest
-                if (totalBytesRead < 2048) {
-                    int toPrint = std::min(
-                        static_cast<int>(sizeof(buffer) - 1 - totalBytesRead),
-                        bytesRead);
-                    std::cout.write(buffer, toPrint);
-                    std::cout.flush();
-                } else if (isFirstChunk && totalBytesRead > 0) {
-                    std::cout << "\n... (response truncated, showing stats) ...\n";
-                    isFirstChunk = false;
-                }
+        std::cout << "\n─────────────────────────────────────────\n";
+    });
 
-                totalBytesRead += bytesRead;
-            }
-
-            if (totalBytesRead == 0 && retval < 0) {
-                std::cout << "\nConnection closed by server, after sending zero bytes\n";
-                std::cout << "Last error: " 
-                          << static_cast<int>(sock.getLastError()) 
-                          << " - " << sock.getErrorMessage() << "\n";
-            }
-
-            std::cout << "\n─────────────────────────────────────────\n";
-        });
-
-        std::cout << "\nConnection complete!\n";
-        std::cout << "Total bytes received: " << totalBytesRead << "\n";
-        return 0;
-
-    } catch (const SocketException& e) {
+    if (!client.isConnected()) {
         std::cerr << "\n*** CONNECTION FAILED ***\n";
-        std::cerr << "Error: " << e.what() << "\n";
         return 1;
     }
+
+    std::cout << "\nConnection complete!\n";
+    std::cout << "Total bytes received: " << totalBytesRead << "\n";
+    return 0;
 }
 
 int main() {
@@ -89,12 +88,10 @@ int main() {
                               "\r\n";
 
     auto ret = httpConnect(
-        ConnectArgs{"google.com", Port{80}, Milliseconds{1000}},
-        httpRequest);
+        ConnectArgs{"google.com", Port{80}, Milliseconds{1000}}, httpRequest);
 
     std::cout << "8765 Example finished with code: " << ret << "\n";
 
     ret = ret = httpConnect(
-        ConnectArgs{"google.com", Port{8765}, Milliseconds{1000}},
-        httpRequest);
+        ConnectArgs{"google.com", Port{8765}, Milliseconds{1000}}, httpRequest);
 }

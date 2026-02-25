@@ -21,6 +21,8 @@ struct Poller::Impl {
     // Parallel vectors: fds[i] and sockets[i] refer to the same entry.
     std::vector<WSAPOLLFD> fds;
     std::vector<const Socket*> sockets;
+    // Reusable result buffer to avoid per-call allocation in wait()
+    std::vector<PollResult> resultBuffer;
 };
 
 Poller::Poller() : pImpl_(std::make_unique<Impl>()) {
@@ -81,13 +83,20 @@ bool Poller::remove(const Socket& s) {
 std::vector<PollResult> Poller::wait(Milliseconds timeout) {
     if (pImpl_->fds.empty()) return {};
 
+    // Convert 0ms to 0.5ms minimum to prevent CPU spinning
+    int64_t effectiveTimeout = timeout.count;
+    if (effectiveTimeout == 0) {
+        effectiveTimeout
+            = 1; // WSAPoll only supports millisecond precision, so 0ms -> 1ms
+    }
+
     // On Windows, std::signal handlers fire on a separate thread, so WSAPoll
     // with an infinite timeout will never be interrupted. Cap the wait at 100ms
     // so the run() loop can check the stop flag and exit cleanly.
     static constexpr int MAX_WAIT_MS = 100;
-    const int timeoutMs = (timeout.count() < 0)
+    const int timeoutMs = (effectiveTimeout < 0)
         ? MAX_WAIT_MS
-        : static_cast<int>(timeout.count());
+        : static_cast<int>(effectiveTimeout);
 
     // WSAPoll modifies revents in-place; clear them first.
     for (auto& pfd : pImpl_->fds) {
@@ -97,11 +106,14 @@ std::vector<PollResult> Poller::wait(Milliseconds timeout) {
     int rc = ::WSAPoll(
         pImpl_->fds.data(), static_cast<ULONG>(pImpl_->fds.size()), timeoutMs);
     if (rc == SOCKET_ERROR) {
-        throw SocketException(SocketError::Unknown, "WSAPoll()",
-            "WSAPoll() failed", WSAGetLastError(), false);
+        // Don't throw - return empty result on error
+        // Users can check error via WSAGetLastError()
+        return {};
     }
 
-    std::vector<PollResult> results;
+    pImpl_->resultBuffer.clear();
+    pImpl_->resultBuffer.reserve(pImpl_->fds.size());
+    auto& results = pImpl_->resultBuffer;
     for (size_t i = 0; i < pImpl_->fds.size(); ++i) {
         SHORT rev = pImpl_->fds[i].revents;
         if (rev == 0) continue;

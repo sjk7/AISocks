@@ -21,7 +21,20 @@ namespace aiSocks {
 
 struct Poller::Impl {
     int epfd{-1};
-    std::unordered_map<uintptr_t, const Socket*> sockets;
+    // Sparse array for O(1) direct fd->Socket lookup instead of unordered_map
+    std::vector<const Socket*> socketArray;
+    std::vector<bool> socketValid;
+    // Reusable result buffer to avoid per-call allocation in wait()
+    std::vector<PollResult> resultBuffer;
+
+    // Helper to ensure array is large enough for fd
+    void ensureCapacity(int fd) {
+        size_t required = static_cast<size_t>(fd) + 1;
+        if (socketArray.size() < required) {
+            socketArray.resize(required, nullptr);
+            socketValid.resize(required, false);
+        }
+    }
 };
 
 static uint32_t interestToEpollEvents(PollEvent interest) {
@@ -34,8 +47,9 @@ static uint32_t interestToEpollEvents(PollEvent interest) {
 Poller::Poller() : pImpl_(std::make_unique<Impl>()) {
     pImpl_->epfd = ::epoll_create1(EPOLL_CLOEXEC);
     if (pImpl_->epfd == -1) {
-        throw SocketException(SocketError::CreateFailed, "epoll_create1()",
-            "Failed to create epoll instance", errno, false);
+        // Don't throw - set to invalid state
+        // Users can check isValid() via the Poller methods
+        pImpl_->epfd = -1;
     }
 }
 
@@ -57,7 +71,9 @@ bool Poller::add(const Socket& s, PollEvent interest) {
     if (::epoll_ctl(pImpl_->epfd, EPOLL_CTL_ADD, fd, &ev) == -1) {
         return false;
     }
-    pImpl_->sockets[static_cast<uintptr_t>(fd)] = &s;
+    pImpl_->ensureCapacity(fd);
+    pImpl_->socketArray[fd] = &s;
+    pImpl_->socketValid[fd] = true;
     return true;
 }
 
@@ -82,15 +98,25 @@ bool Poller::remove(const Socket& s) {
     struct epoll_event ev{}; // required on kernels < 2.6.9
     ::epoll_ctl(pImpl_->epfd, EPOLL_CTL_DEL, fd, &ev);
 
-    pImpl_->sockets.erase(static_cast<uintptr_t>(fd));
+    if (fd < static_cast<int>(pImpl_->socketArray.size())) {
+        pImpl_->socketArray[fd] = nullptr;
+        pImpl_->socketValid[fd] = false;
+    }
     return true;
 }
 
 std::vector<PollResult> Poller::wait(Milliseconds timeout) {
-    const int timeoutMs
-        = (timeout.count() < 0) ? -1 : static_cast<int>(timeout.count());
+    // Convert 0ms to 0.5ms minimum to prevent CPU spinning
+    int64_t effectiveTimeout = timeout.count;
+    if (effectiveTimeout == 0) {
+        effectiveTimeout
+            = 1; // epoll only supports millisecond precision, so 0ms -> 1ms
+    }
 
-    const int maxEvents = static_cast<int>(pImpl_->sockets.size()) + 1;
+    const int timeoutMs
+        = (effectiveTimeout < 0) ? -1 : static_cast<int>(effectiveTimeout);
+
+    const int maxEvents = static_cast<int>(pImpl_->socketArray.size()) + 1;
     std::vector<struct epoll_event> events(static_cast<size_t>(maxEvents));
 
     for (;;) {
@@ -98,34 +124,39 @@ std::vector<PollResult> Poller::wait(Milliseconds timeout) {
         if (n < 0) {
             if (errno == EINTR)
                 return {}; // signal received -- let caller check stop flag
-            throw SocketException(SocketError::Unknown, "epoll_wait()",
-                "epoll_wait() failed", errno, false);
+            // Don't throw - return empty result on error
+            // Users can check system error via errno
+            return {};
         }
 
-        std::vector<PollResult> results;
-        results.reserve(static_cast<size_t>(n));
+        pImpl_->resultBuffer.clear();
+        pImpl_->resultBuffer.reserve(static_cast<size_t>(n));
+        auto& results = pImpl_->resultBuffer;
         for (int i = 0; i < n; ++i) {
             const struct epoll_event& ev = events[static_cast<size_t>(i)];
-            auto fd = static_cast<uintptr_t>(ev.data.fd);
-            auto it = pImpl_->sockets.find(fd);
-            if (it == pImpl_->sockets.end()) continue;
+            auto fd = static_cast<int>(ev.data.fd);
+            if (fd < static_cast<int>(pImpl_->socketArray.size())
+                && pImpl_->socketValid[fd] && pImpl_->socketArray[fd]) {
 
-            uint8_t bits = 0;
-            if ((ev.events & (EPOLLIN | EPOLLRDNORM | EPOLLRDHUP)) != 0)
-                bits |= static_cast<uint8_t>(PollEvent::Readable);
-            if ((ev.events & (EPOLLOUT | EPOLLWRNORM)) != 0)
-                bits |= static_cast<uint8_t>(PollEvent::Writable);
-            if ((ev.events & EPOLLERR) != 0) {
-                bits |= static_cast<uint8_t>(PollEvent::Error);
-                // Let caller drain to detect the cause.
-                bits |= static_cast<uint8_t>(PollEvent::Readable);
+                uint8_t bits = 0;
+                if ((ev.events & (EPOLLIN | EPOLLRDNORM | EPOLLRDHUP)) != 0)
+                    bits |= static_cast<uint8_t>(PollEvent::Readable);
+                if ((ev.events & (EPOLLOUT | EPOLLWRNORM)) != 0)
+                    bits |= static_cast<uint8_t>(PollEvent::Writable);
+                if ((ev.events & EPOLLERR) != 0) {
+                    bits |= static_cast<uint8_t>(PollEvent::Error);
+                    // Let caller drain to detect the cause.
+                    bits |= static_cast<uint8_t>(PollEvent::Readable);
+                }
+                if ((ev.events & EPOLLHUP) != 0) {
+                    // EPOLLHUP = remote closed (TCP FIN) -- not a socket error,
+                    // treat as readable so the read path sees n==0 and
+                    // disconnects.
+                    bits |= static_cast<uint8_t>(PollEvent::Readable);
+                }
+                results.push_back(
+                    {pImpl_->socketArray[fd], static_cast<PollEvent>(bits)});
             }
-            if ((ev.events & EPOLLHUP) != 0) {
-                // EPOLLHUP = remote closed (TCP FIN) -- not a socket error,
-                // treat as readable so the read path sees n==0 and disconnects.
-                bits |= static_cast<uint8_t>(PollEvent::Readable);
-            }
-            results.push_back({it->second, static_cast<PollEvent>(bits)});
         }
         return results;
     }

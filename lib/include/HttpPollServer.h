@@ -52,6 +52,12 @@ struct HttpClientState {
     bool responseStarted{false}; // true once onResponseBegin has been called
     bool closeAfterSend{false}; // set by keep-alive negotiation; derived
                                 // class may override in buildResponse()
+
+    // Pre-allocated buffer for better performance
+    HttpClientState() {
+        request.reserve(4096); // Pre-allocate for typical HTTP request
+        response.reserve(1024); // Pre-allocate for typical HTTP response
+    }
 };
 
 // ---------------------------------------------------------------------------
@@ -88,9 +94,8 @@ class HttpPollServer : public ServerBase<HttpClientState> {
         // resets or other conditions. This is not a real error and should not
         // be logged.
         if (err != SocketError::None) {
-            std::cout << "[error] poll error on client socket: code="
-                      << static_cast<int>(err)
-                      << " msg=" << sock.getErrorMessage() << "\n";
+            printf("[error] poll error on client socket: code=%d msg=%s\n",
+                static_cast<int>(err), sock.getErrorMessage().c_str());
         }
     }
 
@@ -234,18 +239,17 @@ class HttpPollServer : public ServerBase<HttpClientState> {
 
         auto since_print
             = std::chrono::duration<double>(now - last_print_).count();
-        double print_interval = first_output_done_ ? 30.0 : 2.0;
+        double print_interval = first_output_done_ ? 60.0 : 0.5;
 
         if (since_print >= print_interval) {
             if (!intervals_.empty()) {
                 double sum = 0;
                 for (double v : intervals_) sum += v;
-                std::cout << std::fixed << std::setprecision(1)
-                          << "onIdle() called " << call_count_
-                          << " times, avg interval: "
-                          << (sum / static_cast<double>(intervals_.size()))
-                          << "ms  clients: " << clientCount()
-                          << "  peak: " << peakClientCount() << "\n";
+                printf("onIdle() called %d times, avg interval: %.1fms  "
+                       "clients: %zu  peak: %zu\n",
+                    call_count_, sum / static_cast<double>(intervals_.size()),
+                    static_cast<size_t>(clientCount()),
+                    static_cast<size_t>(peakClientCount()));
             }
             intervals_.clear();
             call_count_ = 0;
