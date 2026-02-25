@@ -382,6 +382,21 @@ template <typename ClientData> class ServerBase {
         SteadyClock::time_point lastActivity{SteadyClock::now()};
         
         ClientEntry() = default;
+        ClientEntry(const ClientEntry& other) 
+            : socket(other.socket ? std::make_unique<TcpSocket>(*other.socket) : nullptr), 
+              data(other.data), lastActivity(other.lastActivity) {
+            std::cout << "DEBUG: ClientEntry() COPY constructor called at " << this << std::endl;
+            std::cout << "DEBUG:   socket ptr: " << (void*)socket.get() << std::endl;
+            std::cout << "DEBUG:   data ptr: " << (void*)&data << std::endl;
+        }
+        
+        ClientEntry(ClientEntry&& other) noexcept
+            : socket(std::move(other.socket)), data(std::move(other.data)), lastActivity(other.lastActivity) {
+            std::cout << "DEBUG: ClientEntry() MOVE constructor called at " << this << std::endl;
+            std::cout << "DEBUG:   socket ptr: " << (void*)socket.get() << std::endl;
+            std::cout << "DEBUG:   data ptr: " << (void*)&data << std::endl;
+        }
+        
         ClientEntry(std::unique_ptr<TcpSocket> sock, ClientData clientData) 
             : socket(std::move(sock)), data(std::move(clientData)) {
             std::cout << "DEBUG: ClientEntry() constructor called at " << this << std::endl;
