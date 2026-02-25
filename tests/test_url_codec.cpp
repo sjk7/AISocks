@@ -24,7 +24,8 @@
 // 15. Space encodes to %20 (not +)
 // 16. Mixed plain+encoded input round-trip
 
-#include "HttpPollServer.h"
+#include "HttpRequest.h"
+#include "UrlCodec.h"
 #include "test_helpers.h"
 #include <iostream>
 #include <string>
