@@ -14,6 +14,19 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 # builds the library and the primary example (main.cpp).
 option(BUILD_TESTS    "Build test programs"    OFF)
 option(BUILD_EXAMPLES "Build all example programs" OFF)
+option(ENABLE_ASAN    "Enable AddressSanitizer"    OFF)
+
+# Add AddressSanitizer if enabled
+if(ENABLE_ASAN AND MSVC)
+    add_compile_definitions(_ENABLE_ASAN)
+    if(CMAKE_VERSION VERSION_GREATER_EQUAL "3.13")
+        add_compile_options($<$<CONFIG:Debug>:/fsanitize=address>)
+        add_link_options($<$<CONFIG:Debug>:/fsanitize=address>)
+    endif()
+elseif(ENABLE_ASAN)
+    add_compile_options(-fsanitize=address -fno-omit-frame-pointer)
+    add_link_options(-fsanitize=address)
+endif()
 
 # Add the library
 add_subdirectory(lib)
