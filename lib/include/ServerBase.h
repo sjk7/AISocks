@@ -384,23 +384,15 @@ template <typename ClientData> class ServerBase {
         ClientEntry() = default;
         ClientEntry(const ClientEntry& other) 
             : socket(other.socket ? std::make_unique<TcpSocket>(*other.socket) : nullptr), 
-              data(other.data), lastActivity(other.lastActivity) {
-            std::cout << "DEBUG: ClientEntry COPY constructor called" << std::endl;
-        }
+              data(other.data), lastActivity(other.lastActivity) {}
         
         ClientEntry(ClientEntry&& other) noexcept
-            : socket(std::move(other.socket)), data(std::move(other.data)), lastActivity(other.lastActivity) {
-            std::cout << "DEBUG: ClientEntry MOVE constructor called" << std::endl;
-        }
+            : socket(std::move(other.socket)), data(std::move(other.data)), lastActivity(other.lastActivity) {}
         
-        ClientEntry(std::unique_ptr<TcpSocket> sock, ClientData clientData) 
-            : socket(std::move(sock)), data(std::move(clientData)) {
-            std::cout << "DEBUG: ClientEntry constructor called" << std::endl;
-        }
+        ClientEntry(std::unique_ptr<TcpSocket> sock) 
+            : socket(std::move(sock)), data() {}
         
-        ~ClientEntry() {
-            std::cout << "DEBUG: ClientEntry destructor called" << std::endl;
-        }
+        ~ClientEntry() = default;
     };
 
     std::atomic<bool> stop_{false};
@@ -440,14 +432,7 @@ template <typename ClientData> class ServerBase {
                 continue;
             }
 
-            std::cout << "DEBUG: About to create ClientEntry for key " << key << std::endl;
-            std::cout << "DEBUG: Creating ClientData()..." << std::endl;
-            ClientData tempData = ClientData();
-            std::cout << "DEBUG: ClientData created" << std::endl;
-            
-            std::cout << "DEBUG: About to emplace ClientEntry..." << std::endl;
-            clients_.try_emplace(key, std::move(client), std::move(tempData));
-            std::cout << "DEBUG: ClientEntry emplaced successfully" << std::endl;
+            clients_.emplace(key, std::move(client));
             ++accepted;
             if (clients_.size() > peak_clients_)
                 peak_clients_ = clients_.size();

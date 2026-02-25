@@ -56,30 +56,22 @@ struct HttpClientState {
     // Pre-allocated buffer for better performance
     HttpClientState() 
         : request(), response(), startTime(std::chrono::steady_clock::now()) {
-        std::cout << "DEBUG: HttpClientState() constructor called" << std::endl;
         request.reserve(4096); // Pre-allocate for typical HTTP request
         response.reserve(1024); // Pre-allocate for typical HTTP response
-        std::cout << "DEBUG:   strings reserved" << std::endl;
     }
     
     // Explicit copy/move constructors to ensure proper initialization
     HttpClientState(const HttpClientState& other) 
         : request(other.request), response(other.response), 
           sent(other.sent), startTime(other.startTime),
-          responseStarted(other.responseStarted), closeAfterSend(other.closeAfterSend) {
-        std::cout << "DEBUG: HttpClientState() COPY constructor called" << std::endl;
-    }
+          responseStarted(other.responseStarted), closeAfterSend(other.closeAfterSend) {}
           
     HttpClientState(HttpClientState&& other) noexcept
         : request(std::move(other.request)), response(std::move(other.response)),
           sent(other.sent), startTime(other.startTime),
-          responseStarted(other.responseStarted), closeAfterSend(other.closeAfterSend) {
-        std::cout << "DEBUG: HttpClientState() MOVE constructor called" << std::endl;
-    }
+          responseStarted(other.responseStarted), closeAfterSend(other.closeAfterSend) {}
     
-    ~HttpClientState() {
-        std::cout << "DEBUG: HttpClientState() destructor called" << std::endl;
-    }
+    ~HttpClientState() = default;
 };
 
 // ---------------------------------------------------------------------------
