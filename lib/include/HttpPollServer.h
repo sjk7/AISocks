@@ -54,7 +54,8 @@ struct HttpClientState {
                                 // class may override in buildResponse()
 
     // Pre-allocated buffer for better performance
-    HttpClientState() {
+    HttpClientState() 
+        : startTime(std::chrono::steady_clock::now()) {
         request.reserve(4096); // Pre-allocate for typical HTTP request
         response.reserve(1024); // Pre-allocate for typical HTTP response
     }
