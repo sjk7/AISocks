@@ -10,7 +10,7 @@ A modern C++ socket library that abstracts platform differences between Windows,
 Zero dependencies, other than a standard C++ compiler and CMake.
 
 - ✅ Cross-platform support (Windows, macOS, Linux)
-- ✅ Clean pimpl-based API hiding platform details
+- ✅ Clean pimpl-based API hiding platform (and socket header)details
 - ✅ IPv4 and IPv6 support
 - ✅ TCP and UDP socket support
 - ✅ Blocking and non-blocking modes

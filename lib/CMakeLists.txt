@@ -44,6 +44,11 @@ if(WIN32)
     target_precompile_headers(aiSocksLib PRIVATE src/pch.h)
 endif()
 
+# Configure precompiled headers for Clang (Mac/Linux)
+if(NOT MSVC)
+    target_precompile_headers(aiSocksLib PRIVATE src/pch.h)
+endif()
+
 # Compiler-specific settings
 if(MSVC)
     target_compile_options(aiSocksLib PRIVATE /W4 /WX /utf-8 /MP)
