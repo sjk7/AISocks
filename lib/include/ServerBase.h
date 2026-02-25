@@ -422,7 +422,7 @@ template <typename ClientData> class ServerBase {
                 continue;
             }
 
-            clients_.emplace(key, ClientEntry{std::move(client), ClientData{}});
+            clients_.emplace(key, ClientEntry{std::move(client), ClientData()});
             ++accepted;
             if (clients_.size() > peak_clients_)
                 peak_clients_ = clients_.size();
