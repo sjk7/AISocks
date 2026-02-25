@@ -387,20 +387,12 @@ template <typename ClientData> class ServerBase {
             std::cout << "DEBUG: ClientEntry() constructor called at " << this << std::endl;
             std::cout << "DEBUG:   socket ptr: " << (void*)socket.get() << std::endl;
             std::cout << "DEBUG:   data ptr: " << (void*)&data << std::endl;
-            std::cout << "DEBUG:   data.request ptr: " << (void*)&data.request << std::endl;
-            std::cout << "DEBUG:   data.response ptr: " << (void*)&data.response << std::endl;
-            std::cout << "DEBUG:   data.request data ptr: " << (void*)data.request.c_str() << std::endl;
-            std::cout << "DEBUG:   data.response data ptr: " << (void*)data.response.c_str() << std::endl;
         }
         
         ~ClientEntry() {
             std::cout << "DEBUG: ClientEntry() destructor called at " << this << std::endl;
             std::cout << "DEBUG:   socket ptr: " << (void*)socket.get() << std::endl;
             std::cout << "DEBUG:   data ptr: " << (void*)&data << std::endl;
-            std::cout << "DEBUG:   data.request ptr: " << (void*)&data.request << std::endl;
-            std::cout << "DEBUG:   data.response ptr: " << (void*)&data.response << std::endl;
-            std::cout << "DEBUG:   data.request data ptr: " << (void*)data.request.c_str() << std::endl;
-            std::cout << "DEBUG:   data.response data ptr: " << (void*)data.response.c_str() << std::endl;
         }
     };
 
@@ -445,10 +437,6 @@ template <typename ClientData> class ServerBase {
             std::cout << "DEBUG: Creating ClientData()..." << std::endl;
             ClientData tempData = ClientData();
             std::cout << "DEBUG: ClientData() created at " << (void*)&tempData << std::endl;
-            std::cout << "DEBUG:   tempData.request ptr: " << (void*)&tempData.request << std::endl;
-            std::cout << "DEBUG:   tempData.response ptr: " << (void*)&tempData.response << std::endl;
-            std::cout << "DEBUG:   tempData.request data ptr: " << (void*)tempData.request.c_str() << std::endl;
-            std::cout << "DEBUG:   tempData.response data ptr: " << (void*)tempData.response.c_str() << std::endl;
             
             std::cout << "DEBUG: About to emplace ClientEntry..." << std::endl;
             clients_.emplace(key, ClientEntry{std::move(client), std::move(tempData)});
