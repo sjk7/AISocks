@@ -56,8 +56,7 @@ struct HttpClientState {
     // Pre-allocated buffer for better performance
     HttpClientState() 
         : request(""), response(""), startTime(std::chrono::steady_clock::now()) {
-        request.reserve(4096); // Pre-allocate for typical HTTP request
-        response.reserve(1024); // Pre-allocate for typical HTTP response
+        // Removed reserve() calls as they may trigger MemorySanitizer issues
     }
     
     // Explicit copy/move constructors to ensure proper initialization
