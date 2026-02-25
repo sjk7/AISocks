@@ -377,8 +377,10 @@ template <typename ClientData> class ServerBase {
     using SteadyClock = std::chrono::steady_clock;
     struct ClientEntry {
         std::unique_ptr<TcpSocket> socket;
-        ClientData data{};
+        ClientData data;
         SteadyClock::time_point lastActivity{SteadyClock::now()};
+        
+        ClientEntry() : data() {}  // Ensure proper constructor is called
     };
 
     std::atomic<bool> stop_{false};
