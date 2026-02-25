@@ -72,10 +72,10 @@ int main() {
         std::atomic<bool> ready{false};
 
         // Start server with limited clients
-        std::thread([&server, &ready]() {
+        std::thread serverThread([&server, &ready]() {
             ready = true;
             server.run(ClientLimit{2}, Milliseconds{10});
-        }).detach();
+        });
 
         // Wait for server to be ready AND actually accept a client
         while (!ready)
@@ -105,6 +105,9 @@ int main() {
             std::chrono::milliseconds{100});
 
         std::cout << "Server stopped successfully\n";
+        
+        // CRITICAL: Wait for server thread to finish before destructor
+        serverThread.join();
     }
 
     std::cout << "Minimal test completed\n";
