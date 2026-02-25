@@ -169,9 +169,11 @@ template <typename ClientData> class ServerBase {
         size_t accepted = 0;
 
         while (!stop_.load(std::memory_order_relaxed)
+            && !signal_stop_.load(std::memory_order_relaxed)
             && (accepting || !clients_.empty())) {
             auto ready = poller.wait(timeout);
-            if (stop_.load(std::memory_order_relaxed)) break;
+            if (stop_.load(std::memory_order_relaxed)
+                || signal_stop_.load(std::memory_order_relaxed)) break;
             for (const auto& event : ready) {
                 if (event.socket == listener_.get()) {
                     if (!accepting) continue;
@@ -387,10 +389,10 @@ template <typename ClientData> class ServerBase {
     static void handleSignal(int) {
         // Signal handler can't access instance, so use a static flag for signals only
         // This is only used for Ctrl+C, not for normal test shutdown
-        static std::atomic<bool> signal_stop_{false};
         signal_stop_.store(true, std::memory_order_relaxed);
     }
 
+    static std::atomic<bool> signal_stop_;
     Poller* current_poller_{nullptr};
     std::unique_ptr<TcpSocket> listener_;
     std::unordered_map<uintptr_t, ClientEntry> clients_;
@@ -434,6 +436,10 @@ template <typename ClientData> class ServerBase {
         }
     }
 };
+
+// Define static member
+template <typename ClientData>
+std::atomic<bool> ServerBase<ClientData>::signal_stop_{false};
 
 } // namespace aiSocks
 
