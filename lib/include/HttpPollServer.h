@@ -59,8 +59,7 @@ struct HttpClientState {
         std::cout << "DEBUG: HttpClientState() constructor called" << std::endl;
         request.reserve(4096); // Pre-allocate for typical HTTP request
         response.reserve(1024); // Pre-allocate for typical HTTP response
-        std::cout << "DEBUG:   request reserved: " << request.capacity() << std::endl;
-        std::cout << "DEBUG:   response reserved: " << response.capacity() << std::endl;
+        std::cout << "DEBUG:   strings reserved" << std::endl;
     }
     
     // Explicit copy/move constructors to ensure proper initialization
