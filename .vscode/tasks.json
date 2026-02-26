@@ -1,0 +1,213 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "build-msan-http-server",
+      "type": "shell",
+      "command": "cmake",
+      "args": [
+        "--build",
+        "build-msan",
+        "--target",
+        "http_server",
+        "--config",
+        "Debug"
+      ],
+      "group": "build",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      },
+      "problemMatcher": ["$gcc"],
+      "detail": "Build http_server with MemorySanitizer"
+    },
+    {
+      "label": "build-asan-http-server",
+      "type": "shell",
+      "command": "cmake",
+      "args": [
+        "--build",
+        "build-asan",
+        "--target",
+        "http_server",
+        "--config",
+        "Debug"
+      ],
+      "group": "build",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      },
+      "problemMatcher": ["$gcc"],
+      "detail": "Build http_server with AddressSanitizer"
+    },
+    {
+      "label": "build-http-server",
+      "type": "shell",
+      "command": "cmake",
+      "args": [
+        "--build",
+        "build",
+        "--target",
+        "http_server",
+        "--config",
+        "Debug"
+      ],
+      "group": "build",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      },
+      "problemMatcher": ["$gcc"],
+      "detail": "Build http_server with debug symbols"
+    },
+    {
+      "label": "build-aiSocksExample",
+      "type": "shell",
+      "command": "cmake",
+      "args": [
+        "--build",
+        "build",
+        "--target",
+        "aiSocksExample",
+        "--config",
+        "Debug"
+      ],
+      "group": "build",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      },
+      "problemMatcher": ["$gcc"],
+      "detail": "Build aiSocksExample with debug symbols"
+    },
+    {
+      "label": "build-aiSocksNonBlocking",
+      "type": "shell",
+      "command": "cmake",
+      "args": [
+        "--build",
+        "build",
+        "--target",
+        "aiSocksNonBlocking",
+        "--config",
+        "Debug"
+      ],
+      "group": "build",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      },
+      "problemMatcher": ["$gcc"],
+      "detail": "Build aiSocksNonBlocking with debug symbols"
+    },
+    {
+      "label": "build-aiSocksGoogleClient",
+      "type": "shell",
+      "command": "cmake",
+      "args": [
+        "--build",
+        "build",
+        "--target",
+        "aiSocksGoogleClient",
+        "--config",
+        "Debug"
+      ],
+      "group": "build",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      },
+      "problemMatcher": ["$gcc"],
+      "detail": "Build aiSocksGoogleClient with debug symbols"
+    },
+    {
+      "label": "configure-msan-debug",
+      "type": "shell",
+      "command": "cmake",
+      "args": [
+        "-S",
+        ".",
+        "-B",
+        "build-msan",
+        "-DCMAKE_BUILD_TYPE=Debug",
+        "-DENABLE_MSAN=ON",
+        "-DBUILD_EXAMPLES=ON",
+        "-G",
+        "Ninja"
+      ],
+      "group": "build",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      },
+      "problemMatcher": [],
+      "detail": "Configure CMake for MemorySanitizer debug build"
+    },
+    {
+      "label": "configure-asan-debug",
+      "type": "shell",
+      "command": "cmake",
+      "args": [
+        "-S",
+        ".",
+        "-B",
+        "build-asan",
+        "-DCMAKE_BUILD_TYPE=Debug",
+        "-DENABLE_ASAN=ON",
+        "-DBUILD_EXAMPLES=ON",
+        "-G",
+        "Ninja"
+      ],
+      "group": "build",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      },
+      "problemMatcher": [],
+      "detail": "Configure CMake for AddressSanitizer debug build"
+    },
+    {
+      "label": "configure-debug",
+      "type": "shell",
+      "command": "cmake",
+      "args": [
+        "-S",
+        ".",
+        "-B",
+        "build",
+        "-DCMAKE_BUILD_TYPE=Debug",
+        "-DBUILD_EXAMPLES=ON",
+        "-G",
+        "Ninja"
+      ],
+      "group": "build",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      },
+      "problemMatcher": [],
+      "detail": "Configure CMake for debug build"
+    },
+    {
+      "label": "build-all-examples",
+      "type": "shell",
+      "command": "cmake",
+      "args": [
+        "--build",
+        "build",
+        "--target",
+        "all",
+        "--config",
+        "Debug"
+      ],
+      "group": "build",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      },
+      "problemMatcher": ["$gcc"],
+      "detail": "Build all example targets"
+    }
+  ]
+}

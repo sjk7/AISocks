@@ -15,6 +15,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 option(BUILD_TESTS    "Build test programs"    OFF)
 option(BUILD_EXAMPLES "Build all example programs" OFF)
 option(ENABLE_ASAN    "Enable AddressSanitizer"    OFF)
+option(ENABLE_MSAN    "Enable MemorySanitizer"     OFF)
 
 # Add AddressSanitizer if enabled
 if(ENABLE_ASAN AND MSVC)
@@ -26,6 +27,18 @@ if(ENABLE_ASAN AND MSVC)
 elseif(ENABLE_ASAN)
     add_compile_options(-fsanitize=address -fno-omit-frame-pointer)
     add_link_options(-fsanitize=address)
+endif()
+
+# Add MemorySanitizer if enabled
+if(ENABLE_MSAN AND NOT MSVC)
+    if(APPLE)
+        message(FATAL_ERROR "MemorySanitizer is not supported on macOS (including Apple Silicon). Use Linux for MSan.")
+    endif()
+    add_compile_options(-fsanitize=memory -fno-omit-frame-pointer -g -O0)
+    add_link_options(-fsanitize=memory)
+    message(STATUS "MemorySanitizer enabled - requires runtime with MSan instrumentation")
+elseif(ENABLE_MSAN AND MSVC)
+    message(FATAL_ERROR "MemorySanitizer is not supported on MSVC/Windows")
 endif()
 
 # Add the library

@@ -174,7 +174,8 @@ template <typename ClientData> class ServerBase {
             && (accepting || !clients_.empty())) {
             auto ready = poller.wait(timeout);
             if (stop_.load(std::memory_order_relaxed)
-                || signal_stop_.load(std::memory_order_relaxed)) break;
+                || signal_stop_.load(std::memory_order_relaxed))
+                break;
             for (const auto& event : ready) {
                 if (event.socket == listener_.get()) {
                     if (!accepting) continue;
@@ -380,18 +381,22 @@ template <typename ClientData> class ServerBase {
         std::unique_ptr<TcpSocket> socket;
         ClientData data;
         SteadyClock::time_point lastActivity{SteadyClock::now()};
-        
+
         ClientEntry() = default;
-        ClientEntry(const ClientEntry& other) 
-            : socket(other.socket ? std::make_unique<TcpSocket>(*other.socket) : nullptr), 
-              data(other.data), lastActivity(other.lastActivity) {}
-        
+        ClientEntry(const ClientEntry& other)
+            : socket(other.socket ? std::make_unique<TcpSocket>(*other.socket)
+                                  : nullptr)
+            , data(other.data)
+            , lastActivity(other.lastActivity) {}
+
         ClientEntry(ClientEntry&& other) noexcept
-            : socket(std::move(other.socket)), data(std::move(other.data)), lastActivity(other.lastActivity) {}
-        
-        ClientEntry(std::unique_ptr<TcpSocket> sock) 
+            : socket(std::move(other.socket))
+            , data(std::move(other.data))
+            , lastActivity(other.lastActivity) {}
+
+        ClientEntry(std::unique_ptr<TcpSocket> sock)
             : socket(std::move(sock)), data() {}
-        
+
         ~ClientEntry() = default;
     };
 
@@ -401,8 +406,9 @@ template <typename ClientData> class ServerBase {
 #endif
 
     static void handleSignal(int) {
-        // Signal handler can't access instance, so use a static flag for signals only
-        // This is only used for Ctrl+C, not for normal test shutdown
+        // Signal handler can't access instance, so use a static flag for
+        // signals only This is only used for Ctrl+C, not for normal test
+        // shutdown
         signal_stop_.store(true, std::memory_order_relaxed);
     }
 

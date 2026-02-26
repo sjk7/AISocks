@@ -1,0 +1,11 @@
+{
+  "cmake.buildDirectory": "${workspaceFolder}/build",
+  "cmake.configureArgs": [
+    "-DCMAKE_BUILD_TYPE=Debug",
+    "-DBUILD_EXAMPLES=ON"
+  ],
+  "cmake.configurePreset": "asan-debug",
+  "cmake.buildPreset": "asan-debug",
+  "cmake.generator": "Ninja",
+  "cmake.buildBeforeRun": true
+}
