@@ -1,0 +1,98 @@
+{
+  "version": 3,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 15,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "base",
+      "hidden": true,
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build",
+      "toolset": {
+        "value": "host",
+        "strategy": "external"
+      }
+    },
+    {
+      "name": "debug",
+      "inherits": "base",
+      "displayName": "Debug",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "BUILD_EXAMPLES": "ON"
+      }
+    },
+    {
+      "name": "msan-debug",
+      "inherits": "base",
+      "displayName": "MemorySanitizer Debug",
+      "binaryDir": "${sourceDir}/build-msan",
+      "condition": {
+        "type": "notEquals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Darwin"
+      },
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "BUILD_EXAMPLES": "ON",
+        "ENABLE_MSAN": "ON"
+      }
+    },
+    {
+      "name": "asan-debug",
+      "inherits": "base", 
+      "displayName": "AddressSanitizer Debug",
+      "binaryDir": "${sourceDir}/build-asan",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "BUILD_EXAMPLES": "ON",
+        "ENABLE_ASAN": "ON"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "debug",
+      "configurePreset": "debug",
+      "displayName": "Build Debug"
+    },
+    {
+      "name": "http-server-debug",
+      "configurePreset": "debug",
+      "displayName": "Build http_server (Debug)",
+      "targets": ["http_server"]
+    },
+    {
+      "name": "msan-debug",
+      "configurePreset": "msan-debug", 
+      "displayName": "Build MemorySanitizer Debug"
+    },
+    {
+      "name": "http-server-msan",
+      "configurePreset": "msan-debug",
+      "displayName": "Build http_server (MemorySanitizer)",
+      "targets": ["http_server"]
+    },
+    {
+      "name": "asan-debug",
+      "configurePreset": "asan-debug",
+      "displayName": "Build AddressSanitizer Debug"
+    },
+    {
+      "name": "http-server-asan",
+      "configurePreset": "asan-debug", 
+      "displayName": "Build http_server (AddressSanitizer)",
+      "targets": ["http_server"]
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "debug",
+      "configurePreset": "debug",
+      "displayName": "Run Tests (Debug)"
+    }
+  ]
+}

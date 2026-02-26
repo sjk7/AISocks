@@ -1,0 +1,77 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Debug http_server (MemorySanitizer)",
+      "type": "lldb",
+      "request": "launch",
+      "program": "${workspaceFolder}/build-msan/http_server",
+      "args": [],
+      "cwd": "${workspaceFolder}",
+      "environment": [
+        {
+          "name": "MSAN_OPTIONS",
+          "value": "halt_on_error=1:report_umrs=1:print_stats=1"
+        }
+      ],
+      "console": "integratedTerminal",
+      "preLaunchTask": "build-msan-http-server"
+    },
+    {
+      "name": "Debug http_server (AddressSanitizer)",
+      "type": "lldb",
+      "request": "launch",
+      "program": "${workspaceFolder}/build-asan/http_server",
+      "args": [],
+      "cwd": "${workspaceFolder}",
+      "environment": [
+        {
+          "name": "ASAN_OPTIONS",
+          "value": "halt_on_error=1:detect_stack_use_after_return=1:strict_string_checks=1:detect_leaks=1"
+        }
+      ],
+      "console": "integratedTerminal",
+      "preLaunchTask": "build-asan-http-server"
+    },
+    {
+      "name": "Debug http_server (Debug)",
+      "type": "lldb",
+      "request": "launch",
+      "program": "${workspaceFolder}/build/http_server",
+      "args": [],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "preLaunchTask": "build-http-server"
+    },
+    {
+      "name": "Debug aiSocksExample (Debug)",
+      "type": "lldb",
+      "request": "launch",
+      "program": "${workspaceFolder}/build/aiSocksExample",
+      "args": [],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "preLaunchTask": "build-aiSocksExample"
+    },
+    {
+      "name": "Debug aiSocksNonBlocking (Debug)",
+      "type": "lldb",
+      "request": "launch",
+      "program": "${workspaceFolder}/build/aiSocksNonBlocking",
+      "args": [],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "preLaunchTask": "build-aiSocksNonBlocking"
+    },
+    {
+      "name": "Debug aiSocksGoogleClient (Debug)",
+      "type": "lldb",
+      "request": "launch",
+      "program": "${workspaceFolder}/build/aiSocksGoogleClient",
+      "args": [],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "preLaunchTask": "build-aiSocksGoogleClient"
+    }
+  ]
+}
