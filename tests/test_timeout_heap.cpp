@@ -400,8 +400,9 @@ static void test_zero_timeout_disables_sweep() {
 static void test_only_idle_client_closed() {
     BEGIN_TEST("timeout heap: only idle client closed, active client survives");
 
-    // Port 0: OS picks; we read it back after the server constructor has
-    // already bound, eliminating the TOCTOU window of pickFreePort().
+    // Port 0: the OS assigns a free port atomically during bind+listen inside
+    // the constructor. We read it back via actualPort() while the server
+    // already holds the socket — no TOCTOU window.
     TimedServer server(0);
     REQUIRE(server.isValid());
     const uint16_t port = server.actualPort();
