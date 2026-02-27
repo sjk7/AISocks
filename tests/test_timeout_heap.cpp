@@ -235,8 +235,8 @@ static void test_timeout_fires_when_idle() {
 //   t=0       connect  -- initial entry pushed: expiry = t+500 = t500
 //   t=TOUCH   send 1B  -- touchClient pushes new entry: expiry = t+(TOUCH+500)
 //                         old stale entry at t500 remains in heap
-//   t=500ms   sweep    -- pops stale entry (lastActivitySnap mismatch), discards
-//   t=TOUCH+500+GRACE  -- new entry finally fires, connection closed
+//   t=500ms   sweep    -- pops stale entry (lastActivitySnap mismatch),
+//   discards t=TOUCH+500+GRACE  -- new entry finally fires, connection closed
 // ---------------------------------------------------------------------------
 static void test_touch_resets_expiry() {
     BEGIN_TEST(
@@ -302,8 +302,9 @@ static void test_touch_resets_expiry() {
 // once, and must never fail to close it.
 // ---------------------------------------------------------------------------
 static void test_multiple_touches_no_spurious_close() {
-    BEGIN_TEST("timeout heap: N rapid touches -> exactly one close, no spurious "
-               "closes");
+    BEGIN_TEST(
+        "timeout heap: N rapid touches -> exactly one close, no spurious "
+        "closes");
 
     TimedServer server(0);
     REQUIRE(server.isValid());
@@ -346,7 +347,8 @@ static void test_multiple_touches_no_spurious_close() {
     // Now let the refreshed window expire.
     sleepFor(KEEP_ALIVE + GRACE);
     REQUIRE_MSG(server.timeoutClosedCount == 1,
-        "exactly one close after idle -- no spurious closes from stale entries");
+        "exactly one close after idle -- no spurious closes from stale "
+        "entries");
     // onDisconnect should also have been called exactly once.
     REQUIRE_MSG(
         server.disconnectCount == 1, "onDisconnect called exactly once");
@@ -491,7 +493,7 @@ static void test_subsecond_timeout_precision() {
     BEGIN_TEST(
         "timeout heap: sub-second 300ms timeout fires (not truncated to 0)");
 
-    static constexpr auto SHORT_KA    = std::chrono::milliseconds{300};
+    static constexpr auto SHORT_KA = std::chrono::milliseconds{300};
     static constexpr auto SHORT_GRACE = 400ms; // generous vs 300ms window
 
     TimedServer server(0, SHORT_KA);
@@ -581,8 +583,8 @@ static void test_getKeepAliveTimeout_roundtrip() {
 // and onDisconnect must be invoked exactly once per client.
 // ---------------------------------------------------------------------------
 static void test_many_idle_clients_all_timeout() {
-    BEGIN_TEST(
-        "timeout heap: 8 simultaneous idle clients all time out within one window");
+    BEGIN_TEST("timeout heap: 8 simultaneous idle clients all time out within "
+               "one window");
 
     static constexpr int N = 8;
 

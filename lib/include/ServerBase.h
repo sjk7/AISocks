@@ -23,17 +23,18 @@ namespace aiSocks {
 // Client connection limits with sensible defaults and maximums
 enum class ClientLimit : size_t {
     Unlimited = 0, // Accept unlimited connections
-    Default   = 1000, // Default limit for production safety
-    Low       = 100,  // Low resource environments
-    Medium    = 500,  // Medium resource environments
-    High      = 2000, // High performance servers
-    Maximum   = 10000 // Reasonable maximum for most systems
+    Default = 1000, // Default limit for production safety
+    Low = 100, // Low resource environments
+    Medium = 500, // Medium resource environments
+    High = 2000, // High performance servers
+    Maximum = 10000 // Reasonable maximum for most systems
 };
 
 // Number of client slots reserved at startup when no explicit limit is set.
 // Used as the floor for clients_ and timeout_heap_ pre-allocation so that the
 // first burst of connections never triggers a rehash or reallocation.
-inline constexpr size_t defaultMaxClients = static_cast<size_t>(ClientLimit::Default);
+inline constexpr size_t defaultMaxClients
+    = static_cast<size_t>(ClientLimit::Default);
 
 // Return values for ServerBase virtual functions
 enum class ServerResult {
