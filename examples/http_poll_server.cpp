@@ -9,25 +9,74 @@
 #include "HttpPollServer.h"
 #include <cstdio>
 #include <cstdlib>
+#include <ctime>
 
 using namespace aiSocks;
 
+// Response body matching the reference server exactly (251 bytes, no trailing
+// newline).
+static const char kBody[]
+    = "<!DOCTYPE html>\n"
+      "<html lang=\"en\">\n"
+      "\n"
+      "<head>\n"
+      "    <meta charset=\"UTF-8\">\n"
+      "    <meta name=\"viewport\" content=\"width=device-width, "
+      "initial-scale=1.0\">\n"
+      "    <title>C++ App</title>\n"
+      "    <h1>\n"
+      "        Welcome to my world!\n"
+      "    </h1>\n"
+      "</head>\n"
+      "\n"
+      "<body>\n"
+      "\n"
+      "</body>\n"
+      "\n"
+      "</html>";
+
+// Header template: %s = RFC 7231 date, %s = "keep-alive" or "close"
+static const char kHeaderFmt[]
+    = "HTTP/1.1 200 OK\r\n"
+      "Server: nginx/1.29.5\r\n"
+      "Date: %s\r\n"
+      "Content-Type: text/html\r\n"
+      "Content-Length: 251\r\n"
+      "Last-Modified: Fri, 11 Oct 2024 01:06:56 GMT\r\n"
+      "Connection: %s\r\n"
+      "ETag: \"67087a30-fb\"\r\n"
+      "Accept-Ranges: bytes\r\n"
+      "\r\n";
+
 class HttpServer : public HttpPollServer {
     private:
-    std::string cached_response_;
+    // Full pre-built responses, rebuilt once per second when the Date changes.
+    std::string ka_response_;
+    std::string close_response_;
     std::string cached_bad_request_;
+    time_t last_time_ = 0;
+
+    void rebuildResponses() {
+        time_t now = time(nullptr);
+        if (now == last_time_) return;
+        last_time_ = now;
+
+        char date_buf[64];
+        struct tm tm_buf;
+        gmtime_r(&now, &tm_buf);
+        strftime(
+            date_buf, sizeof(date_buf), "%a, %d %b %Y %H:%M:%S GMT", &tm_buf);
+
+        char hdr[512];
+        snprintf(hdr, sizeof(hdr), kHeaderFmt, date_buf, "keep-alive");
+        ka_response_ = std::string(hdr) + kBody;
+
+        snprintf(hdr, sizeof(hdr), kHeaderFmt, date_buf, "close");
+        close_response_ = std::string(hdr) + kBody;
+    }
 
     public:
     explicit HttpServer(const ServerBind& bind) : HttpPollServer(bind) {
-        // Pre-build responses to avoid string concatenation overhead
-        cached_response_ = "HTTP/1.1 200 OK\r\n"
-                           "Content-Type: text/html; charset=utf-8\r\n"
-                           "Content-Length: 92\r\n"
-                           "\r\n"
-                           "<html><body><h1>Hello World!</h1>"
-                           "<p>This is a normal HTTP server response.</p>"
-                           "</body></html>";
-
         cached_bad_request_
             = "HTTP/1.1 400 Bad Request\r\n"
               "Content-Type: text/plain; charset=utf-8\r\n"
@@ -35,6 +84,7 @@ class HttpServer : public HttpPollServer {
               "\r\n"
               "Bad Request: this server only accepts HTTP requests.\n";
 
+        rebuildResponses(); // warm the cache before the first request
         setKeepAliveTimeout(std::chrono::seconds{5});
         printf("Listening on %s:%d\n", bind.address.c_str(),
             static_cast<int>(bind.port));
@@ -42,17 +92,11 @@ class HttpServer : public HttpPollServer {
 
     protected:
     void buildResponse(HttpClientState& s) override {
-        bool keepAlive = !s.closeAfterSend;
         if (isHttpRequest(s.request)) {
-            s.response = cached_response_;
-            if (!keepAlive) {
-                s.response += "Connection: close\r\n";
-            }
+            rebuildResponses();
+            s.response = s.closeAfterSend ? close_response_ : ka_response_;
         } else {
             s.response = cached_bad_request_;
-            if (!keepAlive) {
-                s.response += "Connection: close\r\n";
-            }
         }
     }
 };
