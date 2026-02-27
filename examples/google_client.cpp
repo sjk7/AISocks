@@ -35,7 +35,7 @@ int httpConnect(const ConnectArgs& args, const char* httpRequest) {
         bool isFirstChunk = true;
         int retval = 0;
         std::cout << "Reading response...\n";
-        std::cout << "─────────────────────────────────────────\n\n";
+        std::cout << "-----------------------------------------\n\n";
 
         while ((retval = (bytesRead = sock.receive(buffer, sizeof(buffer) - 1)))
             > 0) {
@@ -63,7 +63,7 @@ int httpConnect(const ConnectArgs& args, const char* httpRequest) {
                       << " - " << sock.getErrorMessage() << "\n";
         }
 
-        std::cout << "\n─────────────────────────────────────────\n";
+        std::cout << "\n-----------------------------------------\n";
     });
 
     if (!client.isConnected()) {

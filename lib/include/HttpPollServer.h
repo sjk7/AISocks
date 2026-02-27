@@ -84,7 +84,7 @@ class HttpPollServer : public ServerBase<HttpClientState> {
     // -------------------------------------------------------------------------
     // Must override: fill s.response from s.request.
     // s.closeAfterSend is already set according to HTTP/1.0 vs 1.1 keep-alive
-    // rules — read it to pick the right "Connection:" header, and optionally
+    // rules -- read it to pick the right "Connection:" header, and optionally
     // override it (e.g. force close after an error response).
     // -------------------------------------------------------------------------
     virtual void buildResponse(HttpClientState& s) = 0;
@@ -112,7 +112,7 @@ class HttpPollServer : public ServerBase<HttpClientState> {
     }
 
     // -------------------------------------------------------------------------
-    // HTTP helpers — available to derived classes
+    // HTTP helpers -- available to derived classes
     // -------------------------------------------------------------------------
 
     static bool isHttpRequest(const std::string& req) {
@@ -178,7 +178,7 @@ class HttpPollServer : public ServerBase<HttpClientState> {
                 s.request.append(buf, static_cast<size_t>(n));
 
                 if (s.request.size() > MAX_REQUEST_BYTES) {
-                    // Request too large — respond and close.
+                    // Request too large -- respond and close.
                     s.response = makeResponse("HTTP/1.1 413 Payload Too Large",
                         "text/plain; charset=utf-8", "Request too large.\n",
                         false);

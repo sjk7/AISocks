@@ -23,12 +23,17 @@ namespace aiSocks {
 // Client connection limits with sensible defaults and maximums
 enum class ClientLimit : size_t {
     Unlimited = 0, // Accept unlimited connections
-    Default = 1000, // Default limit for production safety
-    Low = 100, // Low resource environments
-    Medium = 500, // Medium resource environments
-    High = 2000, // High performance servers
-    Maximum = 10000 // Reasonable maximum for most systems
+    Default   = 1000, // Default limit for production safety
+    Low       = 100,  // Low resource environments
+    Medium    = 500,  // Medium resource environments
+    High      = 2000, // High performance servers
+    Maximum   = 10000 // Reasonable maximum for most systems
 };
+
+// Number of client slots reserved at startup when no explicit limit is set.
+// Used as the floor for clients_ and timeout_heap_ pre-allocation so that the
+// first burst of connections never triggers a rehash or reallocation.
+inline constexpr size_t defaultMaxClients = static_cast<size_t>(ClientLimit::Default);
 
 // Return values for ServerBase virtual functions
 enum class ServerResult {
@@ -162,10 +167,19 @@ template <typename ClientData> class ServerBase {
             return; // Failed to register with poller
         }
 
-        // Pre-reserve client map if maxClients is specified to eliminate hash
-        // table growth
-        if (static_cast<size_t>(maxClients) > 0) {
-            clients_.reserve(static_cast<size_t>(maxClients));
+        // Always pre-reserve both containers so that the first burst of
+        // connections never triggers a rehash or vector reallocation.
+        // When Unlimited is requested we still use defaultMaxClients as a
+        // sensible starting capacity; the containers will grow automatically
+        // if more clients arrive.
+        {
+            const size_t cap = (maxClients == ClientLimit::Unlimited)
+                ? defaultMaxClients
+                : static_cast<size_t>(maxClients);
+            clients_.reserve(cap);
+            // Each client can have multiple heap entries while stale ones
+            // accumulate between sweeps, so reserve 2x the client capacity.
+            timeout_heap_.reserve(cap * 2);
         }
 
         bool accepting = true;
@@ -354,7 +368,7 @@ template <typename ClientData> class ServerBase {
     // calls pass a bounded timeout to run() (e.g. Milliseconds{100}).
     //
     // Note: keep-alive timeout enforcement is now handled entirely by
-    // sweepTimeouts() which runs in the main loop automatically — there is
+    // sweepTimeouts() which runs in the main loop automatically -- there is
     // no need to call ServerBase::onIdle() from overrides any more.
     virtual ServerResult onIdle() { return ServerResult::KeepConnection; }
 
@@ -386,7 +400,7 @@ template <typename ClientData> class ServerBase {
     // -----------------------------------------------------------------------
     // TimeoutEntry: one node in the lazy-deletion min-heap.
     //
-    // Design — why lazy deletion?
+    // Design -- why lazy deletion?
     //   A keep-alive sweep must visit only the clients that have *actually*
     //   expired, not all connected clients.  A sorted structure (heap, set)
     //   lets us stop as soon as the front entry hasn't expired yet.
@@ -398,8 +412,8 @@ template <typename ClientData> class ServerBase {
     //
     //   On each sweep we pop entries in expiry order and discard any that are
     //   stale before touching the socket:
-    //     • fd no longer in clients_     → client already gone, skip.
-    //     • lastActivitySnap ≠ current   → client was touched after this
+    //     - fd no longer in clients_     -> client already gone, skip.
+    //     - lastActivitySnap != current   -> client was touched after this
     //                                      entry was pushed; a newer entry
     //                                      exists further back in the heap.
     //
@@ -417,7 +431,7 @@ template <typename ClientData> class ServerBase {
         // operator< is intentionally inverted relative to wall-clock order.
         // std::push_heap / std::pop_heap build a MAX-heap (largest value at
         // front).  By making "larger expiry" compare as less-than we make
-        // "smaller expiry" sort as the largest value — so the soonest-to-
+        // "smaller expiry" sort as the largest value -- so the soonest-to-
         // expire entry stays at the front, giving us a min-heap by expiry
         // with no extra comparator object anywhere.
         bool operator<(const TimeoutEntry& o) const noexcept {
@@ -442,7 +456,7 @@ template <typename ClientData> class ServerBase {
     // close the corresponding connections.
     //
     // Called every loop iteration.  The fast-path (nothing expired) costs
-    // one time comparison against the heap front and then returns — O(1).
+    // one time comparison against the heap front and then returns -- O(1).
     void sweepTimeouts(Poller& poller) {
         if (keepAliveTimeout_.count() == 0 || timeout_heap_.empty()) return;
 
@@ -467,7 +481,7 @@ template <typename ClientData> class ServerBase {
             // ---- Stale-entry check 1 ----------------------------------------
             // The client was already removed via a non-timeout path (e.g. a
             // read error, or the remote half closed).  The heap entry is a
-            // dangling reference — discard it.
+            // dangling reference -- discard it.
             auto it = clients_.find(entry.fd);
             if (it == clients_.end()) continue;
 

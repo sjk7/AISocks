@@ -58,7 +58,7 @@ template <typename T> class Result {
     // No heap allocation - constructs T directly in value_storage_ bytes
     explicit Result(T&& value) : has_value_(true) {
         new (value_storage_)
-            T(std::move(value)); // ← Placement new: construct T in raw memory
+            T(std::move(value)); // <- Placement new: construct T in raw memory
     }
 
     // Error constructor - takes error info for lazy message construction
@@ -73,13 +73,13 @@ template <typename T> class Result {
     Result(const Result& other) : has_value_(other.has_value_) {
         if (has_value_) {
             new (value_storage_)
-                T(other.value_ref()); // ← Placement new: copy construct T in
+                T(other.value_ref()); // <- Placement new: copy construct T in
                                       // raw memory
         } else {
             new (&error_ref()) ErrorInfo{other.error_ref().error,
                 other.error_ref().description, other.error_ref().sysCode,
                 other.error_ref().isDns,
-                other.error_ref().cachedMessage_}; // ← Placement new: copy
+                other.error_ref().cachedMessage_}; // <- Placement new: copy
                                                    // construct ErrorInfo
         }
     }
@@ -101,17 +101,17 @@ template <typename T> class Result {
     Result& operator=(const Result& other) {
         if (this != &other) {
             if (has_value_)
-                value_ref().~T(); // ← Manual destructor call required!
+                value_ref().~T(); // <- Manual destructor call required!
             if (other.has_value_) {
                 has_value_ = true;
                 new (value_storage_)
-                    T(other.value_ref()); // ← Placement new: copy construct T
+                    T(other.value_ref()); // <- Placement new: copy construct T
             } else {
                 has_value_ = false;
                 new (&error_ref()) ErrorInfo{other.error_ref().error,
                     other.error_ref().description, other.error_ref().sysCode,
                     other.error_ref().isDns,
-                    other.error_ref().cachedMessage_}; // ← Placement new: copy
+                    other.error_ref().cachedMessage_}; // <- Placement new: copy
                                                        // construct ErrorInfo
             }
         }
@@ -140,9 +140,9 @@ template <typename T> class Result {
     ~Result() {
         if (has_value_) {
             value_ref()
-                .~T(); // ← Manual destructor call for placement new object
+                .~T(); // <- Manual destructor call for placement new object
         } else {
-            error_ref().~ErrorInfo(); // ← Manual destructor call for placement
+            error_ref().~ErrorInfo(); // <- Manual destructor call for placement
                                       // new object
         }
     }

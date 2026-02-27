@@ -29,7 +29,7 @@ namespace aiSocks {
 // -----------------------------------------------------------------------
 
 // Classify the errno / WSAError from a send/recv syscall into a SocketError
-// value. Does NO string work — descriptions are provided by the caller so
+// value. Does NO string work -- descriptions are provided by the caller so
 // zero allocation occurs even in the WouldBlock fast path.
 SocketError classifyTransferSysError(int sysErr) noexcept {
 #ifdef _WIN32

@@ -5,20 +5,20 @@
 // Tests for HttpPollServer::urlEncode / urlDecode.
 //
 // Coverage goals
-// ──────────────
+// --------------
 // 1.  Empty string edge case
-// 2.  Unreserved characters pass through unchanged (RFC 3986 §2.3)
+// 2.  Unreserved characters pass through unchanged (RFC 3986 S.2.3)
 // 3.  All ASCII characters that MUST be encoded produce %XX
 // 4.  Uppercase hex digits in encoder output
 // 5.  Decoder handles both uppercase and lowercase hex
-// 6.  '+' in decoder → space (form-encoding convention)
-// 7.  '%2B' in decoder → '+' (not space)
+// 6.  '+' in decoder -> space (form-encoding convention)
+// 7.  '%2B' in decoder -> '+' (not space)
 // 8.  Truncated/invalid %XX sequences pass through verbatim
-//     (WHATWG: %25%s%1G → %%s%1G)
-// 9.  '%' at end-of-string and '%X' (only one hex digit) → literal
+//     (WHATWG: %25%s%1G -> %%s%1G)
+// 9.  '%' at end-of-string and '%X' (only one hex digit) -> literal
 // 10. Null byte ('\0') encodes/decodes correctly
 // 11. High bytes (0x80-0xFF) encode as %XX and round-trip
-// 12. Double-percent / one-level-only decode (%2525 → %25)
+// 12. Double-percent / one-level-only decode (%2525 -> %25)
 // 13. Full round-trips: urlDecode(urlEncode(s)) == s
 // 14. '~' is treated as unreserved (historical curl/PHP bug target)
 // 15. Space encodes to %20 (not +)
@@ -31,7 +31,7 @@
 
 using namespace aiSocks;
 
-// ── helpers ────────────────────────────────────────────────────────────────
+// -- helpers ----------------------------------------------------------------
 static std::string enc(const std::string& s) {
     return aiSocks::urlEncode(s);
 }
@@ -58,7 +58,7 @@ static void CHECK_ROUNDTRIP(const std::string& original) {
         "round-trip: decode(encode(s)) == s  for s=\"" + original + "\"");
 }
 
-// ── test functions ─────────────────────────────────────────────────────────
+// -- test functions ---------------------------------------------------------
 
 static void test_empty() {
     BEGIN_TEST("empty string");
@@ -67,7 +67,7 @@ static void test_empty() {
 }
 
 static void test_unreserved_chars() {
-    BEGIN_TEST("unreserved characters pass through (RFC 3986 §2.3)");
+    BEGIN_TEST("unreserved characters pass through (RFC 3986 S.2.3)");
     // Letters
     CHECK_ENC("abcdefghijklmnopqrstuvwxyz", "abcdefghijklmnopqrstuvwxyz");
     CHECK_ENC("ABCDEFGHIJKLMNOPQRSTUVWXYZ", "ABCDEFGHIJKLMNOPQRSTUVWXYZ");
@@ -77,7 +77,7 @@ static void test_unreserved_chars() {
     CHECK_ENC("-", "-");
     CHECK_ENC("_", "_");
     CHECK_ENC(".", ".");
-    CHECK_ENC("~", "~"); // historical bug target — must NOT be encoded
+    CHECK_ENC("~", "~"); // historical bug target -- must NOT be encoded
 
     // All at once
     CHECK_ENC("Hello-World_1.0~", "Hello-World_1.0~");
@@ -85,7 +85,7 @@ static void test_unreserved_chars() {
 
 static void test_space_and_common() {
     BEGIN_TEST("space and common special characters");
-    // Space → %20 (encoder never uses '+')
+    // Space -> %20 (encoder never uses '+')
     CHECK_ENC(" ", "%20");
     CHECK_ENC("hello world", "hello%20world");
 
@@ -110,13 +110,13 @@ static void test_space_and_common() {
 
 static void test_uppercase_hex_output() {
     BEGIN_TEST("encoder always outputs uppercase hex digits");
-    // 0x0a → must be %0A, not %0a
+    // 0x0a -> must be %0A, not %0a
     std::string s(1, '\x0a');
     const std::string got = enc(s);
     REQUIRE_MSG(
         got == "%0A", "urlEncode(\"\\x0a\") == \"%0A\"  (got \"" + got + "\")");
 
-    // 0xfe → must be %FE
+    // 0xfe -> must be %FE
     s = std::string(1, '\xfe');
     const std::string got2 = enc(s);
     REQUIRE_MSG(got2 == "%FE",
@@ -129,12 +129,12 @@ static void test_decoder_case_insensitive() {
     CHECK_DEC("%2F", "/");
     CHECK_DEC("%2e", ".");
     CHECK_DEC("%2E", ".");
-    CHECK_DEC("%61", "a"); // 'a' — lower hex
+    CHECK_DEC("%61", "a"); // 'a' -- lower hex
     CHECK_DEC("%61%62%63", "abc");
 }
 
 static void test_plus_decoding() {
-    BEGIN_TEST("'+' in decoder → space (form-encoding convention)");
+    BEGIN_TEST("'+' in decoder -> space (form-encoding convention)");
     CHECK_DEC("+", " ");
     CHECK_DEC("hello+world", "hello world");
     CHECK_DEC("a+b+c", "a b c");
@@ -144,11 +144,11 @@ static void test_plus_decoding() {
 }
 
 static void test_invalid_percent_sequences() {
-    BEGIN_TEST("invalid / truncated %XX → pass through verbatim");
-    // WHATWG spec example: %25%s%1G → %%s%1G
+    BEGIN_TEST("invalid / truncated %XX -> pass through verbatim");
+    // WHATWG spec example: %25%s%1G -> %%s%1G
     CHECK_DEC("%25%s%1G", "%%s%1G");
 
-    // '%' at very end of string — no following chars
+    // '%' at very end of string -- no following chars
     CHECK_DEC("abc%", "abc%");
 
     // Only one hex digit after '%'
@@ -194,7 +194,7 @@ static void test_double_percent_one_level_only() {
     BEGIN_TEST("decoder is single-pass: does not double-decode");
     // %2525 is '%' encoded then '25'; one pass gives %25, not '%'
     CHECK_DEC("%2525", "%25");
-    // %252F → %2F  (not '/')
+    // %252F -> %2F  (not '/')
     CHECK_DEC("%252F", "%2F");
 }
 
@@ -206,7 +206,7 @@ static void test_round_trips() {
     CHECK_ROUNDTRIP("https://example.com/path?q=1#frag");
     CHECK_ROUNDTRIP("~unreserved-chars_are.fine");
     CHECK_ROUNDTRIP("100% done!");
-    CHECK_ROUNDTRIP("上海+中國"); // UTF-8 multi-byte
+    CHECK_ROUNDTRIP("??+??"); // UTF-8 multi-byte
     CHECK_ROUNDTRIP("\x01\x7F\x80\xFF");
     CHECK_ROUNDTRIP("a/b/c?x=1&y=2");
     CHECK_ROUNDTRIP("");
@@ -230,7 +230,7 @@ static void test_mixed_plain_and_encoded() {
     // Partially encoded string from a browser
     CHECK_DEC("hello%20world%21", "hello world!");
     CHECK_DEC("foo%3Dbar%26baz%3Dqux", "foo=bar&baz=qux");
-    // Encoder on a string that already contains '%' → encodes the '%'
+    // Encoder on a string that already contains '%' -> encodes the '%'
     CHECK_ENC("50% off", "50%25%20off");
     // Decode it back
     CHECK_DEC("50%25%20off", "50% off");
@@ -250,7 +250,7 @@ static void test_all_bytes_encode_decode() {
     }
 }
 
-// ── main ───────────────────────────────────────────────────────────────────
+// -- main -------------------------------------------------------------------
 int main() {
     std::cout << "=== url_codec tests ===\n";
 

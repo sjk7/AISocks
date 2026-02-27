@@ -4,12 +4,12 @@
 // Tests for HttpRequest::parse()
 //
 // Coverage goals (grouped by RFC / spec area)
-// ─────────────────────────────────────────────
-// 1.  Basic GET — method / path / version split
+// ---------------------------------------------
+// 1.  Basic GET -- method / path / version split
 // 2.  All common methods (POST, PUT, DELETE, PATCH, HEAD, OPTIONS, TRACE)
 // 3.  HTTP/1.0 vs HTTP/1.1 vs HTTP/2 version strings
-// 4.  Path URL decoding — rawPath preserved, path decoded
-// 5.  '%2F' in path — decoded in path but kept encoded in rawPath
+// 4.  Path URL decoding -- rawPath preserved, path decoded
+// 5.  '%2F' in path -- decoded in path but kept encoded in rawPath
 // 6.  Query string split at first '?' only (second '?' belongs to value)
 // 7.  Query parameters: single, multiple, ordering independent
 // 8.  Query param: key-only (no '=' sign)
@@ -17,9 +17,9 @@
 // 10. Query param: '+' decoded to space
 // 11. Query param: '%2B' decoded to '+'
 // 12. Query param: percent-encoded key
-// 13. Header key case-folding (stored lowercase) — RFC 7230 §3.2
-// 14. Header value OWS trimming (leading/trailing SP/HT) — RFC 7230 §3.2.6
-// 15. Header value with colon — only the first ':' splits key/value
+// 13. Header key case-folding (stored lowercase) -- RFC 7230 S.3.2
+// 14. Header value OWS trimming (leading/trailing SP/HT) -- RFC 7230 S.3.2.6
+// 15. Header value with colon -- only the first ':' splits key/value
 // 16. Header with empty value ('X-Empty:')
 // 17. Header with tab OWS
 // 18. Case-insensitive header() accessor
@@ -30,15 +30,15 @@
 // 23. Request with no headers (only request line + \r\n\r\n)
 // 24. Absolute-form request target (HTTP/1.1 CONNECT / proxies)
 // 25. Asterisk-form request target ('*')
-// 26. Malformed: missing version → valid=false
-// 27. Malformed: missing SP after method → valid=false
-// 28. Malformed: completely empty string → valid=false
+// 26. Malformed: missing version -> valid=false
+// 27. Malformed: missing SP after method -> valid=false
+// 28. Malformed: completely empty string -> valid=false
 // 29. operator bool reflects valid field
-// 30. Multiple query params with the same key — last value wins
+// 30. Multiple query params with the same key -- last value wins
 // 31. Double-slash path
 // 32. Root path '/'
 // 33. Deep path with encoded characters
-// 34. Fragment — '#' is NOT sent in HTTP requests (but graceful if present)
+// 34. Fragment -- '#' is NOT sent in HTTP requests (but graceful if present)
 // 35. Very long header value preserved intact
 // 36. Request with many headers
 // 37. Trailing whitespace on request line is handled gracefully
@@ -51,7 +51,7 @@
 
 using namespace aiSocks;
 
-// ── helpers ────────────────────────────────────────────────────────────────
+// -- helpers ----------------------------------------------------------------
 
 // Build a minimal well-formed GET request.
 static std::string makeGet(const std::string& target,
@@ -82,7 +82,7 @@ static void CHECK_FIELD(const std::string& label,
         label + ": expected \"" + expected + "\"  got \"" + got + "\"");
 }
 
-// ── test functions ─────────────────────────────────────────────────────────
+// -- test functions ---------------------------------------------------------
 
 // 1. Basic GET
 static void test_basic_get() {
@@ -154,7 +154,7 @@ static void test_path_decoding() {
     }
 }
 
-// 5. %2F in path — encodes '/', should decode but rawPath preserved
+// 5. %2F in path -- encodes '/', should decode but rawPath preserved
 static void test_path_encoded_slash() {
     BEGIN_TEST("%%2F in path");
     auto req = HttpRequest::parse("GET /foo%2Fbar HTTP/1.1\r\n\r\n");
@@ -237,7 +237,7 @@ static void test_query_param_encoded_key() {
     CHECK_FIELD("encoded key", req.queryParams.at("hello world"), "1");
 }
 
-// 13. Header key case-folding (RFC 7230 §3.2)
+// 13. Header key case-folding (RFC 7230 S.3.2)
 static void test_header_case_folding() {
     BEGIN_TEST("header key case-folding");
     std::string raw =
@@ -257,7 +257,7 @@ static void test_header_case_folding() {
     CHECK_FIELD("content-type", req.headers.at("content-type"), "text/html");
 }
 
-// 14. Header OWS trimming (RFC 7230 §3.2.6)
+// 14. Header OWS trimming (RFC 7230 S.3.2.6)
 static void test_header_ows() {
     BEGIN_TEST("header OWS trimming");
     std::string raw =
@@ -273,7 +273,7 @@ static void test_header_ows() {
     CHECK_FIELD("leading only",    req.headers.at("x-b"), "leading only");
 }
 
-// 15. Header value with colon — only first colon splits key/value
+// 15. Header value with colon -- only first colon splits key/value
 static void test_header_colon_in_value() {
     BEGIN_TEST("colon in header value");
     std::string raw =
@@ -354,7 +354,7 @@ static void test_body_separation() {
     CHECK_FIELD("body", req.body, "name=Alice&age=30");
 }
 
-// 21. No body → body is empty
+// 21. No body -> body is empty
 static void test_no_body() {
     BEGIN_TEST("no body");
     auto req = HttpRequest::parse("GET / HTTP/1.1\r\nHost: example.com\r\n\r\n");
@@ -442,7 +442,7 @@ static void test_operator_bool() {
     REQUIRE(!static_cast<bool>(HttpRequest::parse("OOPS\r\n\r\n")));
 }
 
-// 30. Duplicate query param key — last value wins
+// 30. Duplicate query param key -- last value wins
 static void test_duplicate_query_key() {
     BEGIN_TEST("duplicate query param key");
     // RFC 3986 does not define which value wins; common behaviour is last-wins.
@@ -481,7 +481,7 @@ static void test_deep_encoded_path() {
     CHECK_FIELD("lang param",   req.queryParams.at("lang"), "en");
 }
 
-// 34. '#' fragment — clients MUST NOT send fragments; if present, it ends up
+// 34. '#' fragment -- clients MUST NOT send fragments; if present, it ends up
 //     in the query string or param value (graceful pass-through expected)
 static void test_fragment_not_sent() {
     BEGIN_TEST("fragment (graceful pass-through)");
@@ -546,7 +546,7 @@ static void test_typical_browser_request() {
     REQUIRE(req.body.empty());
 }
 
-// ── main ───────────────────────────────────────────────────────────────────
+// -- main -------------------------------------------------------------------
 
 int main() {
     test_basic_get();
