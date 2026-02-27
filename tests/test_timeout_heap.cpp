@@ -8,44 +8,44 @@
 // The heap replaced an O(n) linear scan.  Eight tests verify the
 // critical correctness properties of the new implementation and API:
 //
-//  Test 1 — timeout_fires_when_idle
+//  Test 1 -- timeout_fires_when_idle
 //    An idle connection (no data sent after connect) must be closed by
 //    sweepTimeouts() once keepAliveTimeout elapses.
 //
-//  Test 2 — touch_resets_expiry
-//    Sending data causes onReadable → touchClient(), which pushes a *new*
+//  Test 2 -- touch_resets_expiry
+//    Sending data causes onReadable -> touchClient(), which pushes a *new*
 //    TimeoutEntry with a refreshed expiry and marks the old one stale via
 //    the lastActivitySnap mismatch.  The connection must NOT be closed at
 //    the original expiry; it must be closed only after the refreshed window.
 //
-//  Test 3 — multiple_touches_no_spurious_close
+//  Test 3 -- multiple_touches_no_spurious_close
 //    Touching a client N times in rapid succession pushes N stale entries
 //    plus one live entry onto the heap.  Once the connection finally idles
 //    out, exactly ONE close must occur (stale-entry check 1 in sweepTimeouts:
 //    after erasing from clients_, the N stale pops find the fd gone and
 //    are silently discarded).
 //
-//  Test 4 — zero_timeout_disables_sweep
+//  Test 4 -- zero_timeout_disables_sweep
 //    When keepAliveTimeout == 0 the sweep mechanism is disabled entirely.
 //    A client that transmits nothing must still be alive after an interval
 //    that would otherwise exceed any sensible timeout.
 //
-//  Test 5 — only_idle_client_closed
+//  Test 5 -- only_idle_client_closed
 //    With two connected clients, only the one that sends no traffic times
 //    out.  The active client (touched repeatedly) must survive until the
 //    server is stopped explicitly.
 //
-//  Test 6 — subsecond_timeout_precision
+//  Test 6 -- subsecond_timeout_precision
 //    A 300 ms keepAliveTimeout must actually fire.  With the former
 //    chrono::seconds API, 300 ms would silently truncate to 0, disabling
 //    the sweep.  This test proves the milliseconds migration fixed that.
 //
-//  Test 7 — getKeepAliveTimeout_roundtrip
+//  Test 7 -- getKeepAliveTimeout_roundtrip
 //    setKeepAliveTimeout(ms) / getKeepAliveTimeout() must form an exact
 //    round-trip for any millisecond value (0, 250, 1000, 65000).
 //    Covers the changed public-API surface of ServerBase.
 //
-//  Test 8 — many_idle_clients_all_timeout
+//  Test 8 -- many_idle_clients_all_timeout
 //    N=8 simultaneous idle connections must all be closed by the sweep
 //    within one timeout window.  Tests heap correctness at scale: N entries
 //    with nearly-identical expiry times must all pop and be acted on.
@@ -66,13 +66,13 @@ using namespace std::chrono_literals;
 // ---------------------------------------------------------------------------
 // Timing constants
 //
-// KEEP_ALIVE   — the timeout given to every test server instance, in
+// KEEP_ALIVE   -- the timeout given to every test server instance, in
 //               milliseconds. setKeepAliveTimeout() now takes milliseconds
 //               so any positive value works without truncation.
-// POLL_TICK    — how often run()'s inner poller loop wakes up.
+// POLL_TICK    -- how often run()'s inner poller loop wakes up.
 //               The sweep runs every tick, so POLL_TICK is also the maximum
 //               lag between a timeout firing and the connection being closed.
-// GRACE        — extra margin added to expected deadlines in test assertions.
+// GRACE        -- extra margin added to expected deadlines in test assertions.
 //               Covers OS scheduler jitter and CI slowness.
 // ---------------------------------------------------------------------------
 static constexpr std::chrono::milliseconds KEEP_ALIVE{1000}; // 1 s
@@ -80,14 +80,14 @@ static constexpr Milliseconds POLL_TICK{20};
 static constexpr auto GRACE = 600ms; // generous for slow machines
 
 // ---------------------------------------------------------------------------
-// TimedServer — minimal ServerBase<> subclass used by all tests.
+// TimedServer -- minimal ServerBase<> subclass used by all tests.
 //
 // Behaviour:
-//   onReadable — drains the socket, calls touchClient() on every non-zero
+//   onReadable -- drains the socket, calls touchClient() on every non-zero
 //                read so that data arrival resets the keep-alive timer.
-//   onWritable — not used by these tests; returns KeepConnection.
-//   onDisconnect      — increments disconnectCount (all paths).
-//   onClientsTimedOut — increments timeoutClosedCount (heap sweep path only).
+//   onWritable -- not used by these tests; returns KeepConnection.
+//   onDisconnect      -- increments disconnectCount (all paths).
+//   onClientsTimedOut -- increments timeoutClosedCount (heap sweep path only).
 //
 // Both counters are std::atomic so they can be safely read from the test
 // thread while the server runs in its own background thread.
@@ -116,7 +116,7 @@ class TimedServer : public ServerBase<int> {
         for (;;) {
             int n = sock.receive(buf, sizeof(buf));
             if (n > 0) {
-                // Receipt of data counts as activity — reset the idle timer.
+                // Receipt of data counts as activity -- reset the idle timer.
                 touchClient(sock);
             } else if (n == 0) {
                 // Clean EOF: peer closed its write end.
@@ -137,7 +137,7 @@ class TimedServer : public ServerBase<int> {
     void onDisconnect(int& /*state*/) override { ++disconnectCount; }
 
     // onClientsTimedOut is called by sweepTimeouts() with the count of clients
-    // it actually closed this tick — NOT called on normal disconnects.
+    // it actually closed this tick -- NOT called on normal disconnects.
     void onClientsTimedOut(size_t count) override {
         timeoutClosedCount += static_cast<int>(count);
     }
@@ -199,7 +199,7 @@ static void test_timeout_fires_when_idle() {
     REQUIRE(waitUntil([&] { return serverReady.load(); }, 1s));
     sleepFor(50ms); // let the poller add the listener socket
 
-    // Connect but never send — the client is purely idle.
+    // Connect but never send -- the client is purely idle.
     TcpSocket client = connectClient(port);
     REQUIRE(client.isValid());
 
@@ -232,11 +232,11 @@ static void test_timeout_fires_when_idle() {
 // the original expiry time; it must survive until the new window elapses.
 //
 // Timeline (KEEP_ALIVE = 500ms):
-//   t=0       connect  — initial entry pushed: expiry = t+500 = t500
-//   t=TOUCH   send 1B  — touchClient pushes new entry: expiry = t+(TOUCH+500)
+//   t=0       connect  -- initial entry pushed: expiry = t+500 = t500
+//   t=TOUCH   send 1B  -- touchClient pushes new entry: expiry = t+(TOUCH+500)
 //                         old stale entry at t500 remains in heap
-//   t=500ms   sweep    — pops stale entry (lastActivitySnap mismatch), discards
-//   t=TOUCH+500+GRACE  — new entry finally fires, connection closed
+//   t=500ms   sweep    -- pops stale entry (lastActivitySnap mismatch), discards
+//   t=TOUCH+500+GRACE  -- new entry finally fires, connection closed
 // ---------------------------------------------------------------------------
 static void test_touch_resets_expiry() {
     BEGIN_TEST(
@@ -260,7 +260,7 @@ static void test_touch_resets_expiry() {
     TcpSocket client = connectClient(port);
     REQUIRE(client.isValid());
 
-    // At t ≈ 500ms from connect, send data to trigger
+    // At t ~= 500ms from connect, send data to trigger
     // touchClient(), refreshing the expiry to (now + KEEP_ALIVE).
     static constexpr auto touchAt = 500ms;
     sleepFor(touchAt);
@@ -271,15 +271,15 @@ static void test_touch_resets_expiry() {
     sleepFor(std::chrono::milliseconds{POLL_TICK.count} * 3);
 
     // --- assertion A: not closed at the original expiry ---
-    // Total time from connect ≈ 500ms + 60ms + 600ms ≈ 1160ms.  The original
+    // Total time from connect ~= 500ms + 60ms + 600ms ~= 1160ms.  The original
     // expiry was at 1000ms; we have just past it.  The stale entry for that
     // expiry should have been discarded by stale-check 2 in sweepTimeouts.
     sleepFor(KEEP_ALIVE - touchAt); // advance to just past the original expiry
     REQUIRE_MSG(server.timeoutClosedCount == 0,
-        "connection NOT closed at original expiry — stale entry discarded");
+        "connection NOT closed at original expiry -- stale entry discarded");
 
     // --- assertion B: closed at the refreshed expiry ---
-    // Refreshed expiry ≈ 1500ms from connect.  We are at ≈ 1160ms, so sleep
+    // Refreshed expiry ~= 1500ms from connect.  We are at ~= 1160ms, so sleep
     // the remaining window plus grace.
     sleepFor(touchAt + GRACE);
     REQUIRE_MSG(server.timeoutClosedCount >= 1,
@@ -302,12 +302,12 @@ static void test_touch_resets_expiry() {
 // once, and must never fail to close it.
 // ---------------------------------------------------------------------------
 static void test_multiple_touches_no_spurious_close() {
-    BEGIN_TEST("timeout heap: N rapid touches → exactly one close, no spurious "
+    BEGIN_TEST("timeout heap: N rapid touches -> exactly one close, no spurious "
                "closes");
 
     TimedServer server(0);
     REQUIRE(server.isValid());
-    // Query port after the bind — the OS has already reserved it; no TOCTOU.
+    // Query port after the bind -- the OS has already reserved it; no TOCTOU.
     const uint16_t port = server.actualPort();
     REQUIRE(port != 0);
 
@@ -338,7 +338,7 @@ static void test_multiple_touches_no_spurious_close() {
     // Allow the server to process the last touch.
     sleepFor(std::chrono::milliseconds{POLL_TICK.count} * 3);
 
-    // The last touch happened ≈ 3*POLL_TICK ago.  At this point none of the
+    // The last touch happened ~= 3*POLL_TICK ago.  At this point none of the
     // entries should have expired (the youngest expiry is ~ now + KEEP_ALIVE).
     REQUIRE_MSG(server.timeoutClosedCount == 0,
         "no close immediately after last touch");
@@ -346,7 +346,7 @@ static void test_multiple_touches_no_spurious_close() {
     // Now let the refreshed window expire.
     sleepFor(KEEP_ALIVE + GRACE);
     REQUIRE_MSG(server.timeoutClosedCount == 1,
-        "exactly one close after idle — no spurious closes from stale entries");
+        "exactly one close after idle -- no spurious closes from stale entries");
     // onDisconnect should also have been called exactly once.
     REQUIRE_MSG(
         server.disconnectCount == 1, "onDisconnect called exactly once");
@@ -382,7 +382,7 @@ static void test_zero_timeout_disables_sweep() {
     TcpSocket client = connectClient(port);
     REQUIRE(client.isValid());
 
-    // Wait 2× the KEEP_ALIVE window — more than enough for the sweep to
+    // Wait 2? the KEEP_ALIVE window -- more than enough for the sweep to
     // have fired if it were enabled.  With keepAlive=0 nothing should happen.
     sleepFor(KEEP_ALIVE * 2 + GRACE);
     REQUIRE_MSG(server.timeoutClosedCount == 0,
@@ -397,7 +397,7 @@ static void test_zero_timeout_disables_sweep() {
     // onDisconnect must be called for the client in the cleanup sweep.
     REQUIRE_MSG(server.disconnectCount == 1,
         "onDisconnect called for surviving client on server shutdown");
-    // But timeoutClosedCount must remain 0 — the cleanup loop doesn't call
+    // But timeoutClosedCount must remain 0 -- the cleanup loop doesn't call
     // onClientsTimedOut; it is not a timeout close, it is a shutdown close.
     REQUIRE_MSG(server.timeoutClosedCount == 0,
         "onClientsTimedOut never called when keepAliveTimeout == 0");
@@ -406,7 +406,7 @@ static void test_zero_timeout_disables_sweep() {
 // ---------------------------------------------------------------------------
 // Test 5: only_idle_client_closed
 //
-// Property: with two clients — one idle, one periodically sending data —
+// Property: with two clients -- one idle, one periodically sending data --
 // only the idle client's heap entry should become genuine; the active
 // client's entries are continually superseded by touches.  After
 // KEEP_ALIVE + GRACE has elapsed, exactly one timeout close must have
@@ -417,7 +417,7 @@ static void test_only_idle_client_closed() {
 
     // Port 0: the OS assigns a free port atomically during bind+listen inside
     // the constructor. We read it back via actualPort() while the server
-    // already holds the socket — no TOCTOU window.
+    // already holds the socket -- no TOCTOU window.
     TimedServer server(0);
     REQUIRE(server.isValid());
     const uint16_t port = server.actualPort();
@@ -432,11 +432,11 @@ static void test_only_idle_client_closed() {
     REQUIRE(waitUntil([&] { return serverReady.load(); }, 2s));
     sleepFor(50ms);
 
-    // Client A: idle — connects but never sends.
+    // Client A: idle -- connects but never sends.
     TcpSocket clientA = connectClient(port);
     REQUIRE_MSG(clientA.isValid(), "client A connected");
 
-    // Client B: active — sends a byte every 250ms so its timer is refreshed
+    // Client B: active -- sends a byte every 250ms so its timer is refreshed
     //           well within each 1s keep-alive window.
     TcpSocket clientB = connectClient(port);
     REQUIRE_MSG(clientB.isValid(), "client B connected");
@@ -459,7 +459,7 @@ static void test_only_idle_client_closed() {
 
     // --- assertion: exactly one timeout close (for A) ---
     REQUIRE_MSG(server.timeoutClosedCount == 1,
-        "exactly one timeout close — idle client A timed out");
+        "exactly one timeout close -- idle client A timed out");
 
     // Stop the background touch thread.
     stopTouching = true;
@@ -511,15 +511,15 @@ static void test_subsecond_timeout_precision() {
     TcpSocket client = connectClient(port);
     REQUIRE(client.isValid());
 
-    // --- assertion A: not closed at 100ms — well within the 300ms window ---
+    // --- assertion A: not closed at 100ms -- well within the 300ms window ---
     sleepFor(100ms);
     REQUIRE_MSG(server.timeoutClosedCount == 0,
-        "not closed at 100ms — still within the 300ms window");
+        "not closed at 100ms -- still within the 300ms window");
 
     // --- assertion B: closed after 300ms + grace ---
     sleepFor(SHORT_KA + SHORT_GRACE);
     REQUIRE_MSG(server.timeoutClosedCount >= 1,
-        "closed after 300ms window — sub-second value was not truncated to 0");
+        "closed after 300ms window -- sub-second value was not truncated to 0");
 
     server.requestStop();
     serverThread.join();
@@ -529,7 +529,7 @@ static void test_subsecond_timeout_precision() {
 // Test 7: getKeepAliveTimeout_roundtrip
 //
 // Property: setKeepAliveTimeout(ms) / getKeepAliveTimeout() form an exact
-// round-trip for any millisecond value.  No running server needed — the
+// round-trip for any millisecond value.  No running server needed -- the
 // getter/setter operate before run() and cover the public API surface
 // changed when keepAliveTimeout_ moved from seconds to milliseconds.
 // ---------------------------------------------------------------------------

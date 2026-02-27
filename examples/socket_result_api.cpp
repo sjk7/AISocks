@@ -109,10 +109,10 @@ void demonstrateResultApi() {
     
     if (server_result.isSuccess()) {
         auto& server = server_result.value();
-        std::cout << "   ✓ Server created successfully\n";
+        std::cout << "   ? Server created successfully\n";
         std::cout << "   Socket valid: " << server.isValid() << "\n";
     } else {
-        std::cout << "   ✗ Server creation failed\n";
+        std::cout << "   ? Server creation failed\n";
         std::cout << "   Error: " << server_result.message() << "\n";
         // Note: Error message is only constructed here because we accessed it!
     }
@@ -128,7 +128,7 @@ void demonstrateResultApi() {
     
     if (client_result.isSuccess()) {
         auto& client = client_result.value();
-        std::cout << "   ✓ Connected successfully\n";
+        std::cout << "   ? Connected successfully\n";
         std::cout << "   Local endpoint: ";
         if (auto local = client.getLocalEndpoint()) {
             std::cout << local->toString() << "\n";
@@ -136,7 +136,7 @@ void demonstrateResultApi() {
             std::cout << "unknown\n";
         }
     } else {
-        std::cout << "   ✗ Connection failed\n";
+        std::cout << "   ? Connection failed\n";
         std::cout << "   Error: " << client_result.message() << "\n";
         // Again, error message constructed only when needed
     }
@@ -182,10 +182,10 @@ void demonstrateResultApi() {
     if (chained_result.isSuccess()) {
         auto& sock = chained_result.value();
         if (auto endpoint = sock.getLocalEndpoint()) {
-            std::cout << "   ✓ Bound to: " << endpoint->toString() << "\n";
+            std::cout << "   ? Bound to: " << endpoint->toString() << "\n";
         }
     } else {
-        std::cout << "   ✗ Chain failed: " << chained_result.message() << "\n";
+        std::cout << "   ? Chain failed: " << chained_result.message() << "\n";
     }
     
     std::cout << "\n";

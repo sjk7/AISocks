@@ -1,6 +1,6 @@
 #pragma once
 // ---------------------------------------------------------------------------
-// HttpRequest.h — header-only HTTP/1.x request parser
+// HttpRequest.h -- header-only HTTP/1.x request parser
 // ---------------------------------------------------------------------------
 #include "UrlCodec.h"
 
@@ -29,10 +29,10 @@ struct HttpRequest {
     std::string version;      ///< e.g. "HTTP/1.1"
     std::string body;         ///< request body (may be empty)
 
-    /// Request headers — keys are lowercased; values preserve original case.
+    /// Request headers -- keys are lowercased; values preserve original case.
     std::unordered_map<std::string, std::string> headers;
 
-    /// Query parameters — both keys and values are URL-decoded.
+    /// Query parameters -- both keys and values are URL-decoded.
     std::unordered_map<std::string, std::string> queryParams;
 
     /// True when the request line was successfully parsed.
@@ -85,7 +85,7 @@ struct HttpRequest {
         // ------------------------------------------------------------------ //
         {
             const auto sp1 = requestLine.find(' ');
-            if (sp1 == std::string::npos) return req; // malformed — leave valid=false
+            if (sp1 == std::string::npos) return req; // malformed -- leave valid=false
 
             const auto sp2 = requestLine.find(' ', sp1 + 1);
             if (sp2 == std::string::npos) return req;

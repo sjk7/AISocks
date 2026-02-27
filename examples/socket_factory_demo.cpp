@@ -14,21 +14,21 @@ void demonstrateBasicCreation() {
     auto tcp_result = SocketFactory::createTcpSocket();
     if (tcp_result.isSuccess()) {
         auto& socket = tcp_result.value();
-        std::cout << "✓ TCP socket created successfully\n";
+        std::cout << "? TCP socket created successfully\n";
         std::cout << "  Valid: " << socket.isValid() << "\n";
         std::cout << "  Family: " << (socket.getAddressFamily() == AddressFamily::IPv4 ? "IPv4" : "IPv6") << "\n";
     } else {
-        std::cout << "✗ TCP socket creation failed: " << tcp_result.message() << "\n";
+        std::cout << "? TCP socket creation failed: " << tcp_result.message() << "\n";
     }
     
     // Create a UDP socket
     auto udp_result = SocketFactory::createUdpSocket();
     if (udp_result.isSuccess()) {
         auto& socket = udp_result.value();
-        std::cout << "✓ UDP socket created successfully\n";
+        std::cout << "? UDP socket created successfully\n";
         std::cout << "  Valid: " << socket.isValid() << "\n";
     } else {
-        std::cout << "✗ UDP socket creation failed: " << udp_result.message() << "\n";
+        std::cout << "? UDP socket creation failed: " << udp_result.message() << "\n";
     }
     
     std::cout << "\n";
@@ -45,7 +45,7 @@ void demonstrateServerCreation() {
     
     if (server_result.isSuccess()) {
         auto& server = server_result.value();
-        std::cout << "✓ TCP server created successfully\n";
+        std::cout << "? TCP server created successfully\n";
         
         if (auto endpoint = server.getLocalEndpoint()) {
             std::cout << "  Listening on: " << endpoint->toString() << "\n";
@@ -54,7 +54,7 @@ void demonstrateServerCreation() {
         // Server is ready to accept connections
         std::cout << "  Ready to accept connections\n";
     } else {
-        std::cout << "✗ TCP server creation failed: " << server_result.message() << "\n";
+        std::cout << "? TCP server creation failed: " << server_result.message() << "\n";
     }
     
     // Try to create another server on the same port (should fail)
@@ -64,9 +64,9 @@ void demonstrateServerCreation() {
     );
     
     if (duplicate_result.isError()) {
-        std::cout << "✓ Duplicate server correctly failed: " << duplicate_result.message() << "\n";
+        std::cout << "? Duplicate server correctly failed: " << duplicate_result.message() << "\n";
     } else {
-        std::cout << "✗ Duplicate server unexpectedly succeeded\n";
+        std::cout << "? Duplicate server unexpectedly succeeded\n";
     }
     
     std::cout << "\n";
@@ -82,7 +82,7 @@ void demonstrateClientConnection() {
     );
     
     if (server_result.isError()) {
-        std::cout << "✗ Failed to create test server: " << server_result.message() << "\n";
+        std::cout << "? Failed to create test server: " << server_result.message() << "\n";
         return;
     }
     
@@ -90,7 +90,7 @@ void demonstrateClientConnection() {
     Port server_port{0};
     if (auto endpoint = server.getLocalEndpoint()) {
         server_port = endpoint->port;
-        std::cout << "✓ Test server listening on: " << endpoint->toString() << "\n";
+        std::cout << "? Test server listening on: " << endpoint->toString() << "\n";
     }
     
     // Now try to connect a client
@@ -101,7 +101,7 @@ void demonstrateClientConnection() {
     
     if (client_result.isSuccess()) {
         auto& client = client_result.value();
-        std::cout << "✓ Client connected successfully\n";
+        std::cout << "? Client connected successfully\n";
         
         if (auto local = client.getLocalEndpoint()) {
             std::cout << "  Client local: " << local->toString() << "\n";
@@ -110,7 +110,7 @@ void demonstrateClientConnection() {
             std::cout << "  Client peer: " << peer->toString() << "\n";
         }
     } else {
-        std::cout << "✗ Client connection failed: " << client_result.message() << "\n";
+        std::cout << "? Client connection failed: " << client_result.message() << "\n";
     }
     
     std::cout << "\n";
@@ -128,12 +128,12 @@ void demonstratePortUtilities() {
     
     if (port_check.isSuccess()) {
         if (port_check.value()) {
-            std::cout << "✓ Port 8080 is available\n";
+            std::cout << "? Port 8080 is available\n";
         } else {
-            std::cout << "✓ Port 8080 is in use\n";
+            std::cout << "? Port 8080 is in use\n";
         }
     } else {
-        std::cout << "✗ Port check failed: " << port_check.message() << "\n";
+        std::cout << "? Port check failed: " << port_check.message() << "\n";
     }
     
     // Find an available port
@@ -145,9 +145,9 @@ void demonstratePortUtilities() {
     );
     
     if (find_port.isSuccess()) {
-        std::cout << "✓ Found available port: " << find_port.value().value << "\n";
+        std::cout << "? Found available port: " << find_port.value().value << "\n";
     } else {
-        std::cout << "✗ Failed to find available port: " << find_port.message() << "\n";
+        std::cout << "? Failed to find available port: " << find_port.message() << "\n";
     }
     
     std::cout << "\n";
@@ -163,7 +163,7 @@ void demonstrateErrorHandling() {
     );
     
     if (invalid_bind.isError()) {
-        std::cout << "✓ Invalid address correctly rejected\n";
+        std::cout << "? Invalid address correctly rejected\n";
         std::cout << "  Error: " << invalid_bind.message() << "\n";
     }
     
@@ -174,7 +174,7 @@ void demonstrateErrorHandling() {
     );
     
     if (no_server.isError()) {
-        std::cout << "✓ Connection to non-existent server correctly failed\n";
+        std::cout << "? Connection to non-existent server correctly failed\n";
         std::cout << "  Error: " << no_server.message() << "\n";
     }
     
@@ -185,7 +185,7 @@ void demonstrateErrorHandling() {
     );
     
     if (privileged_port.isError()) {
-        std::cout << "✓ Privileged port correctly rejected (expected)\n";
+        std::cout << "? Privileged port correctly rejected (expected)\n";
         std::cout << "  Error: " << privileged_port.message() << "\n";
     } else {
         std::cout << "! Privileged port allowed (running as root?)\n";
@@ -212,8 +212,8 @@ void demonstratePerformanceBenefits() {
     auto end = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
     
-    std::cout << "✓ Created " << iterations << " sockets in " << duration.count() << " μs\n";
-    std::cout << "  Average: " << duration.count() / iterations << " μs per socket\n";
+    std::cout << "? Created " << iterations << " sockets in " << duration.count() << " ?s\n";
+    std::cout << "  Average: " << duration.count() / iterations << " ?s per socket\n";
     std::cout << "  Zero error message construction overhead for success cases\n\n";
     
     // Demonstrate lazy error message construction
@@ -223,7 +223,7 @@ void demonstratePerformanceBenefits() {
     );
     
     if (error_result.isError()) {
-        std::cout << "✓ Error result created (message not yet constructed)\n";
+        std::cout << "? Error result created (message not yet constructed)\n";
         
         // First access constructs the message
         std::cout << "  First access: " << error_result.message() << "\n";
