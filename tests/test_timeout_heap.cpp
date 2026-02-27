@@ -5,8 +5,8 @@
 // ---------------------------------------------------------------------------
 // Provability tests for ServerBase's lazy-deletion min-heap keep-alive sweep.
 //
-// The heap replaced an O(n) linear scan.  These five tests verify the
-// critical correctness properties of the new implementation:
+// The heap replaced an O(n) linear scan.  Eight tests verify the
+// critical correctness properties of the new implementation and API:
 //
 //  Test 1 — timeout_fires_when_idle
 //    An idle connection (no data sent after connect) must be closed by
@@ -34,6 +34,21 @@
 //    With two connected clients, only the one that sends no traffic times
 //    out.  The active client (touched repeatedly) must survive until the
 //    server is stopped explicitly.
+//
+//  Test 6 — subsecond_timeout_precision
+//    A 300 ms keepAliveTimeout must actually fire.  With the former
+//    chrono::seconds API, 300 ms would silently truncate to 0, disabling
+//    the sweep.  This test proves the milliseconds migration fixed that.
+//
+//  Test 7 — getKeepAliveTimeout_roundtrip
+//    setKeepAliveTimeout(ms) / getKeepAliveTimeout() must form an exact
+//    round-trip for any millisecond value (0, 250, 1000, 65000).
+//    Covers the changed public-API surface of ServerBase.
+//
+//  Test 8 — many_idle_clients_all_timeout
+//    N=8 simultaneous idle connections must all be closed by the sweep
+//    within one timeout window.  Tests heap correctness at scale: N entries
+//    with nearly-identical expiry times must all pop and be acted on.
 // ---------------------------------------------------------------------------
 
 #include "ServerBase.h"
@@ -464,6 +479,155 @@ static void test_only_idle_client_closed() {
 }
 
 // ---------------------------------------------------------------------------
+// Test 6: subsecond_timeout_precision
+//
+// Property: a 300 ms timeout must actually fire.  With the former
+// chrono::seconds API, duration_cast<seconds>(300ms) == 0 s, which would
+// disable the sweep silently.  This test proves the milliseconds migration
+// fixed the truncation: the client must NOT be closed at 100 ms but MUST
+// be closed after 300 ms + grace.
+// ---------------------------------------------------------------------------
+static void test_subsecond_timeout_precision() {
+    BEGIN_TEST(
+        "timeout heap: sub-second 300ms timeout fires (not truncated to 0)");
+
+    static constexpr auto SHORT_KA    = std::chrono::milliseconds{300};
+    static constexpr auto SHORT_GRACE = 400ms; // generous vs 300ms window
+
+    TimedServer server(0, SHORT_KA);
+    REQUIRE(server.isValid());
+    const uint16_t port = server.actualPort();
+    REQUIRE(port != 0);
+
+    std::atomic<bool> serverReady{false};
+    std::thread serverThread([&] {
+        serverReady = true;
+        server.run(ClientLimit::Unlimited, POLL_TICK);
+    });
+
+    REQUIRE(waitUntil([&] { return serverReady.load(); }, 1s));
+    sleepFor(50ms);
+
+    TcpSocket client = connectClient(port);
+    REQUIRE(client.isValid());
+
+    // --- assertion A: not closed at 100ms — well within the 300ms window ---
+    sleepFor(100ms);
+    REQUIRE_MSG(server.timeoutClosedCount == 0,
+        "not closed at 100ms — still within the 300ms window");
+
+    // --- assertion B: closed after 300ms + grace ---
+    sleepFor(SHORT_KA + SHORT_GRACE);
+    REQUIRE_MSG(server.timeoutClosedCount >= 1,
+        "closed after 300ms window — sub-second value was not truncated to 0");
+
+    server.requestStop();
+    serverThread.join();
+}
+
+// ---------------------------------------------------------------------------
+// Test 7: getKeepAliveTimeout_roundtrip
+//
+// Property: setKeepAliveTimeout(ms) / getKeepAliveTimeout() form an exact
+// round-trip for any millisecond value.  No running server needed — the
+// getter/setter operate before run() and cover the public API surface
+// changed when keepAliveTimeout_ moved from seconds to milliseconds.
+// ---------------------------------------------------------------------------
+static void test_getKeepAliveTimeout_roundtrip() {
+    BEGIN_TEST("setKeepAliveTimeout / getKeepAliveTimeout round-trip");
+
+    // Constructor-supplied values must survive to the getter unchanged.
+    {
+        TimedServer s(0, std::chrono::milliseconds{300});
+        REQUIRE(s.isValid());
+        REQUIRE_MSG(s.getKeepAliveTimeout() == std::chrono::milliseconds{300},
+            "constructor-set 300ms round-trips via getter");
+    }
+    {
+        TimedServer s(0, std::chrono::milliseconds{0});
+        REQUIRE(s.isValid());
+        REQUIRE_MSG(s.getKeepAliveTimeout() == std::chrono::milliseconds{0},
+            "constructor-set 0ms (disabled) round-trips via getter");
+    }
+
+    // setKeepAliveTimeout() must overwrite and the getter must follow.
+    {
+        TimedServer s(0); // default KEEP_ALIVE set by TimedServer ctor
+        REQUIRE(s.isValid());
+        REQUIRE_MSG(s.getKeepAliveTimeout() == KEEP_ALIVE,
+            "default KEEP_ALIVE (1000ms) returned correctly");
+
+        s.setKeepAliveTimeout(std::chrono::milliseconds{250});
+        REQUIRE_MSG(s.getKeepAliveTimeout() == std::chrono::milliseconds{250},
+            "setKeepAliveTimeout(250ms) round-trips correctly");
+
+        s.setKeepAliveTimeout(std::chrono::milliseconds{65'000});
+        REQUIRE_MSG(
+            s.getKeepAliveTimeout() == std::chrono::milliseconds{65'000},
+            "setKeepAliveTimeout(65000ms) round-trips correctly");
+
+        s.setKeepAliveTimeout(std::chrono::milliseconds{0});
+        REQUIRE_MSG(s.getKeepAliveTimeout() == std::chrono::milliseconds{0},
+            "setKeepAliveTimeout(0ms) (disable) round-trips correctly");
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Test 8: many_idle_clients_all_timeout
+//
+// Property: N=8 simultaneous idle connections must all be closed by the
+// sweep within one KEEP_ALIVE window.  Tests heap correctness at scale:
+// 8 entries with nearly-identical expiry times must all pop and fire,
+// and onDisconnect must be invoked exactly once per client.
+// ---------------------------------------------------------------------------
+static void test_many_idle_clients_all_timeout() {
+    BEGIN_TEST(
+        "timeout heap: 8 simultaneous idle clients all time out within one window");
+
+    static constexpr int N = 8;
+
+    TimedServer server(0);
+    REQUIRE(server.isValid());
+    const uint16_t port = server.actualPort();
+    REQUIRE(port != 0);
+
+    std::atomic<bool> serverReady{false};
+    std::thread serverThread([&] {
+        serverReady = true;
+        server.run(ClientLimit::Unlimited, POLL_TICK);
+    });
+
+    REQUIRE(waitUntil([&] { return serverReady.load(); }, 1s));
+    sleepFor(50ms);
+
+    // Connect all N clients; none will ever send data.
+    std::vector<TcpSocket> clients;
+    clients.reserve(N);
+    for (int i = 0; i < N; ++i) {
+        TcpSocket c = connectClient(port);
+        REQUIRE_MSG(c.isValid(), "idle client connected");
+        clients.push_back(std::move(c));
+    }
+
+    // Give the server enough poll ticks to accept all N connections.
+    sleepFor(std::chrono::milliseconds{POLL_TICK.count} * (N + 2));
+
+    // --- assertion A: none closed at half the window ---
+    sleepFor(KEEP_ALIVE / 2);
+    REQUIRE_MSG(server.timeoutClosedCount == 0,
+        "no timeout closes at half the keep-alive window");
+
+    // --- assertion B: all N closed after window + grace ---
+    sleepFor(KEEP_ALIVE + GRACE);
+    REQUIRE_MSG(server.timeoutClosedCount == N, "all 8 idle clients timed out");
+    REQUIRE_MSG(
+        server.disconnectCount == N, "onDisconnect called exactly 8 times");
+
+    server.requestStop();
+    serverThread.join();
+}
+
+// ---------------------------------------------------------------------------
 // Entry point
 // ---------------------------------------------------------------------------
 int main() {
@@ -474,6 +638,9 @@ int main() {
     test_multiple_touches_no_spurious_close();
     test_zero_timeout_disables_sweep();
     test_only_idle_client_closed();
+    test_subsecond_timeout_precision();
+    test_getKeepAliveTimeout_roundtrip();
+    test_many_idle_clients_all_timeout();
 
     return test_summary();
 }
