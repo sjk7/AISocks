@@ -51,20 +51,18 @@ using namespace std::chrono_literals;
 // ---------------------------------------------------------------------------
 // Timing constants
 //
-// KEEP_ALIVE   — the timeout given to every test server instance.
-//               setKeepAliveTimeout() takes std::chrono::seconds, so this
-//               must be a seconds value; sub-second values truncate to 0
-//               (which disables the sweep entirely).
+// KEEP_ALIVE   — the timeout given to every test server instance, in
+//               milliseconds. setKeepAliveTimeout() now takes milliseconds
+//               so any positive value works without truncation.
 // POLL_TICK    — how often run()'s inner poller loop wakes up.
 //               The sweep runs every tick, so POLL_TICK is also the maximum
 //               lag between a timeout firing and the connection being closed.
 // GRACE        — extra margin added to expected deadlines in test assertions.
 //               Covers OS scheduler jitter and CI slowness.
 // ---------------------------------------------------------------------------
-static constexpr std::chrono::seconds KEEP_ALIVE{1};  // 1 s — smallest legal value
-static constexpr auto                 KA_MS = std::chrono::milliseconds{1000}; // == KEEP_ALIVE
-static constexpr Milliseconds         POLL_TICK{20};
-static constexpr auto                 GRACE = 600ms; // generous for slow machines
+static constexpr std::chrono::milliseconds KEEP_ALIVE{1000}; // 1 s
+static constexpr Milliseconds POLL_TICK{20};
+static constexpr auto GRACE = 600ms; // generous for slow machines
 
 // ---------------------------------------------------------------------------
 // TimedServer — minimal ServerBase<> subclass used by all tests.
@@ -84,8 +82,8 @@ class TimedServer : public ServerBase<int> {
     std::atomic<int> disconnectCount{0};
     std::atomic<int> timeoutClosedCount{0};
 
-    explicit TimedServer(uint16_t port,
-        std::chrono::seconds keepAlive = KEEP_ALIVE)
+    explicit TimedServer(
+        uint16_t port, std::chrono::milliseconds keepAlive = KEEP_ALIVE)
         : ServerBase<int>(ServerBind{"127.0.0.1", Port{port}, 16}) {
         setKeepAliveTimeout(keepAlive);
     }
@@ -150,8 +148,7 @@ static void sleepFor(std::chrono::milliseconds ms) {
 // Returns true if the condition was met.
 template <typename Pred>
 static bool waitUntil(Pred predicate, std::chrono::milliseconds timeout) {
-    const auto deadline
-        = std::chrono::steady_clock::now() + timeout;
+    const auto deadline = std::chrono::steady_clock::now() + timeout;
     while (std::chrono::steady_clock::now() < deadline) {
         if (predicate()) return true;
         std::this_thread::sleep_for(10ms);
@@ -169,14 +166,13 @@ static bool waitUntil(Pred predicate, std::chrono::milliseconds timeout) {
 static void test_timeout_fires_when_idle() {
     BEGIN_TEST("timeout heap: idle connection closed after keepAliveTimeout");
 
-    const uint16_t port = pickFreePort();
-    REQUIRE(port != 0);
-
-    // KEEP_ALIVE is chrono::duration; setKeepAliveTimeout takes seconds.
-    // Convert explicitly so the intent is clear.
-    TimedServer server(port,
-        std::chrono::duration_cast<std::chrono::seconds>(KEEP_ALIVE));
+    // Bind to port 0: OS assigns a free port atomically. We query it via
+    // actualPort() after the constructor has already bound+listened, so no
+    // other process can steal the port between allocation and use.
+    TimedServer server(0);
     REQUIRE(server.isValid());
+    const uint16_t port = server.actualPort();
+    REQUIRE(port != 0);
 
     std::atomic<bool> serverReady{false};
     std::thread serverThread([&] {
@@ -198,8 +194,9 @@ static void test_timeout_fires_when_idle() {
         "no timeout before half the window has elapsed");
 
     // --- assertion B: timed out (past the window plus grace) ---
-    // Total from connect: 500ms + 1000ms + 600ms grace = 2100ms > 1000ms window.
-    sleepFor(KA_MS + GRACE);
+    // Total from connect: 500ms + 1000ms + 600ms grace = 2100ms > 1000ms
+    // window.
+    sleepFor(KEEP_ALIVE + GRACE);
     REQUIRE_MSG(server.timeoutClosedCount >= 1,
         "server closed idle connection after keepAliveTimeout");
 
@@ -227,13 +224,14 @@ static void test_timeout_fires_when_idle() {
 //   t=TOUCH+500+GRACE  — new entry finally fires, connection closed
 // ---------------------------------------------------------------------------
 static void test_touch_resets_expiry() {
-    BEGIN_TEST("timeout heap: touch mid-window resets expiry, no spurious close");
+    BEGIN_TEST(
+        "timeout heap: touch mid-window resets expiry, no spurious close");
 
-    const uint16_t port = pickFreePort();
-    REQUIRE(port != 0);
-
-    TimedServer server(port);
+    // Bind to port 0; query actual port after the server is already listening.
+    TimedServer server(0);
     REQUIRE(server.isValid());
+    const uint16_t port = server.actualPort();
+    REQUIRE(port != 0);
 
     std::atomic<bool> serverReady{false};
     std::thread serverThread([&] {
@@ -241,14 +239,14 @@ static void test_touch_resets_expiry() {
         server.run(ClientLimit::Unlimited, POLL_TICK);
     });
 
-    REQUIRE(waitUntil([&] { return serverReady.load(); }, 2s));
-    sleepFor(50ms);
+    REQUIRE(waitUntil([&] { return serverReady.load(); }, 1s));
+    sleepFor(50ms); // let the poller add the listener socket
 
     TcpSocket client = connectClient(port);
     REQUIRE(client.isValid());
 
-    // At the halfway mark (500ms), send data. The server's onReadable calls
-    // touchClient(), refreshing the expiry to (now + 1s) = t ≈ 1500ms.
+    // At t ≈ 500ms from connect, send data to trigger
+    // touchClient(), refreshing the expiry to (now + KEEP_ALIVE).
     static constexpr auto touchAt = 500ms;
     sleepFor(touchAt);
     const char ping[] = "ping";
@@ -261,7 +259,7 @@ static void test_touch_resets_expiry() {
     // Total time from connect ≈ 500ms + 60ms + 600ms ≈ 1160ms.  The original
     // expiry was at 1000ms; we have just past it.  The stale entry for that
     // expiry should have been discarded by stale-check 2 in sweepTimeouts.
-    sleepFor(KA_MS - touchAt); // advance to just past the original expiry
+    sleepFor(KEEP_ALIVE - touchAt); // advance to just past the original expiry
     REQUIRE_MSG(server.timeoutClosedCount == 0,
         "connection NOT closed at original expiry — stale entry discarded");
 
@@ -289,13 +287,14 @@ static void test_touch_resets_expiry() {
 // once, and must never fail to close it.
 // ---------------------------------------------------------------------------
 static void test_multiple_touches_no_spurious_close() {
-    BEGIN_TEST("timeout heap: N rapid touches → exactly one close, no spurious closes");
+    BEGIN_TEST("timeout heap: N rapid touches → exactly one close, no spurious "
+               "closes");
 
-    const uint16_t port = pickFreePort();
-    REQUIRE(port != 0);
-
-    TimedServer server(port);
+    TimedServer server(0);
     REQUIRE(server.isValid());
+    // Query port after the bind — the OS has already reserved it; no TOCTOU.
+    const uint16_t port = server.actualPort();
+    REQUIRE(port != 0);
 
     std::atomic<bool> serverReady{false};
     std::thread serverThread([&] {
@@ -330,12 +329,12 @@ static void test_multiple_touches_no_spurious_close() {
         "no close immediately after last touch");
 
     // Now let the refreshed window expire.
-    sleepFor(KA_MS + GRACE);
+    sleepFor(KEEP_ALIVE + GRACE);
     REQUIRE_MSG(server.timeoutClosedCount == 1,
         "exactly one close after idle — no spurious closes from stale entries");
     // onDisconnect should also have been called exactly once.
-    REQUIRE_MSG(server.disconnectCount == 1,
-        "onDisconnect called exactly once");
+    REQUIRE_MSG(
+        server.disconnectCount == 1, "onDisconnect called exactly once");
 
     server.requestStop();
     serverThread.join();
@@ -351,12 +350,10 @@ static void test_multiple_touches_no_spurious_close() {
 static void test_zero_timeout_disables_sweep() {
     BEGIN_TEST("timeout heap: keepAliveTimeout=0 disables idle close entirely");
 
-    const uint16_t port = pickFreePort();
-    REQUIRE(port != 0);
-
-    // Explicitly pass zero to disable the mechanism.
-    TimedServer server(port, std::chrono::seconds{0});
+    TimedServer server(0, std::chrono::seconds{0}); // port 0 = OS assigns
     REQUIRE(server.isValid());
+    const uint16_t port = server.actualPort();
+    REQUIRE(port != 0);
 
     std::atomic<bool> serverReady{false};
     std::thread serverThread([&] {
@@ -372,7 +369,7 @@ static void test_zero_timeout_disables_sweep() {
 
     // Wait 2× the KEEP_ALIVE window — more than enough for the sweep to
     // have fired if it were enabled.  With keepAlive=0 nothing should happen.
-    sleepFor(KA_MS * 2 + GRACE);
+    sleepFor(KEEP_ALIVE * 2 + GRACE);
     REQUIRE_MSG(server.timeoutClosedCount == 0,
         "no timeout close when keepAliveTimeout == 0");
     REQUIRE_MSG(server.disconnectCount == 0,
@@ -403,11 +400,12 @@ static void test_zero_timeout_disables_sweep() {
 static void test_only_idle_client_closed() {
     BEGIN_TEST("timeout heap: only idle client closed, active client survives");
 
-    const uint16_t port = pickFreePort();
-    REQUIRE(port != 0);
-
-    TimedServer server(port);
+    // Port 0: OS picks; we read it back after the server constructor has
+    // already bound, eliminating the TOCTOU window of pickFreePort().
+    TimedServer server(0);
     REQUIRE(server.isValid());
+    const uint16_t port = server.actualPort();
+    REQUIRE(port != 0);
 
     std::atomic<bool> serverReady{false};
     std::thread serverThread([&] {
@@ -441,7 +439,7 @@ static void test_only_idle_client_closed() {
     });
 
     // Wait long enough for A to time out but B to have been touched 4+ times.
-    sleepFor(KA_MS + GRACE);
+    sleepFor(KEEP_ALIVE + GRACE);
 
     // --- assertion: exactly one timeout close (for A) ---
     REQUIRE_MSG(server.timeoutClosedCount == 1,
