@@ -271,8 +271,7 @@ template <typename ClientData> class ServerBase {
         it->second.lastActivity = now;
 
         // Only bother pushing if keep-alive timeouts are enabled.
-        if (keepAliveTimeout_.count() > 0)
-            pushTimeoutEntry(it->first, now);
+        if (keepAliveTimeout_.count() > 0) pushTimeoutEntry(it->first, now);
     }
 
     // Enable or disable Writable interest for a client socket.
@@ -285,11 +284,13 @@ template <typename ClientData> class ServerBase {
     }
 
     // Keep-alive idle timeout. Connections that have been idle longer than
-    // this will be closed gracefully. Set to 0 to disable. Default: 65s.
-    void setKeepAliveTimeout(std::chrono::seconds timeout) {
+    // this will be closed gracefully. Set to 0 to disable. Default: 65000ms.
+    // Accepts milliseconds so callers can specify sub-second timeouts without
+    // the silent truncation-to-zero that chrono::seconds would cause.
+    void setKeepAliveTimeout(std::chrono::milliseconds timeout) {
         keepAliveTimeout_ = timeout;
     }
-    std::chrono::seconds getKeepAliveTimeout() const {
+    std::chrono::milliseconds getKeepAliveTimeout() const {
         return keepAliveTimeout_;
     }
 
@@ -407,11 +408,11 @@ template <typename ClientData> class ServerBase {
     //         O(log n) per touchClient() call.
     // -----------------------------------------------------------------------
     struct TimeoutEntry {
-        SteadyClock::time_point expiry;           // absolute time this fires
+        SteadyClock::time_point expiry; // absolute time this fires
         SteadyClock::time_point lastActivitySnap; // lastActivity when pushed;
                                                   //   stale if it differs from
                                                   //   the ClientEntry's value
-        uintptr_t fd;                             // key into clients_
+        uintptr_t fd; // key into clients_
 
         // operator< is intentionally inverted relative to wall-clock order.
         // std::push_heap / std::pop_heap build a MAX-heap (largest value at
@@ -420,7 +421,8 @@ template <typename ClientData> class ServerBase {
         // expire entry stays at the front, giving us a min-heap by expiry
         // with no extra comparator object anywhere.
         bool operator<(const TimeoutEntry& o) const noexcept {
-            return expiry > o.expiry; // reversed: earlier expiry = higher priority
+            return expiry
+                > o.expiry; // reversed: earlier expiry = higher priority
         }
     };
 
@@ -508,7 +510,7 @@ template <typename ClientData> class ServerBase {
     // reallocations during high-frequency touchClient() churn.  The heap
     // may contain stale entries (lazily removed during sweepTimeouts()).
     std::vector<TimeoutEntry> timeout_heap_;
-    std::chrono::seconds keepAliveTimeout_{65};
+    std::chrono::milliseconds keepAliveTimeout_{65'000};
     size_t peak_clients_{0};
 
     void drainAccept(Poller& poller, bool& accepting, size_t& accepted,

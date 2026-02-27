@@ -35,7 +35,7 @@ class EchoServer : public ServerBase<EchoState> {
     public:
     explicit EchoServer(uint16_t port)
         : ServerBase<EchoState>(ServerBind{"127.0.0.1", Port{port}, 5}) {
-        setKeepAliveTimeout(std::chrono::seconds{0});
+        setKeepAliveTimeout(std::chrono::milliseconds{0});
     }
 
     std::atomic<int> idleCalls{0};

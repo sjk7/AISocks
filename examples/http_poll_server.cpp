@@ -85,7 +85,7 @@ class HttpServer : public HttpPollServer {
               "Bad Request: this server only accepts HTTP requests.\n";
 
         rebuildResponses(); // warm the cache before the first request
-        setKeepAliveTimeout(std::chrono::seconds{5});
+        setKeepAliveTimeout(std::chrono::milliseconds{5000});
         printf("Listening on %s:%d\n", bind.address.c_str(),
             static_cast<int>(bind.port));
     }
