@@ -51,6 +51,17 @@
         "BUILD_EXAMPLES": "ON",
         "ENABLE_ASAN": "ON"
       }
+    },
+    {
+      "name": "ubsan-release",
+      "inherits": "base",
+      "displayName": "UBSan RelWithDebInfo",
+      "binaryDir": "${sourceDir}/build-ubsan",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+        "BUILD_EXAMPLES": "ON",
+        "ENABLE_UBSAN": "ON"
+      }
     }
   ],
   "buildPresets": [
@@ -83,8 +94,19 @@
     },
     {
       "name": "http-server-asan",
-      "configurePreset": "asan-debug", 
+      "configurePreset": "asan-debug",
       "displayName": "Build http_server (AddressSanitizer)",
+      "targets": ["http_server"]
+    },
+    {
+      "name": "ubsan-release",
+      "configurePreset": "ubsan-release",
+      "displayName": "Build UBSan RelWithDebInfo"
+    },
+    {
+      "name": "http-server-ubsan",
+      "configurePreset": "ubsan-release",
+      "displayName": "Build http_server (UBSan RelWithDebInfo)",
       "targets": ["http_server"]
     }
   ],

@@ -42,8 +42,7 @@ static void test_happy_construction() {
 
     BEGIN_TEST("TcpSocket: ServerBind ctor binds and listens in one step");
     {
-        TcpSocket srv(
-            AddressFamily::IPv4, ServerBind{"127.0.0.1", Port{BASE}});
+        TcpSocket srv(AddressFamily::IPv4, ServerBind{"127.0.0.1", Port{BASE}});
         REQUIRE(srv.isValid());
         auto ep = srv.getLocalEndpoint();
         REQUIRE(ep.isSuccess());
@@ -56,8 +55,8 @@ static void test_happy_construction() {
     {
         std::atomic<bool> ready{false};
         std::thread srvThread([&] {
-            TcpSocket srv(AddressFamily::IPv4,
-                ServerBind{"127.0.0.1", Port{BASE + 1}});
+            TcpSocket srv(
+                AddressFamily::IPv4, ServerBind{"127.0.0.1", Port{BASE + 1}});
             REQUIRE(srv.isValid());
             ready = true;
             auto peer = srv.accept();
@@ -73,7 +72,7 @@ static void test_happy_construction() {
         TcpSocket c(
             AddressFamily::IPv4, ConnectArgs{"127.0.0.1", Port{BASE + 1}});
         REQUIRE(c.isValid());
-        
+
         srvThread.join();
     }
 }
@@ -305,13 +304,12 @@ static void test_sad_construction() {
     {
         // First server should succeed
         TcpSocket first(AddressFamily::IPv4,
-            ServerBind{"127.0.0.1", Port{BASE + 10}, 5, false});
+            ServerBind{"127.0.0.1", Port{BASE + 10}, Backlog{5}, false});
         REQUIRE(first.isValid());
 
         // Second server should fail
-        auto result = SocketFactory::createTcpServer(
-            AddressFamily::IPv4,
-            ServerBind{"127.0.0.1", Port{BASE + 10}, 5, false});
+        auto result = SocketFactory::createTcpServer(AddressFamily::IPv4,
+            ServerBind{"127.0.0.1", Port{BASE + 10}, Backlog{5}, false});
         REQUIRE(result.isError());
         REQUIRE(result.error() != SocketError::None);
     }
@@ -320,8 +318,7 @@ static void test_sad_construction() {
 
     BEGIN_TEST("TcpSocket(ServerBind): fails on invalid bind address");
     {
-        auto result = SocketFactory::createTcpServer(
-            AddressFamily::IPv4,
+        auto result = SocketFactory::createTcpServer(AddressFamily::IPv4,
             ServerBind{"999.999.999.999", Port{BASE + 11}});
         REQUIRE(result.isError());
         REQUIRE(result.error() == SocketError::BindFailed);
@@ -332,14 +329,12 @@ static void test_sad_construction() {
     BEGIN_TEST("TcpSocket(ConnectArgs): fails when nothing is listening");
     {
         // Port 21899 is in our exclusive range but nothing is listening
-        auto result = SocketFactory::createTcpClient(
-            AddressFamily::IPv4,
-            ConnectArgs{
-                "127.0.0.1", Port{21899}, Milliseconds{100}});
+        auto result = SocketFactory::createTcpClient(AddressFamily::IPv4,
+            ConnectArgs{"127.0.0.1", Port{21899}, Milliseconds{100}});
         REQUIRE(result.isError());
-        REQUIRE(result.error() == SocketError::ConnectFailed || 
-                result.error() == SocketError::ConnectionReset ||
-                result.error() == SocketError::Timeout);
+        REQUIRE(result.error() == SocketError::ConnectFailed
+            || result.error() == SocketError::ConnectionReset
+            || result.error() == SocketError::Timeout);
     }
 }
 

@@ -34,7 +34,8 @@ struct EchoState {
 class EchoServer : public ServerBase<EchoState> {
     public:
     explicit EchoServer(uint16_t port)
-        : ServerBase<EchoState>(ServerBind{"127.0.0.1", Port{port}, 5}) {
+        : ServerBase<EchoState>(
+              ServerBind{"127.0.0.1", Port{port}, Backlog{5}}) {
         setKeepAliveTimeout(std::chrono::milliseconds{0});
     }
 

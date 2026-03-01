@@ -16,6 +16,7 @@ option(BUILD_TESTS    "Build test programs"    OFF)
 option(BUILD_EXAMPLES "Build all example programs" OFF)
 option(ENABLE_ASAN    "Enable AddressSanitizer"    OFF)
 option(ENABLE_MSAN    "Enable MemorySanitizer"     OFF)
+option(ENABLE_UBSAN   "Enable UndefinedBehaviorSanitizer" OFF)
 
 # Add AddressSanitizer if enabled
 if(ENABLE_ASAN AND MSVC)
@@ -27,6 +28,15 @@ if(ENABLE_ASAN AND MSVC)
 elseif(ENABLE_ASAN)
     add_compile_options(-fsanitize=address -fno-omit-frame-pointer)
     add_link_options(-fsanitize=address)
+endif()
+
+# Add UndefinedBehaviorSanitizer if enabled
+if(ENABLE_UBSAN AND NOT MSVC)
+    add_compile_options(-fsanitize=undefined -fno-omit-frame-pointer)
+    add_link_options(-fsanitize=undefined)
+    message(STATUS "UndefinedBehaviorSanitizer enabled")
+elseif(ENABLE_UBSAN AND MSVC)
+    message(FATAL_ERROR "UndefinedBehaviorSanitizer is not supported on MSVC/Windows")
 endif()
 
 # Add MemorySanitizer if enabled
@@ -78,6 +88,7 @@ if(BUILD_EXAMPLES)
         aiSocksTestMove         examples/test_move_semantics.cpp
         aiSocksPeerLogger       examples/peer_logger.cpp
         aiSocksGoogleClient     examples/google_client.cpp
+        aiSocksSocketFactoryDemo examples/socket_factory_demo.cpp
         http_server             examples/http_poll_server.cpp
     )
     list(LENGTH _EXAMPLES _len)

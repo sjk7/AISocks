@@ -17,7 +17,8 @@ struct SimpleState {
 class SimpleServer : public ServerBase<SimpleState> {
     public:
     explicit SimpleServer(uint16_t port)
-        : ServerBase<SimpleState>(ServerBind{"127.0.0.1", Port{port}, 5}) {}
+        : ServerBase<SimpleState>(
+              ServerBind{"127.0.0.1", Port{port}, Backlog{5}}) {}
 
     protected:
     ServerResult onReadable(TcpSocket& sock, SimpleState& s) override {
