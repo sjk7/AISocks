@@ -27,7 +27,7 @@ int main() {
         // Start echo server in background
         std::thread server_thread([]() {
             auto srv_result = SocketFactory::createTcpServer(
-                ServerBind{"127.0.0.1", Port{BASE}, 5});
+                ServerBind{"127.0.0.1", Port{BASE}, Backlog{5}});
             if (srv_result.isSuccess()) {
                 auto& srv = srv_result.value();
                 auto conn_result = srv.accept();
@@ -110,7 +110,7 @@ int main() {
         // Start echo server
         std::thread server_thread([]() {
             auto srv_result = SocketFactory::createTcpServer(
-                ServerBind{"127.0.0.1", Port{BASE + 1}, 5});
+                ServerBind{"127.0.0.1", Port{BASE + 1}, Backlog{5}});
             if (srv_result.isSuccess()) {
                 auto& srv = srv_result.value();
                 for (int i = 0; i < 3; ++i) {
@@ -158,7 +158,7 @@ int main() {
     {
         std::thread server_thread([]() {
             auto srv_result = SocketFactory::createTcpServer(
-                ServerBind{"127.0.0.1", Port{BASE + 2}, 5});
+                ServerBind{"127.0.0.1", Port{BASE + 2}, Backlog{5}});
             if (srv_result.isSuccess()) {
                 auto& srv = srv_result.value();
                 auto conn_result = srv.accept();

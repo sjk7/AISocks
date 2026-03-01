@@ -104,7 +104,7 @@ class HttpServer : public HttpPollServer {
 int main() {
     printf("=== Poll-Driven HTTP Server ===\n");
 
-    HttpServer server(ServerBind{"0.0.0.0", Port{8080}, 1024});
+    HttpServer server(ServerBind{"0.0.0.0", Port{8080}});
     if (!server.isValid()) {
         printf("Server failed to start\n");
         return 1;

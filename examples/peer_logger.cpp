@@ -60,7 +60,8 @@ static void logAcceptedPeer(const TcpSocket& accepted) {
 // Runs on the provided port, handles one connection, then exits.
 // ---------------------------------------------------------------------------
 static void runEchoServer(Port port) {
-    TcpSocket server(AddressFamily::IPv4, ServerBind{"127.0.0.1", port, 1});
+    TcpSocket server(
+        AddressFamily::IPv4, ServerBind{"127.0.0.1", port, Backlog{1}});
 
     auto localEp = server.getLocalEndpoint();
     std::cout << "[server] listening on "

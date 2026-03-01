@@ -130,12 +130,12 @@ int main() {
     {
         // First server
         auto first_result = SocketFactory::createTcpServer(
-            ServerBind{"127.0.0.1", Port{19902}, 5, false});
+            ServerBind{"127.0.0.1", Port{19902}, Backlog{5}, false});
         REQUIRE(first_result.isSuccess());
 
         // Second server tries same port without reuseAddr
         auto second_result = SocketFactory::createTcpServer(
-            ServerBind{"127.0.0.1", Port{19902}, 5, false});
+            ServerBind{"127.0.0.1", Port{19902}, Backlog{5}, false});
         REQUIRE(second_result.isError());
         REQUIRE(second_result.error() != SocketError::None);
     }

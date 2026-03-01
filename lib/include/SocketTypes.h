@@ -50,6 +50,50 @@ struct Milliseconds {
 inline constexpr Milliseconds defaultTimeout{30000}; // 30 seconds
 inline constexpr Milliseconds defaultConnectTimeout{10000}; // 10 seconds
 
+// Platform listen() backlog constants.
+// All three OS values are always defined so the intent is readable everywhere.
+// _WIN32 / __APPLE__ / __linux__ are predefined compiler macros, not headers.
+struct Backlog {
+    // macOS: SOMAXCONN = 128 in <sys/socket.h>.
+    // The kernel clips to kern.ipc.somaxconn (default 128).
+    // Raise with: sudo sysctl -w kern.ipc.somaxconn=4096
+    static constexpr int somaxconnMacOS = 128;
+
+    // Linux: SOMAXCONN = 128 in <sys/socket.h>.
+    // The kernel clips to net.core.somaxconn (default 128 on kernels < 5.4,
+    // raised to 4096 on kernels >= 5.4).
+    // Raise with: sudo sysctl -w net.core.somaxconn=4096
+    static constexpr int somaxconnLinux = 128;
+
+    // Windows: SOMAXCONN = 0x7fffffff in <winsock2.h>.
+    // This is a sentinel value — the TCP/IP stack picks the real cap (~200).
+    // Passing any integer has the same effect; there is no user-tunable sysctl.
+    static constexpr int somaxconnWindows = 0x7fff'ffff;
+
+    // Maximum backlog for the current platform, selected at compile time.
+#if defined(_WIN32)
+    static constexpr int maxBacklog = somaxconnWindows;
+#elif defined(__APPLE__)
+    static constexpr int maxBacklog = somaxconnMacOS;
+#else
+    static constexpr int maxBacklog = somaxconnLinux;
+#endif
+
+    // Sensible default for general-purpose servers that do not need the
+    // platform maximum (e.g. unit-test echo servers, port-availability probes).
+    static constexpr int defaultBacklog = 64;
+
+    // Current value. Defaults to defaultBacklog.
+    // Use Backlog{4096} to request a higher queue after raising the sysctl.
+    int value = defaultBacklog;
+
+    Backlog() = default;
+    constexpr explicit Backlog(int v) noexcept : value(v) {}
+
+    // Implicit conversion to int so POSIX/Winsock APIs need no call-site casts.
+    constexpr operator int() const noexcept { return value; }
+};
+
 // Named timeout constants for common use cases.
 namespace Timeouts {
     inline constexpr Milliseconds Immediate{0};
@@ -167,7 +211,7 @@ struct NetworkInterface {
 struct ServerBind {
     std::string address; // e.g. "0.0.0.0", "127.0.0.1", "::1"
     Port port{0};
-    int backlog = 10;
+    Backlog backlog{};
     bool reuseAddr = true;
 };
 

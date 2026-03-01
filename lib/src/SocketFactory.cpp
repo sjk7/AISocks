@@ -235,7 +235,7 @@ Result<bool> SocketFactory::isPortAvailable(
 
     // Try to bind
     ServerBind bind_config{
-        address, port, 1, false}; // Minimal backlog, no reuse
+        address, port, Backlog{1}, false}; // Minimal backlog, no reuse
     auto bind_result
         = bindSocket(std::move(socket_result.value()), bind_config);
 

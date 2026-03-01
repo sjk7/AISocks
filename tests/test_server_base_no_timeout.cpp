@@ -42,7 +42,8 @@ struct NoTimeoutState {
 class NoTimeoutServer : public ServerBase<NoTimeoutState> {
     public:
     explicit NoTimeoutServer(uint16_t port)
-        : ServerBase<NoTimeoutState>(ServerBind{"127.0.0.1", Port{port}, 5}) {
+        : ServerBase<NoTimeoutState>(
+              ServerBind{"127.0.0.1", Port{port}, Backlog{5}}) {
         // Don't set keep-alive timeout
     }
 
@@ -122,7 +123,7 @@ int main() {
             std::chrono::milliseconds{100});
 
         std::cout << "Server stopped successfully\n";
-        
+
         // CRITICAL: Wait for server thread to finish before destructor
         serverThread.join();
     }

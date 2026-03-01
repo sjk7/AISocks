@@ -99,7 +99,7 @@ class TimedServer : public ServerBase<int> {
 
     explicit TimedServer(
         uint16_t port, std::chrono::milliseconds keepAlive = KEEP_ALIVE)
-        : ServerBase<int>(ServerBind{"127.0.0.1", Port{port}, 16}) {
+        : ServerBase<int>(ServerBind{"127.0.0.1", Port{port}, Backlog{16}}) {
         setKeepAliveTimeout(keepAlive);
     }
 

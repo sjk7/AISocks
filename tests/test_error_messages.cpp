@@ -60,8 +60,7 @@ static bool hasOsBracket(const std::string& msg) {
 static void test_connect_exception_message() {
     BEGIN_TEST("ConnectArgs error: basic error handling");
     {
-        auto result = SocketFactory::createTcpClient(
-            AddressFamily::IPv4, 
+        auto result = SocketFactory::createTcpClient(AddressFamily::IPv4,
             ConnectArgs{"127.0.0.1", Port{1}, Milliseconds{100}});
         REQUIRE(result.isError());
         // Just verify basic error handling works
@@ -70,18 +69,17 @@ static void test_connect_exception_message() {
 
     BEGIN_TEST("ConnectArgs error: error() is Timeout or ConnectFailed");
     {
-        auto result = SocketFactory::createTcpClient(
-            AddressFamily::IPv4, 
+        auto result = SocketFactory::createTcpClient(AddressFamily::IPv4,
             ConnectArgs{"127.0.0.1", Port{1}, Milliseconds{100}});
         SocketError code = result.error();
-        REQUIRE_MSG(code == SocketError::Timeout || code == SocketError::ConnectFailed,
+        REQUIRE_MSG(
+            code == SocketError::Timeout || code == SocketError::ConnectFailed,
             "error() is Timeout or ConnectFailed");
     }
 
     BEGIN_TEST("ConnectArgs error: verify error codes");
     {
-        auto result = SocketFactory::createTcpClient(
-            AddressFamily::IPv4, 
+        auto result = SocketFactory::createTcpClient(AddressFamily::IPv4,
             ConnectArgs{"127.0.0.1", Port{2}, Milliseconds{500}});
         REQUIRE(result.isError());
         REQUIRE(result.error() != SocketError::None);
@@ -94,11 +92,10 @@ static void test_connect_exception_message() {
 static void test_bind_exception_message() {
     BEGIN_TEST("ServerBind error: basic error handling");
     {
-        TcpSocket occupant(
-            AddressFamily::IPv4, ServerBind{"127.0.0.1", Port{BASE}, 5, false});
-        auto result = SocketFactory::createTcpServer(
-            AddressFamily::IPv4,
-            ServerBind{"127.0.0.1", Port{BASE}, 5, false});
+        TcpSocket occupant(AddressFamily::IPv4,
+            ServerBind{"127.0.0.1", Port{BASE}, Backlog{5}, false});
+        auto result = SocketFactory::createTcpServer(AddressFamily::IPv4,
+            ServerBind{"127.0.0.1", Port{BASE}, Backlog{5}, false});
         REQUIRE(result.isError());
         REQUIRE(result.error() != SocketError::None);
     }
@@ -106,10 +103,9 @@ static void test_bind_exception_message() {
     BEGIN_TEST("ServerBind error: error() == BindFailed");
     {
         TcpSocket occupant(AddressFamily::IPv4,
-            ServerBind{"127.0.0.1", Port{BASE + 1}, 5, false});
-        auto result = SocketFactory::createTcpServer(
-            AddressFamily::IPv4,
-            ServerBind{"127.0.0.1", Port{BASE + 1}, 5, false});
+            ServerBind{"127.0.0.1", Port{BASE + 1}, Backlog{5}, false});
+        auto result = SocketFactory::createTcpServer(AddressFamily::IPv4,
+            ServerBind{"127.0.0.1", Port{BASE + 1}, Backlog{5}, false});
         SocketError code = result.error();
         REQUIRE(code == SocketError::BindFailed);
     }
@@ -129,10 +125,9 @@ static void test_dns_error_message() {
     {
         // Test both exception and non-throwing paths in one test to avoid
         // two slow DNS lookups (~2s each)
-        
+
         // Result<T> path (SocketFactory)
-        auto result = SocketFactory::createTcpClient(
-            AddressFamily::IPv4, 
+        auto result = SocketFactory::createTcpClient(AddressFamily::IPv4,
             ConnectArgs{BAD_HOST, Port{BASE + 10}, Milliseconds{500}});
         std::string message = result.message();
         std::cout << "  message(): " << message << "\n";
@@ -140,14 +135,15 @@ static void test_dns_error_message() {
         // Result<T> messages for DNS are simpler, just verify OS bracket
         REQUIRE_MSG(hasOsBracket(message),
             "DNS failure message() has '[code: gai_strerror_text]' bracket");
-        
+
         // Non-throwing path (connect())
         auto s = TcpSocket::createRaw();
         (void)s.connect(BAD_HOST, Port{BASE + 10});
         std::string msg = s.getErrorMessage();
         std::cout << "  getErrorMessage(): " << msg << "\n";
         REQUIRE_MSG(msg.find(BAD_HOST) != std::string::npos,
-            "getErrorMessage() contains the failing hostname (non-throwing path)");
+            "getErrorMessage() contains the failing hostname (non-throwing "
+            "path)");
         REQUIRE_MSG(
             hasOsBracket(msg), "getErrorMessage() has '[code: text]' bracket");
     }

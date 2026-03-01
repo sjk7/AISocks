@@ -3,7 +3,8 @@
 // https://pvs-studio.com
 //
 // Tests: SocketFactory API with Result<T> exception-free error handling
-// Verifies that SocketFactory methods return Result<T> with proper error handling
+// Verifies that SocketFactory methods return Result<T> with proper error
+// handling
 
 #include "TcpSocket.h"
 #include "UdpSocket.h"
@@ -37,12 +38,12 @@ static void test_basic_constructor() {
         auto b = SocketFactory::createTcpSocket(AddressFamily::IPv6);
         auto c = SocketFactory::createUdpSocket();
         auto d = SocketFactory::createUdpSocket(AddressFamily::IPv6);
-        
+
         REQUIRE(a.isSuccess());
         REQUIRE(b.isSuccess());
         REQUIRE(c.isSuccess());
         REQUIRE(d.isSuccess());
-        
+
         REQUIRE(a.value().getAddressFamily() == AddressFamily::IPv4);
         REQUIRE(b.value().getAddressFamily() == AddressFamily::IPv6);
         REQUIRE(c.value().getAddressFamily() == AddressFamily::IPv4);
@@ -91,10 +92,11 @@ static void test_server_bind_happy() {
 
     std::this_thread::sleep_for(std::chrono::milliseconds(1));
 
-    BEGIN_TEST("ServerBind factory: reuseAddr=false still works on a fresh port");
+    BEGIN_TEST(
+        "ServerBind factory: reuseAddr=false still works on a fresh port");
     {
         auto result = SocketFactory::createTcpServer(
-            ServerBind{"127.0.0.1", Port{BASE + 2}, 5, false});
+            ServerBind{"127.0.0.1", Port{BASE + 2}, Backlog{5}, false});
         REQUIRE(result.isSuccess());
         auto& s = result.value();
         REQUIRE(s.isValid());
@@ -125,12 +127,12 @@ static void test_connect_to_happy() {
         });
 
         // Wait for server
-        auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(2);
+        auto deadline
+            = std::chrono::steady_clock::now() + std::chrono::seconds(2);
         while (!ready && std::chrono::steady_clock::now() < deadline)
             std::this_thread::sleep_for(std::chrono::milliseconds(5));
 
-        auto clt_result = SocketFactory::createTcpClient(
-            AddressFamily::IPv4,
+        auto clt_result = SocketFactory::createTcpClient(AddressFamily::IPv4,
             ConnectArgs{"127.0.0.1", Port{BASE + 3}, Milliseconds{1000}});
         srvThread.join();
         REQUIRE(clt_result.isSuccess());
@@ -139,7 +141,8 @@ static void test_connect_to_happy() {
 
     std::this_thread::sleep_for(std::chrono::milliseconds(1));
 
-    BEGIN_TEST("ConnectArgs factory: send/receive works immediately after construction");
+    BEGIN_TEST("ConnectArgs factory: send/receive works immediately after "
+               "construction");
     {
         const std::string payload = "hello-from-constructor";
         std::atomic<bool> ready{false};
@@ -164,12 +167,12 @@ static void test_connect_to_happy() {
             }
         });
 
-        auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(2);
+        auto deadline
+            = std::chrono::steady_clock::now() + std::chrono::seconds(2);
         while (!ready && std::chrono::steady_clock::now() < deadline)
             std::this_thread::sleep_for(std::chrono::milliseconds(5));
 
-        auto clt_result = SocketFactory::createTcpClient(
-            AddressFamily::IPv4,
+        auto clt_result = SocketFactory::createTcpClient(AddressFamily::IPv4,
             ConnectArgs{"127.0.0.1", Port{BASE + 4}, Milliseconds{1000}});
         REQUIRE(clt_result.isSuccess());
         auto& c = clt_result.value();
@@ -186,17 +189,18 @@ static void test_connect_to_happy() {
 static void test_server_bind_failures() {
     std::this_thread::sleep_for(std::chrono::milliseconds(1));
 
-    BEGIN_TEST("ServerBind factory: returns error on port-in-use (same port, no reuseAddr)");
+    BEGIN_TEST("ServerBind factory: returns error on port-in-use (same port, "
+               "no reuseAddr)");
     {
         // First socket holds the port
         auto first_result = SocketFactory::createTcpServer(
-            ServerBind{"127.0.0.1", Port{BASE + 10}, 5, false});
+            ServerBind{"127.0.0.1", Port{BASE + 10}, Backlog{5}, false});
         REQUIRE(first_result.isSuccess());
         auto& first = first_result.value();
 
         // Second socket tries same port without reuseAddr
         auto second_result = SocketFactory::createTcpServer(
-            ServerBind{"127.0.0.1", Port{BASE + 10}, 5, false});
+            ServerBind{"127.0.0.1", Port{BASE + 10}, Backlog{5}, false});
         REQUIRE(second_result.isError());
         REQUIRE(second_result.error() != SocketError::None);
         REQUIRE(!second_result.message().empty());
@@ -222,8 +226,7 @@ static void test_connect_to_failures() {
 
     BEGIN_TEST("ConnectArgs factory: returns error on refused port");
     {
-        auto result = SocketFactory::createTcpClient(
-            AddressFamily::IPv4,
+        auto result = SocketFactory::createTcpClient(AddressFamily::IPv4,
             ConnectArgs{"127.0.0.1", Port{1}, Milliseconds{100}});
         REQUIRE(result.isError());
         REQUIRE(result.error() != SocketError::None);
@@ -232,9 +235,9 @@ static void test_connect_to_failures() {
 
     BEGIN_TEST("ConnectArgs factory: returns error on invalid address");
     {
-        auto result = SocketFactory::createTcpClient(
-            AddressFamily::IPv4,
-            ConnectArgs{"invalid.address.that.does.not.exist", Port{80}, Milliseconds{100}});
+        auto result = SocketFactory::createTcpClient(AddressFamily::IPv4,
+            ConnectArgs{"invalid.address.that.does.not.exist", Port{80},
+                Milliseconds{100}});
         REQUIRE(result.isError());
         REQUIRE(result.error() != SocketError::None);
         REQUIRE(!result.message().empty());
@@ -242,12 +245,13 @@ static void test_connect_to_failures() {
 
     BEGIN_TEST("ConnectArgs factory: returns error on timeout");
     {
-        auto result = SocketFactory::createTcpClient(
-            AddressFamily::IPv4,
-            ConnectArgs{"10.255.255.1", Port{80}, Milliseconds{10}}); // Non-routable IP
+        auto result = SocketFactory::createTcpClient(AddressFamily::IPv4,
+            ConnectArgs{
+                "10.255.255.1", Port{80}, Milliseconds{10}}); // Non-routable IP
         REQUIRE(result.isError());
         // Should timeout or be unreachable
-        REQUIRE(result.error() == SocketError::Timeout || result.error() == SocketError::ConnectFailed);
+        REQUIRE(result.error() == SocketError::Timeout
+            || result.error() == SocketError::ConnectFailed);
     }
 }
 
@@ -259,7 +263,7 @@ static void test_move_semantics() {
     {
         auto result1 = SocketFactory::createTcpSocket();
         REQUIRE(result1.isSuccess());
-        
+
         auto result2 = std::move(result1);
         REQUIRE(result2.isSuccess());
         REQUIRE(result2.value().isValid());
@@ -269,10 +273,10 @@ static void test_move_semantics() {
     {
         auto result = SocketFactory::createTcpSocket();
         REQUIRE(result.isSuccess());
-        
+
         TcpSocket sock1 = std::move(result.value());
         REQUIRE(sock1.isValid());
-        
+
         TcpSocket sock2 = std::move(sock1);
         REQUIRE(sock2.isValid());
     }

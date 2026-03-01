@@ -43,7 +43,8 @@ struct MinimalState {
 class MinimalServer : public ServerBase<MinimalState> {
     public:
     explicit MinimalServer(uint16_t port)
-        : ServerBase<MinimalState>(ServerBind{"127.0.0.1", Port{port}, 5}) {}
+        : ServerBase<MinimalState>(
+              ServerBind{"127.0.0.1", Port{port}, Backlog{5}}) {}
 
     protected:
     ServerResult onReadable(TcpSocket& sock, MinimalState& s) override {
@@ -105,7 +106,7 @@ int main() {
             std::chrono::milliseconds{100});
 
         std::cout << "Server stopped successfully\n";
-        
+
         // CRITICAL: Wait for server thread to finish before destructor
         serverThread.join();
     }

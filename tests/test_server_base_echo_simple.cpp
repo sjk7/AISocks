@@ -18,7 +18,8 @@ struct SimpleEchoState {
 class SimpleEchoServer : public ServerBase<SimpleEchoState> {
     public:
     explicit SimpleEchoServer(uint16_t port)
-        : ServerBase<SimpleEchoState>(ServerBind{"127.0.0.1", Port{port}, 5}) {}
+        : ServerBase<SimpleEchoState>(
+              ServerBind{"127.0.0.1", Port{port}, Backlog{5}}) {}
 
     protected:
     ServerResult onReadable(TcpSocket& sock, SimpleEchoState& s) override {

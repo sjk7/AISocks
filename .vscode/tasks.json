@@ -190,6 +190,49 @@
       "detail": "Configure CMake for debug build"
     },
     {
+      "label": "configure-ubsan-release",
+      "type": "shell",
+      "command": "cmake",
+      "args": [
+        "-S",
+        ".",
+        "-B",
+        "build-ubsan",
+        "-DCMAKE_BUILD_TYPE=RelWithDebInfo",
+        "-DENABLE_UBSAN=ON",
+        "-DBUILD_EXAMPLES=ON",
+        "-G",
+        "Ninja"
+      ],
+      "group": "build",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      },
+      "problemMatcher": [],
+      "detail": "Configure CMake for UBSan RelWithDebInfo build"
+    },
+    {
+      "label": "build-ubsan-http-server",
+      "type": "shell",
+      "command": "cmake",
+      "args": [
+        "--build",
+        "build-ubsan",
+        "--target",
+        "http_server",
+        "--config",
+        "RelWithDebInfo"
+      ],
+      "group": "build",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      },
+      "problemMatcher": ["$gcc"],
+      "detail": "Build http_server with UndefinedBehaviorSanitizer (RelWithDebInfo)"
+    },
+    {
       "label": "build-all-examples",
       "type": "shell",
       "command": "cmake",
