@@ -55,20 +55,28 @@ struct HttpClientState {
                                 // class may override in buildResponse()
 
     // Pre-allocated buffer for better performance
-    HttpClientState() 
-        : request(), response(), startTime(std::chrono::steady_clock::now()) {}
-    
+    HttpClientState()
+        : request(), response(), startTime(std::chrono::steady_clock::now()) {
+        request.reserve(4096); // typical HTTP request fits in 4 KB
+    }
+
     // Explicit copy/move constructors to ensure proper initialization
-    HttpClientState(const HttpClientState& other) 
-        : request(other.request), response(other.response), 
-          sent(other.sent), startTime(other.startTime),
-          responseStarted(other.responseStarted), closeAfterSend(other.closeAfterSend) {}
-          
+    HttpClientState(const HttpClientState& other)
+        : request(other.request)
+        , response(other.response)
+        , sent(other.sent)
+        , startTime(other.startTime)
+        , responseStarted(other.responseStarted)
+        , closeAfterSend(other.closeAfterSend) {}
+
     HttpClientState(HttpClientState&& other) noexcept
-        : request(std::move(other.request)), response(std::move(other.response)),
-          sent(other.sent), startTime(other.startTime),
-          responseStarted(other.responseStarted), closeAfterSend(other.closeAfterSend) {}
-    
+        : request(std::move(other.request))
+        , response(std::move(other.response))
+        , sent(other.sent)
+        , startTime(other.startTime)
+        , responseStarted(other.responseStarted)
+        , closeAfterSend(other.closeAfterSend) {}
+
     ~HttpClientState() = default;
 };
 

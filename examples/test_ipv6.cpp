@@ -1,5 +1,6 @@
 // This is a personal academic project. Dear PVS-Studio, please check it.
-// PVS-Studio Static Code Analyzer for C, C++, C#, and Java: https://pvs-studio.com
+// PVS-Studio Static Code Analyzer for C, C++, C#, and Java:
+// https://pvs-studio.com
 #include "TcpSocket.h"
 #include <iostream>
 #include <thread>
@@ -24,7 +25,7 @@ void testIPv4() {
     }
     std::cout << "   Address family is IPv4" << std::endl;
 
-    serverSocket.setReuseAddress(true);
+    (void)serverSocket.setReuseAddress(true);
 
     if (!serverSocket.bind("127.0.0.1", Port{8001})) {
         std::cerr << "   Failed to bind IPv4: "
@@ -87,13 +88,12 @@ void testIPv6() {
     }
     std::cout << "   Address family is IPv6" << std::endl;
 
-    serverSocket.setReuseAddress(true);
+    (void)serverSocket.setReuseAddress(true);
 
     if (!serverSocket.bind("::1", Port{8002})) {
         std::cerr << "   Failed to bind IPv6: "
                   << serverSocket.getErrorMessage() << std::endl;
-        std::cerr << "   IPv6 may not be available on this system"
-                  << std::endl;
+        std::cerr << "   IPv6 may not be available on this system" << std::endl;
         return;
     }
     std::cout << "   Bound to ::1:8002" << std::endl;

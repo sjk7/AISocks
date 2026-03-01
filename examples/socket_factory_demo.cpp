@@ -238,26 +238,20 @@ void demonstratePerformanceBenefits() {
 int main() {
     std::cout << "=== SocketFactory Exception-Free API Demonstration ===\n\n";
 
-    try {
-        demonstrateBasicCreation();
-        demonstrateServerCreation();
-        demonstrateClientConnection();
-        demonstratePortUtilities();
-        demonstrateErrorHandling();
-        demonstratePerformanceBenefits();
+    demonstrateBasicCreation();
+    demonstrateServerCreation();
+    demonstrateClientConnection();
+    demonstratePortUtilities();
+    demonstrateErrorHandling();
+    demonstratePerformanceBenefits();
 
-        std::cout << "=== All demonstrations completed successfully ===\n";
-        std::cout << "Key benefits demonstrated:\n";
-        std::cout << "- No exceptions thrown anywhere\n";
-        std::cout << "- Lazy error message construction\n";
-        std::cout << "- Rich error context when needed\n";
-        std::cout << "- Zero overhead for success cases\n";
-        std::cout << "- Clean, composable API\n";
-
-    } catch (const std::exception& e) {
-        std::cout << "Unexpected exception: " << e.what() << "\n";
-        return 1;
-    }
+    std::cout << "=== All demonstrations completed successfully ===\n";
+    std::cout << "Key benefits demonstrated:\n";
+    std::cout << "- No exceptions thrown anywhere\n";
+    std::cout << "- Lazy error message construction\n";
+    std::cout << "- Rich error context when needed\n";
+    std::cout << "- Zero overhead for success cases\n";
+    std::cout << "- Clean, composable API\n";
 
     return 0;
 }

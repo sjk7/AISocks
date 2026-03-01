@@ -28,7 +28,7 @@ void runServerNonBlocking() {
         return;
     }
 
-    serverSocket.setReuseAddress(true);
+    (void)serverSocket.setReuseAddress(true);
 
     if (!serverSocket.bind("0.0.0.0", Port{8080})) {
         std::cerr << "Failed to bind: " << serverSocket.getErrorMessage()

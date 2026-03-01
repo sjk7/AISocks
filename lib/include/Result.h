@@ -5,7 +5,8 @@
 #define AISOCKS_RESULT_H
 
 #include "SocketTypes.h"
-#include <stdexcept>
+#include <cassert>
+#include <cstdio>
 #include <string>
 #include <utility>
 
@@ -29,7 +30,7 @@ struct ErrorInfo {
 // Result<T> - Exception-free error handling with lazy error message
 // construction
 // ---------------------------------------------------------------------------
-template <typename T> class Result {
+template <typename T> class [[nodiscard]] Result {
     private:
     // Union storage - uses placement new to construct objects in raw memory
     // This enables zero-allocation Result with same size as T + bool
@@ -151,27 +152,35 @@ template <typename T> class Result {
     bool isSuccess() const noexcept { return has_value_; }
     bool isError() const noexcept { return !has_value_; }
 
-    // Access value (only valid when successful)
+    // Access value — Precondition: isSuccess() must be true.
+    // Use isSuccess(), operator bool, or value_or() to guard before calling.
+    // Always prints to stderr on violation; asserts (aborts) in debug builds.
     const T& value() const& {
         if (!has_value_) {
-            throw std::runtime_error(
-                "Attempted to access value of error Result");
+            fprintf(stderr,
+                "Result::value() called on an error Result"
+                " — check isSuccess() first\n");
+            assert(false);
         }
         return value_ref();
     }
 
     T& value() & {
         if (!has_value_) {
-            throw std::runtime_error(
-                "Attempted to access value of error Result");
+            fprintf(stderr,
+                "Result::value() called on an error Result"
+                " — check isSuccess() first\n");
+            assert(false);
         }
         return value_ref();
     }
 
     T&& value() && {
         if (!has_value_) {
-            throw std::runtime_error(
-                "Attempted to access value of error Result");
+            fprintf(stderr,
+                "Result::value() called on an error Result"
+                " — check isSuccess() first\n");
+            assert(false);
         }
         return std::move(value_ref());
     }
@@ -216,7 +225,7 @@ template <typename T> class Result {
 // ---------------------------------------------------------------------------
 // Result<void> specialization for operations without return values
 // ---------------------------------------------------------------------------
-template <> class Result<void> {
+template <> class [[nodiscard]] Result<void> {
     private:
     SocketError error_;
 
@@ -332,7 +341,7 @@ template <> class Result<void> {
 // ---------------------------------------------------------------------------
 // Result<Endpoint> specialization for endpoint queries
 // ---------------------------------------------------------------------------
-template <> class Result<Endpoint> {
+template <> class [[nodiscard]] Result<Endpoint> {
     private:
     union {
         alignas(Endpoint) unsigned char endpoint_storage_[sizeof(Endpoint)];
@@ -441,26 +450,35 @@ template <> class Result<Endpoint> {
         return has_value_ ? SocketError::None : error_ref().error;
     }
 
+    // Access value — Precondition: isSuccess() must be true.
+    // Use isSuccess(), operator bool, or value_or() to guard before calling.
+    // Always prints to stderr on violation; asserts (aborts) in debug builds.
     const Endpoint& value() const& {
         if (!has_value_) {
-            throw std::runtime_error(
-                "Attempted to access value of error Result<Endpoint>");
+            fprintf(stderr,
+                "Result<Endpoint>::value() called on an error Result"
+                " — check isSuccess() first\n");
+            assert(false);
         }
         return endpoint_ref();
     }
 
     Endpoint& value() & {
         if (!has_value_) {
-            throw std::runtime_error(
-                "Attempted to access value of error Result<Endpoint>");
+            fprintf(stderr,
+                "Result<Endpoint>::value() called on an error Result"
+                " — check isSuccess() first\n");
+            assert(false);
         }
         return endpoint_ref();
     }
 
     Endpoint&& value() && {
         if (!has_value_) {
-            throw std::runtime_error(
-                "Attempted to access value of error Result<Endpoint>");
+            fprintf(stderr,
+                "Result<Endpoint>::value() called on an error Result"
+                " — check isSuccess() first\n");
+            assert(false);
         }
         return std::move(endpoint_ref());
     }

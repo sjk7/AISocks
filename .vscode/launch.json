@@ -2,6 +2,16 @@
   "version": "0.2.0",
   "configurations": [
     {
+      "name": "Run http_server (macOS Release -O3)",
+      "type": "lldb",
+      "request": "launch",
+      "program": "${workspaceFolder}/build-mac-rel/http_server",
+      "args": [],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "preLaunchTask": "build-mac-rel-http-server"
+    },
+    {
       "name": "Debug http_server (MemorySanitizer)",
       "type": "lldb",
       "request": "launch",

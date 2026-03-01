@@ -190,6 +190,43 @@
       "detail": "Configure CMake for debug build"
     },
     {
+      "label": "configure-mac-rel",
+      "type": "shell",
+      "command": "cmake",
+      "args": [
+        "-S",
+        ".",
+        "-B",
+        "build-mac-rel",
+        "-DCMAKE_BUILD_TYPE=Release",
+        "-DCMAKE_CXX_FLAGS_RELEASE=-O2 -DNDEBUG -fno-exceptions",
+        "-DBUILD_EXAMPLES=ON",
+        "-G",
+        "Ninja"
+      ],
+      "group": "build",
+      "presentation": { "reveal": "always", "panel": "shared" },
+      "problemMatcher": [],
+      "detail": "Configure macOS Release -O3 with debug symbols"
+    },
+    {
+      "label": "build-mac-rel-http-server",
+      "type": "shell",
+      "command": "cmake",
+      "args": [
+        "--build",
+        "build-mac-rel",
+        "--target",
+        "http_server",
+        "--config",
+        "Release"
+      ],
+      "group": "build",
+      "presentation": { "reveal": "always", "panel": "shared" },
+      "problemMatcher": ["$gcc"],
+      "detail": "Build http_server — macOS Release -O3 with symbols"
+    },
+    {
       "label": "configure-ubsan-release",
       "type": "shell",
       "command": "cmake",

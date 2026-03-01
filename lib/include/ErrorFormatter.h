@@ -17,13 +17,15 @@ namespace aiSocks {
 
 // Format error message in exact same format as SocketException::what()
 // Format: "step: description [sysCode: systemMessage]"
-inline std::string formatErrorMessage(const std::string& step, const ErrorContext& ctx) {
+inline std::string formatErrorMessage(
+    const std::string& step, const ErrorContext& ctx) {
     std::string result = step + ": " + formatErrorContext(ctx);
     return result;
 }
 
 // Format error message from SocketImpl for compatibility
-inline std::string formatErrorMessage(const std::string& step, const Socket& socket) {
+inline std::string formatErrorMessage(
+    const std::string& step, const Socket& socket) {
     if (!socket.isValid()) {
         auto err = socket.getLastError();
         auto msg = socket.getErrorMessage();
@@ -40,30 +42,30 @@ inline ErrorContext getErrorContext(const Socket& socket) {
     ctx.description = "Unknown error";
     ctx.sysCode = 0;
     ctx.isDns = false;
-    
+
     // Try to extract more detailed error information
     auto err = socket.getLastError();
     auto msg = socket.getErrorMessage();
-    
+
     // Parse the message to extract description and system code
     // Message format: "description [sysCode: systemMessage]"
     auto bracket_pos = msg.find('[');
     if (bracket_pos != std::string::npos) {
-        ctx.description = msg.substr(0, bracket_pos - 1); // Remove trailing space
-        
+        ctx.description
+            = msg.substr(0, bracket_pos - 1); // Remove trailing space
+
         auto colon_pos = msg.find(':', bracket_pos);
         if (colon_pos != std::string::npos) {
-            try {
-                std::string code_str = msg.substr(bracket_pos + 1, colon_pos - bracket_pos - 1);
-                ctx.sysCode = std::stoi(code_str);
-            } catch (...) {
-                ctx.sysCode = 0;
-            }
+            std::string code_str
+                = msg.substr(bracket_pos + 1, colon_pos - bracket_pos - 1);
+            char* end = nullptr;
+            long v = std::strtol(code_str.c_str(), &end, 10);
+            ctx.sysCode = (end != code_str.c_str()) ? static_cast<int>(v) : 0;
         }
     } else {
         ctx.description = msg.c_str();
     }
-    
+
     return ctx;
 }
 

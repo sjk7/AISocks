@@ -114,7 +114,7 @@ static void runEchoClient(Port port) {
 static void runUdpPeerLog(Port port) {
     // Server side: just bind and receive one datagram.
     UdpSocket server;
-    server.setReuseAddress(true);
+    (void)server.setReuseAddress(true);
     if (!server.bind("127.0.0.1", port)) {
         std::cerr << "[udp-server] bind failed\n";
         return;

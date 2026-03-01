@@ -84,7 +84,8 @@ struct Backlog {
     static constexpr int defaultBacklog = 64;
 
     // Current value. Defaults to defaultBacklog.
-    // Use Backlog{4096} to request a higher queue after raising the sysctl.
+    // Use Backlog{4096} to request a higher queue after raising the sysctl in
+    // *nix, or just Backlog{} for the default.
     int value = defaultBacklog;
 
     Backlog() = default;

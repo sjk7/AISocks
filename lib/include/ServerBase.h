@@ -250,6 +250,13 @@ template <typename ClientData> class ServerBase {
             }
         }
 
+        // Flush any accumulated keep-alive timeout count before exiting.
+        if (timeoutLogCount_ > 0) {
+            printf("[keepalive] closed %zu idle connection%s total\n",
+                timeoutLogCount_, timeoutLogCount_ == 1 ? "" : "s");
+            timeoutLogCount_ = 0;
+        }
+
         // Clean up any remaining clients when stopping
         for (auto& [fd, entry] : clients_) {
             onDisconnect(entry.data);
@@ -357,10 +364,17 @@ template <typename ClientData> class ServerBase {
     virtual void onError(TcpSocket& /*sock*/, ClientData& /*data*/) {}
 
     // Called after the keep-alive sweep closes one or more idle connections.
-    // Default: prints the count to stdout.
+    // Default: accumulates count and prints at most once per minute.
     virtual void onClientsTimedOut(size_t count) {
-        printf("[keepalive] closed %zu idle connection%s\n", count,
-            count == 1 ? "" : "s");
+        timeoutLogCount_ += count;
+        auto now = SteadyClock::now();
+        if (now - timeoutLogLast_ >= std::chrono::minutes{1}) {
+            printf(
+                "[keepalive] closed %zu idle connection%s in the last minute\n",
+                timeoutLogCount_, timeoutLogCount_ == 1 ? "" : "s");
+            timeoutLogCount_ = 0;
+            timeoutLogLast_ = now;
+        }
     }
 
     // Called on every loop iteration after poller.wait() returns, before
@@ -375,6 +389,11 @@ template <typename ClientData> class ServerBase {
 
     private:
     using SteadyClock = std::chrono::steady_clock;
+
+    // Keepalive log throttle state — initialised to epoch so the first
+    // sweep always prints immediately rather than waiting a full minute.
+    SteadyClock::time_point timeoutLogLast_{};
+    size_t timeoutLogCount_{0};
     struct ClientEntry {
         std::unique_ptr<TcpSocket> socket;
         ClientData data;
@@ -539,7 +558,9 @@ template <typename ClientData> class ServerBase {
             if (!client->setBlocking(false)) {
                 continue; // couldn't set non-blocking; drop this client
             }
-            client->setNoDelay(true);
+            (void)client->setNoDelay(true); // best-effort, failure is non-fatal
+            (void)client->setReceiveBufferSize(256 * 1024); // SO_RCVBUF 256 KB
+            (void)client->setSendBufferSize(256 * 1024); // SO_SNDBUF 256 KB
 
             uintptr_t key = client->getNativeHandle();
             if (!poller.add(*client, PollEvent::Readable | PollEvent::Error)) {

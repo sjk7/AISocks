@@ -62,6 +62,17 @@
         "BUILD_EXAMPLES": "ON",
         "ENABLE_UBSAN": "ON"
       }
+    },
+    {
+      "name": "mac-release",
+      "inherits": "base",
+      "displayName": "macOS Release -O3 with symbols",
+      "binaryDir": "${sourceDir}/build-mac-rel",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "BUILD_EXAMPLES": "ON",
+        "CMAKE_CXX_FLAGS_RELEASE": "-O2 -DNDEBUG -fno-exceptions"
+      }
     }
   ],
   "buildPresets": [
@@ -107,6 +118,17 @@
       "name": "http-server-ubsan",
       "configurePreset": "ubsan-release",
       "displayName": "Build http_server (UBSan RelWithDebInfo)",
+      "targets": ["http_server"]
+    },
+    {
+      "name": "mac-release",
+      "configurePreset": "mac-release",
+      "displayName": "Build macOS Release -O3"
+    },
+    {
+      "name": "http-server-mac-rel",
+      "configurePreset": "mac-release",
+      "displayName": "Build http_server (macOS Release -O3)",
       "targets": ["http_server"]
     }
   ],
