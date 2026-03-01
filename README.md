@@ -1,200 +1,191 @@
 # aiSocks
-<!-- CI trigger: testing Windows build fixes -->
 
-Cross-Platform Socket Library
+Cross-platform C++17 socket library — and a high-performance poll-driven HTTP/1.x server built on top of it.
 
-A modern C++ socket library that abstracts platform differences between Windows, macOS, and Linux using the pimpl (Pointer to Implementation) idiom.
+Zero dependencies beyond a standard C++17 compiler and CMake.
+
+## Performance
+
+Benchmarked on macOS (Apple Silicon), Release build, `wrk -t12 -c5000 -d30s`:
+
+| Metric | aiSocks | nginx | Δ |
+|---|---|---|---|
+| Requests/sec | **77,243** | 21,385 | ✅ +261% |
+| Transfer/sec | **35.95 MB** | 9.95 MB | ✅ +261% |
+| Total requests (30 s) | **2,325,324** | 643,274 | ✅ +261% |
+| Avg latency | **25.39 ms** | 41.40 ms | ✅ −39% |
+| Read errors | **0** | 154,282 | ✅ |
 
 ## Features
 
-Zero dependencies, other than a standard C++ compiler and CMake.
-
-- ✅ Cross-platform support (Windows, macOS, Linux)
-- ✅ Clean pimpl-based API hiding platform (and socket header)details
-- ✅ IPv4 and IPv6 support
-- ✅ TCP and UDP socket support
+- ✅ Cross-platform (Windows, macOS, Linux)
+- ✅ Clean pimpl API — platform headers never leak into user code
+- ✅ IPv4 and IPv6
+- ✅ TCP and UDP
 - ✅ Blocking and non-blocking modes
-- ✅ Server and client functionality
-- ✅ CamelCase naming convention
-- ✅ Modern C++17
-- ✅ CMake build system
+- ✅ Poll-driven `ServerBase<T>` — single-thread, zero allocations in the hot path
+- ✅ `HttpPollServer` — HTTP/1.x framing, keep-alive, streaming, zero-copy static responses
+- ✅ kqueue backend (macOS/BSD) with lazy-deletion timeout heap
+- ✅ AddressSanitizer / MemorySanitizer / UBSan build presets
+- ✅ Modern C++17, CMake, Ninja
+
+## Hot-path optimisations (Mar 2026)
+
+| # | Change | Where |
+|---|---|---|
+| 2 | `kevent` wait clamped to 1 ms minimum — prevents busy-spin at idle | `PollerKqueue.cpp` |
+| 3 | `sweepTimeouts` throttled to once per 100 ms when > 1000 clients | `ServerBase.h` |
+| 4 | `EV_DISABLE` instead of `EV_DELETE` for Writable toggle; flat byte array replaces `unordered_map` in `wait()` merge | `PollerKqueue.cpp` |
+| 5 | `clients_` hash map replaced with `clientSlots_[]` sparse array + `clientFds_[]` dense list — O(1) insert / lookup / erase, no hashing | `ServerBase.h` |
+| 6 | `HttpClientState::response` (owned `std::string`) replaced with `responseView` (`string_view`) + `responseBuf` — static responses are zero-copy views into pre-built strings | `HttpPollServer.h`, `http_poll_server.cpp` |
 
 ## Project Structure
 
 ```
-AISOcks/
-├── CMakeLists.txt          # Root CMake configuration
-├── lib/                    # Socket library
-│   ├── CMakeLists.txt      # Library CMake configuration
+aiSocks/
+├── CMakeLists.txt
+├── lib/
 │   ├── include/
-│   │   └── Socket.h        # Public API header
+│   │   ├── Socket.h            # Public socket API
+│   │   ├── TcpSocket.h
+│   │   ├── Poller.h
+│   │   ├── ServerBase.h        # Poll-driven server template
+│   │   └── HttpPollServer.h    # HTTP/1.x server base class
 │   └── src/
-│       ├── Socket.cpp      # Public API implementation
-│       ├── SocketImpl.h    # Private implementation header
-│       └── SocketImpl.cpp  # Platform-specific implementation
+│       ├── SocketImpl.cpp      # Platform-specific socket implementation
+│       ├── PollerKqueue.cpp    # kqueue backend (macOS/BSD)
+│       └── PollerEpoll.cpp     # epoll backend (Linux)
 └── examples/
-    └── main.cpp            # Example client-server application
+    ├── http_poll_server.cpp    # Production HTTP server example
+    └── ...
 ```
 
 ## Building
 
+### Debug (default)
+```bash
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DBUILD_EXAMPLES=ON -G Ninja
+cmake --build build --target http_server
+```
+
+### Release
+```bash
+cmake -S . -B build-mac-rel -DCMAKE_BUILD_TYPE=Release -DBUILD_EXAMPLES=ON -G Ninja
+cmake --build build-mac-rel --target http_server
+```
+
+### With sanitizers
+```bash
+# AddressSanitizer
+cmake -S . -B build-asan -DCMAKE_BUILD_TYPE=Debug -DENABLE_ASAN=ON -DBUILD_EXAMPLES=ON -G Ninja
+
+# MemorySanitizer
+cmake -S . -B build-msan -DCMAKE_BUILD_TYPE=Debug -DENABLE_MSAN=ON -DBUILD_EXAMPLES=ON -G Ninja
+
+# UndefinedBehaviorSanitizer
+cmake -S . -B build-ubsan -DCMAKE_BUILD_TYPE=RelWithDebInfo -DENABLE_UBSAN=ON -DBUILD_EXAMPLES=ON -G Ninja
+```
+
 ### Windows
 ```powershell
-mkdir build
-cd build
-cmake ..
-cmake --build . --config Release
+cmake -S . -B build -DBUILD_EXAMPLES=ON
+cmake --build build --config Release
 ```
 
-### macOS/Linux
+## Running the HTTP server
+
 ```bash
-mkdir build
-cd build
-cmake ..
-make
+./build-mac-rel/http_server
+# === Poll-Driven HTTP Server ===
+# Built: Mar  1 2026 05:31:23  |  OS: macOS  |  Build: Release
+# Listening on 0.0.0.0:8080
 ```
 
-## Running the Example
-
-After building, run the example:
-
-### Windows
-```powershell
-.\build\Release\aiSocksExample.exe
-```
-
-### macOS/Linux
+Stress test:
 ```bash
-./build/aiSocksExample
+ulimit -n 65536
+wrk -t12 -c5000 -d30s -H "Connection: keep-alive" http://localhost:8080/
 ```
 
-The example demonstrates a simple client-server communication where:
-1. Server starts and listens on port 8080
-2. Client connects to the server
-3. Client sends "Hello from client!"
-4. Server receives the message and responds with "Hello from server!"
+## HttpPollServer — usage
 
-## Usage
-
-### Basic IPv4 Server
+Derive from `HttpPollServer` and implement `buildResponse()`:
 
 ```cpp
-#include "Socket.h"
-
+#include "HttpPollServer.h"
 using namespace aiSocks;
 
-Socket serverSocket(SocketType::TCP, AddressFamily::IPv4);
-serverSocket.setReuseAddress(true);
-serverSocket.bind("0.0.0.0", 8080);
-serverSocket.listen(5);
+class MyServer : public HttpPollServer {
+public:
+    explicit MyServer(const ServerBind& b) : HttpPollServer(b) {}
+protected:
+    void buildResponse(HttpClientState& s) override {
+        // Zero-copy: point responseView at a long-lived std::string.
+        // For dynamic content, write into s.responseBuf and set responseView = s.responseBuf.
+        static const std::string ok =
+            "HTTP/1.1 200 OK\r\nContent-Length: 6\r\n\r\nHello!";
+        s.responseView = ok;
+    }
+};
 
-auto clientSocket = serverSocket.accept();
-char buffer[1024];
-int bytesReceived = clientSocket->receive(buffer, sizeof(buffer));
+int main() {
+    MyServer srv(ServerBind{"0.0.0.0", Port{8080}});
+    srv.run(ClientLimit::Unlimited, Milliseconds{0});
+}
 ```
 
-### Basic IPv4 Client
+## ServerBase<T> — lower-level usage
 
 ```cpp
-#include "Socket.h"
-
+#include "ServerBase.h"
 using namespace aiSocks;
 
-Socket clientSocket(SocketType::TCP, AddressFamily::IPv4);
-clientSocket.connect("127.0.0.1", 8080);
+struct MyState { std::string inbuf; };
 
-const char* message = "Hello!";
-clientSocket.send(message, strlen(message));
-```
-
-### IPv6 Server
-
-```cpp
-Socket serverSocket(SocketType::TCP, AddressFamily::IPv6);
-serverSocket.setReuseAddress(true);
-serverSocket.bind("::1", 8080);  // IPv6 loopback
-serverSocket.listen(5);
-```
-
-### IPv6 Client
-
-```cpp
-Socket clientSocket(SocketType::TCP, AddressFamily::IPv6);
-clientSocket.connect("::1", 8080);  // Connect to IPv6 loopback
-```
-
-## API Overview
-
-### Socket Class
-
-**Constructor:**
-- `Socket(SocketType type = SocketType::TCP, AddressFamily family = AddressFamily::IPv4)` - Create a TCP or UDP socket with IPv4 or IPv6
-
-**Server Operations:**
-- `bool bind(const std::string& address, uint16_t port)` - Bind to an address/port
-- `bool listen(int backlog = 10)` - Start listening for connections
-- `std::unique_ptr<Socket> accept()` - Accept incoming connection
-
-**Client Operations:**
-- `bool connect(const std::string& address, uint16_t port)` - Connect to server
-
-**Data Transfer:**
-- `int send(const void* data, size_t length)` - Send data
-- `int receive(void* buffer, size_t length)` - Receive data
-
-**Socket Options:**
-- `bool setBlocking(bool blocking)` - Set blocking/non-blocking mode
-- `bool isBlocking() const` - Check if socket is in blocking mode
-- `bool setReuseAddress(bool reuse)` - Enable SO_REUSEADDR
-- `bool setTimeout(int seconds)` - Set receive timeout
-
-**Utility:**
-- `void close()` - Close the socket
-- `bool isValid()` - Check if socket is valid
-- `AddressFamily getAddressFamily() const` - Get the address family (IPv4/IPv6)
-- `SocketError getLastError()` - Get last error code
-- `std::string getErrorMessage()` - Get last error message
-
-### Socket Types
-
-- `SocketType::TCP` - Stream socket (SOCK_STREAM)
-- `SocketType::UDP` - Datagram socket (SOCK_DGRAM)
-
-### Address Families
-
-- `AddressFamily::IPv4` - Internet Protocol version 4
-- `AddressFamily::IPv6` - Internet Protocol version 6
-
-### Error Codes
-
-```cpp
-enum class SocketError {
-    None, CreateFailed, BindFailed, ListenFailed,
-    AcceptFailed, ConnectFailed, SendFailed,
-    ReceiveFailed, CloseFailed, SetOptionFailed,
-    InvalidSocket, Timeout, WouldBlock, Unknown
+class MyServer : public ServerBase<MyState> {
+public:
+    explicit MyServer(const ServerBind& b) : ServerBase(b) {}
+protected:
+    ServerResult onReadable(TcpSocket& sock, MyState& s) override {
+        char buf[4096];
+        int n = sock.receive(buf, sizeof(buf));
+        if (n <= 0) return ServerResult::Disconnect;
+        s.inbuf.append(buf, n);
+        return ServerResult::KeepConnection;
+    }
+    ServerResult onWritable(TcpSocket& sock, MyState& s) override {
+        return ServerResult::KeepConnection;
+    }
 };
 ```
 
-## Platform Details
+## Socket API
 
-### Windows
-- Uses Winsock2 (`ws2_32.lib`)
-- Automatically initializes WSA on first socket creation
+```cpp
+#include "Socket.h"
+using namespace aiSocks;
 
-### macOS/Linux
-- Uses BSD sockets
-- POSIX-compliant implementation
+// Server
+Socket srv(SocketType::TCP, AddressFamily::IPv4);
+srv.setReuseAddress(true);
+srv.bind("0.0.0.0", 8080);
+srv.listen(128);
+auto client = srv.accept();
+
+// Client
+Socket cli(SocketType::TCP, AddressFamily::IPv4);
+cli.connect("127.0.0.1", 8080);
+cli.send("Hello!", 6);
+```
+
+Key methods: `bind`, `listen`, `accept`, `connect`, `send`, `receive`, `setBlocking`, `setReuseAddress`, `setTimeout`, `close`, `isValid`, `getLastError`.
 
 ## Requirements
 
-- CMake 3.15 or higher
-- C++17 compatible compiler
-  - MSVC 2017 or higher (Windows)
-  - GCC 7 or higher (Linux)
-  - Clang 5 or higher (macOS)
+- CMake 3.15+
+- C++17 compiler: MSVC 2017+, GCC 7+, Clang 5+
 
 ## License
 
-This is a demonstration library for educational purposes.
+Personal academic project.
 
