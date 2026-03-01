@@ -64,7 +64,7 @@ SocketImpl::SocketImpl(SocketType type, AddressFamily family)
     , socketType(type)
     , addressFamily(family)
     , lastError(SocketError::None)
-    , blockingMode(true) {
+    , blockingMode(false) {
     platformInit();
 
     int af = (family == AddressFamily::IPv6) ? AF_INET6 : AF_INET;
@@ -77,6 +77,22 @@ SocketImpl::SocketImpl(SocketType type, AddressFamily family)
         setError(SocketError::CreateFailed, "Failed to create socket");
         return;
     }
+
+    // Set non-blocking immediately after creation.  Non-blocking is the
+    // library-wide default: callers must never assume a fresh socket is
+    // blocking, and all I/O helpers handle SocketError::WouldBlock.
+    // setBlocking(true) is still available for the rare caller that truly
+    // needs blocking semantics.
+#ifdef _WIN32
+    u_long nb = 1;
+    ioctlsocket(socketHandle, FIONBIO, &nb);
+#else
+    {
+        int fl = fcntl(socketHandle, F_GETFL, 0);
+        if (fl != -1) fcntl(socketHandle, F_SETFL, fl | O_NONBLOCK);
+    }
+#endif
+    // blockingMode is already initialised false in the member-initialiser list.
 
 #ifdef SO_NOSIGPIPE
     // macOS: prevent send/write to a half-closed socket from raising SIGPIPE.
@@ -103,17 +119,21 @@ SocketImpl::SocketImpl(
     , addressFamily(family)
     , lastError(SocketError::None)
     , blockingMode(true) {
-    // Accepted sockets inherit the server fd's blocking mode, which may differ
-    // from our default.  Query the kernel so isBlocking() reflects reality.
+    // This constructor wraps an already-open fd (e.g. from ::accept()).
+    // The caller is responsible for setting the fd's blocking mode before
+    // calling this constructor; SocketImpl::accept() does this explicitly.
+    // We then query the kernel so blockingMode accurately reflects the fd's
+    // actual state regardless of how the handle was obtained.
 #ifndef _WIN32
     if (handle != INVALID_SOCKET_HANDLE) {
         int flags = ::fcntl(handle, F_GETFL, 0);
         if (flags != -1) blockingMode = (flags & O_NONBLOCK) == 0;
     }
 #else
-    // Windows: no portable way to query FIONBIO state; default (true) is
-    // correct because accepted sockets always start in blocking mode on
-    // WinSock.
+    // Windows: ioctlsocket(FIONBIO) is write-only — there is no portable way
+    // to query the current state.  We rely on accept() having propagated the
+    // listener's mode before constructing this object, so the blockingMode
+    // set by the member-initialiser list is only a fallback for edge cases.
 #endif
 #ifdef SO_NOSIGPIPE
     if (socketHandle != INVALID_SOCKET_HANDLE) {
@@ -171,6 +191,25 @@ bool SocketImpl::listen(int backlog) {
     return true;
 }
 
+void SocketImpl::propagateSocketProps(SocketImpl& child) const {
+    // Blocking mode: POSIX does not guarantee that ::accept() inherits
+    // O_NONBLOCK — on Linux and macOS the returned fd is always blocking.
+    // Explicitly match the listener's mode so the child is consistent.
+    child.setBlocking(blockingMode);
+
+    // Server-wide socket policies: options set once on the listening socket
+    // that should apply to every accepted connection.
+    int rcvBuf = getReceiveBufferSize();
+    if (rcvBuf > 0) child.setReceiveBufferSize(rcvBuf);
+
+    int sndBuf = getSendBufferSize();
+    if (sndBuf > 0) child.setSendBufferSize(sndBuf);
+
+    if (socketType == SocketType::TCP) child.setNoDelay(getNoDelay());
+
+    child.setKeepAlive(getKeepAlive());
+}
+
 std::unique_ptr<SocketImpl> SocketImpl::accept() {
     if (!isValid()) {
         setError(SocketError::InvalidSocket, "Socket is not valid");
@@ -190,9 +229,11 @@ std::unique_ptr<SocketImpl> SocketImpl::accept() {
                       == AF_INET6)
                 ? AddressFamily::IPv6
                 : AddressFamily::IPv4;
-            lastError = SocketError::None;
-            return std::make_unique<SocketImpl>(
+            auto child = std::make_unique<SocketImpl>(
                 clientSocket, socketType, clientFamily);
+            propagateSocketProps(*child);
+            lastError = SocketError::None;
+            return child;
         }
 
         int err = getLastSystemError();
@@ -1134,6 +1175,17 @@ bool SocketImpl::getNoDelay() const {
         != 0)
         return false;
     return noDelay != 0;
+}
+
+bool SocketImpl::getKeepAlive() const {
+    if (!isValid()) return false;
+    int keepAlive = 0;
+    socklen_t len = static_cast<socklen_t>(sizeof(keepAlive));
+    if (getsockopt(socketHandle, SOL_SOCKET, SO_KEEPALIVE,
+            reinterpret_cast<char*>(&keepAlive), &len)
+        != 0)
+        return false;
+    return keepAlive != 0;
 }
 
 // Static utility methods

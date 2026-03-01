@@ -14,7 +14,6 @@
 #include <sys/time.h>
 #include <unistd.h>
 
-#include <unordered_map>
 #include <vector>
 #include <cerrno>
 
@@ -22,18 +21,27 @@ namespace aiSocks {
 
 struct Poller::Impl {
     int kq{-1};
-    // Sparse array for O(1) direct fd->Socket lookup instead of unordered_map
+    // Sparse arrays for O(1) fd->Socket lookup.
     std::vector<const Socket*> socketArray;
     std::vector<bool> socketValid;
-    // Reusable result buffer to avoid per-call allocation in wait()
+    // Flat merge buffers: replace the per-wait() unordered_map.
+    // mergeBits[fd] accumulates PollEvent flags across multiple kevent entries
+    // for the same fd.  seenFds tracks which slots were written so we can
+    // zero them without scanning the whole array.
+    std::vector<uint8_t> mergeBits;
+    std::vector<size_t> seenFds;
+    // Reusable kevent output buffer — sized to 2 filters × registered fds.
+    std::vector<struct kevent> keventBuf;
+    // Reusable result buffer to avoid per-call allocation in wait().
     std::vector<PollResult> resultBuffer;
 
-    // Helper to ensure array is large enough for fd
     void ensureCapacity(int fd) {
         size_t required = static_cast<size_t>(fd) + 1;
         if (socketArray.size() < required) {
             socketArray.resize(required, nullptr);
             socketValid.resize(required, false);
+            mergeBits.resize(required, 0);
+            keventBuf.resize(required * 2 + 1);
         }
     }
 };
@@ -93,17 +101,20 @@ bool Poller::modify(const Socket& s, PollEvent interest) {
         EV_SET(&changes[n++], static_cast<uintptr_t>(fd), EVFILT_READ,
             EV_ADD | EV_ENABLE, 0, 0, nullptr);
     } else {
+        // EV_DISABLE keeps the filter registered in the kernel so re-enabling
+        // it later only needs EV_ENABLE, avoiding the EV_DELETE + EV_ADD
+        // round-trip that would otherwise happen on every request cycle.
         EV_SET(&changes[n++], static_cast<uintptr_t>(fd), EVFILT_READ,
-            EV_DELETE, 0, 0, nullptr);
+            EV_ADD | EV_DISABLE, 0, 0, nullptr);
     }
     if (hasFlag(interest, PollEvent::Writable)) {
         EV_SET(&changes[n++], static_cast<uintptr_t>(fd), EVFILT_WRITE,
             EV_ADD | EV_ENABLE, 0, 0, nullptr);
     } else {
         EV_SET(&changes[n++], static_cast<uintptr_t>(fd), EVFILT_WRITE,
-            EV_DELETE, 0, 0, nullptr);
+            EV_ADD | EV_DISABLE, 0, 0, nullptr);
     }
-    // kevent() returns ENOENT for filters that were not registered  benign.
+    // kevent() returns ENOENT for filters not yet registered — benign.
     ::kevent(pImpl_->kq, changes, n, nullptr, 0, nullptr);
     pImpl_->ensureCapacity(fd);
     pImpl_->socketArray[fd] = &s;
@@ -135,12 +146,12 @@ std::vector<PollResult> Poller::wait(Milliseconds timeout) {
     struct timespec ts{};
     struct timespec* tsp = nullptr;
     if (timeout.count >= 0) {
-        // Convert 0ms to 0.5ms minimum to prevent CPU spinning
         int64_t effectiveTimeout = timeout.count;
         if (effectiveTimeout == 0) {
-            // 0ms requested -> use 0.5ms (500 microseconds)
+            // Clamp 0ms to 1ms: a true zero-timeout busy-spin burns a whole
+            // CPU core and starves the TCP stack under load.
             ts.tv_sec = 0;
-            ts.tv_nsec = 500000L; // 500 microseconds = 0.5ms
+            ts.tv_nsec = 1000000L; // 1 ms
         } else {
             ts.tv_sec = static_cast<time_t>(effectiveTimeout / 1000);
             ts.tv_nsec
@@ -149,26 +160,30 @@ std::vector<PollResult> Poller::wait(Milliseconds timeout) {
         tsp = &ts;
     }
 
-    // Allocate enough room for two events per registered socket (READ+WRITE).
-    const int maxEvents = static_cast<int>(pImpl_->socketArray.size() * 2) + 1;
-    std::vector<struct kevent> events(static_cast<size_t>(maxEvents));
+    // keventBuf is pre-sized in ensureCapacity; guard against empty state.
+    if (pImpl_->keventBuf.empty()) pImpl_->keventBuf.resize(1);
+    const int maxEvents = static_cast<int>(pImpl_->keventBuf.size());
 
     for (;;) {
-        int n = ::kevent(pImpl_->kq, nullptr, 0, events.data(), maxEvents, tsp);
+        int n = ::kevent(
+            pImpl_->kq, nullptr, 0, pImpl_->keventBuf.data(), maxEvents, tsp);
         if (n < 0) {
             if (errno == EINTR)
                 return {}; // signal received -- let caller check stop flag
-            // Don't throw - return empty result on error
             return {};
         }
 
         // Merge per-filter events for the same fd into one PollResult.
-        std::unordered_map<uintptr_t, PollEvent> ready;
+        // Use a flat byte array indexed by fd — no hash map, no allocation.
+        // seenFds tracks which slots were written so we reset only those.
+        auto& arr = pImpl_->socketArray;
+        pImpl_->seenFds.clear();
         for (int i = 0; i < n; ++i) {
-            const struct kevent& ev = events[static_cast<size_t>(i)];
-            uintptr_t fd = ev.ident;
-            auto bits = static_cast<uint8_t>(ready[fd]); // default-inits to 0
-
+            const struct kevent& ev = pImpl_->keventBuf[static_cast<size_t>(i)];
+            auto fd = static_cast<size_t>(ev.ident);
+            if (fd >= arr.size()) continue;
+            uint8_t bits = pImpl_->mergeBits[fd];
+            if (bits == 0) pImpl_->seenFds.push_back(fd);
             if ((ev.flags & EV_ERROR) != 0) {
                 bits |= static_cast<uint8_t>(PollEvent::Error);
             } else if (ev.filter == EVFILT_READ) {
@@ -177,26 +192,23 @@ std::vector<PollResult> Poller::wait(Milliseconds timeout) {
                 if ((ev.flags & EV_EOF) != 0)
                     bits |= static_cast<uint8_t>(PollEvent::Readable);
             } else if (ev.filter == EVFILT_WRITE) {
-                // EV_EOF on a write filter means the peer shut down their read
-                // side, but we may still have data to send and the read side
-                // may still be open.  Just signal Writable and let onReadable
-                // detect the full close via a 0-byte read.
+                // EV_EOF on write filter: peer shut down their read side.
+                // Signal Writable; onReadable will detect full close via n==0.
                 bits |= static_cast<uint8_t>(PollEvent::Writable);
             }
-            ready[fd] = static_cast<PollEvent>(bits);
+            pImpl_->mergeBits[fd] = bits;
         }
 
         pImpl_->resultBuffer.clear();
-        pImpl_->resultBuffer.reserve(ready.size());
-        auto& results = pImpl_->resultBuffer;
-        for (const auto& kv : ready) {
-            auto fd = static_cast<int>(kv.first);
-            if (fd < static_cast<int>(pImpl_->socketArray.size())
-                && pImpl_->socketValid[fd] && pImpl_->socketArray[fd]) {
-                results.push_back({pImpl_->socketArray[fd], kv.second});
-            }
+        pImpl_->resultBuffer.reserve(pImpl_->seenFds.size());
+        for (auto fd : pImpl_->seenFds) {
+            const uint8_t bits = pImpl_->mergeBits[fd];
+            pImpl_->mergeBits[fd] = 0; // reset for next call
+            if (pImpl_->socketValid[fd] && arr[fd])
+                pImpl_->resultBuffer.push_back(
+                    {arr[fd], static_cast<PollEvent>(bits)});
         }
-        return results;
+        return pImpl_->resultBuffer;
     }
 }
 

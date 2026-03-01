@@ -90,6 +90,7 @@ if(BUILD_EXAMPLES)
         aiSocksGoogleClient     examples/google_client.cpp
         aiSocksSocketFactoryDemo examples/socket_factory_demo.cpp
         http_server             examples/http_poll_server.cpp
+        throughput_client       examples/throughput_client.cpp
     )
     list(LENGTH _EXAMPLES _len)
     math(EXPR _last "${_len} - 2")

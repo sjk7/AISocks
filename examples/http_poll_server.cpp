@@ -10,6 +10,7 @@
 #include "SocketTypes.h"
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <ctime>
 
 using namespace aiSocks;
@@ -49,11 +50,34 @@ static const char headerFmt[]
       "Accept-Ranges: bytes\r\n"
       "\r\n";
 
+// 1 MB payload for /big — filled once at startup with repeating pattern.
+static std::string makeBigBody() {
+    static constexpr size_t bigSize = 1024 * 1024;
+    std::string s(bigSize, '\0');
+    // Fill with a repeating ASCII pattern so it compresses poorly (realistic).
+    for (size_t i = 0; i < bigSize; ++i)
+        s[i] = static_cast<char>('A' + (i % 26));
+    return s;
+}
+static const std::string bigBody = makeBigBody();
+
+// Header template for /big: %s = date, %s = connection, %zu = content-length
+static const char bigHeaderFmt[]
+    = "HTTP/1.1 200 OK\r\n"
+      "Server: nginx/1.29.5\r\n"
+      "Date: %s\r\n"
+      "Content-Type: application/octet-stream\r\n"
+      "Content-Length: %zu\r\n"
+      "Connection: %s\r\n"
+      "\r\n";
+
 class HttpServer : public HttpPollServer {
     private:
     // Full pre-built responses, rebuilt once per second when the Date changes.
     std::string ka_response_;
     std::string close_response_;
+    std::string big_ka_response_;
+    std::string big_close_response_;
     std::string cached_bad_request_;
     time_t last_time_ = 0;
 
@@ -74,6 +98,13 @@ class HttpServer : public HttpPollServer {
 
         snprintf(hdr, sizeof(hdr), headerFmt, date_buf, "close");
         close_response_ = std::string(hdr) + body;
+
+        char bigHdr[256];
+        snprintf(bigHdr, sizeof(bigHdr), bigHeaderFmt, date_buf, bigBody.size(), "keep-alive");
+        big_ka_response_ = bigHdr + bigBody;
+
+        snprintf(bigHdr, sizeof(bigHdr), bigHeaderFmt, date_buf, bigBody.size(), "close");
+        big_close_response_ = bigHdr + bigBody;
     }
 
     public:
@@ -93,11 +124,16 @@ class HttpServer : public HttpPollServer {
 
     protected:
     void buildResponse(HttpClientState& s) override {
-        if (isHttpRequest(s.request)) {
-            rebuildResponses();
-            s.response = s.closeAfterSend ? close_response_ : ka_response_;
+        if (!isHttpRequest(s.request)) {
+            s.responseView = cached_bad_request_; // zero-copy: view into static string
+            return;
+        }
+        rebuildResponses();
+        // Assign string_view directly into pre-built storage — no copy, no allocation.
+        if (s.request.find("GET /big ") != std::string::npos) {
+            s.responseView = s.closeAfterSend ? big_close_response_ : big_ka_response_;
         } else {
-            s.response = cached_bad_request_;
+            s.responseView = s.closeAfterSend ? close_response_ : ka_response_;
         }
     }
 };
@@ -110,11 +146,18 @@ class HttpServer : public HttpPollServer {
     kern.ipc.somaxconn=4096
 /*/
 
+/*/
+    *nix stress test:
+    ulimit -n 65536; wrk -t12 -c15000 -d30s -H "Connection: keep-alive"
+http://localhost:8080/ 2>&1
+
+/*/
+
 int main() {
     printf("=== Poll-Driven HTTP Server ===\n");
 
     HttpServer server(ServerBind{
-        "0.0.0.0", Port{8080}, Backlog{Backlog::maxBacklog}, true});
+        "0.0.0.0", Port{8080}, Backlog{Backlog::defaultBacklog}, true});
     if (!server.isValid()) {
         printf("Server failed to start\n");
         return 1;
