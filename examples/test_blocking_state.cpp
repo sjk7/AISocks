@@ -1,5 +1,6 @@
 // This is a personal academic project. Dear PVS-Studio, please check it.
-// PVS-Studio Static Code Analyzer for C, C++, C#, and Java: https://pvs-studio.com
+// PVS-Studio Static Code Analyzer for C, C++, C#, and Java:
+// https://pvs-studio.com
 #include "TcpSocket.h"
 #include <iostream>
 #include <thread>
@@ -28,8 +29,7 @@ int main() {
     if (defaultBlocking) {
         std::cout << "   PASS - Default state is blocking" << std::endl;
     } else {
-        std::cout << "   FAIL - Expected blocking=true by default"
-                  << std::endl;
+        std::cout << "   FAIL - Expected blocking=true by default" << std::endl;
         return 1;
     }
     std::cout << std::endl;
@@ -64,8 +64,7 @@ int main() {
     std::cout << "  Socket is blocking: " << (isBlockingAgain ? "YES" : "NO")
               << std::endl;
     if (isBlockingAgain) {
-        std::cout << "   PASS - Successfully set back to blocking"
-                  << std::endl;
+        std::cout << "   PASS - Successfully set back to blocking" << std::endl;
     } else {
         std::cout << "   FAIL - State not updated after setBlocking(true)"
                   << std::endl;
@@ -102,7 +101,7 @@ int main() {
     // Test 5: Accepted socket should default to blocking
     std::cout << "Test 5: Accepted socket blocking state" << std::endl;
     auto serverSocket = TcpSocket::createRaw();
-    serverSocket.setReuseAddress(true);
+    (void)serverSocket.setReuseAddress(true);
 
     if (serverSocket.bind("127.0.0.1", Port{9999}) && serverSocket.listen(1)) {
         std::cout << "  Server bound to port 9999" << std::endl;

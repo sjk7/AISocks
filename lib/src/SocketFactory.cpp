@@ -56,17 +56,12 @@ Result<SocketType> SocketFactory::createSocketFromImpl(
         // For UdpSocket, use the public constructor
         // Note: We can't inject a custom impl, so we'll create a basic socket
         // and check if it's valid
-        try {
-            auto socket = SocketType(family);
-            if (!socket.isValid()) {
-                return Result<SocketType>::failure(socket.getLastError(),
-                    operation, SocketFactory::captureLastError(), false);
-            }
-            return Result<SocketType>::success(std::move(socket));
-        } catch (...) {
-            return Result<SocketType>::failure(SocketError::CreateFailed,
-                operation, SocketFactory::captureLastError(), false);
+        auto socket = SocketType(family);
+        if (!socket.isValid()) {
+            return Result<SocketType>::failure(socket.getLastError(), operation,
+                SocketFactory::captureLastError(), false);
         }
+        return Result<SocketType>::success(std::move(socket));
     } else {
         return Result<SocketType>::failure(
             SocketError::Unknown, "Unsupported socket type", 0, false);
@@ -161,24 +156,13 @@ Result<TcpSocket> SocketFactory::connectSocket(
 // ---------------------------------------------------------------------------
 
 Result<TcpSocket> SocketFactory::createTcpSocketRaw(AddressFamily family) {
-    try {
-        auto impl = std::make_unique<SocketImpl>(SocketType::TCP, family);
-        return createSocketFromImpl<TcpSocket>(std::move(impl), "socket()");
-    } catch (...) {
-        return Result<TcpSocket>::failure(SocketError::CreateFailed, "socket()",
-            SocketFactory::captureLastError(), false);
-    }
+    auto impl = std::make_unique<SocketImpl>(SocketType::TCP, family);
+    return createSocketFromImpl<TcpSocket>(std::move(impl), "socket()");
 }
 
 Result<UdpSocket> SocketFactory::createUdpSocketRaw(AddressFamily family) {
-    try {
-        auto impl = std::make_unique<SocketImpl>(SocketType::UDP, family);
-        return createSocketFromImpl<UdpSocket>(
-            std::move(impl), "socket()", family);
-    } catch (...) {
-        return Result<UdpSocket>::failure(SocketError::CreateFailed, "socket()",
-            SocketFactory::captureLastError(), false);
-    }
+    auto impl = std::make_unique<SocketImpl>(SocketType::UDP, family);
+    return createSocketFromImpl<UdpSocket>(std::move(impl), "socket()", family);
 }
 
 Result<TcpSocket> SocketFactory::createTcpServer(

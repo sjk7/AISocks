@@ -7,6 +7,7 @@
 // application-level response logic.
 
 #include "HttpPollServer.h"
+#include "SocketTypes.h"
 #include <cstdio>
 #include <cstdlib>
 #include <ctime>
@@ -15,7 +16,7 @@ using namespace aiSocks;
 
 // Response body matching the reference server exactly (251 bytes, no trailing
 // newline).
-static const char kBody[]
+static const char body[]
     = "<!DOCTYPE html>\n"
       "<html lang=\"en\">\n"
       "\n"
@@ -36,7 +37,7 @@ static const char kBody[]
       "</html>";
 
 // Header template: %s = RFC 7231 date, %s = "keep-alive" or "close"
-static const char kHeaderFmt[]
+static const char headerFmt[]
     = "HTTP/1.1 200 OK\r\n"
       "Server: nginx/1.29.5\r\n"
       "Date: %s\r\n"
@@ -68,11 +69,11 @@ class HttpServer : public HttpPollServer {
             date_buf, sizeof(date_buf), "%a, %d %b %Y %H:%M:%S GMT", &tm_buf);
 
         char hdr[512];
-        snprintf(hdr, sizeof(hdr), kHeaderFmt, date_buf, "keep-alive");
-        ka_response_ = std::string(hdr) + kBody;
+        snprintf(hdr, sizeof(hdr), headerFmt, date_buf, "keep-alive");
+        ka_response_ = std::string(hdr) + body;
 
-        snprintf(hdr, sizeof(hdr), kHeaderFmt, date_buf, "close");
-        close_response_ = std::string(hdr) + kBody;
+        snprintf(hdr, sizeof(hdr), headerFmt, date_buf, "close");
+        close_response_ = std::string(hdr) + body;
     }
 
     public:
@@ -101,10 +102,19 @@ class HttpServer : public HttpPollServer {
     }
 };
 
+// for more backlog in Mac:
+/*/
+    sudo pico /etc/sysctl.conf
+    kern.maxfiles=65536
+    kern.maxfilesperproc=65536
+    kern.ipc.somaxconn=4096
+/*/
+
 int main() {
     printf("=== Poll-Driven HTTP Server ===\n");
 
-    HttpServer server(ServerBind{"0.0.0.0", Port{8080}});
+    HttpServer server(ServerBind{
+        "0.0.0.0", Port{8080}, Backlog{Backlog::maxBacklog}, true});
     if (!server.isValid()) {
         printf("Server failed to start\n");
         return 1;

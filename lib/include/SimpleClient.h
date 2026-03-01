@@ -20,7 +20,8 @@ namespace aiSocks {
 //
 // Usage:
 //   try {
-//       SimpleClient client(ConnectArgs{"example.com", 80}, [](TcpSocket& sock) {
+//       SimpleClient client(ConnectArgs{"example.com", 80}, [](TcpSocket& sock)
+//       {
 //           sock.sendAll("GET / HTTP/1.0\r\n\r\n", ...);
 //           char buf[4096];
 //           int n = sock.receive(buf, sizeof(buf));
@@ -38,7 +39,7 @@ class SimpleClient {
     public:
     // Connect using ConnectArgs and invoke callback with the connected socket.
     // Callback signature: void(TcpSocket&)
-    // 
+    //
     // Returns invalid client if connection fails - check isConnected().
     template <typename Callback>
     SimpleClient(const ConnectArgs& args, Callback&& onConnected,
@@ -49,7 +50,7 @@ class SimpleClient {
             socket_ = std::make_unique<TcpSocket>(std::move(result.value()));
             // Set receive timeout to prevent indefinite blocking
             // Use the connection timeout as the receive timeout
-            socket_->setReceiveTimeout(args.connectTimeout);
+            (void)socket_->setReceiveTimeout(args.connectTimeout);
             onConnected(*socket_);
         } else {
             // Connection failed - socket remains null
@@ -57,7 +58,8 @@ class SimpleClient {
         }
     }
 
-    // Check if the connection was established (always true if constructor succeeded).
+    // Check if the connection was established (always true if constructor
+    // succeeded).
     bool isConnected() const noexcept { return socket_ != nullptr; }
 
     // Access the underlying socket for manual operations.
