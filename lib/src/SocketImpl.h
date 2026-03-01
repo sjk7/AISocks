@@ -118,6 +118,7 @@ class SocketImpl {
     int getReceiveBufferSize() const;
     int getSendBufferSize() const;
     bool getNoDelay() const;
+    bool getKeepAlive() const;
 
     // Check if last error was DNS-related
     bool getLastErrorIsDns() const;
@@ -179,6 +180,11 @@ class SocketImpl {
     bool setBufSizeOpt(int optname, int bytes, const char* errMsg);
     bool waitReady(bool forRead, std::chrono::milliseconds timeout);
     static Endpoint endpointFromSockaddr(const sockaddr_storage& addr);
+
+    // Propagate blocking mode, buffer sizes, TCP_NODELAY and SO_KEEPALIVE
+    // from this (listener) socket onto an accepted SocketImpl.
+    // Called by accept() after constructing the child.
+    void propagateSocketProps(SocketImpl& child) const;
 };
 
 // Free function: translate an ErrorContext into a human-readable string.

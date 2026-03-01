@@ -36,6 +36,7 @@
 #include <iomanip>
 #include <iostream>
 #include <string>
+#include <string_view>
 #include <vector>
 #include <algorithm>
 
@@ -47,35 +48,48 @@ namespace aiSocks {
 // HTTP client state for tracking request/response data
 struct HttpClientState {
     std::string request;
-    std::string response;
+    // Zero-copy response path: responseView is the active view of the response
+    // data.  For static pre-built responses it points directly into the
+    // server's long-lived std::string storage — no copy, no allocation.
+    // For dynamic responses (error pages etc.) responseBuf owns the bytes
+    // and responseView points into it.
+    std::string_view responseView;
+    std::string responseBuf;
     size_t sent{0};
     std::chrono::steady_clock::time_point startTime{};
     bool responseStarted{false}; // true once onResponseBegin has been called
-    bool closeAfterSend{false}; // set by keep-alive negotiation; derived
-                                // class may override in buildResponse()
+    bool closeAfterSend{false}; // set by keep-alive negotiation
 
-    // Pre-allocated buffer for better performance
-    HttpClientState()
-        : request(), response(), startTime(std::chrono::steady_clock::now()) {
+    HttpClientState() : startTime(std::chrono::steady_clock::now()) {
         request.reserve(4096); // typical HTTP request fits in 4 KB
     }
 
-    // Explicit copy/move constructors to ensure proper initialization
     HttpClientState(const HttpClientState& other)
         : request(other.request)
-        , response(other.response)
+        , responseView(other.responseView)
+        , responseBuf(other.responseBuf)
         , sent(other.sent)
         , startTime(other.startTime)
         , responseStarted(other.responseStarted)
-        , closeAfterSend(other.closeAfterSend) {}
+        , closeAfterSend(other.closeAfterSend) {
+        // If view pointed into the original's responseBuf, redirect into ours.
+        if (!responseBuf.empty()
+            && other.responseView.data() == other.responseBuf.data())
+            responseView = responseBuf;
+    }
 
     HttpClientState(HttpClientState&& other) noexcept
         : request(std::move(other.request))
-        , response(std::move(other.response))
+        , responseView(other.responseView)
+        , responseBuf(std::move(other.responseBuf))
         , sent(other.sent)
         , startTime(other.startTime)
         , responseStarted(other.responseStarted)
-        , closeAfterSend(other.closeAfterSend) {}
+        , closeAfterSend(other.closeAfterSend) {
+        // After the move, fix up view if it was backed by the (now moved) buf.
+        if (!responseBuf.empty()) responseView = responseBuf;
+        other.responseView = {};
+    }
 
     ~HttpClientState() = default;
 };
@@ -186,16 +200,18 @@ class HttpPollServer : public ServerBase<HttpClientState> {
                 s.request.append(buf, static_cast<size_t>(n));
 
                 if (s.request.size() > MAX_REQUEST_BYTES) {
-                    // Request too large -- respond and close.
-                    s.response = makeResponse("HTTP/1.1 413 Payload Too Large",
-                        "text/plain; charset=utf-8", "Request too large.\n",
-                        false);
+                    // Request too large -- build into responseBuf, point view.
+                    s.responseBuf
+                        = makeResponse("HTTP/1.1 413 Payload Too Large",
+                            "text/plain; charset=utf-8", "Request too large.\n",
+                            false);
+                    s.responseView = s.responseBuf;
                     s.closeAfterSend = true;
                     setClientWritable(sock, true);
                     return onWritable(sock, s);
                 }
 
-                if (s.response.empty() && requestComplete(s.request)) {
+                if (s.responseView.empty() && requestComplete(s.request)) {
                     dispatchBuildResponse(s);
                     setClientWritable(sock, true);
                     return onWritable(sock, s);
@@ -214,15 +230,15 @@ class HttpPollServer : public ServerBase<HttpClientState> {
     }
 
     ServerResult onWritable(TcpSocket& sock, HttpClientState& s) final {
-        if (s.response.empty()) return ServerResult::KeepConnection;
+        if (s.responseView.empty()) return ServerResult::KeepConnection;
 
         if (!s.responseStarted) {
             s.responseStarted = true;
             onResponseBegin(s);
         }
 
-        int sent = sendOptimized(
-            sock, s.response.data() + s.sent, s.response.size() - s.sent);
+        int sent = sendOptimized(sock, s.responseView.data() + s.sent,
+            s.responseView.size() - s.sent);
         if (sent > 0) {
             touchClient(sock);
             s.sent += static_cast<size_t>(sent);
@@ -233,11 +249,12 @@ class HttpPollServer : public ServerBase<HttpClientState> {
             return ServerResult::Disconnect;
         }
 
-        if (s.sent >= s.response.size()) {
+        if (s.sent >= s.responseView.size()) {
             onResponseSent(s);
             bool shouldClose = s.closeAfterSend;
             s.request.clear();
-            s.response.clear();
+            s.responseView = {};
+            s.responseBuf.clear();
             s.sent = 0;
             s.responseStarted = false;
             s.closeAfterSend = false;
