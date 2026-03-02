@@ -135,8 +135,8 @@ static void test_signal_opt_out() {
     // Reset the global flag from any previous test/signal.
     g_serverSignalStop.store(false);
 
-    BaseServer sensitive(23100); // will honour the global flag
-    BaseServer immune(23101); // should ignore it
+    BaseServer sensitive(0); // will honour the global flag
+    BaseServer immune(0); // should ignore it
     immune.setHandleSignals(false);
 
     REQUIRE(sensitive.handlesSignals() == true);
@@ -204,8 +204,16 @@ static void test_on_error_returns_server_result() {
     // this TU compiles is the proof.
 
     // Runtime: returning StopServer from onError stops the server.
-    BaseServer server(23102);
+    BaseServer server(0);
     server.errorReturn = ServerResult::StopServer;
+
+    // Read back the port the OS assigned on bind.
+    uint16_t srvPort102 = 0;
+    {
+        auto ep = server.getSocket().getLocalEndpoint();
+        srvPort102 = ep.isSuccess() ? ep.value().port.value() : 0;
+    }
+    REQUIRE(srvPort102 != 0);
 
     std::atomic<bool> running{false};
     std::atomic<bool> done{false};
@@ -221,7 +229,7 @@ static void test_on_error_returns_server_result() {
 
     // Connect then abruptly close with RST to trigger an error/hangup event.
     auto res = SocketFactory::createTcpClient(AddressFamily::IPv4,
-        ConnectArgs{"127.0.0.1", Port{23102}, Milliseconds{200}});
+        ConnectArgs{"127.0.0.1", Port{srvPort102}, Milliseconds{200}});
 
     if (res.isSuccess()) {
         // SO_LINGER with l_onoff=1, l_linger=0 causes close() to send RST.
@@ -267,7 +275,7 @@ static void test_on_idle_only_on_timeout() {
     // Phase 1: no clients — every poll iteration times out → idle fires each
     // time.
     {
-        BaseServer server(23103);
+        BaseServer server(0);
         std::atomic<bool> started{false};
         std::thread t([&] {
             started = true;
@@ -289,7 +297,16 @@ static void test_on_idle_only_on_timeout() {
     // Phase 2: a client continuously writes data → poll returns with Readable
     // events every cycle → onIdle should NOT be called (no timeout fires).
     {
-        BaseServer server(23104);
+        BaseServer server(0);
+
+        // Read back the OS-assigned port before starting the server thread.
+        uint16_t srvPort104 = 0;
+        {
+            auto ep = server.getSocket().getLocalEndpoint();
+            srvPort104 = ep.isSuccess() ? ep.value().port.value() : 0;
+        }
+        REQUIRE(srvPort104 != 0);
+
         std::atomic<bool> started{false};
         std::thread t([&] {
             started = true;
@@ -299,7 +316,7 @@ static void test_on_idle_only_on_timeout() {
         std::this_thread::sleep_for(std::chrono::milliseconds{20});
 
         auto res = SocketFactory::createTcpClient(AddressFamily::IPv4,
-            ConnectArgs{"127.0.0.1", Port{23104}, Milliseconds{200}});
+            ConnectArgs{"127.0.0.1", Port{srvPort104}, Milliseconds{200}});
         REQUIRE(res.isSuccess());
         auto client = std::make_unique<TcpSocket>(std::move(res.value()));
 

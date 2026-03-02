@@ -368,28 +368,6 @@ template <typename ClientData> class ServerBase {
         return keepAliveTimeout_;
     }
 
-    // Optimized send with large chunks for better throughput
-    int sendOptimized(TcpSocket& sock, const char* data, size_t size) {
-        const size_t CHUNK_SIZE = 64 * 1024; // 64KB chunks
-        size_t sent = 0;
-
-        while (sent < size) {
-            size_t to_send = std::min(CHUNK_SIZE, size - sent);
-            int n = sock.send(data + sent, to_send);
-            if (n <= 0) {
-                return sent > 0 ? static_cast<int>(sent) : n;
-            }
-            sent += n;
-
-            // If we couldn't send the full chunk, socket buffer is full
-            if (n < static_cast<int>(to_send)) {
-                break;
-            }
-        }
-
-        return static_cast<int>(sent);
-    }
-
     // Request a graceful shutdown. Safe to call from any thread.
     // run() will exit after the current wait() returns.
     void requestStop() noexcept {
@@ -450,13 +428,22 @@ template <typename ClientData> class ServerBase {
     // The socket has been accepted from the OS but cannot be served; it will
     // be closed immediately after this call returns.
     //
-    // Default: logs a warning to stderr with the fd value.
-    // Override to suppress the log, record metrics, or send a rejection.
-    virtual void onPollerAddFailed(TcpSocket& sock) {
+    // Parameters:
+    //   fd       — the OS fd/SOCKET handle of the accepted (but unserved)
+    //   socket. peerAddr — remote address string ("a.b.c.d:port"), empty if
+    //   unavailable.
+    //
+    // The TcpSocket itself is NOT passed because the callee cannot usefully
+    // send or receive on it (the poller never registered it).  Read the peer
+    // address for logging/metrics; the socket is closed immediately on return.
+    //
+    // Default: logs a warning to stderr.
+    // Override to suppress the log, record metrics, or increment a counter.
+    virtual void onPollerAddFailed(uintptr_t fd, const std::string& peerAddr) {
         fprintf(stderr,
             "[ServerBase] warning: poller.add failed for accepted fd %zu"
-            " — connection dropped\n",
-            static_cast<size_t>(sock.getNativeHandle()));
+            " (peer %s) — connection dropped\n",
+            static_cast<size_t>(fd), peerAddr.c_str());
     }
 
     // Called when poller.wait() returns with no ready events, i.e. a genuine
@@ -702,7 +689,11 @@ template <typename ClientData> class ServerBase {
 
             uintptr_t key = client->getNativeHandle();
             if (!poller.add(*client, PollEvent::Readable | PollEvent::Error)) {
-                onPollerAddFailed(*client);
+                // Capture peer address before the socket is destroyed.
+                std::string peer;
+                auto ep = client->getPeerEndpoint();
+                if (ep.isSuccess()) peer = ep.value().toString();
+                onPollerAddFailed(key, peer);
                 // client goes out of scope here — socket closed via RAII.
                 continue;
             }

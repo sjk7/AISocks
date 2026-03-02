@@ -22,7 +22,7 @@ int main() {
         s.close(); // invalidate
 
         // Try to bind on invalid socket
-        bool bind_result = s.bind("127.0.0.1", Port{19700});
+        bool bind_result = s.bind("127.0.0.1", Port{0});
         REQUIRE(!bind_result);
         REQUIRE(s.getLastError() != SocketError::None);
     }
@@ -86,15 +86,23 @@ int main() {
 
     BEGIN_TEST("SocketFactory::createTcpServer fails on port in use");
     {
-        // First server
+        // First server (Port{0} — OS picks an ephemeral port)
         auto first_result = SocketFactory::createTcpServer(
-            ServerBind{"127.0.0.1", Port{19701}, Backlog{5}, false});
+            ServerBind{"127.0.0.1", Port{0}, Backlog{5}, false});
         REQUIRE(first_result.isSuccess());
         auto& first = first_result.value();
 
-        // Second server tries same port without reuseAddr
+        // Read back the assigned port so the second bind targets the same one.
+        uint16_t p19701 = 0;
+        {
+            auto ep = first.getLocalEndpoint();
+            p19701 = ep.isSuccess() ? ep.value().port.value() : 0;
+        }
+        REQUIRE(p19701 != 0);
+
+        // Second server tries the same port without reuseAddr — must fail.
         auto second_result = SocketFactory::createTcpServer(
-            ServerBind{"127.0.0.1", Port{19701}, Backlog{5}, false});
+            ServerBind{"127.0.0.1", Port{p19701}, Backlog{5}, false});
         REQUIRE(second_result.isError());
         REQUIRE(second_result.error() != SocketError::None);
         REQUIRE(!second_result.message().empty());
@@ -159,7 +167,7 @@ int main() {
         auto& s = result.value();
 
         // Successful bind
-        bool bind_result = s.bind("127.0.0.1", Port{19702});
+        bool bind_result = s.bind("127.0.0.1", Port{0});
         if (bind_result) {
             REQUIRE(s.getLastError() == SocketError::None);
         }

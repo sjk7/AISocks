@@ -180,6 +180,29 @@ cli.send("Hello!", 6);
 
 Key methods: `bind`, `listen`, `accept`, `connect`, `send`, `receive`, `setBlocking`, `setReuseAddress`, `setTimeout`, `close`, `isValid`, `getLastError`.
 
+## Async / coroutine / executor integration
+
+aiSocks is **intentionally single-threaded and synchronous**.  The design
+tradeoff: zero overhead on the hot path, zero thread-safety surface, trivial
+debugging.
+
+### Documented extension seams
+
+If you need to integrate with an external executor (`std::execution`,
+Asio, `io_uring`, a coroutine scheduler, etc.) here are the intended hooks:
+
+| Goal | How |
+|---|---|
+| Drive `run()` from an executor thread | Call `server.setHandleSignals(false)`, invoke `run()` on a dedicated thread, use `requestStop()` from any thread to signal shutdown. |
+| Yield after each event | Override `onIdle()` and return `KeepConnection`; pass a bounded `timeout` to `run()` so `onIdle()` fires on a regular cadence. |
+| Integrate a Poller-compatible fd with `io_uring` or `epoll` | `ServerBase` exposes `getSocket()` for the listener fd.  Register it separately with your ring; deliver readiness as calls to a subclass that bypasses `run()` and drives `drainAccept()` / `onReadable()` / `onWritable()` directly (requires friend or protected-accessor extension). |
+| Per-connection coroutine | Store a coroutine handle in `ClientData`.  Resume it from `onReadable()` / `onWritable()` and return `Disconnect` when the coroutine is done. |
+
+There is currently no built-in `io_uring` backend.  The kqueue (macOS/BSD)
+and epoll (Linux) backends live entirely inside `Poller`; adding an
+`io_uring` `Poller` implementation would not require changes to `ServerBase`
+or `SimpleServer`.
+
 ## Requirements
 
 - CMake 3.15+

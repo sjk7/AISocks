@@ -49,8 +49,8 @@ int main() {
     // Test 4: Server socket creation
     BEGIN_TEST("SocketFactory::createTcpServer succeeds");
     {
-        auto result = SocketFactory::createTcpServer(
-            ServerBind{"127.0.0.1", Port{19900}});
+        auto result
+            = SocketFactory::createTcpServer(ServerBind{"127.0.0.1", Port{0}});
         REQUIRE(result.isSuccess());
         auto& server = result.value();
         REQUIRE(server.isValid());
@@ -59,7 +59,7 @@ int main() {
         auto endpoint = server.getLocalEndpoint();
         REQUIRE(endpoint.isSuccess());
         REQUIRE(endpoint.value().address == "127.0.0.1");
-        REQUIRE(endpoint.value().port == Port{19900});
+        REQUIRE(endpoint.value().port.value() != 0); // OS chose a real port
     }
 
     // Test 5: Client socket creation
@@ -75,11 +75,15 @@ int main() {
     // Test 6: Client socket creation success
     BEGIN_TEST("SocketFactory::createTcpClient succeeds with real server");
     {
+        // Bind synchronously so we know the port before spawning the thread.
+        std::atomic<uint16_t> srvPort{0};
         // Start server in background
-        std::thread server_thread([]() {
+        std::thread server_thread([&srvPort]() {
             auto srv_result = SocketFactory::createTcpServer(
-                ServerBind{"127.0.0.1", Port{19901}});
+                ServerBind{"127.0.0.1", Port{0}});
             if (srv_result.isSuccess()) {
+                auto ep = srv_result.value().getLocalEndpoint();
+                if (ep.isSuccess()) srvPort.store(ep.value().port.value());
                 auto& srv = srv_result.value();
                 auto client_result = srv.accept();
                 if (client_result != nullptr) {
@@ -93,19 +97,16 @@ int main() {
             }
         });
 
-        // Give server time to start and retry connection if needed
-        std::this_thread::sleep_for(std::chrono::milliseconds(200));
-        
+        // Wait for the server to bind and set its port.
+        auto deadline
+            = std::chrono::steady_clock::now() + std::chrono::seconds(3);
+        while (
+            srvPort.load() == 0 && std::chrono::steady_clock::now() < deadline)
+            std::this_thread::sleep_for(std::chrono::milliseconds(5));
+        REQUIRE(srvPort.load() != 0);
+
         auto clt_result = SocketFactory::createTcpClient(AddressFamily::IPv4,
-            ConnectArgs{"127.0.0.1", Port{19901}, Milliseconds{2000}});
-        
-        if (!clt_result.isSuccess()) {
-            // If connection failed, wait a bit more and retry once
-            std::this_thread::sleep_for(std::chrono::milliseconds(500));
-            clt_result = SocketFactory::createTcpClient(AddressFamily::IPv4,
-                ConnectArgs{"127.0.0.1", Port{19901}, Milliseconds{2000}});
-        }
-        
+            ConnectArgs{"127.0.0.1", Port{srvPort.load()}, Milliseconds{2000}});
         REQUIRE(clt_result.isSuccess());
         auto& client = clt_result.value();
         REQUIRE(client.isValid());
@@ -136,14 +137,20 @@ int main() {
     // Test 8: Port in use error
     BEGIN_TEST("SocketFactory::createTcpServer fails on port in use");
     {
-        // First server
+        // First server (Port{0} — OS picks an ephemeral port)
         auto first_result = SocketFactory::createTcpServer(
-            ServerBind{"127.0.0.1", Port{19902}, Backlog{5}, false});
+            ServerBind{"127.0.0.1", Port{0}, Backlog{5}, false});
         REQUIRE(first_result.isSuccess());
+        uint16_t p19902 = 0;
+        {
+            auto ep = first_result.value().getLocalEndpoint();
+            p19902 = ep.isSuccess() ? ep.value().port.value() : 0;
+        }
+        REQUIRE(p19902 != 0);
 
-        // Second server tries same port without reuseAddr
+        // Second server tries the same port without reuseAddr — must fail.
         auto second_result = SocketFactory::createTcpServer(
-            ServerBind{"127.0.0.1", Port{19902}, Backlog{5}, false});
+            ServerBind{"127.0.0.1", Port{p19902}, Backlog{5}, false});
         REQUIRE(second_result.isError());
         REQUIRE(second_result.error() != SocketError::None);
     }

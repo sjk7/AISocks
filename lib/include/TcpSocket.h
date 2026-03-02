@@ -5,6 +5,7 @@
 #define AISOCKS_TCP_SOCKET_H
 
 #include "Socket.h"
+#include "SocketTypes.h" // ConnectArgs, ServerBind, Port, Milliseconds, etc.
 #include <memory>
 
 namespace aiSocks {
@@ -114,6 +115,29 @@ class TcpSocket : public Socket {
     // Zero-copy file transfer using sendfile system call (Linux/macOS)
     // Returns bytes sent, or <0 on error
     int sendfile(int fd, off_t offset, size_t count);
+
+    // Chunked non-blocking send: writes up to 64 KB per call, returns as
+    // soon as the socket buffer is full (partial send).
+    //
+    // This is the right primitive for Poller-driven servers: call it from
+    // onWritable() and re-arm PollEvent::Writable if the return value is less
+    // than `size` (meaning the kernel buffer filled before all bytes were
+    // sent).
+    //
+    // Returns: bytes sent (>= 0), or < 0 on hard error.
+    // Returns 0 with getLastError() == WouldBlock if the buffer is full.
+    int sendChunked(const char* data, size_t size) {
+        constexpr size_t kChunk = 64 * 1024;
+        size_t sent = 0;
+        while (sent < size) {
+            const size_t toSend = size - sent < kChunk ? size - sent : kChunk;
+            int n = doSend(data + sent, toSend);
+            if (n <= 0) return sent > 0 ? static_cast<int>(sent) : n;
+            sent += static_cast<size_t>(n);
+            if (static_cast<size_t>(n) < toSend) break; // buffer full
+        }
+        return static_cast<int>(sent);
+    }
 
     // sendAll with a per-chunk progress callback.
     //

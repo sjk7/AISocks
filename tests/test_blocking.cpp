@@ -79,15 +79,21 @@ int main() {
     {
         auto server = TcpSocket::createRaw();
         REQUIRE(server.setReuseAddress(true));
-        // Use a fixed port; if in use the test is skipped gracefully
-        bool bound = server.bind("127.0.0.1", Port{19300}) && server.listen(1);
+        // OS assigns an ephemeral port; no risk of collision
+        bool bound = server.bind("127.0.0.1", Port{0}) && server.listen(1);
+        uint16_t port = 0;
+        if (bound) {
+            auto ep = server.getLocalEndpoint();
+            port = ep.isSuccess() ? ep.value().port.value() : 0;
+            bound = (port != 0);
+        }
         if (!bound) {
-            REQUIRE_MSG(true, "SKIP - port 19300 unavailable");
+            REQUIRE_MSG(true, "SKIP - ephemeral port unavailable");
         } else {
-            std::thread connector([]() {
+            std::thread connector([port]() {
                 std::this_thread::sleep_for(std::chrono::milliseconds(10));
                 auto c = TcpSocket::createRaw();
-                (void)c.connect("127.0.0.1", Port{19300});
+                (void)c.connect("127.0.0.1", Port{port});
                 std::this_thread::sleep_for(std::chrono::milliseconds(20));
             });
             auto accepted = server.accept();

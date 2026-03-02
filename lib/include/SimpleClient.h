@@ -6,6 +6,9 @@
 
 #include "TcpSocket.h"
 #include "SocketFactory.h"
+#include "SocketTypes.h" // ConnectArgs, Port, Milliseconds — direct include
+// for discoverability; also pulled in transitively
+// via TcpSocket.h.
 #include <memory>
 #include <string>
 

@@ -61,7 +61,12 @@ int main() {
 
     BEGIN_TEST("Simple echo server with ClientLimit");
     {
-        SimpleEchoServer server(21002);
+        SimpleEchoServer server(0);
+        uint16_t port = 0;
+        {
+            auto ep = server.getSocket().getLocalEndpoint();
+            port = ep.isSuccess() ? ep.value().port.value() : 0;
+        }
         std::atomic<bool> ready{false};
 
         // Start server with limited clients
@@ -76,7 +81,7 @@ int main() {
 
         // Connect one client
         auto result = SocketFactory::createTcpClient(AddressFamily::IPv4,
-            ConnectArgs{"127.0.0.1", Port{21002}, Milliseconds{1000}});
+            ConnectArgs{"127.0.0.1", Port{port}, Milliseconds{1000}});
 
         if (result.isSuccess()) {
             std::cout << "Client connected successfully\n";

@@ -262,8 +262,8 @@ class HttpPollServer : public ServerBase<HttpClientState> {
             onResponseBegin(s);
         }
 
-        int sent = sendOptimized(sock, s.responseView.data() + s.sent,
-            s.responseView.size() - s.sent);
+        int sent = sock.sendChunked(
+            s.responseView.data() + s.sent, s.responseView.size() - s.sent);
         if (sent > 0) {
             touchClient(sock);
             s.sent += static_cast<size_t>(sent);

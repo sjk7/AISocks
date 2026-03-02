@@ -18,22 +18,24 @@
 
 using namespace aiSocks;
 
-static constexpr uint16_t BASE = 22000;
-
 // Start a one-shot echo server in the background.
-// Both accept() and receive() carry short timeouts so the server thread
-// always exits cleanly even if the test fails before the client connects
-// or the client connects but intentionally sends nothing.
-static std::thread startEchoServer(uint16_t port, int clients = 1) {
-    return std::thread([port, clients]() {
-        auto srv = SocketFactory::createTcpServer(
-            ServerBind{"127.0.0.1", Port{port}, Backlog{5}});
-        if (!srv.isSuccess()) return;
-        // SO_RCVTIMEO on the listener applies to accept() on POSIX, so the
-        // thread won't block forever if the client never arrives.
-        srv.value().setReceiveTimeout(Milliseconds{500});
+// Binds Port{0} synchronously so the caller knows the assigned port before
+// spawning the thread, eliminating hardcoded port numbers and race-free.
+static std::pair<std::thread, uint16_t> startEchoServer(int clients = 1) {
+    auto res = SocketFactory::createTcpServer(
+        ServerBind{"127.0.0.1", Port{0}, Backlog{5}});
+    if (!res.isSuccess()) return {std::thread{}, 0};
+    uint16_t port = 0;
+    {
+        auto ep = res.value().getLocalEndpoint();
+        port = ep.isSuccess() ? ep.value().port.value() : 0;
+    }
+    // SO_RCVTIMEO on the listener applies to accept() on POSIX, so the
+    // thread won't block forever if the client never arrives.
+    res.value().setReceiveTimeout(Milliseconds{500});
+    std::thread t([s = std::move(res.value()), clients]() mutable {
         for (int i = 0; i < clients; ++i) {
-            auto conn = srv.value().accept();
+            auto conn = s.accept();
             if (!conn) continue;
             conn->setReceiveTimeout(Milliseconds{300});
             char buf[256]{};
@@ -41,6 +43,7 @@ static std::thread startEchoServer(uint16_t port, int clients = 1) {
             if (n > 0) conn->sendAll(buf, n);
         }
     });
+    return {std::move(t), port};
 }
 
 int main() {
@@ -51,11 +54,11 @@ int main() {
     // -------------------------------------------------------------------------
     BEGIN_TEST("SimpleClient: construction does not fire callback");
     {
-        auto srv = startEchoServer(BASE);
+        auto [srv, srvPort] = startEchoServer();
         std::this_thread::sleep_for(std::chrono::milliseconds{10});
 
         bool callbackFired = false;
-        SimpleClient client(ConnectArgs{"127.0.0.1", Port{BASE}});
+        SimpleClient client(ConnectArgs{"127.0.0.1", Port{srvPort}});
         REQUIRE(client.isConnected());
         REQUIRE(!callbackFired); // must NOT have fired yet
 
@@ -92,11 +95,11 @@ int main() {
     // -------------------------------------------------------------------------
     BEGIN_TEST("SimpleClient::connect — returns live socket on success");
     {
-        auto srv = startEchoServer(BASE + 1);
+        auto [srv, srvPort] = startEchoServer();
         std::this_thread::sleep_for(std::chrono::milliseconds{10});
 
         auto result
-            = SimpleClient::connect(ConnectArgs{"127.0.0.1", Port{BASE + 1}});
+            = SimpleClient::connect(ConnectArgs{"127.0.0.1", Port{srvPort}});
         REQUIRE(result.isSuccess());
 
         TcpSocket sock = std::move(result.value());
@@ -127,10 +130,10 @@ int main() {
     // -------------------------------------------------------------------------
     BEGIN_TEST("SimpleClient: getSocket() accessible before run()");
     {
-        auto srv = startEchoServer(BASE + 2);
+        auto [srv, srvPort] = startEchoServer();
         std::this_thread::sleep_for(std::chrono::milliseconds{10});
 
-        SimpleClient client(ConnectArgs{"127.0.0.1", Port{BASE + 2}});
+        SimpleClient client(ConnectArgs{"127.0.0.1", Port{srvPort}});
         REQUIRE(client.isConnected());
         REQUIRE(client.getSocket() != nullptr);
         REQUIRE(client.getSocket()->isValid());
@@ -151,11 +154,11 @@ int main() {
     BEGIN_TEST(
         "SimpleClient: getLastError() empty on success, non-empty on failure");
     {
-        auto srv = startEchoServer(BASE + 3);
+        auto [srv, srvPort] = startEchoServer();
         std::this_thread::sleep_for(std::chrono::milliseconds{10});
 
         {
-            SimpleClient ok(ConnectArgs{"127.0.0.1", Port{BASE + 3}});
+            SimpleClient ok(ConnectArgs{"127.0.0.1", Port{srvPort}});
             REQUIRE(ok.isConnected());
             (void)ok.getLastError(); // must not crash
         } // closes socket → server's receive() returns, server thread exits
@@ -171,12 +174,12 @@ int main() {
     // -------------------------------------------------------------------------
     BEGIN_TEST("SimpleClient: exception from run() propagates cleanly");
     {
-        auto srv = startEchoServer(BASE + 4);
+        auto [srv, srvPort] = startEchoServer();
         std::this_thread::sleep_for(std::chrono::milliseconds{10});
 
         bool threw = false;
         {
-            SimpleClient client(ConnectArgs{"127.0.0.1", Port{BASE + 4}});
+            SimpleClient client(ConnectArgs{"127.0.0.1", Port{srvPort}});
             REQUIRE(client.isConnected());
             try {
                 client.run(
@@ -196,12 +199,12 @@ int main() {
     // -------------------------------------------------------------------------
     BEGIN_TEST("SimpleClient: multiple sequential two-step connections");
     {
-        auto srv = startEchoServer(BASE + 5, 3);
+        auto [srv, srvPort] = startEchoServer(3);
         std::this_thread::sleep_for(std::chrono::milliseconds{10});
 
         for (int i = 0; i < 3; ++i) {
             std::string msg = "Message " + std::to_string(i);
-            SimpleClient client(ConnectArgs{"127.0.0.1", Port{BASE + 5}});
+            SimpleClient client(ConnectArgs{"127.0.0.1", Port{srvPort}});
             REQUIRE(client.isConnected());
 
             bool callbackRan = false;
@@ -223,11 +226,11 @@ int main() {
     // -------------------------------------------------------------------------
     BEGIN_TEST("SimpleClient: run() return value");
     {
-        auto srv = startEchoServer(BASE + 6);
+        auto [srv, srvPort] = startEchoServer();
         std::this_thread::sleep_for(std::chrono::milliseconds{10});
 
         {
-            SimpleClient good(ConnectArgs{"127.0.0.1", Port{BASE + 6}});
+            SimpleClient good(ConnectArgs{"127.0.0.1", Port{srvPort}});
             REQUIRE(good.isConnected());
             bool ret = good.run([](TcpSocket&) {});
             REQUIRE(ret); // true — callback was invoked
@@ -246,11 +249,18 @@ int main() {
     BEGIN_TEST("SimpleClient: run() callable multiple times");
     {
         // A server that echoes two messages on the same connection.
-        std::thread srv([]() {
-            auto s = SocketFactory::createTcpServer(
-                ServerBind{"127.0.0.1", Port{BASE + 7}, Backlog{2}});
-            if (!s.isSuccess()) return;
-            auto conn = s.value().accept();
+        // Bind Port{0} synchronously so we know the port before spawning.
+        auto srvRes = SocketFactory::createTcpServer(
+            ServerBind{"127.0.0.1", Port{0}, Backlog{2}});
+        REQUIRE(srvRes.isSuccess());
+        uint16_t srvPort = 0;
+        {
+            auto ep = srvRes.value().getLocalEndpoint();
+            srvPort = ep.isSuccess() ? ep.value().port.value() : 0;
+        }
+        REQUIRE(srvPort != 0);
+        std::thread srv([s = std::move(srvRes.value())]() mutable {
+            auto conn = s.accept();
             if (!conn) return;
             for (int i = 0; i < 2; ++i) {
                 char buf[64]{};
@@ -260,7 +270,7 @@ int main() {
         });
         std::this_thread::sleep_for(std::chrono::milliseconds{10});
 
-        SimpleClient client(ConnectArgs{"127.0.0.1", Port{BASE + 7}});
+        SimpleClient client(ConnectArgs{"127.0.0.1", Port{srvPort}});
         REQUIRE(client.isConnected());
 
         int calls = 0;
@@ -321,11 +331,11 @@ int main() {
     // -------------------------------------------------------------------------
     BEGIN_TEST("SimpleClient: destroyed without calling run() — no crash");
     {
-        auto srv = startEchoServer(BASE + 8);
+        auto [srv, srvPort] = startEchoServer();
         std::this_thread::sleep_for(std::chrono::milliseconds{10});
 
         {
-            SimpleClient client(ConnectArgs{"127.0.0.1", Port{BASE + 8}});
+            SimpleClient client(ConnectArgs{"127.0.0.1", Port{srvPort}});
             REQUIRE(client.isConnected());
             // run() is intentionally never called;
             // destructor must release the socket cleanly.

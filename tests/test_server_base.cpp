@@ -148,7 +148,7 @@ int main() {
     // Test 1: requestStop() from another thread
     BEGIN_TEST("ServerBase::requestStop() from another thread");
     {
-        EchoServer server(20000);
+        EchoServer server(0);
         std::atomic<bool> ready{false};
         auto serverThread = startServerInBackground(server, ready);
         waitForServerReady(ready);
@@ -170,7 +170,8 @@ int main() {
     // Test 2: Server exits when maxClients limit is reached
     BEGIN_TEST("ServerBase: exits when maxClients limit is reached");
     {
-        EchoServer server(20001);
+        EchoServer server(0);
+        const uint16_t port = server.getActualPort();
         std::atomic<bool> ready{false};
         const int maxClients = 3;
         auto serverThread = startServerInBackground(
@@ -181,7 +182,7 @@ int main() {
         std::vector<std::unique_ptr<TcpSocket>> clients;
         for (int i = 0; i < maxClients; ++i) {
             auto result = SocketFactory::createTcpClient(AddressFamily::IPv4,
-                ConnectArgs{"127.0.0.1", Port{20001}, Milliseconds{200}});
+                ConnectArgs{"127.0.0.1", Port{port}, Milliseconds{200}});
             if (result.isSuccess()) {
                 clients.emplace_back(
                     std::make_unique<TcpSocket>(std::move(result.value())));
@@ -207,7 +208,7 @@ int main() {
     // Test 3: onIdle() is called periodically
     BEGIN_TEST("ServerBase: onIdle() is called periodically with timeout");
     {
-        EchoServer server(20002);
+        EchoServer server(0);
         std::atomic<bool> ready{false};
         auto serverThread = startServerInBackground(server, ready);
         waitForServerReady(ready);
@@ -225,7 +226,8 @@ int main() {
     // Test 4: Server handles client connections gracefully
     BEGIN_TEST("ServerBase: handles client connections gracefully");
     {
-        EchoServer server(20003);
+        EchoServer server(0);
+        const uint16_t port = server.getActualPort();
         std::atomic<bool> ready{false};
         auto serverThread = startServerInBackground(server, ready);
         waitForServerReady(ready);
@@ -233,7 +235,7 @@ int main() {
         // Connect and disconnect a client
         {
             auto result = SocketFactory::createTcpClient(AddressFamily::IPv4,
-                ConnectArgs{"127.0.0.1", Port{20003}, Milliseconds{200}});
+                ConnectArgs{"127.0.0.1", Port{port}, Milliseconds{200}});
             if (result.isSuccess()) {
                 auto client
                     = std::make_unique<TcpSocket>(std::move(result.value()));
@@ -283,7 +285,8 @@ int main() {
         "ServerBase: ClientLimit::Unlimited accepts unlimited connections");
     {
         std::cout << "DEBUG: Starting unlimited test\n";
-        EchoServer server(20004);
+        EchoServer server(0);
+        const uint16_t port = server.getActualPort();
         std::atomic<bool> ready{false};
         auto serverThread
             = startServerInBackground(server, ready, ClientLimit::Unlimited);
@@ -297,7 +300,7 @@ int main() {
         for (int i = 0; i < manyClients; ++i) {
             std::cout << "DEBUG: Connecting client " << i << "\n";
             auto result = SocketFactory::createTcpClient(AddressFamily::IPv4,
-                ConnectArgs{"127.0.0.1", Port{20004},
+                ConnectArgs{"127.0.0.1", Port{port},
                     Milliseconds{200}}); // Reduced timeout
             if (result.isSuccess()) {
                 clients.emplace_back(
@@ -336,7 +339,8 @@ int main() {
     // Test 6: ClientLimit::Default works correctly
     BEGIN_TEST("ServerBase: ClientLimit::Default respects limit");
     {
-        EchoServer server(20005);
+        EchoServer server(0);
+        const uint16_t port = server.getActualPort();
         std::atomic<bool> ready{false};
         auto serverThread
             = startServerInBackground(server, ready, ClientLimit::Default);
@@ -349,7 +353,7 @@ int main() {
 
         for (int i = 0; i < maxTestClients; ++i) {
             auto result = SocketFactory::createTcpClient(AddressFamily::IPv4,
-                ConnectArgs{"127.0.0.1", Port{20005},
+                ConnectArgs{"127.0.0.1", Port{port},
                     Milliseconds{200}}); // Reduced timeout
             if (result.isSuccess()) {
                 clients.emplace_back(
@@ -376,28 +380,29 @@ int main() {
     // Test 7: Server can be stopped and restarted
     BEGIN_TEST("ServerBase: can be stopped and restarted");
     {
-        EchoServer server1(20006);
+        EchoServer server1(0);
+        const uint16_t port = server1.getActualPort();
         std::atomic<bool> ready1{false};
         auto serverThread1 = startServerInBackground(server1, ready1);
         waitForServerReady(ready1);
 
         // Connect a client to first server
         auto result = SocketFactory::createTcpClient(AddressFamily::IPv4,
-            ConnectArgs{"127.0.0.1", Port{20006}, Milliseconds{200}});
+            ConnectArgs{"127.0.0.1", Port{port}, Milliseconds{200}});
         REQUIRE(result.isSuccess());
 
         server1.requestStop();
         serverThread1.join();
 
         // Create a new server on the same port
-        EchoServer server2(20006);
+        EchoServer server2(port);
         std::atomic<bool> ready2{false};
         auto serverThread2 = startServerInBackground(server2, ready2);
         waitForServerReady(ready2);
 
         // Should be able to connect again
         auto result2 = SocketFactory::createTcpClient(AddressFamily::IPv4,
-            ConnectArgs{"127.0.0.1", Port{20006}, Milliseconds{200}});
+            ConnectArgs{"127.0.0.1", Port{port}, Milliseconds{200}});
         REQUIRE(result2.isSuccess());
 
         server2.requestStop();

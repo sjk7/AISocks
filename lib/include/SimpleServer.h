@@ -4,234 +4,154 @@
 #ifndef AISOCKS_SIMPLE_SERVER_H
 #define AISOCKS_SIMPLE_SERVER_H
 
-#include "Poller.h"
-#include "ServerTypes.h"
-#include "TcpSocket.h"
-#include "SocketFactory.h"
+#include "ServerBase.h"
 #include <functional>
-#include <memory>
-#include <string>
-#include <unordered_map>
 
 namespace aiSocks {
 
 // ---------------------------------------------------------------------------
 // SimpleServer  convenience wrapper for TCP server polling loops.
 //
-// Creates a non-blocking listening socket and drives a Poller-based event
-// loop for accept/read/write readiness. Useful for quick prototyping and
-// simple single-threaded server patterns.
+// Privately inherits ServerBase<detail::NoClientState>, so it shares the O(1)
+// flat-array client table, keep-alive timeout heap, requestStop(), and
+// signal handling — without exposing the full ServerBase API surface.
 //
-// Usage:
-//   try {
-//       SimpleServer server(ServerBind{"0.0.0.0", Port{8080}});
-//       server.pollClients([](TcpSocket& client, PollEvent events) {
-//           if (hasFlag(events, PollEvent::Readable)) {
-//               char buf[1024];
-//               int n = client.receive(buf, sizeof(buf));
-//               if (n > 0) {
-//                   (void)client.send(buf, static_cast<size_t>(n));
-//               }
-//           }
-//           return true; // keep client connected
-//       });
-//   if (!server.isValid()) {
-//       std::cerr << "Server failed: " << server.getErrorMessage() << "\n";
-//   }
+// Usage — poll loop (read + write events):
+//   SimpleServer server(ServerBind{"0.0.0.0", Port{8080}});
+//   if (!server.isValid()) { ... }
+//   server.pollClients([](TcpSocket& client, PollEvent events) {
+//       if (hasFlag(events, PollEvent::Readable)) {
+//           char buf[1024];
+//           int n = client.receive(buf, sizeof(buf));
+//           if (n > 0) client.send(buf, n);
+//       }
+//       return true; // keep client connected
+//   });
 //
-// On failure (socket creation, bind, or listen), the server is left invalid;
-// check isValid(). pollClients() uses non-blocking sockets throughout and
-// Poller readiness for:
-//   - accepting clients
-//   - readable client data
-//   - writable client buffer space
+// Writable interest is off by default (same as ServerBase).  Call
+// setClientWritable(sock, true) from inside the callback to opt a client
+// into Writable events.
+//
+// Usage — accept-only loop (synchronous per-client callback, then close):
+//   server.acceptClients([](TcpSocket& client) {
+//       // do a blocking exchange; socket closes when this returns
+//   });
+//
+// On failure (socket creation, bind, or listen), isValid() returns false.
 // ---------------------------------------------------------------------------
-class SimpleServer {
+
+namespace detail {
+    // SimpleServer needs a ClientData type for ServerBase<T> but stores no
+    // per-client state — all logic lives in the user's callback.  This tag
+    // satisfies the template parameter without exposing implementation noise.
+    struct NoClientState {};
+} // namespace detail
+
+class SimpleServer : private ServerBase<detail::NoClientState> {
+    using Base = ServerBase<detail::NoClientState>;
+
     public:
     // Create a listening server socket.
-    // Returns invalid socket if bind or listen fails - check isValid().
+    // Returns invalid server if bind or listen fails — check isValid().
     SimpleServer(
         const ServerBind& args, AddressFamily family = AddressFamily::IPv4)
-        : socket_(std::make_unique<TcpSocket>(TcpSocket::createRaw(family))) {
-        // Use SocketFactory to create server without exceptions
-        auto result = SocketFactory::createTcpServer(family, args);
-        if (result.isSuccess()) {
-            *socket_ = std::move(result.value());
-            if (!socket_->setBlocking(false)) {
-                // Failed to set non-blocking - invalidate socket
-                socket_.reset();
-            }
-        } else {
-            // Server creation failed - socket remains invalid
-            socket_.reset();
-        }
+        : Base(args, family) {}
+
+    // Expose the useful subset of Base's public API.
+    using Base::clientCount;
+    using Base::getKeepAliveTimeout;
+    using Base::getSocket;
+    using Base::handlesSignals;
+    using Base::isValid;
+    using Base::peakClientCount;
+    using Base::requestStop;
+    using Base::setClientWritable;
+    using Base::setHandleSignals;
+    using Base::setKeepAliveTimeout;
+    using Base::stopRequested;
+    using Base::touchClient;
+
+    // -------------------------------------------------------------------------
+    // Full Poller-driven server loop: accept + readable + writable events.
+    // Callback signature: bool(TcpSocket& client, PollEvent events)
+    //
+    // Return value from callback:
+    //   true   keep the client registered.
+    //   false  remove and close the client.
+    //
+    // maxClients / timeout have the same semantics as ServerBase::run().
+    //
+    // Note: PollEvent::Writable only fires for clients where you have called
+    // setClientWritable(sock, true).  This avoids spurious callbacks when the
+    // send buffer is always ready but you have nothing to write.
+    // -------------------------------------------------------------------------
+    template <typename Callback>
+    void pollClients(Callback&& cb,
+        ClientLimit maxClients = ClientLimit::Default,
+        Milliseconds timeout = Milliseconds{-1}) {
+        callback_ = std::forward<Callback>(cb);
+        Base::run(maxClients, timeout);
+        callback_ = nullptr;
     }
 
-    // Poll-driven accept loop that invokes callback for each accepted client.
-    // Callback signature: void(TcpSocket&)
+    // -------------------------------------------------------------------------
+    // Accept-only loop: accepts up to maxClients connections, calls
+    // onClient(TcpSocket&) synchronously for each, then closes the socket.
     //
-    // Note: This accepts clients in non-blocking mode using Poller, but the
-    // callback itself is responsible for any client I/O strategy.
+    // Use pollClients() for servers that need to keep multiple clients alive
+    // concurrently.  acceptClients() is for simple request/response servers
+    // that handle one exchange per accepted socket.
+    // -------------------------------------------------------------------------
     template <typename Callback>
     void acceptClients(
         Callback&& onClient, ClientLimit maxClients = ClientLimit::Default) {
-        if (!socket_ || !socket_->isValid()) return;
+        if (!isValid()) return;
 
         Poller poller;
-        if (!poller.add(*socket_, PollEvent::Readable | PollEvent::Error)) {
-            return; // Failed to register with poller
-        }
+        TcpSocket& listener = getSocket();
+        if (!poller.add(listener, PollEvent::Readable | PollEvent::Error))
+            return;
 
         size_t count = 0;
         while (maxClients == ClientLimit::Unlimited
             || count < static_cast<size_t>(maxClients)) {
             auto ready = poller.wait(Milliseconds{-1});
             for (const auto& event : ready) {
-                if (event.socket != socket_.get()) continue;
-                if (!hasFlag(event.events, PollEvent::Readable)
-                    && !hasFlag(event.events, PollEvent::Error)) {
-                    continue;
-                }
-
+                if (event.socket != &listener) continue;
+                if (!hasFlag(event.events, PollEvent::Readable)) continue;
                 for (;;) {
-                    auto client = socket_->accept();
-                    if (!client) {
-                        auto err = socket_->getLastError();
-                        if (err == SocketError::WouldBlock) {
-                            break; // drained all pending accepts
-                        }
-                        break; // hard accept error; continue event loop
-                    }
-
-                    if (!client->setBlocking(false)) {
-                        continue;
-                    }
-
+                    auto client = listener.accept();
+                    if (!client) break;
+                    (void)client->setBlocking(false);
                     onClient(*client);
                     ++count;
                     if (maxClients != ClientLimit::Unlimited
-                        && count >= static_cast<size_t>(maxClients)) {
+                        && count >= static_cast<size_t>(maxClients))
                         return;
-                    }
                 }
             }
         }
     }
 
-    // Full Poller-driven server loop for accept + readable + writable events.
-    // Callback signature: bool(TcpSocket&, PollEvent)
-    //
-    // Return value:
-    //   true  keep the client registered.
-    //   false remove and close the client.
-    //
-    // maxClients semantics:
-    //   ClientLimit::Unlimited (0)  accept forever.
-    //   N > 0                        accept up to N clients, then stop
-    //   accepting and keep
-    //                                polling existing clients until all
-    //                                disconnect.
-    template <typename Callback>
-    void pollClients(Callback&& onClientEvent,
-        ClientLimit maxClients = ClientLimit::Default,
-        Milliseconds timeout = Milliseconds{-1}) {
-        if (!socket_ || !socket_->isValid()) return;
-
-        Poller poller;
-        if (!poller.add(*socket_, PollEvent::Readable | PollEvent::Error)) {
-            return; // Failed to register with poller
-        }
-
-        std::unordered_map<const Socket*, std::unique_ptr<TcpSocket>> clients;
-        // Pre-reserve client map if maxClients is specified to eliminate hash
-        // table growth
-        if (static_cast<size_t>(maxClients) > 0) {
-            clients.reserve(static_cast<size_t>(maxClients));
-        }
-        size_t accepted = 0;
-        bool accepting = true;
-
-        while (accepting || !clients.empty()) {
-            auto ready = poller.wait(timeout);
-            for (const auto& event : ready) {
-                if (event.socket == socket_.get()) {
-                    if (!accepting) continue;
-                    if (!hasFlag(event.events, PollEvent::Readable)
-                        && !hasFlag(event.events, PollEvent::Error)) {
-                        continue;
-                    }
-
-                    for (;;) {
-                        auto client = socket_->accept();
-                        if (!client) {
-                            auto err = socket_->getLastError();
-                            if (err == SocketError::WouldBlock) break;
-                            break;
-                        }
-
-                        if (!client->setBlocking(false)) {
-                            continue;
-                        }
-
-                        const Socket* key = client.get();
-                        if (!poller.add(*client,
-                                PollEvent::Readable | PollEvent::Writable
-                                    | PollEvent::Error)) {
-                            continue;
-                        }
-
-                        clients.emplace(key, std::move(client));
-                        ++accepted;
-
-                        if (maxClients != ClientLimit::Unlimited
-                            && accepted >= static_cast<size_t>(maxClients)) {
-                            (void)poller.remove(*socket_);
-                            accepting = false;
-                            break;
-                        }
-                    }
-                    continue;
-                }
-
-                auto it = clients.find(event.socket);
-                if (it == clients.end()) continue;
-
-                bool keepClient = !hasFlag(event.events, PollEvent::Error);
-                if (keepClient) {
-                    keepClient = onClientEvent(*it->second, event.events);
-                }
-
-                if (!keepClient) {
-                    (void)poller.remove(*it->second);
-                    clients.erase(it);
-                }
-            }
-        }
+    protected:
+    ServerResult onReadable(TcpSocket& sock, detail::NoClientState&) override {
+        if (callback_ && !callback_(sock, PollEvent::Readable))
+            return ServerResult::Disconnect;
+        return ServerResult::KeepConnection;
     }
 
-    // Check if the server socket is valid and ready for use
-    bool isValid() const { return socket_ && socket_->isValid(); }
-
-    // Get access to the underlying server socket.
-    // Useful for configuring socket options or checking socket state.
-    TcpSocket& getSocket() {
-        if (!socket_) {
-            static TcpSocket dummy = TcpSocket::createRaw();
-            return dummy;
-        }
-        return *socket_;
-    }
-
-    const TcpSocket& getSocket() const {
-        if (!socket_) {
-            static TcpSocket dummy = TcpSocket::createRaw();
-            return dummy;
-        }
-        return *socket_;
+    ServerResult onWritable(TcpSocket& sock, detail::NoClientState&) override {
+        if (callback_ && !callback_(sock, PollEvent::Writable))
+            return ServerResult::Disconnect;
+        return ServerResult::KeepConnection;
     }
 
     private:
-    std::unique_ptr<TcpSocket> socket_;
+    // Type-erased callback; set for the duration of pollClients(), null
+    // outside of it.  std::function is appropriate here: SimpleServer is a
+    // prototyping class and the indirection cost is negligible compared to the
+    // poll()/kqueue syscall it wraps.
+    std::function<bool(TcpSocket&, PollEvent)> callback_;
 };
 
 } // namespace aiSocks

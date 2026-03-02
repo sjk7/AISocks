@@ -69,7 +69,12 @@ int main() {
     {
         // Reset static stop flag to clean state between test runs
         // (No longer needed with instance variable, but keep for compatibility)
-        MinimalServer server(21001);
+        MinimalServer server(0);
+        uint16_t port = 0;
+        {
+            auto ep = server.getSocket().getLocalEndpoint();
+            port = ep.isSuccess() ? ep.value().port.value() : 0;
+        }
         std::atomic<bool> ready{false};
 
         // Start server with limited clients
@@ -84,7 +89,7 @@ int main() {
 
         // Connect a client to verify server works
         auto result = SocketFactory::createTcpClient(AddressFamily::IPv4,
-            ConnectArgs{"127.0.0.1", Port{21001}, Milliseconds{200}});
+            ConnectArgs{"127.0.0.1", Port{port}, Milliseconds{200}});
         REQUIRE(result.isSuccess());
         auto client = std::make_unique<TcpSocket>(std::move(result.value()));
 

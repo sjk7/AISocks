@@ -19,8 +19,6 @@
 
 using namespace aiSocks;
 
-static const uint16_t BASE = 21800; // unique port range for this test suite
-
 // -----------------------------------------------------------------------
 // Happy path: construction
 // -----------------------------------------------------------------------
@@ -42,11 +40,11 @@ static void test_happy_construction() {
 
     BEGIN_TEST("TcpSocket: ServerBind ctor binds and listens in one step");
     {
-        TcpSocket srv(AddressFamily::IPv4, ServerBind{"127.0.0.1", Port{BASE}});
+        TcpSocket srv(AddressFamily::IPv4, ServerBind{"127.0.0.1", Port{0}});
         REQUIRE(srv.isValid());
         auto ep = srv.getLocalEndpoint();
         REQUIRE(ep.isSuccess());
-        REQUIRE(ep.value().port == Port{BASE});
+        REQUIRE(ep.value().port.value() != 0);
     }
 
     std::this_thread::sleep_for(std::chrono::milliseconds(1));
@@ -54,10 +52,13 @@ static void test_happy_construction() {
     BEGIN_TEST("TcpSocket: ConnectArgs ctor creates a connected socket");
     {
         std::atomic<bool> ready{false};
+        std::atomic<uint16_t> srvPort{0};
         std::thread srvThread([&] {
             TcpSocket srv(
-                AddressFamily::IPv4, ServerBind{"127.0.0.1", Port{BASE + 1}});
+                AddressFamily::IPv4, ServerBind{"127.0.0.1", Port{0}});
             REQUIRE(srv.isValid());
+            auto ep = srv.getLocalEndpoint();
+            srvPort.store(ep.isSuccess() ? ep.value().port.value() : 0);
             ready = true;
             auto peer = srv.accept();
             if (peer == nullptr) {
@@ -75,7 +76,7 @@ static void test_happy_construction() {
             std::this_thread::sleep_for(std::chrono::milliseconds(10));
 
         TcpSocket c(
-            AddressFamily::IPv4, ConnectArgs{"127.0.0.1", Port{BASE + 1}});
+            AddressFamily::IPv4, ConnectArgs{"127.0.0.1", Port{srvPort.load()}});
         REQUIRE(c.isValid());
 
         srvThread.join();
@@ -92,13 +93,19 @@ static void test_happy_accept() {
     {
         auto srv = TcpSocket::createRaw();
         REQUIRE(srv.setReuseAddress(true));
-        REQUIRE(srv.bind("127.0.0.1", Port{BASE + 2}));
+        REQUIRE(srv.bind("127.0.0.1", Port{0}));
         REQUIRE(srv.listen(1));
+        uint16_t srvPort = 0;
+        {
+            auto ep = srv.getLocalEndpoint();
+            srvPort = ep.isSuccess() ? ep.value().port.value() : 0;
+        }
+        REQUIRE(srvPort != 0);
 
-        std::thread clt([] {
+        std::thread clt([srvPort] {
             try {
                 auto c = TcpSocket::createRaw();
-                (void)c.connect("127.0.0.1", Port{BASE + 2});
+                (void)c.connect("127.0.0.1", Port{srvPort});
             } catch (...) {
             }
         });
@@ -126,14 +133,17 @@ static void test_happy_send_receive() {
         const std::string msg = "hello-tcp-typed";
         std::string received;
         std::atomic<bool> ready{false};
+        std::atomic<uint16_t> srvPort{0};
 
         std::thread srvThread([&] {
             auto srv = TcpSocket::createRaw();
             REQUIRE(srv.setReuseAddress(true));
-            if (!srv.bind("127.0.0.1", Port{BASE + 3}) || !srv.listen(1)) {
+            if (!srv.bind("127.0.0.1", Port{0}) || !srv.listen(1)) {
                 ready = true;
                 return;
             }
+            auto ep = srv.getLocalEndpoint();
+            srvPort.store(ep.isSuccess() ? ep.value().port.value() : 0);
             ready = true;
             auto peer = srv.accept();
             if (peer) {
@@ -149,7 +159,7 @@ static void test_happy_send_receive() {
             std::this_thread::sleep_for(std::chrono::milliseconds(5));
 
         auto c = TcpSocket::createRaw();
-        REQUIRE(c.connect("127.0.0.1", Port{BASE + 3}));
+        REQUIRE(c.connect("127.0.0.1", Port{srvPort.load()}));
         int sent = c.send(msg.data(), msg.size());
         REQUIRE(sent == static_cast<int>(msg.size()));
         c.close();
@@ -165,14 +175,17 @@ static void test_happy_send_receive() {
         const std::string msg = "exact-byte-transfer";
         std::string received(msg.size(), '\0');
         std::atomic<bool> ready{false};
+        std::atomic<uint16_t> srvPort{0};
 
         std::thread srvThread([&] {
             auto srv = TcpSocket::createRaw();
             REQUIRE(srv.setReuseAddress(true));
-            if (!srv.bind("127.0.0.1", Port{BASE + 4}) || !srv.listen(1)) {
+            if (!srv.bind("127.0.0.1", Port{0}) || !srv.listen(1)) {
                 ready = true;
                 return;
             }
+            auto ep = srv.getLocalEndpoint();
+            srvPort.store(ep.isSuccess() ? ep.value().port.value() : 0);
             ready = true;
             auto peer = srv.accept();
             if (peer) {
@@ -186,7 +199,7 @@ static void test_happy_send_receive() {
             std::this_thread::sleep_for(std::chrono::milliseconds(5));
 
         auto c = TcpSocket::createRaw();
-        REQUIRE(c.connect("127.0.0.1", Port{BASE + 4}));
+        REQUIRE(c.connect("127.0.0.1", Port{srvPort.load()}));
         REQUIRE(c.sendAll(msg.data(), msg.size()));
         c.close();
 
@@ -205,16 +218,19 @@ static void test_happy_progress_callback() {
     {
         const std::string msg = "progress-data-test";
         std::atomic<bool> ready{false};
+        std::atomic<uint16_t> srvPort{0};
         size_t reportedSent = 0;
         size_t reportedTotal = 0;
 
         std::thread srvThread([&] {
             auto srv = TcpSocket::createRaw();
             REQUIRE(srv.setReuseAddress(true));
-            if (!srv.bind("127.0.0.1", Port{BASE + 5}) || !srv.listen(1)) {
+            if (!srv.bind("127.0.0.1", Port{0}) || !srv.listen(1)) {
                 ready = true;
                 return;
             }
+            auto ep = srv.getLocalEndpoint();
+            srvPort.store(ep.isSuccess() ? ep.value().port.value() : 0);
             ready = true;
             auto peer = srv.accept();
             if (peer) {
@@ -229,7 +245,7 @@ static void test_happy_progress_callback() {
             std::this_thread::sleep_for(std::chrono::milliseconds(5));
 
         auto c = TcpSocket::createRaw();
-        REQUIRE(c.connect("127.0.0.1", Port{BASE + 5}));
+        REQUIRE(c.connect("127.0.0.1", Port{srvPort.load()}));
         bool ok
             = c.sendAll(msg.data(), msg.size(), [&](size_t sent, size_t total) {
                   reportedSent = sent;
@@ -309,12 +325,18 @@ static void test_sad_construction() {
     {
         // First server should succeed
         TcpSocket first(AddressFamily::IPv4,
-            ServerBind{"127.0.0.1", Port{BASE + 10}, Backlog{5}, false});
+            ServerBind{"127.0.0.1", Port{0}, Backlog{5}, false});
         REQUIRE(first.isValid());
+        uint16_t firstPort = 0;
+        {
+            auto ep = first.getLocalEndpoint();
+            firstPort = ep.isSuccess() ? ep.value().port.value() : 0;
+        }
+        REQUIRE(firstPort != 0);
 
         // Second server should fail
         auto result = SocketFactory::createTcpServer(AddressFamily::IPv4,
-            ServerBind{"127.0.0.1", Port{BASE + 10}, Backlog{5}, false});
+            ServerBind{"127.0.0.1", Port{firstPort}, Backlog{5}, false});
         REQUIRE(result.isError());
         REQUIRE(result.error() != SocketError::None);
     }
@@ -324,7 +346,7 @@ static void test_sad_construction() {
     BEGIN_TEST("TcpSocket(ServerBind): fails on invalid bind address");
     {
         auto result = SocketFactory::createTcpServer(AddressFamily::IPv4,
-            ServerBind{"999.999.999.999", Port{BASE + 11}});
+            ServerBind{"999.999.999.999", Port{0}});
         REQUIRE(result.isError());
         REQUIRE(result.error() == SocketError::BindFailed);
     }
@@ -352,7 +374,7 @@ static void test_sad_operations() {
     BEGIN_TEST("TcpSocket: bind() fails on bad address (manual call)");
     {
         auto s = TcpSocket::createRaw();
-        bool ok = s.bind("999.999.999.999", Port{BASE + 20});
+        bool ok = s.bind("999.999.999.999", Port{0});
         REQUIRE(!ok);
         REQUIRE(s.getLastError() == SocketError::BindFailed);
     }
@@ -474,11 +496,11 @@ static void test_happy_endpoints() {
     BEGIN_TEST("TcpSocket: getLocalEndpoint() reflects bind address");
     {
         auto s = TcpSocket::createRaw();
-        REQUIRE(s.bind("127.0.0.1", Port{BASE + 30}));
+        REQUIRE(s.bind("127.0.0.1", Port{0}));
         auto ep = s.getLocalEndpoint();
         REQUIRE(ep.isSuccess());
         REQUIRE(ep.value().address == "127.0.0.1");
-        REQUIRE(ep.value().port == Port{BASE + 30});
+        REQUIRE(ep.value().port.value() != 0);
     }
 
     std::this_thread::sleep_for(std::chrono::milliseconds(1));
@@ -486,13 +508,16 @@ static void test_happy_endpoints() {
     BEGIN_TEST("TcpSocket: getPeerEndpoint() populated after connect");
     {
         std::atomic<bool> ready{false};
+        std::atomic<uint16_t> srvPort31{0};
         std::thread srvThread([&] {
             auto srv = TcpSocket::createRaw();
             REQUIRE(srv.setReuseAddress(true));
-            if (!srv.bind("127.0.0.1", Port{BASE + 31}) || !srv.listen(1)) {
+            if (!srv.bind("127.0.0.1", Port{0}) || !srv.listen(1)) {
                 ready = true;
                 return;
             }
+            auto ep = srv.getLocalEndpoint();
+            srvPort31.store(ep.isSuccess() ? ep.value().port.value() : 0);
             ready = true;
             (void)srv.accept(); // accept and discard
         });
@@ -503,12 +528,84 @@ static void test_happy_endpoints() {
             std::this_thread::sleep_for(std::chrono::milliseconds(5));
 
         auto c = TcpSocket::createRaw();
-        REQUIRE(c.connect("127.0.0.1", Port{BASE + 31}));
+        REQUIRE(c.connect("127.0.0.1", Port{srvPort31.load()}));
         auto peer = c.getPeerEndpoint();
         REQUIRE(peer.isSuccess());
-        REQUIRE(peer.value().port == Port{BASE + 31});
+        REQUIRE(peer.value().port.value() == srvPort31.load());
 
         srvThread.join();
+    }
+}
+
+// -----------------------------------------------------------------------
+// Happy path: sendChunked
+// -----------------------------------------------------------------------
+static void test_happy_send_chunked() {
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+
+    BEGIN_TEST(
+        "TcpSocket: sendChunked() delivers a multi-chunk payload (200 KB)");
+    {
+        // 200 KB forces at least 3 iterations of the 64 KB inner chunk loop.
+        constexpr size_t kSize = 200 * 1024;
+        std::string payload(kSize, '\0');
+        for (size_t i = 0; i < kSize; ++i)
+            payload[i] = static_cast<char>(i & 0xFF);
+
+        std::string received;
+        received.reserve(kSize);
+        std::atomic<bool> ready{false};
+        std::atomic<uint16_t> port{0};
+
+        std::thread srvThread([&] {
+            auto srv = TcpSocket::createRaw();
+            REQUIRE(srv.setReuseAddress(true));
+            if (!srv.bind("127.0.0.1", Port{0}) || !srv.listen(1)) {
+                ready = true;
+                return;
+            }
+            auto ep = srv.getLocalEndpoint();
+            port.store(ep.isSuccess() ? ep.value().port.value() : 0);
+            ready = true;
+            auto peer = srv.accept(); // blocking: waits for client
+            if (peer) {
+                char buf[8192];
+                while (received.size() < kSize) {
+                    int n = peer->receive(buf, sizeof(buf));
+                    if (n > 0)
+                        received.append(buf, static_cast<size_t>(n));
+                    else
+                        break; // EOF or error
+                }
+            }
+        });
+
+        auto deadline
+            = std::chrono::steady_clock::now() + std::chrono::seconds(3);
+        while (!ready && std::chrono::steady_clock::now() < deadline)
+            std::this_thread::sleep_for(std::chrono::milliseconds(5));
+
+        REQUIRE(port.load() != 0);
+        auto c = TcpSocket::createRaw();
+        REQUIRE(c.connect("127.0.0.1", Port{port.load()}));
+
+        // sendChunked on a blocking socket drives the full chunk loop.
+        // On loopback this completes in one call, but the loop inside
+        // sendChunked still iterates through each 64 KB slice.
+        size_t totalSent = 0;
+        while (totalSent < kSize) {
+            int n
+                = c.sendChunked(payload.data() + totalSent, kSize - totalSent);
+            REQUIRE(n > 0);
+            if (n <= 0) break;
+            totalSent += static_cast<size_t>(n);
+        }
+        REQUIRE(totalSent == kSize);
+        c.close();
+
+        srvThread.join();
+        REQUIRE(received.size() == kSize);
+        REQUIRE(received == payload);
     }
 }
 
@@ -552,6 +649,7 @@ int main() {
     time("test_sad_operations", test_sad_operations);
     time("test_sad_timeout", test_sad_timeout);
     time("test_happy_endpoints", test_happy_endpoints);
+    time("test_happy_send_chunked", test_happy_send_chunked);
     time("test_happy_lifecycle", test_happy_lifecycle);
 
     return test_summary();
