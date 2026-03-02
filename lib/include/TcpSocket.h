@@ -29,14 +29,16 @@ namespace aiSocks {
 class TcpSocket : public Socket {
     // Allow SocketFactory to access private constructor
     friend class SocketFactory;
-    
+
     public:
     // Server socket  socket()  [SO_REUSEADDR]  bind()  listen().
-    // Throws SocketException on any step failure.
+    // On failure the socket is left invalid (isValid() == false); check
+    // getLastError().
     TcpSocket(AddressFamily family, const ServerBind& cfg);
 
     // Client socket  socket()  connect().
-    // Throws SocketException on any step failure.
+    // On failure the socket is left invalid (isValid() == false); check
+    // getLastError().
     TcpSocket(AddressFamily family, const ConnectArgs& cfg);
 
     // Public non-virtual destructor  chains to Socket::~Socket().
