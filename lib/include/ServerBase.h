@@ -102,9 +102,14 @@ template <typename ClientData> class ServerBase {
         auto result = SocketFactory::createTcpServer(family, args);
         if (result.isSuccess()) {
             *listener_ = std::move(result.value());
-            // Non-blocking is set by default (library default: all sockets
-            // start non-blocking).  Set server-wide policies on the listener
-            // so accepted sockets inherit them via propagateSocketProps.
+            // CRITICAL: Server listening socket must be non-blocking so the
+            // poller can check stop flags and handle timeouts properly.
+            // Sockets default to blocking mode, so we must explicitly set
+            // non-blocking for the server listener.
+            if (!listener_->setBlocking(false))
+                printf("Warning: Failed to set non-blocking mode on server socket\n");
+            // Set server-wide policies on the listener so accepted sockets
+            // inherit them via propagateSocketProps.
             if (!listener_->setNoDelay(true))
                 printf("Warning: Failed to set TCP_NODELAY on server socket\n");
             (void)listener_->setReceiveBufferSize(256 * 1024);

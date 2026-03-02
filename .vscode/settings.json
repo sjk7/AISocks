@@ -1,24 +1,10 @@
 {
-  // Open any navigation target (Go-to-Definition, etc.) in a preview tab
-  // so it can be dismissed with a single Escape rather than closing a full editor.
-  "workbench.editor.enablePreviewFromCodeNavigation": true,
-
-  // Mark system/SDK headers read-only so VS Code signals they should not be edited.
-  // This also suppresses the "save?" prompt if you accidentally type in one.
-  "files.readonlyInclude": {
-    "/Applications/Xcode.app/**": true,
-    "/usr/include/**": true,
-    "/usr/local/include/**": true,
-    "/Library/Developer/**": true
+  \"cmake.buildDirectory\": \"\/build-debug-windows\",
+  \"cmake.configureSettings\": {
+    \"CMAKE_BUILD_TYPE\": \"Debug\",
+    \"BUILD_EXAMPLES\": \"ON\",
+    \"BUILD_TESTS\": \"ON\"
   },
-
-  "cmake.buildDirectory": "${workspaceFolder}/build",
-  "cmake.configureArgs": [
-    "-DCMAKE_BUILD_TYPE=Debug",
-    "-DBUILD_EXAMPLES=ON"
-  ],
-  "cmake.configurePreset": "asan-debug",
-  "cmake.buildPreset": "asan-debug",
-  "cmake.generator": "Ninja",
-  "cmake.buildBeforeRun": true
+  \"cmake.buildTask\": true,
+  \"cmake.buildBeforeRun\": true
 }

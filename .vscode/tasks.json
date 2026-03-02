@@ -2,292 +2,125 @@
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "build-msan-http-server",
+      "label": "build test_socket_basics",
       "type": "shell",
       "command": "cmake",
-      "args": [
-        "--build",
-        "build-msan",
-        "--target",
-        "http_server",
-        "--config",
-        "Debug"
-      ],
-      "group": "build",
-      "presentation": {
-        "reveal": "always",
-        "panel": "shared"
+      "args": ["--build", "build-debug-windows", "--target", "test_socket_basics"],
+      "group": {
+        "kind": "build",
+        "isDefault": false
       },
-      "problemMatcher": ["$gcc"],
-      "detail": "Build http_server with MemorySanitizer"
+      "problemMatcher": ["$gcc"]
     },
     {
-      "label": "build-asan-http-server",
+      "label": "build test_blocking",
       "type": "shell",
       "command": "cmake",
-      "args": [
-        "--build",
-        "build-asan",
-        "--target",
-        "http_server",
-        "--config",
-        "Debug"
-      ],
-      "group": "build",
-      "presentation": {
-        "reveal": "always",
-        "panel": "shared"
+      "args": ["--build", "build-debug-windows", "--target", "test_blocking"],
+      "group": {
+        "kind": "build",
+        "isDefault": false
       },
-      "problemMatcher": ["$gcc"],
-      "detail": "Build http_server with AddressSanitizer"
+      "problemMatcher": ["$gcc"]
     },
     {
-      "label": "build-http-server",
+      "label": "build test_loopback_tcp",
       "type": "shell",
       "command": "cmake",
-      "args": [
-        "--build",
-        "build",
-        "--target",
-        "http_server",
-        "--config",
-        "Debug"
-      ],
-      "group": "build",
-      "presentation": {
-        "reveal": "always",
-        "panel": "shared"
+      "args": ["--build", "build-debug-windows", "--target", "test_loopback_tcp"],
+      "group": {
+        "kind": "build",
+        "isDefault": false
       },
-      "problemMatcher": ["$gcc"],
-      "detail": "Build http_server with debug symbols"
+      "problemMatcher": ["$gcc"]
     },
     {
-      "label": "build-aiSocksExample",
+      "label": "build test_construction",
       "type": "shell",
       "command": "cmake",
-      "args": [
-        "--build",
-        "build",
-        "--target",
-        "aiSocksExample",
-        "--config",
-        "Debug"
-      ],
-      "group": "build",
-      "presentation": {
-        "reveal": "always",
-        "panel": "shared"
+      "args": ["--build", "build-debug-windows", "--target", "test_construction"],
+      "group": {
+        "kind": "build",
+        "isDefault": false
       },
-      "problemMatcher": ["$gcc"],
-      "detail": "Build aiSocksExample with debug symbols"
+      "problemMatcher": ["$gcc"]
     },
     {
-      "label": "build-aiSocksNonBlocking",
+      "label": "build test_new_features",
       "type": "shell",
       "command": "cmake",
-      "args": [
-        "--build",
-        "build",
-        "--target",
-        "aiSocksNonBlocking",
-        "--config",
-        "Debug"
-      ],
-      "group": "build",
-      "presentation": {
-        "reveal": "always",
-        "panel": "shared"
+      "args": ["--build", "build-debug-windows", "--target", "test_new_features"],
+      "group": {
+        "kind": "build",
+        "isDefault": false
       },
-      "problemMatcher": ["$gcc"],
-      "detail": "Build aiSocksNonBlocking with debug symbols"
+      "problemMatcher": ["$gcc"]
     },
     {
-      "label": "build-aiSocksGoogleClient",
+      "label": "build test_error_messages",
       "type": "shell",
       "command": "cmake",
-      "args": [
-        "--build",
-        "build",
-        "--target",
-        "aiSocksGoogleClient",
-        "--config",
-        "Debug"
-      ],
-      "group": "build",
-      "presentation": {
-        "reveal": "always",
-        "panel": "shared"
+      "args": ["--build", "build-debug-windows", "--target", "test_error_messages"],
+      "group": {
+        "kind": "build",
+        "isDefault": false
       },
-      "problemMatcher": ["$gcc"],
-      "detail": "Build aiSocksGoogleClient with debug symbols"
+      "problemMatcher": ["$gcc"]
     },
     {
-      "label": "configure-msan-debug",
+      "label": "build test_poller",
       "type": "shell",
       "command": "cmake",
-      "args": [
-        "-S",
-        ".",
-        "-B",
-        "build-msan",
-        "-DCMAKE_BUILD_TYPE=Debug",
-        "-DENABLE_MSAN=ON",
-        "-DBUILD_EXAMPLES=ON",
-        "-G",
-        "Ninja"
-      ],
-      "group": "build",
-      "presentation": {
-        "reveal": "always",
-        "panel": "shared"
+      "args": ["--build", "build-debug-windows", "--target", "test_poller"],
+      "group": {
+        "kind": "build",
+        "isDefault": false
       },
-      "problemMatcher": [],
-      "detail": "Configure CMake for MemorySanitizer debug build"
+      "problemMatcher": ["$gcc"]
     },
     {
-      "label": "configure-asan-debug",
+      "label": "build test_tcp_socket",
       "type": "shell",
       "command": "cmake",
-      "args": [
-        "-S",
-        ".",
-        "-B",
-        "build-asan",
-        "-DCMAKE_BUILD_TYPE=Debug",
-        "-DENABLE_ASAN=ON",
-        "-DBUILD_EXAMPLES=ON",
-        "-G",
-        "Ninja"
-      ],
-      "group": "build",
-      "presentation": {
-        "reveal": "always",
-        "panel": "shared"
+      "args": ["--build", "build-debug-windows", "--target", "test_tcp_socket"],
+      "group": {
+        "kind": "build",
+        "isDefault": false
       },
-      "problemMatcher": [],
-      "detail": "Configure CMake for AddressSanitizer debug build"
+      "problemMatcher": ["$gcc"]
     },
     {
-      "label": "configure-debug",
+      "label": "build test_socket_factory",
       "type": "shell",
       "command": "cmake",
-      "args": [
-        "-S",
-        ".",
-        "-B",
-        "build",
-        "-DCMAKE_BUILD_TYPE=Debug",
-        "-DBUILD_EXAMPLES=ON",
-        "-G",
-        "Ninja"
-      ],
-      "group": "build",
-      "presentation": {
-        "reveal": "always",
-        "panel": "shared"
+      "args": ["--build", "build-debug-windows", "--target", "test_socket_factory"],
+      "group": {
+        "kind": "build",
+        "isDefault": false
       },
-      "problemMatcher": [],
-      "detail": "Configure CMake for debug build"
+      "problemMatcher": ["$gcc"]
     },
     {
-      "label": "configure-mac-rel",
+      "label": "Build All",
       "type": "shell",
       "command": "cmake",
-      "args": [
-        "-S",
-        ".",
-        "-B",
-        "build-mac-rel",
-        "-DCMAKE_BUILD_TYPE=Release",
-        "-DCMAKE_CXX_FLAGS_RELEASE=-O2 -DNDEBUG -fno-exceptions",
-        "-DBUILD_EXAMPLES=ON",
-        "-G",
-        "Ninja"
-      ],
-      "group": "build",
-      "presentation": { "reveal": "always", "panel": "shared" },
-      "problemMatcher": [],
-      "detail": "Configure macOS Release -O3 with debug symbols"
-    },
-    {
-      "label": "build-mac-rel-http-server",
-      "type": "shell",
-      "command": "cmake",
-      "args": [
-        "--build",
-        "build-mac-rel",
-        "--target",
-        "http_server",
-        "--config",
-        "Release"
-      ],
-      "group": "build",
-      "presentation": { "reveal": "always", "panel": "shared" },
-      "problemMatcher": ["$gcc"],
-      "detail": "Build http_server — macOS Release -O3 with symbols"
-    },
-    {
-      "label": "configure-ubsan-release",
-      "type": "shell",
-      "command": "cmake",
-      "args": [
-        "-S",
-        ".",
-        "-B",
-        "build-ubsan",
-        "-DCMAKE_BUILD_TYPE=RelWithDebInfo",
-        "-DENABLE_UBSAN=ON",
-        "-DBUILD_EXAMPLES=ON",
-        "-G",
-        "Ninja"
-      ],
-      "group": "build",
-      "presentation": {
-        "reveal": "always",
-        "panel": "shared"
+      "args": ["--build", "build-debug-windows"],
+      "group": {
+        "kind": "build",
+        "isDefault": true
       },
-      "problemMatcher": [],
-      "detail": "Configure CMake for UBSan RelWithDebInfo build"
+      "problemMatcher": ["$gcc"]
     },
     {
-      "label": "build-ubsan-http-server",
+      "label": "build test_server_base_minimal",
       "type": "shell",
       "command": "cmake",
-      "args": [
-        "--build",
-        "build-ubsan",
-        "--target",
-        "http_server",
-        "--config",
-        "RelWithDebInfo"
-      ],
-      "group": "build",
-      "presentation": {
-        "reveal": "always",
-        "panel": "shared"
+      "args": ["--build", "build-debug-windows", "--target", "test_server_base_minimal"],
+      "group": {
+        "kind": "build",
+        "isDefault": false
       },
-      "problemMatcher": ["$gcc"],
-      "detail": "Build http_server with UndefinedBehaviorSanitizer (RelWithDebInfo)"
-    },
-    {
-      "label": "build-all-examples",
-      "type": "shell",
-      "command": "cmake",
-      "args": [
-        "--build",
-        "build",
-        "--target",
-        "all",
-        "--config",
-        "Debug"
-      ],
-      "group": "build",
-      "presentation": {
-        "reveal": "always",
-        "panel": "shared"
-      },
-      "problemMatcher": ["$gcc"],
-      "detail": "Build all example targets"
+      "problemMatcher": ["$gcc"]
     }
   ]
 }

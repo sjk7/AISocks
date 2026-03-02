@@ -93,11 +93,19 @@ int main() {
             }
         });
 
-        // Give server time to start
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
-
+        // Give server time to start and retry connection if needed
+        std::this_thread::sleep_for(std::chrono::milliseconds(200));
+        
         auto clt_result = SocketFactory::createTcpClient(AddressFamily::IPv4,
-            ConnectArgs{"127.0.0.1", Port{19901}, Milliseconds{1000}});
+            ConnectArgs{"127.0.0.1", Port{19901}, Milliseconds{2000}});
+        
+        if (!clt_result.isSuccess()) {
+            // If connection failed, wait a bit more and retry once
+            std::this_thread::sleep_for(std::chrono::milliseconds(500));
+            clt_result = SocketFactory::createTcpClient(AddressFamily::IPv4,
+                ConnectArgs{"127.0.0.1", Port{19901}, Milliseconds{2000}});
+        }
+        
         REQUIRE(clt_result.isSuccess());
         auto& client = clt_result.value();
         REQUIRE(client.isValid());

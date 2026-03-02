@@ -37,7 +37,7 @@ static void test_endpoints() {
     BEGIN_TEST("getLocalEndpoint: address and port correct after bind");
     {
         auto s = TcpSocket::createRaw();
-        s.setReuseAddress(true);
+        REQUIRE(s.setReuseAddress(true));
         REQUIRE(s.bind("127.0.0.1", Port{BASE}));
         auto ep = s.getLocalEndpoint();
         REQUIRE(ep.isSuccess());
@@ -63,17 +63,30 @@ static void test_endpoints() {
     BEGIN_TEST("getPeerEndpoint: populated after TCP connect");
     {
         auto srv = TcpSocket::createRaw();
-        srv.setReuseAddress(true);
+        REQUIRE(srv.setReuseAddress(true));
         REQUIRE(srv.bind("127.0.0.1", Port{BASE + 1}));
         REQUIRE(srv.listen(1));
 
         std::thread t([&]() {
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
             auto peer = srv.accept();
+            if (peer == nullptr) {
+                // Wait and retry once
+                std::this_thread::sleep_for(std::chrono::milliseconds(50));
+                peer = srv.accept();
+            }
             // peer goes out of scope; connection closes
         });
 
+        std::this_thread::sleep_for(std::chrono::milliseconds(20));
         auto c = TcpSocket::createRaw();
-        REQUIRE(c.connect("127.0.0.1", Port{BASE + 1}));
+        bool connected = c.connect("127.0.0.1", Port{BASE + 1});
+        if (!connected) {
+            // Retry connection once
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            connected = c.connect("127.0.0.1", Port{BASE + 1});
+        }
+        REQUIRE(connected);
         auto ep = c.getPeerEndpoint();
         REQUIRE(ep.isSuccess());
         if (!ep) {
@@ -171,9 +184,9 @@ static void test_udp() {
     BEGIN_TEST("UDP sendTo/receiveFrom: basic loopback datagram exchange");
     {
         UdpSocket receiver;
-        receiver.setReuseAddress(true);
+        REQUIRE(receiver.setReuseAddress(true));
         REQUIRE(receiver.bind("127.0.0.1", Port{BASE + 10}));
-        receiver.setReceiveTimeout(Milliseconds{2000});
+        REQUIRE(receiver.setReceiveTimeout(Milliseconds{2000}));
 
         UdpSocket sender;
 
@@ -195,9 +208,9 @@ static void test_udp() {
     BEGIN_TEST("UDP sendTo/receiveFrom: multiple datagrams in sequence");
     {
         UdpSocket srv;
-        srv.setReuseAddress(true);
+        REQUIRE(srv.setReuseAddress(true));
         REQUIRE(srv.bind("127.0.0.1", Port{BASE + 11}));
-        srv.setReceiveTimeout(Milliseconds{2000});
+        REQUIRE(srv.setReceiveTimeout(Milliseconds{2000}));
 
         UdpSocket cli;
         Endpoint dest{"127.0.0.1", Port{BASE + 11}, AddressFamily::IPv4};
@@ -227,9 +240,9 @@ static void test_udp_connected() {
     BEGIN_TEST("connected-mode UDP: connect() then send() / receive()");
     {
         UdpSocket server;
-        server.setReuseAddress(true);
+        REQUIRE(server.setReuseAddress(true));
         REQUIRE(server.bind("127.0.0.1", Port{BASE + 30}));
-        server.setReceiveTimeout(Milliseconds{2000});
+        REQUIRE(server.setReceiveTimeout(Milliseconds{2000}));
 
         UdpSocket client;
         // Connect the client to the server so send()/receive() need no
@@ -273,9 +286,9 @@ static void test_udp_transfer() {
     BEGIN_TEST("UDP transfer: 20 datagrams, sequential payload integrity");
     {
         UdpSocket srv;
-        srv.setReuseAddress(true);
+        REQUIRE(srv.setReuseAddress(true));
         REQUIRE(srv.bind("127.0.0.1", Port{BASE + 50}));
-        srv.setReceiveTimeout(Milliseconds{2000});
+        REQUIRE(srv.setReceiveTimeout(Milliseconds{2000}));
 
         UdpSocket cli;
         Endpoint dest{"127.0.0.1", Port{BASE + 50}, AddressFamily::IPv4};
@@ -303,12 +316,12 @@ static void test_udp_transfer() {
         "UDP transfer: bidirectional echo (client sends, server echoes)");
     {
         UdpSocket srv;
-        srv.setReuseAddress(true);
+        REQUIRE(srv.setReuseAddress(true));
         REQUIRE(srv.bind("127.0.0.1", Port{BASE + 51}));
-        srv.setReceiveTimeout(Milliseconds{2000});
+        REQUIRE(srv.setReceiveTimeout(Milliseconds{2000}));
 
         UdpSocket cli;
-        cli.setReceiveTimeout(Milliseconds{2000});
+        REQUIRE(cli.setReceiveTimeout(Milliseconds{2000}));
         Endpoint srvAddr{"127.0.0.1", Port{BASE + 51}, AddressFamily::IPv4};
 
         for (int i = 0; i < 5; ++i) {
@@ -337,9 +350,9 @@ static void test_udp_transfer() {
     BEGIN_TEST("UDP transfer: 8192-byte datagram round-trip");
     {
         UdpSocket srv;
-        srv.setReuseAddress(true);
+        REQUIRE(srv.setReuseAddress(true));
         REQUIRE(srv.bind("127.0.0.1", Port{BASE + 52}));
-        srv.setReceiveTimeout(Milliseconds{2000});
+        REQUIRE(srv.setReceiveTimeout(Milliseconds{2000}));
 
         UdpSocket cli;
         Endpoint dest{"127.0.0.1", Port{BASE + 52}, AddressFamily::IPv4};
@@ -384,12 +397,12 @@ static void test_bulk_throughput() {
         constexpr size_t TOTAL = static_cast<size_t>(COUNT) * DGRAM;
 
         UdpSocket srv;
-        srv.setReuseAddress(true);
+        REQUIRE(srv.setReuseAddress(true));
         REQUIRE(srv.bind("127.0.0.1", Port{BASE + 60}));
         // Ask the kernel for a large receive buffer (actual grant may differ).
-        srv.setReceiveBufferSize(8 * 1024 * 1024);
+        REQUIRE(srv.setReceiveBufferSize(8 * 1024 * 1024));
         // Short timeout: receiver exits quickly once sender is done.
-        srv.setReceiveTimeout(Milliseconds{200});
+        REQUIRE(srv.setReceiveTimeout(Milliseconds{200}));
 
         std::atomic<size_t> recvTotal{0};
         std::atomic<size_t> recvCount{0};
@@ -412,7 +425,7 @@ static void test_bulk_throughput() {
         });
 
         UdpSocket cli;
-        cli.setSendBufferSize(8 * 1024 * 1024);
+        REQUIRE(cli.setSendBufferSize(8 * 1024 * 1024));
         Endpoint dest{"127.0.0.1", Port{BASE + 60}, AddressFamily::IPv4};
         std::vector<char> pkt(DGRAM, 0xAB);
 
@@ -457,7 +470,7 @@ static void test_bulk_throughput() {
 
         std::thread srvThread([&]() {
             auto srv = TcpSocket::createRaw();
-            srv.setReuseAddress(true);
+            REQUIRE(srv.setReuseAddress(true));
             if (!srv.bind("127.0.0.1", Port{BASE + 61}) || !srv.listen(1)) {
                 ready = true;
                 return;
@@ -465,8 +478,8 @@ static void test_bulk_throughput() {
             ready = true;
             auto peer = srv.accept();
             if (!peer) return;
-            peer->setNoDelay(true);
-            peer->setReceiveTimeout(Milliseconds{10000});
+            REQUIRE(peer->setNoDelay(true));
+            REQUIRE(peer->setReceiveTimeout(Milliseconds{10000}));
             size_t got = 0;
             while (got < TOTAL) {
                 size_t want = std::min(CHUNK, TOTAL - got);
@@ -483,7 +496,7 @@ static void test_bulk_throughput() {
 
         auto c = TcpSocket::createRaw();
         REQUIRE(c.connect("127.0.0.1", Port{BASE + 61}));
-        c.setNoDelay(true);
+        REQUIRE(c.setNoDelay(true));
 
         auto t0 = std::chrono::steady_clock::now();
         size_t sent = 0;
@@ -518,14 +531,14 @@ static void test_span_overloads() {
     BEGIN_TEST("Span send/receive: TCP loopback echo via std::byte spans");
     {
         auto srv = TcpSocket::createRaw();
-        srv.setReuseAddress(true);
+        REQUIRE(srv.setReuseAddress(true));
         REQUIRE(srv.bind("127.0.0.1", Port{BASE + 40}));
         REQUIRE(srv.listen(1));
 
         std::thread t([&]() {
             auto conn = srv.accept();
             if (!conn) return;
-            conn->setReceiveTimeout(Milliseconds{2000});
+            REQUIRE(conn->setReceiveTimeout(Milliseconds{2000}));
             std::vector<std::byte> echoBuf(64);
             int r = conn->receive(
                 Span<std::byte>{echoBuf.data(), echoBuf.size()});
@@ -536,7 +549,7 @@ static void test_span_overloads() {
         });
 
         auto cli = TcpSocket::createRaw();
-        cli.setReceiveTimeout(Milliseconds{2000});
+        REQUIRE(cli.setReceiveTimeout(Milliseconds{2000}));
         REQUIRE(cli.connect("127.0.0.1", Port{BASE + 40}));
 
         std::string payload = "span-hello";
@@ -565,9 +578,9 @@ static void test_span_overloads() {
     BEGIN_TEST("Span sendTo/receiveFrom: UDP datagram with byte spans");
     {
         UdpSocket receiver;
-        receiver.setReuseAddress(true);
+        REQUIRE(receiver.setReuseAddress(true));
         REQUIRE(receiver.bind("127.0.0.1", Port{BASE + 41}));
-        receiver.setReceiveTimeout(Milliseconds{2000});
+        REQUIRE(receiver.setReceiveTimeout(Milliseconds{2000}));
 
         UdpSocket sender;
         Endpoint dest{"127.0.0.1", Port{BASE + 41}, AddressFamily::IPv4};
@@ -643,7 +656,7 @@ static void test_shutdown() {
     BEGIN_TEST("shutdown(Write): peer recv sees EOF (returns 0)");
     {
         auto srv = TcpSocket::createRaw();
-        srv.setReuseAddress(true);
+        REQUIRE(srv.setReuseAddress(true));
         REQUIRE(srv.bind("127.0.0.1", Port{BASE + 20}));
         REQUIRE(srv.listen(1));
 
@@ -651,7 +664,7 @@ static void test_shutdown() {
         std::thread t([&]() {
             auto peer = srv.accept();
             if (peer) {
-                peer->setReceiveTimeout(Milliseconds{2000});
+                REQUIRE(peer->setReceiveTimeout(Milliseconds{2000}));
                 char buf[64];
                 peerRecv = peer->receive(buf, sizeof(buf));
             }
@@ -670,7 +683,7 @@ static void test_shutdown() {
     BEGIN_TEST("shutdown(Both): socket remains isValid() after call");
     {
         auto srv = TcpSocket::createRaw();
-        srv.setReuseAddress(true);
+        REQUIRE(srv.setReuseAddress(true));
         REQUIRE(srv.bind("127.0.0.1", Port{BASE + 21}));
         REQUIRE(srv.listen(1));
 

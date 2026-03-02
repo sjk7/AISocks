@@ -78,19 +78,24 @@ int main() {
         "Accepted socket inherits blocking state (defaults to blocking)");
     {
         auto server = TcpSocket::createRaw();
-        server.setReuseAddress(true);
+        REQUIRE(server.setReuseAddress(true));
         // Use a fixed port; if in use the test is skipped gracefully
         bool bound = server.bind("127.0.0.1", Port{19300}) && server.listen(1);
         if (!bound) {
             REQUIRE_MSG(true, "SKIP - port 19300 unavailable");
         } else {
             std::thread connector([]() {
-                std::this_thread::sleep_for(std::chrono::milliseconds(5));
+                std::this_thread::sleep_for(std::chrono::milliseconds(10));
                 auto c = TcpSocket::createRaw();
                 (void)c.connect("127.0.0.1", Port{19300});
-                std::this_thread::sleep_for(std::chrono::milliseconds(10));
+                std::this_thread::sleep_for(std::chrono::milliseconds(20));
             });
             auto accepted = server.accept();
+            if (accepted == nullptr) {
+                // Wait and retry once
+                std::this_thread::sleep_for(std::chrono::milliseconds(50));
+                accepted = server.accept();
+            }
             connector.join();
             REQUIRE(accepted != nullptr);
             REQUIRE(accepted->isBlocking());

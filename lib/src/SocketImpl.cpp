@@ -64,7 +64,7 @@ SocketImpl::SocketImpl(SocketType type, AddressFamily family)
     , socketType(type)
     , addressFamily(family)
     , lastError(SocketError::None)
-    , blockingMode(false) {
+    , blockingMode(true) {
     platformInit();
 
     int af = (family == AddressFamily::IPv6) ? AF_INET6 : AF_INET;
@@ -78,21 +78,9 @@ SocketImpl::SocketImpl(SocketType type, AddressFamily family)
         return;
     }
 
-    // Set non-blocking immediately after creation.  Non-blocking is the
-    // library-wide default: callers must never assume a fresh socket is
-    // blocking, and all I/O helpers handle SocketError::WouldBlock.
-    // setBlocking(true) is still available for the rare caller that truly
-    // needs blocking semantics.
-#ifdef _WIN32
-    u_long nb = 1;
-    ioctlsocket(socketHandle, FIONBIO, &nb);
-#else
-    {
-        int fl = fcntl(socketHandle, F_GETFL, 0);
-        if (fl != -1) fcntl(socketHandle, F_SETFL, fl | O_NONBLOCK);
-    }
-#endif
-    // blockingMode is already initialised false in the member-initialiser list.
+    // Sockets default to blocking mode (OS standard behavior).
+    // Call setBlocking(false) explicitly if non-blocking is needed.
+    // blockingMode is initialized to true in the member-initializer list.
 
 #ifdef SO_NOSIGPIPE
     // macOS: prevent send/write to a half-closed socket from raising SIGPIPE.

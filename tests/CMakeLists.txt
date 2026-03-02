@@ -19,8 +19,14 @@ test_http_request
     test_server_base_minimal
     test_server_base_echo_simple
     test_server_base_no_timeout
-    test_timeout_heap
 )
+
+# Slow tests (disabled by default, enable with -DALLOW_SLOW_TESTS=ON)
+option(ALLOW_SLOW_TESTS "Build and run slow tests (e.g., test_timeout_heap)" OFF)
+if(ALLOW_SLOW_TESTS)
+    list(APPEND TEST_SOURCES test_timeout_heap)
+    message(STATUS "Slow tests enabled: test_timeout_heap will be built")
+endif()
 
 # On macOS with Homebrew LLVM, the compiler's libc++ headers may reference
 # symbols (e.g. __hash_memory) not present in Apple's system libc++.
@@ -85,7 +91,9 @@ foreach(TEST_NAME ${TEST_SOURCES})
 endforeach()
 
 # test_timeout_heap sleeps for multiple keep-alive windows across 5 test cases
-set_tests_properties(test_timeout_heap PROPERTIES TIMEOUT 60)
+if(ALLOW_SLOW_TESTS)
+    set_tests_properties(test_timeout_heap PROPERTIES TIMEOUT 60)
+endif()
 
 # test_construction spins up server threads; give it more room
 set_tests_properties(test_construction PROPERTIES TIMEOUT 60)

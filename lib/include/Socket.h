@@ -99,7 +99,7 @@ class Socket {
     // set immediately after the underlying ::socket() call.  Sockets
     // returned by accept() inherit the listening socket's blocking mode.
     // Call setBlocking(true) to opt into blocking semantics where needed.
-    Result<void> setBlocking(bool blocking);
+    bool setBlocking(bool blocking);
     bool isBlocking() const noexcept;
 
     // Block until the socket has readable data (or EOF) within the given
@@ -111,8 +111,8 @@ class Socket {
     bool waitWritable(Milliseconds timeout);
 
     // SO_REUSEADDR / SO_REUSEPORT
-    Result<void> setReuseAddress(bool reuse);
-    Result<void> setReusePort(bool enable);
+    bool setReuseAddress(bool reuse);
+    bool setReusePort(bool enable);
 
     // Set SO_RCVTIMEO on the socket.
     //   defaultTimeout (30 s)  used when not specified.
@@ -120,13 +120,13 @@ class Socket {
     //                           indefinitely until data arrives.
     //   any positive duration  recv() returns SocketError::Timeout after
     //                           waiting this long with no data.
-    Result<void> setReceiveTimeout(Milliseconds timeout);
+    bool setReceiveTimeout(Milliseconds timeout);
 
     // Set SO_SNDTIMEO on the socket (same semantics as setReceiveTimeout).
-    Result<void> setSendTimeout(Milliseconds timeout);
+    bool setSendTimeout(Milliseconds timeout);
 
     // Disable/enable Nagle's algorithm (TCP only).
-    Result<void> setNoDelay(bool noDelay);
+    bool setNoDelay(bool noDelay);
     bool getNoDelay() const;
 
     // Check if last error was DNS-related
@@ -138,8 +138,8 @@ class Socket {
     // Set the kernel receive / send socket buffer sizes (SO_RCVBUF /
     // SO_SNDBUF). `bytes` is the requested buffer size in bytes; the kernel
     // may round it up or clamp it. Returns false on setsockopt() failure.
-    Result<void> setReceiveBufferSize(int bytes);
-    Result<void> setSendBufferSize(int bytes);
+    bool setReceiveBufferSize(int bytes);
+    bool setSendBufferSize(int bytes);
 
     // Query the current kernel receive / send socket buffer sizes.
     // Returns -1 on getsockopt() failure.
@@ -147,12 +147,12 @@ class Socket {
     int getSendBufferSize() const;
 
     // UDP-only options (no-op on TCP).  Returns false if called on TCP.
-    Result<void> setBroadcast(bool enable);
-    Result<void> setMulticastTTL(int ttl);
+    bool setBroadcast(bool enable);
+    bool setMulticastTTL(int ttl);
 
     // TCP-only options (no-op on UDP).  Returns false if called on UDP.
-    Result<void> setKeepAlive(bool enable);
-    Result<void> setLingerAbort(bool enable);
+    bool setKeepAlive(bool enable);
+    bool setLingerAbort(bool enable);
 
     // Shutdown the socket (disable further sends/receives).
     bool shutdown(ShutdownHow how);

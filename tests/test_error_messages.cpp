@@ -61,7 +61,7 @@ static void test_connect_exception_message() {
     BEGIN_TEST("ConnectArgs error: basic error handling");
     {
         auto result = SocketFactory::createTcpClient(AddressFamily::IPv4,
-            ConnectArgs{"127.0.0.1", Port{1}, Milliseconds{100}});
+            ConnectArgs{"127.0.0.1", Port{1}, Milliseconds{10}});
         REQUIRE(result.isError());
         // Just verify basic error handling works
         REQUIRE(result.error() != SocketError::None);
@@ -70,7 +70,7 @@ static void test_connect_exception_message() {
     BEGIN_TEST("ConnectArgs error: error() is Timeout or ConnectFailed");
     {
         auto result = SocketFactory::createTcpClient(AddressFamily::IPv4,
-            ConnectArgs{"127.0.0.1", Port{1}, Milliseconds{100}});
+            ConnectArgs{"127.0.0.1", Port{1}, Milliseconds{10}});
         SocketError code = result.error();
         REQUIRE_MSG(
             code == SocketError::Timeout || code == SocketError::ConnectFailed,
@@ -80,7 +80,7 @@ static void test_connect_exception_message() {
     BEGIN_TEST("ConnectArgs error: verify error codes");
     {
         auto result = SocketFactory::createTcpClient(AddressFamily::IPv4,
-            ConnectArgs{"127.0.0.1", Port{2}, Milliseconds{500}});
+            ConnectArgs{"127.0.0.1", Port{2}, Milliseconds{50}});
         REQUIRE(result.isError());
         REQUIRE(result.error() != SocketError::None);
     }
@@ -128,7 +128,7 @@ static void test_dns_error_message() {
 
         // Result<T> path (SocketFactory)
         auto result = SocketFactory::createTcpClient(AddressFamily::IPv4,
-            ConnectArgs{BAD_HOST, Port{BASE + 10}, Milliseconds{500}});
+            ConnectArgs{BAD_HOST, Port{BASE + 10}, Milliseconds{100}});
         std::string message = result.message();
         std::cout << "  message(): " << message << "\n";
         REQUIRE(!message.empty());
@@ -157,7 +157,8 @@ static void test_invalid_socket_code() {
     {
         auto s = TcpSocket::createRaw();
         s.close();
-        s.send("x", 1);
+        const auto ret =s.send("x", 1);
+        REQUIRE(ret == -1);
         REQUIRE(s.getLastError() == SocketError::InvalidSocket);
     }
 
@@ -166,7 +167,8 @@ static void test_invalid_socket_code() {
         auto s = TcpSocket::createRaw();
         s.close();
         char buf[16];
-        s.receive(buf, sizeof(buf));
+        auto ret = s.receive(buf, sizeof(buf));
+        REQUIRE(ret == -1);
         REQUIRE(s.getLastError() == SocketError::InvalidSocket);
     }
 
@@ -182,7 +184,7 @@ static void test_invalid_socket_code() {
     {
         auto s = TcpSocket::createRaw();
         s.close();
-        (void)s.connect("127.0.0.1", Port{BASE + 20});
+        REQUIRE(!s.connect("127.0.0.1", Port{BASE + 20}));
         REQUIRE(s.getLastError() == SocketError::InvalidSocket);
     }
 
@@ -191,7 +193,8 @@ static void test_invalid_socket_code() {
         UdpSocket s;
         s.close();
         Endpoint dest{"127.0.0.1", Port{BASE + 20}, AddressFamily::IPv4};
-        s.sendTo("x", 1, dest);
+        auto ret = s.sendTo("x", 1, dest);
+        REQUIRE(ret == -1);
         REQUIRE(s.getLastError() == SocketError::InvalidSocket);
     }
 
@@ -201,7 +204,8 @@ static void test_invalid_socket_code() {
         s.close();
         char buf[16];
         Endpoint from;
-        s.receiveFrom(buf, sizeof(buf), from);
+        const auto ret = s.receiveFrom(buf, sizeof(buf), from);
+        REQUIRE(ret == -1);
         REQUIRE(s.getLastError() == SocketError::InvalidSocket);
     }
 
@@ -209,15 +213,16 @@ static void test_invalid_socket_code() {
     {
         auto s = TcpSocket::createRaw();
         s.close();
-        s.setReceiveBufferSize(64 * 1024);
+        REQUIRE(!s.setReceiveBufferSize(64 * 1024));
         REQUIRE(s.getLastError() == SocketError::InvalidSocket);
+        REQUIRE(!s.getErrorMessage().empty());
     }
 
     BEGIN_TEST("setSendBufferSize() on closed socket: InvalidSocket");
     {
         auto s = TcpSocket::createRaw();
         s.close();
-        s.setSendBufferSize(64 * 1024);
+        REQUIRE(!s.setSendBufferSize(64 * 1024));
         REQUIRE(s.getLastError() == SocketError::InvalidSocket);
     }
 }
@@ -280,7 +285,7 @@ static void test_error_clears_on_success() {
         "getErrorMessage(): empty after a failure followed by a success");
     {
         auto srv = TcpSocket::createRaw();
-        srv.setReuseAddress(true);
+        REQUIRE(srv.setReuseAddress(true));
         REQUIRE(srv.bind("127.0.0.1", Port{BASE + 40}));
         REQUIRE(srv.listen(1));
 
@@ -314,7 +319,7 @@ static void test_post_shutdown_errors() {
     BEGIN_TEST("send() after shutdown(Write): returns -1 and sets an error");
     {
         auto srv = TcpSocket::createRaw();
-        srv.setReuseAddress(true);
+        REQUIRE(srv.setReuseAddress(true));
         REQUIRE(srv.bind("127.0.0.1", Port{BASE + 50}));
         REQUIRE(srv.listen(1));
 

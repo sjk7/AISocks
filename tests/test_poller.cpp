@@ -36,7 +36,7 @@ static void test_poller_construct() {
 static void test_poller_add_remove() {
     BEGIN_TEST("Poller: add/remove a server socket without error");
     auto srv = TcpSocket::createRaw();
-    srv.setReuseAddress(true);
+    REQUIRE(srv.setReuseAddress(true));
     REQUIRE(srv.bind("127.0.0.1", Port{BASE_PORT}));
     REQUIRE(srv.listen(5));
 
@@ -51,7 +51,7 @@ static void test_poller_add_remove() {
 static void test_poller_timeout() {
     BEGIN_TEST("Poller: wait() returns empty vector on timeout");
     auto srv = TcpSocket::createRaw();
-    srv.setReuseAddress(true);
+    REQUIRE(srv.setReuseAddress(true));
     REQUIRE(srv.bind("127.0.0.1", Port{BASE_PORT + 1}));
     REQUIRE(srv.listen(5));
 
@@ -68,7 +68,7 @@ static void test_poller_timeout() {
 static void test_poller_readable_on_connect() {
     BEGIN_TEST("Poller: server socket fires Readable when client connects");
     auto srv = TcpSocket::createRaw();
-    srv.setReuseAddress(true);
+    REQUIRE(srv.setReuseAddress(true));
     REQUIRE(srv.bind("127.0.0.1", Port{BASE_PORT + 2}));
     REQUIRE(srv.listen(5));
 
@@ -122,7 +122,7 @@ static void test_poller_readable_on_connect() {
 static void test_poller_remove_stops_events() {
     BEGIN_TEST("Poller: removed socket no longer fires");
     auto srv = TcpSocket::createRaw();
-    srv.setReuseAddress(true);
+    REQUIRE(srv.setReuseAddress(true));
     REQUIRE(srv.bind("127.0.0.1", Port{BASE_PORT + 3}));
     REQUIRE(srv.listen(5));
 
@@ -151,7 +151,7 @@ static void test_poller_remove_stops_events() {
 static void test_send_all() {
     BEGIN_TEST("sendAll: transmits all bytes in a single call");
     auto srv = TcpSocket::createRaw();
-    srv.setReuseAddress(true);
+    REQUIRE(srv.setReuseAddress(true));
     REQUIRE(srv.bind("127.0.0.1", Port{BASE_PORT + 4})); //-V112
     REQUIRE(srv.listen(1));
 
@@ -185,7 +185,7 @@ static void test_wait_readable_writable() {
     BEGIN_TEST(
         "waitReadable/waitWritable: writable fires immediately on send buffer");
     auto srv = TcpSocket::createRaw();
-    srv.setReuseAddress(true);
+    REQUIRE(srv.setReuseAddress(true));
     REQUIRE(srv.bind("127.0.0.1", Port{BASE_PORT + 5}));
     REQUIRE(srv.listen(1));
 
@@ -206,7 +206,7 @@ static void test_wait_readable_writable() {
 
     // waitReadable should time out on a socket with no data pending.
     auto lonely = TcpSocket::createRaw();
-    lonely.setReuseAddress(true);
+    REQUIRE(lonely.setReuseAddress(true));
     REQUIRE(lonely.bind("127.0.0.1", Port{BASE_PORT + 6}));
     REQUIRE(lonely.listen(1));
     bool timedOut = !lonely.waitReadable(Milliseconds{10});
@@ -240,7 +240,7 @@ static void test_poller_async_connect() {
 
     // Server side  accept in main thread after poller fires.
     auto srv = TcpSocket::createRaw();
-    srv.setReuseAddress(true);
+    REQUIRE(srv.setReuseAddress(true));
     REQUIRE(srv.bind("127.0.0.1", Port{BASE_PORT + 7}));
     REQUIRE(srv.listen(5));
 

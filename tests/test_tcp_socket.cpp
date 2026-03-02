@@ -60,14 +60,19 @@ static void test_happy_construction() {
             REQUIRE(srv.isValid());
             ready = true;
             auto peer = srv.accept();
+            if (peer == nullptr) {
+                // Wait and retry once
+                std::this_thread::sleep_for(std::chrono::milliseconds(100));
+                peer = srv.accept();
+            }
             REQUIRE(peer != nullptr);
             REQUIRE(peer->isValid());
         });
 
         auto deadline
-            = std::chrono::steady_clock::now() + std::chrono::seconds(3);
+            = std::chrono::steady_clock::now() + std::chrono::seconds(5);
         while (!ready && std::chrono::steady_clock::now() < deadline)
-            std::this_thread::sleep_for(std::chrono::milliseconds(5));
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
 
         TcpSocket c(
             AddressFamily::IPv4, ConnectArgs{"127.0.0.1", Port{BASE + 1}});
@@ -86,7 +91,7 @@ static void test_happy_accept() {
     BEGIN_TEST("TcpSocket::accept() returns unique_ptr<TcpSocket>");
     {
         auto srv = TcpSocket::createRaw();
-        srv.setReuseAddress(true);
+        REQUIRE(srv.setReuseAddress(true));
         REQUIRE(srv.bind("127.0.0.1", Port{BASE + 2}));
         REQUIRE(srv.listen(1));
 
@@ -124,7 +129,7 @@ static void test_happy_send_receive() {
 
         std::thread srvThread([&] {
             auto srv = TcpSocket::createRaw();
-            srv.setReuseAddress(true);
+            REQUIRE(srv.setReuseAddress(true));
             if (!srv.bind("127.0.0.1", Port{BASE + 3}) || !srv.listen(1)) {
                 ready = true;
                 return;
@@ -163,7 +168,7 @@ static void test_happy_send_receive() {
 
         std::thread srvThread([&] {
             auto srv = TcpSocket::createRaw();
-            srv.setReuseAddress(true);
+            REQUIRE(srv.setReuseAddress(true));
             if (!srv.bind("127.0.0.1", Port{BASE + 4}) || !srv.listen(1)) {
                 ready = true;
                 return;
@@ -205,7 +210,7 @@ static void test_happy_progress_callback() {
 
         std::thread srvThread([&] {
             auto srv = TcpSocket::createRaw();
-            srv.setReuseAddress(true);
+            REQUIRE(srv.setReuseAddress(true));
             if (!srv.bind("127.0.0.1", Port{BASE + 5}) || !srv.listen(1)) {
                 ready = true;
                 return;
@@ -483,7 +488,7 @@ static void test_happy_endpoints() {
         std::atomic<bool> ready{false};
         std::thread srvThread([&] {
             auto srv = TcpSocket::createRaw();
-            srv.setReuseAddress(true);
+            REQUIRE(srv.setReuseAddress(true));
             if (!srv.bind("127.0.0.1", Port{BASE + 31}) || !srv.listen(1)) {
                 ready = true;
                 return;

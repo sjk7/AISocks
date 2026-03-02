@@ -130,6 +130,60 @@
       "configurePreset": "mac-release",
       "displayName": "Build http_server (macOS Release -O3)",
       "targets": ["http_server"]
+    },
+    {
+      "name": "test-socket-basics",
+      "configurePreset": "debug",
+      "displayName": "Build test_socket_basics",
+      "targets": ["test_socket_basics"]
+    },
+    {
+      "name": "test-blocking",
+      "configurePreset": "debug",
+      "displayName": "Build test_blocking",
+      "targets": ["test_blocking"]
+    },
+    {
+      "name": "test-loopback-tcp",
+      "configurePreset": "debug",
+      "displayName": "Build test_loopback_tcp",
+      "targets": ["test_loopback_tcp"]
+    },
+    {
+      "name": "test-construction",
+      "configurePreset": "debug",
+      "displayName": "Build test_construction",
+      "targets": ["test_construction"]
+    },
+    {
+      "name": "test-new-features",
+      "configurePreset": "debug",
+      "displayName": "Build test_new_features",
+      "targets": ["test_new_features"]
+    },
+    {
+      "name": "test-error-messages",
+      "configurePreset": "debug",
+      "displayName": "Build test_error_messages",
+      "targets": ["test_error_messages"]
+    },
+    {
+      "name": "test-poller",
+      "configurePreset": "debug",
+      "displayName": "Build test_poller",
+      "targets": ["test_poller"]
+    },
+    {
+      "name": "test-tcp-socket",
+      "configurePreset": "debug",
+      "displayName": "Build test_tcp_socket (SEGFAULT)",
+      "targets": ["test_tcp_socket"]
+    },
+    {
+      "name": "test-socket-factory",
+      "configurePreset": "debug",
+      "displayName": "Build test_socket_factory",
+      "targets": ["test_socket_factory"]
     }
   ],
   "testPresets": [

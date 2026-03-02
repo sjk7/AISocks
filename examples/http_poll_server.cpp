@@ -13,6 +13,10 @@
 #include <cstring>
 #include <ctime>
 
+#ifdef _WIN32
+#define gmtime_r(timep, result) gmtime_s(result, timep)
+#endif
+
 using namespace aiSocks;
 
 // Response body matching the reference server exactly (251 bytes, no trailing

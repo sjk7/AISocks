@@ -190,12 +190,8 @@ int Socket::doReceiveFrom(Span<std::byte> buffer, Endpoint& remote) {
     return doReceiveFrom(buffer.data(), buffer.size(), remote);
 }
 
-Result<void> Socket::setBlocking(bool blocking) {
-    if (!pImpl->setBlocking(blocking)) {
-        return Result<void>::failure(
-            pImpl->getLastError(), "setBlocking", 0, false);
-    }
-    return Result<void>::success();
+bool Socket::setBlocking(bool blocking) {
+    return pImpl->setBlocking(blocking);
 }
 
 bool Socket::isBlocking() const noexcept {
@@ -210,44 +206,24 @@ bool Socket::waitWritable(Milliseconds timeout) {
     return pImpl->waitWritable(timeout);
 }
 
-Result<void> Socket::setReuseAddress(bool reuse) {
-    if (!pImpl->setReuseAddress(reuse)) {
-        return Result<void>::failure(
-            pImpl->getLastError(), "setReuseAddress", 0, false);
-    }
-    return Result<void>::success();
+bool Socket::setReuseAddress(bool reuse) {
+    return pImpl->setReuseAddress(reuse);
 }
 
-Result<void> Socket::setReusePort(bool enable) {
-    if (!pImpl->setReusePort(enable)) {
-        return Result<void>::failure(
-            pImpl->getLastError(), "setReusePort", 0, false);
-    }
-    return Result<void>::success();
+bool Socket::setReusePort(bool enable) {
+    return pImpl->setReusePort(enable);
 }
 
-Result<void> Socket::setReceiveTimeout(Milliseconds timeout) {
-    if (!pImpl->setReceiveTimeout(timeout)) {
-        return Result<void>::failure(
-            pImpl->getLastError(), "setReceiveTimeout", 0, false);
-    }
-    return Result<void>::success();
+bool Socket::setReceiveTimeout(Milliseconds timeout) {
+    return pImpl->setReceiveTimeout(timeout);
 }
 
-Result<void> Socket::setSendTimeout(Milliseconds timeout) {
-    if (!pImpl->setSendTimeout(timeout)) {
-        return Result<void>::failure(
-            pImpl->getLastError(), "setSendTimeout", 0, false);
-    }
-    return Result<void>::success();
+bool Socket::setSendTimeout(Milliseconds timeout) {
+    return pImpl->setSendTimeout(timeout);
 }
 
-Result<void> Socket::setNoDelay(bool noDelay) {
-    if (!pImpl->setNoDelay(noDelay)) {
-        return Result<void>::failure(
-            pImpl->getLastError(), "setNoDelay", 0, false);
-    }
-    return Result<void>::success();
+bool Socket::setNoDelay(bool noDelay) {
+    return pImpl->setNoDelay(noDelay);
 }
 
 bool Socket::getNoDelay() const {
@@ -262,52 +238,28 @@ int Socket::getLastErrorSysCode() const {
     return pImpl->getLastErrorSysCode();
 }
 
-Result<void> Socket::setKeepAlive(bool enable) {
-    if (!pImpl->setKeepAlive(enable)) {
-        return Result<void>::failure(
-            pImpl->getLastError(), "setKeepAlive", 0, false);
-    }
-    return Result<void>::success();
+bool Socket::setKeepAlive(bool enable) {
+    return pImpl->setKeepAlive(enable);
 }
 
-Result<void> Socket::setLingerAbort(bool enable) {
-    if (!pImpl->setLingerAbort(enable)) {
-        return Result<void>::failure(
-            pImpl->getLastError(), "setLingerAbort", 0, false);
-    }
-    return Result<void>::success();
+bool Socket::setLingerAbort(bool enable) {
+    return pImpl->setLingerAbort(enable);
 }
 
-Result<void> Socket::setBroadcast(bool enable) {
-    if (!pImpl->setBroadcast(enable)) {
-        return Result<void>::failure(
-            pImpl->getLastError(), "setBroadcast", 0, false);
-    }
-    return Result<void>::success();
+bool Socket::setBroadcast(bool enable) {
+    return pImpl->setBroadcast(enable);
 }
 
-Result<void> Socket::setMulticastTTL(int ttl) {
-    if (!pImpl->setMulticastTTL(ttl)) {
-        return Result<void>::failure(
-            pImpl->getLastError(), "setMulticastTTL", 0, false);
-    }
-    return Result<void>::success();
+bool Socket::setMulticastTTL(int ttl) {
+    return pImpl->setMulticastTTL(ttl);
 }
 
-Result<void> Socket::setReceiveBufferSize(int bytes) {
-    if (!pImpl->setReceiveBufferSize(bytes)) {
-        return Result<void>::failure(
-            pImpl->getLastError(), "setReceiveBufferSize", 0, false);
-    }
-    return Result<void>::success();
+bool Socket::setReceiveBufferSize(int bytes) {
+    return pImpl->setReceiveBufferSize(bytes);
 }
 
-Result<void> Socket::setSendBufferSize(int bytes) {
-    if (!pImpl->setSendBufferSize(bytes)) {
-        return Result<void>::failure(
-            pImpl->getLastError(), "setSendBufferSize", 0, false);
-    }
-    return Result<void>::success();
+bool Socket::setSendBufferSize(int bytes) {
+    return pImpl->setSendBufferSize(bytes);
 }
 
 int Socket::getReceiveBufferSize() const {

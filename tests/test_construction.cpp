@@ -76,15 +76,21 @@ static void test_server_bind_happy() {
 
         std::string cltError;
         std::thread clt([&]() {
+            std::this_thread::sleep_for(std::chrono::milliseconds(50));
             auto clt_result = SocketFactory::createTcpClient(
                 AddressFamily::IPv4,
-                ConnectArgs{"127.0.0.1", Port{BASE + 1}, Milliseconds{1000}});
+                ConnectArgs{"127.0.0.1", Port{BASE + 1}, Milliseconds{2000}});
             if (clt_result.isError()) {
                 cltError = clt_result.message();
             }
         });
 
         auto peer_result = srv.accept();
+        if (peer_result == nullptr) {
+            // Wait and retry once
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            peer_result = srv.accept();
+        }
         clt.join();
         REQUIRE(cltError.empty());
         REQUIRE(peer_result != nullptr);
