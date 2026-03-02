@@ -15,7 +15,7 @@
 //   3. getErrorMessage() returns empty string when lastError == None.
 //   4. DNS resolution failures carry the failing hostname and use gai_strerror,
 //      not strerror(errno) which would read a stale / unrelated error code.
-//   5. Every SocketException::what() includes the operation step and OS text.
+//   5. Every getErrorMessage() includes the operation step and OS text.
 //   6. Closed-socket operations produce SocketError::InvalidSocket
 //   specifically.
 
@@ -55,7 +55,7 @@ static bool hasOsBracket(const std::string& msg) {
 }
 
 // -----------------------------------------------------------------------
-// 1. SocketException what() structure for ConnectTo failures
+// 1. Error message structure for ConnectTo failures
 // -----------------------------------------------------------------------
 static void test_connect_exception_message() {
     BEGIN_TEST("ConnectArgs error: basic error handling");
@@ -87,7 +87,7 @@ static void test_connect_exception_message() {
 }
 
 // -----------------------------------------------------------------------
-// 2. SocketException what() structure for ServerBind failures
+// 2. Error message structure for ServerBind failures
 // -----------------------------------------------------------------------
 static void test_bind_exception_message() {
     BEGIN_TEST("ServerBind error: basic error handling");

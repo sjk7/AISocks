@@ -300,7 +300,7 @@ static void test_happy_options() {
 }
 
 // -----------------------------------------------------------------------
-// Sad path: construction failures throw SocketException
+// Sad path: construction failures leave socket invalid
 // -----------------------------------------------------------------------
 static void test_sad_construction() {
     std::this_thread::sleep_for(std::chrono::milliseconds(1));

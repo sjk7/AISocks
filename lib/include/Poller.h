@@ -49,8 +49,8 @@ struct PollResult {
 //   Windows         WSAPoll
 class Poller {
     public:
-    // Throws SocketException(CreateFailed) if the OS event queue cannot
-    // be created (e.g. kqueue() / epoll_create1() failure).
+    // On OS failure (e.g. kqueue() / epoll_create1()), the Poller is left
+    // in an invalid state; subsequent operations will return empty results.
     Poller();
     ~Poller();
 
@@ -58,7 +58,7 @@ class Poller {
     Poller& operator=(const Poller&) = delete;
 
     // Register `s` for the given event(s).  Returns false if the socket
-    // is invalid; throws SocketException on a hard OS error.
+    // is invalid or on a hard OS error.
     bool add(const Socket& s, PollEvent interest);
 
     // Replace the registered interest mask for an already-registered socket.
@@ -73,8 +73,7 @@ class Poller {
     //   timeout >= Milliseconds{0}  wait at most that long.
     //   timeout == Milliseconds{-1}  wait forever (until an event arrives).
     //
-    // Returns the ready set (may be empty on timeout).
-    // Throws SocketException on a hard system error.
+    // Returns the ready set (may be empty on timeout or hard system error).
     std::vector<PollResult> wait(Milliseconds timeout = Milliseconds{-1});
 
     struct Impl; // platform-specific; defined in Poller*.cpp

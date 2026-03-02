@@ -189,7 +189,7 @@ class SocketImpl {
 
 // Free function: translate an ErrorContext into a human-readable string.
 // Format: "<description> [<sysCode>: <system text>]"
-// Both SocketImpl::getErrorMessage() and SocketException::what() call this;
+// SocketImpl::getErrorMessage() calls this;
 // keeping the platform-specific translation in one place.
 std::string formatErrorContext(const ErrorContext& ctx);
 

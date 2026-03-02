@@ -11,10 +11,9 @@ int main() {
     std::cout << "=== Echo Client Test ===\n";
     std::cout << "Connecting to localhost:8080\n\n";
 
-    try {
-        ConnectArgs args{"127.0.0.1", Port{8080}, Milliseconds{1000}};
+    ConnectArgs args{"127.0.0.1", Port{8080}, Milliseconds{1000}};
 
-        SimpleClient client(args, [](TcpSocket& sock) {
+    SimpleClient client(args, [](TcpSocket& sock) {
             std::cout << "Connected to echo server!\n";
 
             // Test messages to send
@@ -66,8 +65,8 @@ int main() {
             std::cout << "\n[Done] All messages sent and echoed\n";
         });
 
-    } catch (const SocketException& e) {
-        std::cerr << "Connection failed: " << e.what() << "\n";
+    if (!client.isConnected()) {
+        std::cerr << "Connection failed\n";
         return 1;
     }
 

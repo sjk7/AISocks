@@ -27,11 +27,11 @@ namespace aiSocks {
 //           int n = sock.receive(buf, sizeof(buf));
 //           std::cout.write(buf, n);
 //       });
-//   } catch (const SocketException& e) {
-//       std::cerr << "Connection failed: " << e.what() << "\n";
+//   if (!client.isConnected()) {
+//       std::cerr << "Connection failed\n";
 //   }
 //
-// Throws SocketException if connection fails (consistent with TcpSocket).
+// On connection failure the client is left in a disconnected state; check isConnected().
 // The callback is invoked synchronously in the constructor immediately after
 // a successful connection.
 // ---------------------------------------------------------------------------

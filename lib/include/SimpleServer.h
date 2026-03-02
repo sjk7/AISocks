@@ -44,11 +44,11 @@ enum class ClientLimit : size_t {
 //           }
 //           return true; // keep client connected
 //       });
-//   } catch (const SocketException& e) {
-//       std::cerr << "Server failed: " << e.what() << "\n";
+//   if (!server.isValid()) {
+//       std::cerr << "Server failed: " << server.getErrorMessage() << "\n";
 //   }
 //
-// Throws SocketException if socket creation, bind, or listen fails.
+// On failure (socket creation, bind, or listen), the server is left invalid; check isValid().
 // pollClients() uses non-blocking sockets throughout and Poller readiness for:
 //   - accepting clients
 //   - readable client data

@@ -9,6 +9,7 @@
 #include "SocketFactory.h"
 #include <algorithm>
 #include <atomic>
+#include <cassert>
 #include <chrono>
 #include <csignal>
 #include <cstdint>
@@ -16,6 +17,9 @@
 #include <iostream>
 #include <memory>
 #include <vector>
+#ifndef _WIN32
+#include <sys/resource.h>
+#endif
 
 namespace aiSocks {
 
@@ -87,8 +91,9 @@ enum class ServerResult {
 //   MyServer srv(ServerBind{"0.0.0.0", Port{9000}});
 //   srv.run();
 //
-// Throws SocketException if bind, listen, or Poller registration fails.
-// run() blocks until there are no more clients and accepting has stopped.
+// On failure (bind, listen, or Poller registration), the server is left
+// invalid; check isValid(). run() blocks until there are no more clients and
+// accepting has stopped.
 // ---------------------------------------------------------------------------
 
 template <typename ClientData> class ServerBase {
@@ -98,6 +103,11 @@ template <typename ClientData> class ServerBase {
     explicit ServerBase(
         const ServerBind& args, AddressFamily family = AddressFamily::IPv4)
         : listener_(std::make_unique<TcpSocket>(TcpSocket::createRaw(family))) {
+        // Pre-size the sparse fd→client table to the process fd ceiling
+        // here in the constructor, before any threading or accept() calls.
+        // run() can then insert and erase clients in O(1) without ever
+        // resizing clientSlots_ in the hot path.
+        clientSlots_.resize(getFdCeiling());
         // Use SocketFactory to create server without exceptions
         auto result = SocketFactory::createTcpServer(family, args);
         if (result.isSuccess()) {
@@ -107,7 +117,8 @@ template <typename ClientData> class ServerBase {
             // Sockets default to blocking mode, so we must explicitly set
             // non-blocking for the server listener.
             if (!listener_->setBlocking(false))
-                printf("Warning: Failed to set non-blocking mode on server socket\n");
+                printf("Warning: Failed to set non-blocking mode on server "
+                       "socket\n");
             // Set server-wide policies on the listener so accepted sockets
             // inherit them via propagateSocketProps.
             if (!listener_->setNoDelay(true))
@@ -122,6 +133,7 @@ template <typename ClientData> class ServerBase {
 
     virtual ~ServerBase() {
         // Clean up any remaining clients before destruction.
+        // Full clear here (unlike run() cleanup) since the object is gone.
         clientSlots_.clear();
         clientFds_.clear();
         current_poller_ = nullptr;
@@ -179,7 +191,11 @@ template <typename ClientData> class ServerBase {
             const size_t cap = (maxClients == ClientLimit::Unlimited)
                 ? defaultMaxClients
                 : static_cast<size_t>(maxClients);
-            clientSlots_.reserve(cap + 64); // fds grow from small base
+            // Pre-size the sparse fd→client array to the process fd ceiling
+            // once so that emplaceClient() never resizes in the hot path.
+            // The OS cannot issue an fd at or beyond its own limit, so this
+            // single upfront allocation is exact — no gap, no over-run.
+            if (clientSlots_.empty()) clientSlots_.resize(getFdCeiling());
             clientFds_.reserve(cap);
             // Each client can have multiple heap entries while stale ones
             // accumulate between sweeps, so reserve 2x the client capacity.
@@ -267,13 +283,17 @@ template <typename ClientData> class ServerBase {
             timeoutLogCount_ = 0;
         }
 
-        // Clean up any remaining clients when stopping.
+        // Clean up any remaining clients when stopping.  Reset individual
+        // slots rather than clearing the whole vector so that the
+        // getFdCeiling()-sized pre-allocation from the constructor is
+        // preserved across repeated run() calls.
         for (auto fd : clientFds_) {
-            if (fd < clientSlots_.size() && clientSlots_[fd])
+            if (fd < clientSlots_.size() && clientSlots_[fd]) {
                 onDisconnect(clientSlots_[fd]->data);
+                clientSlots_[fd].reset();
+            }
         }
         clientFds_.clear();
-        clientSlots_.clear();
         current_poller_ = nullptr;
     }
 
@@ -544,6 +564,23 @@ template <typename ClientData> class ServerBase {
     size_t max_clients_{0};
 #endif
 
+    // Returns the process's current soft fd limit as the sparse-array ceiling.
+    // Called once in run() to pre-size clientSlots_ before any accept().
+    // On POSIX this is getrlimit(RLIMIT_NOFILE).  On Windows, SOCKET handles
+    // are opaque UINT_PTR values; in practice they start small, but we cap at
+    // 65 536 which comfortably exceeds the default WSA socket limit.
+    static size_t getFdCeiling() noexcept {
+#ifdef _WIN32
+        return 65536;
+#else
+        struct rlimit rl{};
+        if (::getrlimit(RLIMIT_NOFILE, &rl) == 0 && rl.rlim_cur != RLIM_INFINITY
+            && rl.rlim_cur > 0)
+            return static_cast<size_t>(rl.rlim_cur);
+        return 65536; // safe fallback
+#endif
+    }
+
     static void handleSignal(int) {
         // Signal handler can't access instance, so use a static flag for
         // signals only This is only used for Ctrl+C, not for normal test
@@ -578,6 +615,14 @@ template <typename ClientData> class ServerBase {
 
     // O(1) amortised insert.  Stores activeIdx for O(1) future erase.
     ClientEntry& emplaceClient(uintptr_t fd, std::unique_ptr<TcpSocket> sock) {
+        // clientSlots_ is pre-sized in the constructor to getFdCeiling(), so
+        // the OS should never hand us an fd that falls outside the array.
+        // Assert in debug builds to catch any violation immediately; the
+        // resize below is an absolute last-resort safety net (e.g. the app
+        // called setrlimit() to raise the limit after construction).
+        assert(fd < clientSlots_.size()
+            && "emplaceClient: fd exceeds getFdCeiling() — "
+               "was setrlimit() called after ServerBase construction?");
         if (fd >= clientSlots_.size()) clientSlots_.resize(fd + 1);
         clientSlots_[fd] = std::make_unique<ClientEntry>(std::move(sock));
         clientSlots_[fd]->activeIdx = clientFds_.size();

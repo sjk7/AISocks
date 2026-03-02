@@ -36,7 +36,7 @@ namespace aiSocks {
 class UdpSocket : public Socket {
     public:
     // Creates a UDP socket fd.
-    // Throws SocketException(CreateFailed) if the OS call fails.
+    // On failure the socket is left invalid (isValid() == false); check getLastError().
     explicit UdpSocket(AddressFamily family = AddressFamily::IPv4);
 
     // Public non-virtual destructor  chains to Socket::~Socket().
