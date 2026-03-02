@@ -123,7 +123,7 @@ class HttpServer : public HttpPollServer {
         rebuildResponses(); // warm the cache before the first request
         setKeepAliveTimeout(std::chrono::milliseconds{5000});
         printf("Listening on %s:%d\n", bind.address.c_str(),
-            static_cast<int>(bind.port));
+            static_cast<int>(bind.port.value()));
     }
 
     protected:

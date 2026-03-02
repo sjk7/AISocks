@@ -16,9 +16,8 @@ struct SimpleState {
 
 class SimpleServer : public ServerBase<SimpleState> {
     public:
-    explicit SimpleServer(uint16_t port)
-        : ServerBase<SimpleState>(
-              ServerBind{"127.0.0.1", Port{port}, Backlog{5}}) {}
+    explicit SimpleServer(Port port)
+        : ServerBase<SimpleState>(ServerBind{"127.0.0.1", port, Backlog{5}}) {}
 
     protected:
     ServerResult onReadable(TcpSocket& sock, SimpleState& s) override {
@@ -45,11 +44,11 @@ int main() {
 
     BEGIN_TEST("Basic server with ClientLimit");
     {
-        SimpleServer server(0);
-        uint16_t port = 0;
+        SimpleServer server(Port::any);
+        Port port = Port::any;
         {
             auto ep = server.getSocket().getLocalEndpoint();
-            port = ep.isSuccess() ? ep.value().port.value() : 0;
+            port = ep.isSuccess() ? ep.value().port : Port::any;
         }
         std::atomic<bool> ready{false};
 

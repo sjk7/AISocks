@@ -49,8 +49,8 @@ int main() {
     // Test 4: Server socket creation
     BEGIN_TEST("SocketFactory::createTcpServer succeeds");
     {
-        auto result
-            = SocketFactory::createTcpServer(ServerBind{"127.0.0.1", Port{0}});
+        auto result = SocketFactory::createTcpServer(
+            ServerBind{"127.0.0.1", Port::any});
         REQUIRE(result.isSuccess());
         auto& server = result.value();
         REQUIRE(server.isValid());
@@ -80,7 +80,7 @@ int main() {
         // Start server in background
         std::thread server_thread([&srvPort]() {
             auto srv_result = SocketFactory::createTcpServer(
-                ServerBind{"127.0.0.1", Port{0}});
+                ServerBind{"127.0.0.1", Port::any});
             if (srv_result.isSuccess()) {
                 auto ep = srv_result.value().getLocalEndpoint();
                 if (ep.isSuccess()) srvPort.store(ep.value().port.value());
@@ -137,9 +137,9 @@ int main() {
     // Test 8: Port in use error
     BEGIN_TEST("SocketFactory::createTcpServer fails on port in use");
     {
-        // First server (Port{0} — OS picks an ephemeral port)
+        // First server (Port::any — OS picks an ephemeral port)
         auto first_result = SocketFactory::createTcpServer(
-            ServerBind{"127.0.0.1", Port{0}, Backlog{5}, false});
+            ServerBind{"127.0.0.1", Port::any, Backlog{5}, false});
         REQUIRE(first_result.isSuccess());
         uint16_t p19902 = 0;
         {

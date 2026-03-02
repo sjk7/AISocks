@@ -98,15 +98,15 @@ class TimedServer : public ServerBase<int> {
     std::atomic<int> timeoutClosedCount{0};
 
     explicit TimedServer(
-        uint16_t port, std::chrono::milliseconds keepAlive = KEEP_ALIVE)
-        : ServerBase<int>(ServerBind{"127.0.0.1", Port{port}, Backlog{16}}) {
+        Port port, std::chrono::milliseconds keepAlive = KEEP_ALIVE)
+        : ServerBase<int>(ServerBind{"127.0.0.1", port, Backlog{16}}) {
         setKeepAliveTimeout(keepAlive);
     }
 
-    // Query the actual OS port (useful when the server bound to port 0).
-    uint16_t actualPort() const {
+    // Query the actual OS port (useful when the server bound to Port::any).
+    Port actualPort() const {
         auto ep = getSocket().getLocalEndpoint();
-        return ep.isSuccess() ? ep.value().port.value() : 0;
+        return ep.isSuccess() ? ep.value().port : Port::any;
     }
 
     protected:
@@ -149,9 +149,9 @@ class TimedServer : public ServerBase<int> {
 
 // Connect a blocking TCP client to 127.0.0.1:<port>.
 // Returns a valid TcpSocket on success, invalid on failure.
-static TcpSocket connectClient(uint16_t port) {
+static TcpSocket connectClient(Port port) {
     return TcpSocket(AddressFamily::IPv4,
-        ConnectArgs{"127.0.0.1", Port{port}, Milliseconds{2000}});
+        ConnectArgs{"127.0.0.1", port, Milliseconds{2000}});
 }
 
 // Sleep for the given duration (portable shorthand).
@@ -184,10 +184,10 @@ static void test_timeout_fires_when_idle() {
     // Bind to port 0: OS assigns a free port atomically. We query it via
     // actualPort() after the constructor has already bound+listened, so no
     // other process can steal the port between allocation and use.
-    TimedServer server(0);
+    TimedServer server(Port::any);
     REQUIRE(server.isValid());
-    const uint16_t port = server.actualPort();
-    REQUIRE(port != 0);
+    const Port port = server.actualPort();
+    REQUIRE(port != Port::any);
 
     std::atomic<bool> serverReady{false};
     std::thread serverThread([&] {
@@ -243,10 +243,10 @@ static void test_touch_resets_expiry() {
         "timeout heap: touch mid-window resets expiry, no spurious close");
 
     // Bind to port 0; query actual port after the server is already listening.
-    TimedServer server(0);
+    TimedServer server(Port::any);
     REQUIRE(server.isValid());
-    const uint16_t port = server.actualPort();
-    REQUIRE(port != 0);
+    Port port = server.actualPort();
+    REQUIRE(port != Port::any);
 
     std::atomic<bool> serverReady{false};
     std::thread serverThread([&] {
@@ -306,11 +306,11 @@ static void test_multiple_touches_no_spurious_close() {
         "timeout heap: N rapid touches -> exactly one close, no spurious "
         "closes");
 
-    TimedServer server(0);
+    TimedServer server(Port::any);
     REQUIRE(server.isValid());
     // Query port after the bind -- the OS has already reserved it; no TOCTOU.
-    const uint16_t port = server.actualPort();
-    REQUIRE(port != 0);
+    Port port = server.actualPort();
+    REQUIRE(port != Port::any);
 
     std::atomic<bool> serverReady{false};
     std::thread serverThread([&] {
@@ -367,10 +367,11 @@ static void test_multiple_touches_no_spurious_close() {
 static void test_zero_timeout_disables_sweep() {
     BEGIN_TEST("timeout heap: keepAliveTimeout=0 disables idle close entirely");
 
-    TimedServer server(0, std::chrono::seconds{0}); // port 0 = OS assigns
+    TimedServer server(
+        Port::any, std::chrono::seconds{0}); // port 0 = OS assigns
     REQUIRE(server.isValid());
-    const uint16_t port = server.actualPort();
-    REQUIRE(port != 0);
+    Port port = server.actualPort();
+    REQUIRE(port != Port::any);
 
     std::atomic<bool> serverReady{false};
     std::thread serverThread([&] {
@@ -420,10 +421,10 @@ static void test_only_idle_client_closed() {
     // Port 0: the OS assigns a free port atomically during bind+listen inside
     // the constructor. We read it back via actualPort() while the server
     // already holds the socket -- no TOCTOU window.
-    TimedServer server(0);
+    TimedServer server(Port::any);
     REQUIRE(server.isValid());
-    const uint16_t port = server.actualPort();
-    REQUIRE(port != 0);
+    Port port = server.actualPort();
+    REQUIRE(port != Port::any);
 
     std::atomic<bool> serverReady{false};
     std::thread serverThread([&] {
@@ -496,10 +497,10 @@ static void test_subsecond_timeout_precision() {
     static constexpr auto SHORT_KA = std::chrono::milliseconds{300};
     static constexpr auto SHORT_GRACE = 400ms; // generous vs 300ms window
 
-    TimedServer server(0, SHORT_KA);
+    TimedServer server(Port::any, SHORT_KA);
     REQUIRE(server.isValid());
-    const uint16_t port = server.actualPort();
-    REQUIRE(port != 0);
+    Port port = server.actualPort();
+    REQUIRE(port != Port::any);
 
     std::atomic<bool> serverReady{false};
     std::thread serverThread([&] {
@@ -540,13 +541,13 @@ static void test_getKeepAliveTimeout_roundtrip() {
 
     // Constructor-supplied values must survive to the getter unchanged.
     {
-        TimedServer s(0, std::chrono::milliseconds{300});
+        TimedServer s(Port::any, std::chrono::milliseconds{300});
         REQUIRE(s.isValid());
         REQUIRE_MSG(s.getKeepAliveTimeout() == std::chrono::milliseconds{300},
             "constructor-set 300ms round-trips via getter");
     }
     {
-        TimedServer s(0, std::chrono::milliseconds{0});
+        TimedServer s(Port::any, std::chrono::milliseconds{0});
         REQUIRE(s.isValid());
         REQUIRE_MSG(s.getKeepAliveTimeout() == std::chrono::milliseconds{0},
             "constructor-set 0ms (disabled) round-trips via getter");
@@ -554,7 +555,7 @@ static void test_getKeepAliveTimeout_roundtrip() {
 
     // setKeepAliveTimeout() must overwrite and the getter must follow.
     {
-        TimedServer s(0); // default KEEP_ALIVE set by TimedServer ctor
+        TimedServer s(Port::any); // default KEEP_ALIVE set by TimedServer ctor
         REQUIRE(s.isValid());
         REQUIRE_MSG(s.getKeepAliveTimeout() == KEEP_ALIVE,
             "default KEEP_ALIVE (1000ms) returned correctly");
@@ -588,10 +589,10 @@ static void test_many_idle_clients_all_timeout() {
 
     static constexpr int N = 8;
 
-    TimedServer server(0);
+    TimedServer server(Port::any);
     REQUIRE(server.isValid());
-    const uint16_t port = server.actualPort();
-    REQUIRE(port != 0);
+    Port port = server.actualPort();
+    REQUIRE(port != Port::any);
 
     std::atomic<bool> serverReady{false};
     std::thread serverThread([&] {

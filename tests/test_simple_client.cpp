@@ -19,16 +19,16 @@
 using namespace aiSocks;
 
 // Start a one-shot echo server in the background.
-// Binds Port{0} synchronously so the caller knows the assigned port before
+// Binds Port::any synchronously so the caller knows the assigned port before
 // spawning the thread, eliminating hardcoded port numbers and race-free.
-static std::pair<std::thread, uint16_t> startEchoServer(int clients = 1) {
+static std::pair<std::thread, Port> startEchoServer(int clients = 1) {
     auto res = SocketFactory::createTcpServer(
-        ServerBind{"127.0.0.1", Port{0}, Backlog{5}});
-    if (!res.isSuccess()) return {std::thread{}, 0};
-    uint16_t port = 0;
+        ServerBind{"127.0.0.1", Port::any, Backlog{5}});
+    if (!res.isSuccess()) return {std::thread{}, Port::any};
+    Port port = Port::any;
     {
         auto ep = res.value().getLocalEndpoint();
-        port = ep.isSuccess() ? ep.value().port.value() : 0;
+        port = ep.isSuccess() ? ep.value().port : Port::any;
     }
     // SO_RCVTIMEO on the listener applies to accept() on POSIX, so the
     // thread won't block forever if the client never arrives.
@@ -249,16 +249,16 @@ int main() {
     BEGIN_TEST("SimpleClient: run() callable multiple times");
     {
         // A server that echoes two messages on the same connection.
-        // Bind Port{0} synchronously so we know the port before spawning.
+        // Bind Port::any synchronously so we know the port before spawning.
         auto srvRes = SocketFactory::createTcpServer(
-            ServerBind{"127.0.0.1", Port{0}, Backlog{2}});
+            ServerBind{"127.0.0.1", Port::any, Backlog{2}});
         REQUIRE(srvRes.isSuccess());
-        uint16_t srvPort = 0;
+        Port srvPort = Port::any;
         {
             auto ep = srvRes.value().getLocalEndpoint();
-            srvPort = ep.isSuccess() ? ep.value().port.value() : 0;
+            srvPort = ep.isSuccess() ? ep.value().port : Port::any;
         }
-        REQUIRE(srvPort != 0);
+        REQUIRE(srvPort != Port::any);
         std::thread srv([s = std::move(srvRes.value())]() mutable {
             auto conn = s.accept();
             if (!conn) return;

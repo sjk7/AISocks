@@ -107,15 +107,18 @@ enum class AddressFamily { IPv4, IPv6 };
 
 enum class SocketType { TCP, UDP };
 
-// Strong port-number type.  Accepts integer literals and named well-known
-// ports interchangeably and converts back to uint16_t implicitly so all
-// platform socket API calls (htons, etc.) require no casts.
+// Strong port-number type.  Explicit construction only — passing a raw int
+// or uint16_t where Port is expected is a compile error.  Use Port{8080} or
+// Port{Port::http}.  Convert back with .value() or explicit cast.
 //
 // Usage:
-//   Port p{8080};                    // from integer literal
-//   Port p = Port{80};              // copy construction
-//   uint16_t n = p;                // implicit conversion
-//   socket.bind("0.0.0.0", 8080);   // implicit conversion
+//   Port p{8080};                        // OK — direct construction
+//   Port p{Port::http};                  // OK — named constant
+//   Port p = Port{80};                   // OK — copy construction
+//   uint16_t n = p.value();             // OK — explicit accessor
+//   uint16_t n = static_cast<uint16_t>(p); // OK — explicit cast
+//   socket.bind("0.0.0.0", Port{Port::httpAlt}); // OK
+//   socket.bind("0.0.0.0", 8080);       // ERROR — won't compile
 class Port {
     uint16_t value_;
 
@@ -123,12 +126,8 @@ class Port {
     constexpr Port() noexcept : value_(0) {}
     constexpr explicit Port(uint16_t value) noexcept : value_(value) {}
 
-    // Allow implicit conversion from integer literals
-    template <typename T, typename = std::enable_if_t<std::is_integral_v<T>>>
-    constexpr Port(T value) noexcept : value_(static_cast<uint16_t>(value)) {}
-
     constexpr uint16_t value() const noexcept { return value_; }
-    constexpr operator uint16_t() const noexcept { return value_; }
+    constexpr explicit operator uint16_t() const noexcept { return value_; }
 
     constexpr bool operator==(Port other) const noexcept {
         return value_ == other.value_;
@@ -142,13 +141,74 @@ class Port {
     constexpr bool operator>(Port other) const noexcept {
         return value_ > other.value_;
     }
+
+    // -----------------------------------------------------------------------
+    // Named well-known / common ports.
+    // Usage:  Port::any          — let the OS assign an ephemeral port
+    //         Port{Port::http}   — named port (explicit construction)
+    //         Port{Port::httpAlt}  — alternate HTTP port
+    // -----------------------------------------------------------------------
+
+    // Let the OS assign an ephemeral port (bind to port 0).
+    // Defined after the class body (Port must be complete for its own type).
+    static const Port any;
+
+    // File Transfer Protocol (control / data)
+    static constexpr uint16_t ftp = 21;
+    static constexpr uint16_t ftpData = 20;
+
+    // Secure Shell
+    static constexpr uint16_t ssh = 22;
+
+    // Telnet
+    static constexpr uint16_t telnet = 23;
+
+    // Simple Mail Transfer Protocol
+    static constexpr uint16_t smtp = 25;
+
+    // Domain Name System
+    static constexpr uint16_t dns = 53;
+
+    // Hypertext Transfer Protocol
+    static constexpr uint16_t http = 80;
+
+    // Post Office Protocol v3
+    static constexpr uint16_t pop3 = 110;
+
+    // Internet Message Access Protocol
+    static constexpr uint16_t imap = 143;
+
+    // HTTPS (HTTP over TLS)
+    static constexpr uint16_t https = 443;
+
+    // SMTPS (SMTP over TLS)
+    static constexpr uint16_t smtps = 465;
+
+    // SMTP submission (STARTTLS)
+    static constexpr uint16_t smtpSubmit = 587;
+
+    // IMAPS (IMAP over TLS)
+    static constexpr uint16_t imaps = 993;
+
+    // POP3S (POP3 over TLS)
+    static constexpr uint16_t pop3s = 995;
+
+    // Common HTTP alternate / development ports
+    static constexpr uint16_t httpAlt = 8080;
+    static constexpr uint16_t httpsAlt = 8443;
+
+    // Start of the IANA ephemeral (dynamic) port range
+    static constexpr uint16_t ephemeralStart = 49152;
 };
+
+// Port::any is defined here (after class body) because Port must be complete.
+inline const Port Port::any{};
 
 // Network endpoint: an (address, port, family) triple returned by
 // getLocalEndpoint() and getPeerEndpoint(), and passed to sendTo().
 struct Endpoint {
     std::string address; // dotted-decimal or colon-hex string
-    Port port{0}; // port number
+    Port port{}; // port number
     AddressFamily family{}; // IPv4 or IPv6
 
     Endpoint() = default;
@@ -211,7 +271,7 @@ struct NetworkInterface {
 // Returns invalid socket if any step fails - check isValid().
 struct ServerBind {
     std::string address; // e.g. "0.0.0.0", "127.0.0.1", "::1"
-    Port port{0};
+    Port port{};
     Backlog backlog{};
     bool reuseAddr = true;
 };
@@ -241,7 +301,7 @@ struct ServerBind {
 //       issues connect(), then restores the original flag on all exit paths.
 struct ConnectArgs {
     std::string address; // Remote address or hostname
-    Port port{0};
+    Port port{};
     Milliseconds connectTimeout{defaultConnectTimeout};
 };
 

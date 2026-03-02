@@ -41,9 +41,9 @@ struct NoTimeoutState {
 
 class NoTimeoutServer : public ServerBase<NoTimeoutState> {
     public:
-    explicit NoTimeoutServer(uint16_t port)
+    explicit NoTimeoutServer(Port port)
         : ServerBase<NoTimeoutState>(
-              ServerBind{"127.0.0.1", Port{port}, Backlog{5}}) {
+              ServerBind{"127.0.0.1", port, Backlog{5}}) {
         // Don't set keep-alive timeout
     }
 
@@ -75,11 +75,11 @@ int main() {
     {
         // Reset static stop flag to clean state between test runs
         // (No longer needed with instance variable, but keep for compatibility)
-        NoTimeoutServer server(0);
-        uint16_t port = 0;
+        NoTimeoutServer server(Port::any);
+        Port port = Port::any;
         {
             auto ep = server.getSocket().getLocalEndpoint();
-            port = ep.isSuccess() ? ep.value().port.value() : 0;
+            port = ep.isSuccess() ? ep.value().port : Port::any;
         }
         std::atomic<bool> ready{false};
 

@@ -22,7 +22,7 @@ int main() {
         s.close(); // invalidate
 
         // Try to bind on invalid socket
-        bool bind_result = s.bind("127.0.0.1", Port{0});
+        bool bind_result = s.bind("127.0.0.1", Port::any);
         REQUIRE(!bind_result);
         REQUIRE(s.getLastError() != SocketError::None);
     }
@@ -86,9 +86,9 @@ int main() {
 
     BEGIN_TEST("SocketFactory::createTcpServer fails on port in use");
     {
-        // First server (Port{0} — OS picks an ephemeral port)
+        // First server (Port::any — OS picks an ephemeral port)
         auto first_result = SocketFactory::createTcpServer(
-            ServerBind{"127.0.0.1", Port{0}, Backlog{5}, false});
+            ServerBind{"127.0.0.1", Port::any, Backlog{5}, false});
         REQUIRE(first_result.isSuccess());
         auto& first = first_result.value();
 
@@ -167,7 +167,7 @@ int main() {
         auto& s = result.value();
 
         // Successful bind
-        bool bind_result = s.bind("127.0.0.1", Port{0});
+        bool bind_result = s.bind("127.0.0.1", Port::any);
         if (bind_result) {
             REQUIRE(s.getLastError() == SocketError::None);
         }

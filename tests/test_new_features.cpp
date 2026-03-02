@@ -51,7 +51,7 @@ static void test_endpoints() {
         "getLocalEndpoint: ephemeral port non-zero after bind on port 0");
     {
         auto s = TcpSocket::createRaw();
-        REQUIRE(s.bind("127.0.0.1", Port{0}));
+        REQUIRE(s.bind("127.0.0.1", Port::any));
         auto ep = s.getLocalEndpoint();
         REQUIRE(ep.isSuccess());
         if (!ep) return;
@@ -109,7 +109,7 @@ static void test_endpoints() {
     BEGIN_TEST("getPeerEndpoint: nullopt on unconnected socket");
     {
         auto s = TcpSocket::createRaw();
-        (void)s.bind("127.0.0.1", Port{0});
+        (void)s.bind("127.0.0.1", Port::any);
         auto ep = s.getPeerEndpoint();
         REQUIRE(!ep.isSuccess());
     }

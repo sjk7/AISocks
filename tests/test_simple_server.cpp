@@ -37,10 +37,10 @@ static bool waitFor(Cond&& cond,
     return true;
 }
 
-// Read back the OS-assigned port after binding with Port{0}.
-static uint16_t serverPort(const SimpleServer& s) {
+// Read back the OS-assigned port after binding with Port::any.
+static Port serverPort(const SimpleServer& s) {
     auto ep = s.getSocket().getLocalEndpoint();
-    return ep.isSuccess() ? ep.value().port.value() : 0;
+    return ep.isSuccess() ? ep.value().port : Port::any;
 }
 
 // -----------------------------------------------------------------------
@@ -49,14 +49,14 @@ static uint16_t serverPort(const SimpleServer& s) {
 static void test_validity() {
     BEGIN_TEST("SimpleServer: isValid() true on valid bind");
     {
-        SimpleServer s(ServerBind{"127.0.0.1", Port{0}});
+        SimpleServer s(ServerBind{"127.0.0.1", Port::any});
         REQUIRE(s.isValid());
-        REQUIRE(serverPort(s) != 0); // OS chose a real port
+        REQUIRE(serverPort(s) != Port::any); // OS chose a real port
     }
 
     BEGIN_TEST("SimpleServer: isValid() false on bad address");
     {
-        SimpleServer s(ServerBind{"999.999.999.999", Port{0}});
+        SimpleServer s(ServerBind{"999.999.999.999", Port::any});
         REQUIRE(!s.isValid());
     }
 }
@@ -72,10 +72,10 @@ static void test_poll_clients_echo() {
     std::string echoed;
     std::atomic<bool> serverReady{false};
 
-    SimpleServer server(ServerBind{"127.0.0.1", Port{0}, Backlog{5}});
+    SimpleServer server(ServerBind{"127.0.0.1", Port::any, Backlog{5}});
     REQUIRE(server.isValid());
-    const uint16_t port = serverPort(server);
-    REQUIRE(port != 0);
+    Port port = serverPort(server);
+    REQUIRE(port != Port::any);
     server.setHandleSignals(false);
     server.setKeepAliveTimeout(std::chrono::milliseconds{0});
 
@@ -104,7 +104,7 @@ static void test_poll_clients_echo() {
         std::chrono::milliseconds(20)); // let listen() settle
 
     auto res = SocketFactory::createTcpClient(AddressFamily::IPv4,
-        ConnectArgs{"127.0.0.1", Port{port}, Milliseconds{1000}});
+        ConnectArgs{"127.0.0.1", port, Milliseconds{1000}});
     REQUIRE(res.isSuccess());
     auto client = std::make_unique<TcpSocket>(std::move(res.value()));
 
@@ -131,10 +131,10 @@ static void test_poll_clients_disconnect_on_false() {
     std::atomic<bool> serverReady{false};
     std::atomic<bool> callbackFired{false};
 
-    SimpleServer server(ServerBind{"127.0.0.1", Port{0}, Backlog{5}});
+    SimpleServer server(ServerBind{"127.0.0.1", Port::any, Backlog{5}});
     REQUIRE(server.isValid());
-    const uint16_t port = serverPort(server);
-    REQUIRE(port != 0);
+    Port port = serverPort(server);
+    REQUIRE(port != Port::any);
     server.setHandleSignals(false);
     server.setKeepAliveTimeout(std::chrono::milliseconds{0});
 
@@ -157,7 +157,7 @@ static void test_poll_clients_disconnect_on_false() {
     std::this_thread::sleep_for(std::chrono::milliseconds(20));
 
     auto res = SocketFactory::createTcpClient(AddressFamily::IPv4,
-        ConnectArgs{"127.0.0.1", Port{port}, Milliseconds{1000}});
+        ConnectArgs{"127.0.0.1", port, Milliseconds{1000}});
     REQUIRE(res.isSuccess());
     auto client = std::make_unique<TcpSocket>(std::move(res.value()));
 
@@ -184,10 +184,10 @@ static void test_accept_clients() {
     std::atomic<int> callbackCount{0};
     std::atomic<bool> serverReady{false};
 
-    SimpleServer server(ServerBind{"127.0.0.1", Port{0}, Backlog{5}});
+    SimpleServer server(ServerBind{"127.0.0.1", Port::any, Backlog{5}});
     REQUIRE(server.isValid());
-    const uint16_t port = serverPort(server);
-    REQUIRE(port != 0);
+    Port port = serverPort(server);
+    REQUIRE(port != Port::any);
     server.setHandleSignals(false);
 
     std::thread serverThread([&] {
@@ -212,7 +212,7 @@ static void test_accept_clients() {
     // before connecting the next one (acceptClients is synchronous).
     for (int i = 0; i < 2; ++i) {
         auto res = SocketFactory::createTcpClient(AddressFamily::IPv4,
-            ConnectArgs{"127.0.0.1", Port{port}, Milliseconds{1000}});
+            ConnectArgs{"127.0.0.1", port, Milliseconds{1000}});
         REQUIRE(res.isSuccess());
         {
             auto c = std::make_unique<TcpSocket>(std::move(res.value()));

@@ -44,7 +44,8 @@ void demonstrateServerCreation() {
 
     // Create a TCP server
     auto server_result = SocketFactory::createTcpServer(AddressFamily::IPv4,
-        ServerBind{"127.0.0.1", 8080, Backlog{Backlog::defaultBacklog}, true});
+        ServerBind{
+            "127.0.0.1", Port{8080}, Backlog{Backlog::defaultBacklog}, true});
 
     if (server_result.isSuccess()) {
         auto& server = server_result.value();
@@ -64,7 +65,8 @@ void demonstrateServerCreation() {
 
     // Try to create another server on the same port (should fail)
     auto duplicate_result = SocketFactory::createTcpServer(AddressFamily::IPv4,
-        ServerBind{"127.0.0.1", 8080, Backlog{Backlog::defaultBacklog}, true});
+        ServerBind{
+            "127.0.0.1", Port{8080}, Backlog{Backlog::defaultBacklog}, true});
 
     if (duplicate_result.isError()) {
         std::cout << "? Duplicate server correctly failed: "
@@ -81,7 +83,7 @@ void demonstrateClientConnection() {
 
     // First create a server to connect to
     auto server_result = SocketFactory::createTcpServer(AddressFamily::IPv4,
-        ServerBind{"127.0.0.1", 0} // Port 0 = let OS choose
+        ServerBind{"127.0.0.1", Port::any} // Port 0 = let OS choose
     );
 
     if (server_result.isError()) {
@@ -91,7 +93,7 @@ void demonstrateClientConnection() {
     }
 
     auto& server = server_result.value();
-    Port server_port{0};
+    Port server_port = Port::any;
     if (auto endpoint = server.getLocalEndpoint()) {
         server_port = endpoint.value().port;
         std::cout << "? Test server listening on: "
@@ -159,7 +161,7 @@ void demonstrateErrorHandling() {
 
     // Try to bind to an invalid address
     auto invalid_bind = SocketFactory::createTcpServer(
-        AddressFamily::IPv4, ServerBind{"invalid.address.xyz", 8080});
+        AddressFamily::IPv4, ServerBind{"invalid.address.xyz", Port{8080}});
 
     if (invalid_bind.isError()) {
         std::cout << "? Invalid address correctly rejected\n";
@@ -168,7 +170,7 @@ void demonstrateErrorHandling() {
 
     // Try to connect to a non-existent server
     auto no_server = SocketFactory::createTcpClient(AddressFamily::IPv4,
-        ConnectArgs{"127.0.0.1", 65432, std::chrono::milliseconds{1000}});
+        ConnectArgs{"127.0.0.1", Port{65432}, std::chrono::milliseconds{1000}});
 
     if (no_server.isError()) {
         std::cout << "? Connection to non-existent server correctly failed\n";
@@ -219,7 +221,7 @@ void demonstratePerformanceBenefits() {
 
     // Demonstrate lazy error message construction
     auto error_result = SocketFactory::createTcpClient(AddressFamily::IPv4,
-        ConnectArgs{"127.0.0.1", 65432, std::chrono::milliseconds{100}});
+        ConnectArgs{"127.0.0.1", Port{65432}, std::chrono::milliseconds{100}});
 
     if (error_result.isError()) {
         std::cout << "? Error result created (message not yet constructed)\n";

@@ -261,11 +261,11 @@ bool SocketImpl::connect(
 #ifdef _WIN32
             setError(SocketError::ConnectFailed,
                 "Failed to resolve '" + address
-                    + " port:" + std::to_string(port) + "'");
+                    + " port:" + std::to_string(port.value()) + "'");
 #else
             setErrorDns(SocketError::ConnectFailed,
                 "Failed to resolve '" + address
-                    + " port:" + std::to_string(port) + "'",
+                    + " port:" + std::to_string(port.value()) + "'",
                 gaiErr);
 #endif
             return false;

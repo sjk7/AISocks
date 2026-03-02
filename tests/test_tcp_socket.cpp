@@ -40,7 +40,7 @@ static void test_happy_construction() {
 
     BEGIN_TEST("TcpSocket: ServerBind ctor binds and listens in one step");
     {
-        TcpSocket srv(AddressFamily::IPv4, ServerBind{"127.0.0.1", Port{0}});
+        TcpSocket srv(AddressFamily::IPv4, ServerBind{"127.0.0.1", Port::any});
         REQUIRE(srv.isValid());
         auto ep = srv.getLocalEndpoint();
         REQUIRE(ep.isSuccess());
@@ -55,7 +55,7 @@ static void test_happy_construction() {
         std::atomic<uint16_t> srvPort{0};
         std::thread srvThread([&] {
             TcpSocket srv(
-                AddressFamily::IPv4, ServerBind{"127.0.0.1", Port{0}});
+                AddressFamily::IPv4, ServerBind{"127.0.0.1", Port::any});
             REQUIRE(srv.isValid());
             auto ep = srv.getLocalEndpoint();
             srvPort.store(ep.isSuccess() ? ep.value().port.value() : 0);
@@ -75,8 +75,8 @@ static void test_happy_construction() {
         while (!ready && std::chrono::steady_clock::now() < deadline)
             std::this_thread::sleep_for(std::chrono::milliseconds(10));
 
-        TcpSocket c(
-            AddressFamily::IPv4, ConnectArgs{"127.0.0.1", Port{srvPort.load()}});
+        TcpSocket c(AddressFamily::IPv4,
+            ConnectArgs{"127.0.0.1", Port{srvPort.load()}});
         REQUIRE(c.isValid());
 
         srvThread.join();
@@ -93,7 +93,7 @@ static void test_happy_accept() {
     {
         auto srv = TcpSocket::createRaw();
         REQUIRE(srv.setReuseAddress(true));
-        REQUIRE(srv.bind("127.0.0.1", Port{0}));
+        REQUIRE(srv.bind("127.0.0.1", Port::any));
         REQUIRE(srv.listen(1));
         uint16_t srvPort = 0;
         {
@@ -138,7 +138,7 @@ static void test_happy_send_receive() {
         std::thread srvThread([&] {
             auto srv = TcpSocket::createRaw();
             REQUIRE(srv.setReuseAddress(true));
-            if (!srv.bind("127.0.0.1", Port{0}) || !srv.listen(1)) {
+            if (!srv.bind("127.0.0.1", Port::any) || !srv.listen(1)) {
                 ready = true;
                 return;
             }
@@ -180,7 +180,7 @@ static void test_happy_send_receive() {
         std::thread srvThread([&] {
             auto srv = TcpSocket::createRaw();
             REQUIRE(srv.setReuseAddress(true));
-            if (!srv.bind("127.0.0.1", Port{0}) || !srv.listen(1)) {
+            if (!srv.bind("127.0.0.1", Port::any) || !srv.listen(1)) {
                 ready = true;
                 return;
             }
@@ -225,7 +225,7 @@ static void test_happy_progress_callback() {
         std::thread srvThread([&] {
             auto srv = TcpSocket::createRaw();
             REQUIRE(srv.setReuseAddress(true));
-            if (!srv.bind("127.0.0.1", Port{0}) || !srv.listen(1)) {
+            if (!srv.bind("127.0.0.1", Port::any) || !srv.listen(1)) {
                 ready = true;
                 return;
             }
@@ -325,7 +325,7 @@ static void test_sad_construction() {
     {
         // First server should succeed
         TcpSocket first(AddressFamily::IPv4,
-            ServerBind{"127.0.0.1", Port{0}, Backlog{5}, false});
+            ServerBind{"127.0.0.1", Port::any, Backlog{5}, false});
         REQUIRE(first.isValid());
         uint16_t firstPort = 0;
         {
@@ -345,8 +345,8 @@ static void test_sad_construction() {
 
     BEGIN_TEST("TcpSocket(ServerBind): fails on invalid bind address");
     {
-        auto result = SocketFactory::createTcpServer(AddressFamily::IPv4,
-            ServerBind{"999.999.999.999", Port{0}});
+        auto result = SocketFactory::createTcpServer(
+            AddressFamily::IPv4, ServerBind{"999.999.999.999", Port::any});
         REQUIRE(result.isError());
         REQUIRE(result.error() == SocketError::BindFailed);
     }
@@ -374,7 +374,7 @@ static void test_sad_operations() {
     BEGIN_TEST("TcpSocket: bind() fails on bad address (manual call)");
     {
         auto s = TcpSocket::createRaw();
-        bool ok = s.bind("999.999.999.999", Port{0});
+        bool ok = s.bind("999.999.999.999", Port::any);
         REQUIRE(!ok);
         REQUIRE(s.getLastError() == SocketError::BindFailed);
     }
@@ -496,7 +496,7 @@ static void test_happy_endpoints() {
     BEGIN_TEST("TcpSocket: getLocalEndpoint() reflects bind address");
     {
         auto s = TcpSocket::createRaw();
-        REQUIRE(s.bind("127.0.0.1", Port{0}));
+        REQUIRE(s.bind("127.0.0.1", Port::any));
         auto ep = s.getLocalEndpoint();
         REQUIRE(ep.isSuccess());
         REQUIRE(ep.value().address == "127.0.0.1");
@@ -512,7 +512,7 @@ static void test_happy_endpoints() {
         std::thread srvThread([&] {
             auto srv = TcpSocket::createRaw();
             REQUIRE(srv.setReuseAddress(true));
-            if (!srv.bind("127.0.0.1", Port{0}) || !srv.listen(1)) {
+            if (!srv.bind("127.0.0.1", Port::any) || !srv.listen(1)) {
                 ready = true;
                 return;
             }
@@ -560,7 +560,7 @@ static void test_happy_send_chunked() {
         std::thread srvThread([&] {
             auto srv = TcpSocket::createRaw();
             REQUIRE(srv.setReuseAddress(true));
-            if (!srv.bind("127.0.0.1", Port{0}) || !srv.listen(1)) {
+            if (!srv.bind("127.0.0.1", Port::any) || !srv.listen(1)) {
                 ready = true;
                 return;
             }

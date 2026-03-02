@@ -62,7 +62,7 @@ SocketError resolveToSockaddr(const std::string& address, Port port,
     if (family == AddressFamily::IPv6) {
         sockaddr_in6 a6{};
         a6.sin6_family = AF_INET6;
-        a6.sin6_port = htons(port);
+        a6.sin6_port = htons(port.value());
         if (address.empty() || address == "::" || address == "0.0.0.0") {
             a6.sin6_addr = in6addr_any;
         } else if (inet_pton(AF_INET6, address.c_str(), &a6.sin6_addr) > 0) {
@@ -79,7 +79,7 @@ SocketError resolveToSockaddr(const std::string& address, Port port,
             }
             std::memcpy(
                 &a6, res->ai_addr, static_cast<size_t>(res->ai_addrlen));
-            a6.sin6_port = htons(port);
+            a6.sin6_port = htons(port.value());
             freeaddrinfo(res);
         } else {
             return SocketError::BindFailed;
@@ -90,7 +90,7 @@ SocketError resolveToSockaddr(const std::string& address, Port port,
     } else {
         sockaddr_in a4{};
         a4.sin_family = AF_INET;
-        a4.sin_port = htons(port);
+        a4.sin_port = htons(port.value());
         if (address.empty() || address == "0.0.0.0") {
             a4.sin_addr.s_addr = INADDR_ANY;
         } else if (inet_pton(AF_INET, address.c_str(), &a4.sin_addr) > 0) {
@@ -107,7 +107,7 @@ SocketError resolveToSockaddr(const std::string& address, Port port,
             }
             std::memcpy(
                 &a4, res->ai_addr, static_cast<size_t>(res->ai_addrlen));
-            a4.sin_port = htons(port);
+            a4.sin_port = htons(port.value());
             freeaddrinfo(res);
         } else {
             return SocketError::BindFailed;
@@ -158,7 +158,7 @@ std::string formatErrorContext(const ErrorContext& ctx) {
 
 std::vector<NetworkInterface> getLocalAddresses() {
     std::vector<NetworkInterface> interfaces;
-    
+
     // Initialize platform (for WSAStartup on Windows)
 #ifdef _WIN32
     WSADATA wsaData;
@@ -204,14 +204,16 @@ std::vector<NetworkInterface> getLocalAddresses() {
                     if (sa->sa_family == AF_INET) {
                         char buffer[INET_ADDRSTRLEN];
                         sockaddr_in* sin = reinterpret_cast<sockaddr_in*>(sa);
-                        inet_ntop(AF_INET, &sin->sin_addr, buffer, INET_ADDRSTRLEN);
+                        inet_ntop(
+                            AF_INET, &sin->sin_addr, buffer, INET_ADDRSTRLEN);
                         iface.address = buffer;
                         iface.family = AddressFamily::IPv4;
                     } else if (sa->sa_family == AF_INET6) {
                         char buffer[INET6_ADDRSTRLEN];
-                        sockaddr_in6* sin6 = reinterpret_cast<sockaddr_in6*>(sa);
-                        inet_ntop(
-                            AF_INET6, &sin6->sin6_addr, buffer, INET6_ADDRSTRLEN);
+                        sockaddr_in6* sin6
+                            = reinterpret_cast<sockaddr_in6*>(sa);
+                        inet_ntop(AF_INET6, &sin6->sin6_addr, buffer,
+                            INET6_ADDRSTRLEN);
                         iface.address = buffer;
                         iface.family = AddressFamily::IPv6;
                     } else {
@@ -273,24 +275,25 @@ std::vector<NetworkInterface> getLocalAddresses() {
 }
 
 // Specialized timeout setter (platform-specific logic)
-bool setSocketOptionTimeout(SocketHandle socketHandle, int optname, std::chrono::milliseconds timeout, const char* errMsg) {
+bool setSocketOptionTimeout(SocketHandle socketHandle, int optname,
+    std::chrono::milliseconds timeout, const char* errMsg) {
     (void)errMsg; // Suppress unused parameter warning
     const long long ms = timeout.count();
     int result = 0;
 #ifdef _WIN32
     DWORD tv = static_cast<DWORD>(ms);
     result = setsockopt(socketHandle, SOL_SOCKET, optname,
-            reinterpret_cast<const char*>(&tv),
-            static_cast<socklen_t>(sizeof(tv)));
+        reinterpret_cast<const char*>(&tv), static_cast<socklen_t>(sizeof(tv)));
 #else
     struct timeval tv;
     tv.tv_sec = static_cast<time_t>(ms / 1000);
     tv.tv_usec = static_cast<suseconds_t>((ms % 1000) * 1000);
     result = setsockopt(socketHandle, SOL_SOCKET, optname,
-            reinterpret_cast<const char*>(&tv),
-            static_cast<socklen_t>(sizeof(tv)));
+        reinterpret_cast<const char*>(&tv), static_cast<socklen_t>(sizeof(tv)));
 #endif
-    assert(result == 0 && "setsockopt timeout failed - check socket handle and option parameters");
+    assert(result == 0
+        && "setsockopt timeout failed - check socket handle and option "
+           "parameters");
     return result == 0;
 }
 

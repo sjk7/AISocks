@@ -42,9 +42,8 @@ struct MinimalState {
 
 class MinimalServer : public ServerBase<MinimalState> {
     public:
-    explicit MinimalServer(uint16_t port)
-        : ServerBase<MinimalState>(
-              ServerBind{"127.0.0.1", Port{port}, Backlog{5}}) {}
+    explicit MinimalServer(Port port)
+        : ServerBase<MinimalState>(ServerBind{"127.0.0.1", port, Backlog{5}}) {}
 
     protected:
     ServerResult onReadable(TcpSocket& sock, MinimalState& s) override {
@@ -69,11 +68,11 @@ int main() {
     {
         // Reset static stop flag to clean state between test runs
         // (No longer needed with instance variable, but keep for compatibility)
-        MinimalServer server(0);
-        uint16_t port = 0;
+        MinimalServer server(Port::any);
+        Port port = Port::any;
         {
             auto ep = server.getSocket().getLocalEndpoint();
-            port = ep.isSuccess() ? ep.value().port.value() : 0;
+            port = ep.isSuccess() ? ep.value().port : Port::any;
         }
         std::atomic<bool> ready{false};
 
@@ -89,7 +88,7 @@ int main() {
 
         // Connect a client to verify server works
         auto result = SocketFactory::createTcpClient(AddressFamily::IPv4,
-            ConnectArgs{"127.0.0.1", Port{port}, Milliseconds{200}});
+            ConnectArgs{"127.0.0.1", port, Milliseconds{200}});
         REQUIRE(result.isSuccess());
         auto client = std::make_unique<TcpSocket>(std::move(result.value()));
 

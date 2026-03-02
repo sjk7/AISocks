@@ -80,12 +80,13 @@ int main() {
         auto server = TcpSocket::createRaw();
         REQUIRE(server.setReuseAddress(true));
         // OS assigns an ephemeral port; no risk of collision
-        bool bound = server.bind("127.0.0.1", Port{0}) && server.listen(1);
-        uint16_t port = 0;
+        bool bound
+            = server.bind("127.0.0.1", Port{Port::any}) && server.listen(1);
+        Port port = Port::any;
         if (bound) {
             auto ep = server.getLocalEndpoint();
-            port = ep.isSuccess() ? ep.value().port.value() : 0;
-            bound = (port != 0);
+            port = ep.isSuccess() ? ep.value().port : Port::any;
+            bound = (port != Port::any);
         }
         if (!bound) {
             REQUIRE_MSG(true, "SKIP - ephemeral port unavailable");
@@ -93,7 +94,7 @@ int main() {
             std::thread connector([port]() {
                 std::this_thread::sleep_for(std::chrono::milliseconds(10));
                 auto c = TcpSocket::createRaw();
-                (void)c.connect("127.0.0.1", Port{port});
+                (void)c.connect("127.0.0.1", port);
                 std::this_thread::sleep_for(std::chrono::milliseconds(20));
             });
             auto accepted = server.accept();
