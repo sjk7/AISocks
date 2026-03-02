@@ -5,6 +5,7 @@
 #define AISOCKS_SIMPLE_SERVER_H
 
 #include "Poller.h"
+#include "ServerTypes.h"
 #include "TcpSocket.h"
 #include "SocketFactory.h"
 #include <functional>
@@ -13,16 +14,6 @@
 #include <unordered_map>
 
 namespace aiSocks {
-
-// Client connection limits with sensible defaults and maximums
-enum class ClientLimit : size_t {
-    Unlimited = 0,           // Accept unlimited connections
-    Default = 1000,          // Default limit for production safety
-    Low = 100,              // Low resource environments
-    Medium = 500,           // Medium resource environments  
-    High = 2000,            // High performance servers
-    Maximum = 10000         // Reasonable maximum for most systems
-};
 
 // ---------------------------------------------------------------------------
 // SimpleServer  convenience wrapper for TCP server polling loops.
@@ -48,8 +39,9 @@ enum class ClientLimit : size_t {
 //       std::cerr << "Server failed: " << server.getErrorMessage() << "\n";
 //   }
 //
-// On failure (socket creation, bind, or listen), the server is left invalid; check isValid().
-// pollClients() uses non-blocking sockets throughout and Poller readiness for:
+// On failure (socket creation, bind, or listen), the server is left invalid;
+// check isValid(). pollClients() uses non-blocking sockets throughout and
+// Poller readiness for:
 //   - accepting clients
 //   - readable client data
 //   - writable client buffer space
@@ -58,8 +50,8 @@ class SimpleServer {
     public:
     // Create a listening server socket.
     // Returns invalid socket if bind or listen fails - check isValid().
-    SimpleServer(const ServerBind& args,
-        AddressFamily family = AddressFamily::IPv4)
+    SimpleServer(
+        const ServerBind& args, AddressFamily family = AddressFamily::IPv4)
         : socket_(std::make_unique<TcpSocket>(TcpSocket::createRaw(family))) {
         // Use SocketFactory to create server without exceptions
         auto result = SocketFactory::createTcpServer(family, args);
@@ -81,16 +73,18 @@ class SimpleServer {
     // Note: This accepts clients in non-blocking mode using Poller, but the
     // callback itself is responsible for any client I/O strategy.
     template <typename Callback>
-    void acceptClients(Callback&& onClient, ClientLimit maxClients = ClientLimit::Default) {
+    void acceptClients(
+        Callback&& onClient, ClientLimit maxClients = ClientLimit::Default) {
         if (!socket_ || !socket_->isValid()) return;
-        
+
         Poller poller;
         if (!poller.add(*socket_, PollEvent::Readable | PollEvent::Error)) {
             return; // Failed to register with poller
         }
 
         size_t count = 0;
-        while (maxClients == ClientLimit::Unlimited || count < static_cast<size_t>(maxClients)) {
+        while (maxClients == ClientLimit::Unlimited
+            || count < static_cast<size_t>(maxClients)) {
             auto ready = poller.wait(Milliseconds{-1});
             for (const auto& event : ready) {
                 if (event.socket != socket_.get()) continue;
@@ -115,7 +109,8 @@ class SimpleServer {
 
                     onClient(*client);
                     ++count;
-                    if (maxClients != ClientLimit::Unlimited && count >= static_cast<size_t>(maxClients)) {
+                    if (maxClients != ClientLimit::Unlimited
+                        && count >= static_cast<size_t>(maxClients)) {
                         return;
                     }
                 }
@@ -132,20 +127,24 @@ class SimpleServer {
     //
     // maxClients semantics:
     //   ClientLimit::Unlimited (0)  accept forever.
-    //   N > 0                        accept up to N clients, then stop accepting and keep
-    //                                polling existing clients until all disconnect.
+    //   N > 0                        accept up to N clients, then stop
+    //   accepting and keep
+    //                                polling existing clients until all
+    //                                disconnect.
     template <typename Callback>
-    void pollClients(Callback&& onClientEvent, ClientLimit maxClients = ClientLimit::Default,
+    void pollClients(Callback&& onClientEvent,
+        ClientLimit maxClients = ClientLimit::Default,
         Milliseconds timeout = Milliseconds{-1}) {
         if (!socket_ || !socket_->isValid()) return;
-        
+
         Poller poller;
         if (!poller.add(*socket_, PollEvent::Readable | PollEvent::Error)) {
             return; // Failed to register with poller
         }
 
         std::unordered_map<const Socket*, std::unique_ptr<TcpSocket>> clients;
-        // Pre-reserve client map if maxClients is specified to eliminate hash table growth
+        // Pre-reserve client map if maxClients is specified to eliminate hash
+        // table growth
         if (static_cast<size_t>(maxClients) > 0) {
             clients.reserve(static_cast<size_t>(maxClients));
         }
@@ -184,7 +183,8 @@ class SimpleServer {
                         clients.emplace(key, std::move(client));
                         ++accepted;
 
-                        if (maxClients != ClientLimit::Unlimited && accepted >= static_cast<size_t>(maxClients)) {
+                        if (maxClients != ClientLimit::Unlimited
+                            && accepted >= static_cast<size_t>(maxClients)) {
                             (void)poller.remove(*socket_);
                             accepting = false;
                             break;
@@ -210,9 +210,7 @@ class SimpleServer {
     }
 
     // Check if the server socket is valid and ready for use
-    bool isValid() const {
-        return socket_ && socket_->isValid();
-    }
+    bool isValid() const { return socket_ && socket_->isValid(); }
 
     // Get access to the underlying server socket.
     // Useful for configuring socket options or checking socket state.

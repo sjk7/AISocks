@@ -12,13 +12,14 @@ set(TEST_SOURCES
     test_tcp_socket
     test_simple_client
     test_server_base
-test_http_request
+    test_http_request
     test_url_codec
     test_socket_factory
     test_server_base_simple
     test_server_base_minimal
     test_server_base_echo_simple
     test_server_base_no_timeout
+    test_fixes
 )
 
 # Slow tests (disabled by default, enable with -DALLOW_SLOW_TESTS=ON)

@@ -18,8 +18,13 @@ using namespace aiSocks;
 int httpConnect(const ConnectArgs& args, const char* httpRequest) {
     unsigned long totalBytesRead = 0;
 
-    // One-liner: connect and read until closed
-    SimpleClient client(args, [&](TcpSocket& sock) {
+    SimpleClient client(args);
+    if (!client.isConnected()) {
+        std::cerr << "\n*** CONNECTION FAILED ***\n";
+        return 1;
+    }
+
+    client.run([&](TcpSocket& sock) {
         assert(sock.isBlocking());
         std::cout << "Connected! Socket is valid.\n";
 
@@ -65,11 +70,6 @@ int httpConnect(const ConnectArgs& args, const char* httpRequest) {
 
         std::cout << "\n-----------------------------------------\n";
     });
-
-    if (!client.isConnected()) {
-        std::cerr << "\n*** CONNECTION FAILED ***\n";
-        return 1;
-    }
 
     std::cout << "\nConnection complete!\n";
     std::cout << "Total bytes received: " << totalBytesRead << "\n";

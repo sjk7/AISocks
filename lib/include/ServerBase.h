@@ -5,6 +5,8 @@
 #define AISOCKS_SERVER_BASE_H
 
 #include "Poller.h"
+#include "ServerSignal.h"
+#include "ServerTypes.h"
 #include "TcpSocket.h"
 #include "SocketFactory.h"
 #include <algorithm>
@@ -22,16 +24,6 @@
 #endif
 
 namespace aiSocks {
-
-// Client connection limits with sensible defaults and maximums
-enum class ClientLimit : size_t {
-    Unlimited = 0, // Accept unlimited connections
-    Default = 1000, // Default limit for production safety
-    Low = 100, // Low resource environments
-    Medium = 500, // Medium resource environments
-    High = 2000, // High performance servers
-    Maximum = 10000 // Reasonable maximum for most systems
-};
 
 // Number of client slots reserved at startup when no explicit limit is set.
 // Used as the floor for clients_ and timeout_heap_ pre-allocation so that the
@@ -70,8 +62,8 @@ enum class ServerResult {
 //     return from onReadable/onWritable).  Default returns Disconnect.
 //
 //   ServerResult onIdle()   [optional]
-//     Called on every loop iteration after poller.wait() returns, before
-//     processing events. Default returns KeepConnection.
+//     Called when poller.wait() times out with no ready events.
+//     NOT called when events fire.  Default returns KeepConnection.
 //
 // Usage:
 //   struct MyState { std::string inbuf; std::string outbuf; size_t sent{}; };
@@ -165,16 +157,29 @@ template <typename ClientData> class ServerBase {
         stop_.store(false, std::memory_order_relaxed);
 
         // Install SIGINT/SIGTERM for Ctrl+C shutdown; restore on exit.
-        auto prevInt = std::signal(SIGINT, handleSignal);
-        auto prevTerm = std::signal(SIGTERM, handleSignal);
+        //
+        // NOTE: signal_stop_ is a process-wide static flag shared by every
+        // ServerBase instance.  If two servers run concurrently and both have
+        // signal handling enabled, SIGINT will stop both.  Use
+        // setHandleSignals(false) on instances that should be unaffected.
+        using SigHandler = void (*)(int);
+        SigHandler prevInt = SIG_DFL;
+        SigHandler prevTerm = SIG_DFL;
+        if (handleSignals_) {
+            prevInt = std::signal(SIGINT, serverHandleSignal);
+            prevTerm = std::signal(SIGTERM, serverHandleSignal);
+        }
         struct SigGuard {
-            void (*pi)(int);
-            void (*pt)(int);
+            bool active;
+            SigHandler pi;
+            SigHandler pt;
             ~SigGuard() {
-                std::signal(SIGINT, pi);
-                std::signal(SIGTERM, pt);
+                if (active) {
+                    std::signal(SIGINT, pi);
+                    std::signal(SIGTERM, pt);
+                }
             }
-        } guard{prevInt, prevTerm};
+        } guard{handleSignals_, prevInt, prevTerm};
 
         Poller poller;
         current_poller_ = &poller;
@@ -206,11 +211,13 @@ template <typename ClientData> class ServerBase {
         size_t accepted = 0;
 
         while (!stop_.load(std::memory_order_relaxed)
-            && !signal_stop_.load(std::memory_order_relaxed)
+            && !(handleSignals_
+                && g_serverSignalStop.load(std::memory_order_relaxed))
             && (accepting || !clientFds_.empty())) {
             auto ready = poller.wait(timeout);
             if (stop_.load(std::memory_order_relaxed)
-                || signal_stop_.load(std::memory_order_relaxed))
+                || (handleSignals_
+                    && g_serverSignalStop.load(std::memory_order_relaxed)))
                 break;
             for (const auto& event : ready) {
                 if (event.socket == listener_.get()) {
@@ -225,7 +232,12 @@ template <typename ClientData> class ServerBase {
 
                 bool keep = !hasFlag(event.events, PollEvent::Error);
                 if (!keep) {
-                    onError(*ce->socket, ce->data);
+                    ServerResult errResult = onError(*ce->socket, ce->data);
+                    if (errResult == ServerResult::StopServer) {
+                        stop_.store(true);
+                        break;
+                    }
+                    keep = (errResult == ServerResult::KeepConnection);
                 }
                 if (keep && hasFlag(event.events, PollEvent::Readable)) {
                     ServerResult result = onReadable(*ce->socket, ce->data);
@@ -270,9 +282,16 @@ template <typename ClientData> class ServerBase {
                 }
             }
 
-            if (onIdle() == ServerResult::StopServer) {
-                stop_.store(true);
-                break;
+            // onIdle() is called only when poller.wait() returned with no
+            // ready events, i.e. a genuine timeout.  Callers that want
+            // reliable periodic semantics should pass a bounded timeout to
+            // run() (e.g. Milliseconds{100}) rather than guarding with their
+            // own wall-clock timer.
+            if (ready.empty()) {
+                if (onIdle() == ServerResult::StopServer) {
+                    stop_.store(true);
+                    break;
+                }
             }
         }
 
@@ -380,6 +399,17 @@ template <typename ClientData> class ServerBase {
         return stop_.load(std::memory_order_relaxed);
     }
 
+    // Control whether run() installs its own SIGINT/SIGTERM handlers.
+    //
+    // Default: true (signal handling enabled).
+    //
+    // When enabled, SIGINT/SIGTERM set a process-wide static flag that causes
+    // every ServerBase whose handleSignals_ is true to stop on the next loop
+    // iteration.  Set to false on secondary servers (or servers running in
+    // threads) that should be stopped via requestStop() instead.
+    void setHandleSignals(bool enable) noexcept { handleSignals_ = enable; }
+    bool handlesSignals() const noexcept { return handleSignals_; }
+
     protected:
     // -- Override in derived classes ------------------------------------------
 
@@ -393,8 +423,13 @@ template <typename ClientData> class ServerBase {
     virtual void onDisconnect(ClientData& /*data*/) {}
 
     // Called when a poll error event fires on a client socket.
-    // sock is still valid at this point. Default: no-op.
-    virtual void onError(TcpSocket& /*sock*/, ClientData& /*data*/) {}
+    // sock is still valid at this point.
+    // Return KeepConnection to leave the client registered (e.g. the error
+    // was transient), Disconnect to tear down this client (the default), or
+    // StopServer to halt the server gracefully.
+    virtual ServerResult onError(TcpSocket& /*sock*/, ClientData& /*data*/) {
+        return ServerResult::Disconnect;
+    }
 
     // Called after the keep-alive sweep closes one or more idle connections.
     // Default: accumulates count and prints at most once per minute.
@@ -410,14 +445,31 @@ template <typename ClientData> class ServerBase {
         }
     }
 
-    // Called on every loop iteration after poller.wait() returns, before
-    // processing events.  Use this hook for periodic bookkeeping on the
-    // server thread without spawning extra threads.  For reliable periodic
-    // calls pass a bounded timeout to run() (e.g. Milliseconds{100}).
+    // Called when a newly accepted socket cannot be registered with the poller
+    // (a rare OS error — e.g. ENOMEM or the process fd table is full).
+    // The socket has been accepted from the OS but cannot be served; it will
+    // be closed immediately after this call returns.
     //
-    // Note: keep-alive timeout enforcement is now handled entirely by
-    // sweepTimeouts() which runs in the main loop automatically -- there is
-    // no need to call ServerBase::onIdle() from overrides any more.
+    // Default: logs a warning to stderr with the fd value.
+    // Override to suppress the log, record metrics, or send a rejection.
+    virtual void onPollerAddFailed(TcpSocket& sock) {
+        fprintf(stderr,
+            "[ServerBase] warning: poller.add failed for accepted fd %zu"
+            " — connection dropped\n",
+            static_cast<size_t>(sock.getNativeHandle()));
+    }
+
+    // Called when poller.wait() returns with no ready events, i.e. a genuine
+    // poll timeout.  Use this for periodic bookkeeping on the server thread
+    // without spawning extra threads.
+    //
+    // For reliable periodic calls, pass a bounded timeout to run()
+    // (e.g. Milliseconds{100}).  onIdle() is NOT called when events fire,
+    // so no per-callback timer guard is necessary.
+    //
+    // Note: keep-alive timeout enforcement is handled entirely by
+    // sweepTimeouts() which runs in the main loop automatically; there is
+    // no need to call ServerBase::onIdle() from overrides.
     virtual ServerResult onIdle() { return ServerResult::KeepConnection; }
 
     private:
@@ -434,12 +486,8 @@ template <typename ClientData> class ServerBase {
         size_t activeIdx{0}; // index into clientFds_ for O(1) erase
 
         ClientEntry() = default;
-        ClientEntry(const ClientEntry& other)
-            : socket(other.socket ? std::make_unique<TcpSocket>(*other.socket)
-                                  : nullptr)
-            , data(other.data)
-            , lastActivity(other.lastActivity)
-            , activeIdx(other.activeIdx) {}
+        ClientEntry(const ClientEntry&) = delete;
+        ClientEntry& operator=(const ClientEntry&) = delete;
 
         ClientEntry(ClientEntry&& other) noexcept
             : socket(std::move(other.socket))
@@ -581,14 +629,7 @@ template <typename ClientData> class ServerBase {
 #endif
     }
 
-    static void handleSignal(int) {
-        // Signal handler can't access instance, so use a static flag for
-        // signals only This is only used for Ctrl+C, not for normal test
-        // shutdown
-        signal_stop_.store(true, std::memory_order_relaxed);
-    }
-
-    static std::atomic<bool> signal_stop_;
+    bool handleSignals_{true}; // per-instance opt-out; see setHandleSignals()
     Poller* current_poller_{nullptr};
     std::unique_ptr<TcpSocket> listener_;
     // Flat O(1)-by-fd client table.  Replaces unordered_map to eliminate
@@ -661,6 +702,8 @@ template <typename ClientData> class ServerBase {
 
             uintptr_t key = client->getNativeHandle();
             if (!poller.add(*client, PollEvent::Readable | PollEvent::Error)) {
+                onPollerAddFailed(*client);
+                // client goes out of scope here — socket closed via RAII.
                 continue;
             }
 
@@ -687,10 +730,6 @@ template <typename ClientData> class ServerBase {
         }
     }
 };
-
-// Define static member
-template <typename ClientData>
-std::atomic<bool> ServerBase<ClientData>::signal_stop_{false};
 
 } // namespace aiSocks
 

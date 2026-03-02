@@ -101,8 +101,11 @@ template <typename T> class [[nodiscard]] Result {
     // placement new over same memory
     Result& operator=(const Result& other) {
         if (this != &other) {
+            // Destroy whichever arm is currently live before overwriting.
             if (has_value_)
-                value_ref().~T(); // <- Manual destructor call required!
+                value_ref().~T();
+            else
+                error_ref().~ErrorInfo(); // prevent cachedMessage_ leak
             if (other.has_value_) {
                 has_value_ = true;
                 new (value_storage_)
@@ -121,7 +124,11 @@ template <typename T> class [[nodiscard]] Result {
 
     Result& operator=(Result&& other) noexcept {
         if (this != &other) {
-            if (has_value_) value_ref().~T();
+            // Destroy whichever arm is currently live before overwriting.
+            if (has_value_)
+                value_ref().~T();
+            else
+                error_ref().~ErrorInfo(); // prevent cachedMessage_ leak
             if (other.has_value_) {
                 has_value_ = true;
                 new (value_storage_) T(std::move(other.value_ref()));

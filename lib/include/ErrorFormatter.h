@@ -32,7 +32,6 @@ inline std::string formatErrorMessage(
     return "";
 }
 
-
 } // namespace aiSocks
 
 #endif // AISOCKS_ERROR_FORMATTER_H

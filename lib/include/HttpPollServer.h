@@ -59,6 +59,9 @@ struct HttpClientState {
     std::chrono::steady_clock::time_point startTime{};
     bool responseStarted{false}; // true once onResponseBegin has been called
     bool closeAfterSend{false}; // set by keep-alive negotiation
+    // Tracks how far requestComplete() has already scanned so repeated
+    // calls are O(n) total even when bytes arrive one at a time.
+    size_t requestScanPos{0};
 
     HttpClientState() : startTime(std::chrono::steady_clock::now()) {
         request.reserve(4096); // typical HTTP request fits in 4 KB
@@ -71,7 +74,8 @@ struct HttpClientState {
         , sent(other.sent)
         , startTime(other.startTime)
         , responseStarted(other.responseStarted)
-        , closeAfterSend(other.closeAfterSend) {
+        , closeAfterSend(other.closeAfterSend)
+        , requestScanPos(other.requestScanPos) {
         // If view pointed into the original's responseBuf, redirect into ours.
         if (!responseBuf.empty()
             && other.responseView.data() == other.responseBuf.data())
@@ -85,7 +89,8 @@ struct HttpClientState {
         , sent(other.sent)
         , startTime(other.startTime)
         , responseStarted(other.responseStarted)
-        , closeAfterSend(other.closeAfterSend) {
+        , closeAfterSend(other.closeAfterSend)
+        , requestScanPos(other.requestScanPos) {
         // After the move, fix up view if it was backed by the (now moved) buf.
         if (!responseBuf.empty()) responseView = responseBuf;
         other.responseView = {};
@@ -122,7 +127,7 @@ class HttpPollServer : public ServerBase<HttpClientState> {
     virtual void onResponseSent(HttpClientState& /*s*/) {}
 
     // Default error handler: log and drop the connection.
-    void onError(TcpSocket& sock, HttpClientState& /*s*/) override {
+    ServerResult onError(TcpSocket& sock, HttpClientState& /*s*/) override {
         auto err = sock.getLastError();
         // Poll systems can report error events with SO_ERROR==0 for connection
         // resets or other conditions. This is not a real error and should not
@@ -131,6 +136,7 @@ class HttpPollServer : public ServerBase<HttpClientState> {
             printf("[error] poll error on client socket: code=%d msg=%s\n",
                 static_cast<int>(err), sock.getErrorMessage().c_str());
         }
+        return ServerResult::Disconnect;
     }
 
     // -------------------------------------------------------------------------
@@ -144,8 +150,26 @@ class HttpPollServer : public ServerBase<HttpClientState> {
             || req.rfind("PATC", 0) == 0;
     }
 
+    // Single-argument form kept for backward compatibility with derived
+    // classes that call it directly.  Re-scans from the beginning every
+    // time; prefer the two-argument form for new code.
     static bool requestComplete(const std::string& req) {
         return req.find("\r\n\r\n") != std::string::npos;
+    }
+
+    // Incremental form used internally by onReadable().  scanPos tracks how
+    // far we have already confirmed there is no header terminator, so each
+    // call only inspects new bytes (plus a 3-byte overlap for split
+    // \r\n\r\n sequences).  Total cost across all calls per request: O(n).
+    static bool requestComplete(const std::string& req, size_t& scanPos) {
+        const size_t start = scanPos >= 3 ? scanPos - 3 : 0;
+        const size_t pos = req.find("\r\n\r\n", start);
+        if (pos != std::string::npos) {
+            return true;
+        }
+        // Advance the frontier; next call starts just behind the current end.
+        scanPos = req.size() >= 3 ? req.size() - 3 : 0;
+        return false;
     }
 
     // Build a complete HTTP response string with pre-allocated buffer.
@@ -211,7 +235,8 @@ class HttpPollServer : public ServerBase<HttpClientState> {
                     return onWritable(sock, s);
                 }
 
-                if (s.responseView.empty() && requestComplete(s.request)) {
+                if (s.responseView.empty()
+                    && requestComplete(s.request, s.requestScanPos)) {
                     dispatchBuildResponse(s);
                     setClientWritable(sock, true);
                     return onWritable(sock, s);
@@ -258,6 +283,7 @@ class HttpPollServer : public ServerBase<HttpClientState> {
             s.sent = 0;
             s.responseStarted = false;
             s.closeAfterSend = false;
+            s.requestScanPos = 0;
             setClientWritable(sock, false);
             return shouldClose ? ServerResult::Disconnect
                                : ServerResult::KeepConnection;
