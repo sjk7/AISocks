@@ -66,14 +66,13 @@ static std::string makeBigBody() {
 static const std::string bigBody = makeBigBody();
 
 // Header template for /big: %s = date, %s = connection, %zu = content-length
-static const char bigHeaderFmt[]
-    = "HTTP/1.1 200 OK\r\n"
-      "Server: nginx/1.29.5\r\n"
-      "Date: %s\r\n"
-      "Content-Type: application/octet-stream\r\n"
-      "Content-Length: %zu\r\n"
-      "Connection: %s\r\n"
-      "\r\n";
+static const char bigHeaderFmt[] = "HTTP/1.1 200 OK\r\n"
+                                   "Server: nginx/1.29.5\r\n"
+                                   "Date: %s\r\n"
+                                   "Content-Type: application/octet-stream\r\n"
+                                   "Content-Length: %zu\r\n"
+                                   "Connection: %s\r\n"
+                                   "\r\n";
 
 class HttpServer : public HttpPollServer {
     private:
@@ -104,10 +103,12 @@ class HttpServer : public HttpPollServer {
         close_response_ = std::string(hdr) + body;
 
         char bigHdr[256];
-        snprintf(bigHdr, sizeof(bigHdr), bigHeaderFmt, date_buf, bigBody.size(), "keep-alive");
+        snprintf(bigHdr, sizeof(bigHdr), bigHeaderFmt, date_buf, bigBody.size(),
+            "keep-alive");
         big_ka_response_ = bigHdr + bigBody;
 
-        snprintf(bigHdr, sizeof(bigHdr), bigHeaderFmt, date_buf, bigBody.size(), "close");
+        snprintf(bigHdr, sizeof(bigHdr), bigHeaderFmt, date_buf, bigBody.size(),
+            "close");
         big_close_response_ = bigHdr + bigBody;
     }
 
@@ -129,13 +130,16 @@ class HttpServer : public HttpPollServer {
     protected:
     void buildResponse(HttpClientState& s) override {
         if (!isHttpRequest(s.request)) {
-            s.responseView = cached_bad_request_; // zero-copy: view into static string
+            s.responseView
+                = cached_bad_request_; // zero-copy: view into static string
             return;
         }
         rebuildResponses();
-        // Assign string_view directly into pre-built storage — no copy, no allocation.
+        // Assign string_view directly into pre-built storage — no copy, no
+        // allocation.
         if (s.request.find("GET /big ") != std::string::npos) {
-            s.responseView = s.closeAfterSend ? big_close_response_ : big_ka_response_;
+            s.responseView
+                = s.closeAfterSend ? big_close_response_ : big_ka_response_;
         } else {
             s.responseView = s.closeAfterSend ? close_response_ : ka_response_;
         }
@@ -181,8 +185,8 @@ static const char* buildKind() {
 
 int main() {
     printf("=== Poll-Driven HTTP Server ===\n");
-    printf("Built: %s %s  |  OS: %s  |  Build: %s\n",
-        __DATE__, __TIME__, buildOS(), buildKind());
+    printf("Built: %s %s  |  OS: %s  |  Build: %s\n", __DATE__, __TIME__,
+        buildOS(), buildKind());
 
     HttpServer server(ServerBind{
         "0.0.0.0", Port{8080}, Backlog{Backlog::defaultBacklog}, true});
