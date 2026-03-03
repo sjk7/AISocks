@@ -4,6 +4,7 @@
 
 // Comprehensive tests for CustomFileServer
 // Tests both happy path (successful operations) and sad path (error conditions)
+// String literals are now in test_string_literals.h to prevent formatting corruption
 
 #include "HttpFileServer.h"
 #include "FileIO.h"
