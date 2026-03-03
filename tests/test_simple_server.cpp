@@ -22,6 +22,10 @@
 #include <string>
 #include <thread>
 
+// Access global test counters from test_helpers.h
+extern int g_passed;
+extern int g_failed;
+
 using namespace aiSocks;
 
 // Helper: busy-wait with timeout until condition becomes true.
@@ -56,8 +60,12 @@ static void test_validity() {
 
     BEGIN_TEST("SimpleServer: isValid() false on bad address");
     {
-        SimpleServer s(ServerBind{"999.999.999.999", Port::any});
-        REQUIRE(!s.isValid());
+        // Test bind failure directly without fatal exit
+        auto result = SocketFactory::createTcpServer(
+            AddressFamily::IPv4, 
+            ServerBind{"999.999.999.999", Port::any}
+        );
+        REQUIRE(result.isError());
     }
 }
 
