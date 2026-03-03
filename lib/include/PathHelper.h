@@ -298,14 +298,39 @@ public:
         std::string canonicalChild = getCanonicalPath(childPath);
         std::string canonicalParent = getCanonicalPath(parentPath);
         
-        // If child canonicalization failed (e.g., file doesn't exist), use manual normalization
-        if (canonicalChild.empty()) {
-            canonicalChild = normalizePathManual(childPath);
-        }
-        
         // Parent should always succeed (it's the document root which exists)
         if (canonicalParent.empty()) {
             canonicalParent = normalizePathManual(parentPath);
+        }
+        
+        // If child canonicalization failed (e.g., file doesn't exist), we need to
+        // canonicalize its parent directory and append the filename
+        if (canonicalChild.empty()) {
+            // Extract parent directory and filename
+            std::string normalizedChild = normalizePath(childPath);
+            size_t lastSlash = normalizedChild.find_last_of('/');
+            
+            if (lastSlash != std::string::npos) {
+                std::string parentDir = normalizedChild.substr(0, lastSlash);
+                std::string filename = normalizedChild.substr(lastSlash + 1);
+                
+                // Try to canonicalize the parent directory (which should exist)
+                std::string canonicalParentDir = getCanonicalPath(parentDir);
+                if (!canonicalParentDir.empty()) {
+                    // Success - combine canonical parent with filename
+                    canonicalChild = normalizePath(canonicalParentDir);
+                    if (!canonicalChild.empty() && canonicalChild.back() != '/') {
+                        canonicalChild += '/';
+                    }
+                    canonicalChild += filename;
+                } else {
+                    // Parent dir also doesn't exist - use manual normalization
+                    canonicalChild = normalizePathManual(childPath);
+                }
+            } else {
+                // No directory component - just a filename in current dir
+                canonicalChild = normalizePathManual(childPath);
+            }
         }
         
         if (canonicalChild.empty() || canonicalParent.empty()) {
