@@ -41,7 +41,7 @@ public:
         std::map<std::string, std::string> customHeaders; // Additional headers to add
     };
 
-    explicit HttpFileServer(const ServerBind& bind, const Config& config = {})
+    explicit HttpFileServer(const ServerBind& bind, const Config& config)
         : HttpPollServer(bind) {
         // Set default values
         config_.documentRoot = config.documentRoot.empty() ? "." : config.documentRoot;
