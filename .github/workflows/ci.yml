@@ -139,7 +139,7 @@ jobs:
       # ------------------------------------------------------------------ #
       # 5. Test                                                             #
       # ------------------------------------------------------------------ #
-      - name: Run tests (MSVC)
+      - name: Run tests (${{ matrix.compiler }})
         if: matrix.compiler == 'msvc'
         working-directory: build
         shell: pwsh
@@ -150,7 +150,7 @@ jobs:
                 --timeout 60 `
                 --parallel 4
 
-      - name: Run tests (single-config)
+      - name: Run tests (${{ matrix.compiler }})
         if: matrix.compiler != 'msvc'
         shell: bash
         working-directory: build
