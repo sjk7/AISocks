@@ -12,6 +12,14 @@
 #include <stdarg.h>
 #include <errno.h>
 
+#ifdef _WIN32
+    #include <io.h>
+    #include <sys/locking.h>
+#else
+    #include <unistd.h>
+    #include <sys/file.h>
+#endif
+
 namespace aiSocks {
 
 /// Simple C-style file I/O wrapper - no exceptions, no iostreams
@@ -47,15 +55,56 @@ public:
         close();
 #ifdef _WIN32
         errno_t err = fopen_s(&file_, filename, mode);
-        return err == 0 && file_ != nullptr;
+        if (err != 0 || !file_) return false;
+        
+        // Lock the file for exclusive access (both read and write)
+        int fd = _fileno(file_);
+        if (fd != -1) {
+            // _LK_NBLCK: Non-blocking exclusive lock
+            // Lock entire file (offset 0, length 0 means whole file)
+            if (_locking(fd, _LK_NBLCK, 0x7FFFFFFF) != 0) {
+                // Lock failed, close and return false
+                fclose(file_);
+                file_ = nullptr;
+                return false;
+            }
+        }
+        return true;
 #else
         file_ = fopen(filename, mode);
-        return file_ != nullptr;
+        if (!file_) return false;
+        
+        // Lock the file for exclusive access
+        int fd = fileno(file_);
+        if (fd != -1) {
+            // LOCK_EX: Exclusive lock
+            // LOCK_NB: Non-blocking
+            if (flock(fd, LOCK_EX | LOCK_NB) != 0) {
+                // Lock failed, close and return false
+                fclose(file_);
+                file_ = nullptr;
+                return false;
+            }
+        }
+        return true;
 #endif
     }
     
     void close() {
         if (file_) {
+#ifdef _WIN32
+            // Unlock the file before closing
+            int fd = _fileno(file_);
+            if (fd != -1) {
+                _locking(fd, _LK_UNLCK, 0x7FFFFFFF);
+            }
+#else
+            // Unlock the file before closing
+            int fd = fileno(file_);
+            if (fd != -1) {
+                flock(fd, LOCK_UN);
+            }
+#endif
             fclose(file_);
             file_ = nullptr;
         }
