@@ -104,19 +104,17 @@ struct HttpClientState {
 class HttpPollServer : public ServerBase<HttpClientState> {
     public:
     explicit HttpPollServer(const ServerBind& bind)
-        : ServerBase<HttpClientState>(bind) {}
+        : ServerBase<HttpClientState>(bind), bind_(bind) {}
 
     // Run the server with startup/shutdown messages
     void run(ClientLimit maxClients = ClientLimit::Default,
         Milliseconds timeout = Milliseconds{-1}) {
-        printf("DEBUG: HttpPollServer::run() called\n");
         if (!this->isValid()) {
-            printf("DEBUG: Server is not valid! Exiting early.\n");
-            printf("ERROR: Server failed to start - port 8080 is already in use or invalid\n");
+            printf("ERROR: Server failed to start - port %d is already in use or invalid\n",
+                   bind_.port.value());
             return; // Server not valid, exit early
         }
 
-        printf("DEBUG: Server is valid, calling base class run()\n");
         // Call base class run()
         ServerBase<HttpClientState>::run(maxClients, timeout);
 
@@ -132,6 +130,8 @@ class HttpPollServer : public ServerBase<HttpClientState> {
     }
 
     protected:
+    ServerBind bind_;
+    
     // Static helpers for OS/Build info
     static const char* buildOS() {
 #if defined(__APPLE__)

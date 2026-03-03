@@ -123,7 +123,8 @@ template <typename ClientData> class ServerBase {
             fprintf(stderr, "FATAL: SocketFactory::createTcpServer() failed with error "
                    "code %d: %s\n",
                    static_cast<int>(result.error()), result.message().c_str());
-            fprintf(stderr, "FATAL: Cannot start server - port 8080 is already in use or invalid\n");
+            fprintf(stderr, "FATAL: Cannot start server - port %d is already in use or invalid\n",
+                   args.port.value());
             exit(1);
         }
     }
