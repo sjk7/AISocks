@@ -276,6 +276,10 @@ protected:
         response.append("HTTP/1.1 200 OK\r\n");
         response.append("Content-Type: ");
         response.append(getMimeType(filePath));
+        // Add charset for text content to ensure proper UTF-8 display
+        if (getMimeType(filePath).find("text/") == 0 || getMimeType(filePath) == "application/javascript") {
+            response.append("; charset=utf-8");
+        }
         response.append("\r\nContent-Length: ");
         response.appendFormat("%zu", fileContent.size());
         response.append("\r\n");
@@ -315,7 +319,7 @@ protected:
         response.appendFormat("%d", code);
         response.append(" ");
         response.append(status);
-        response.append("\r\nContent-Type: text/html\r\nContent-Length: ");
+        response.append("\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: ");
         response.appendFormat("%zu", htmlBody.size());
         response.append("\r\n");
         
@@ -371,7 +375,7 @@ protected:
         
         StringBuilder response;
         response.append("HTTP/1.1 200 OK\r\n");
-        response.append("Content-Type: text/html\r\nContent-Length: ");
+        response.append("Content-Type: text/html; charset=utf-8\r\nContent-Length: ");
         response.appendFormat("%zu", htmlBody.size());
         response.append("\r\n");
         

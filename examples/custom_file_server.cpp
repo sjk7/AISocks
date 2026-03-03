@@ -131,7 +131,7 @@ protected:
         html.append("a:hover { text-decoration: underline; }\n");
         html.append("</style>\n");
         html.append("</head><body>\n");
-        html.append("<h1>📁 Directory listing: ");
+        html.append("<h1>Directory listing: ");
         html.append(dirPath);
         html.append("</h1>\n");
         html.append("<table>\n");
@@ -139,6 +139,7 @@ protected:
         
         // Add parent directory link
         if (dirPath != getConfig().documentRoot) {
+            html.append("<tr><td><a href=\"../\">../</a></td><td>Directory</td><td>-</td><td>-</td></tr>\n");
             html.append("<tr><td><a href=\"../\">📁 ../</a></td><td>Directory</td><td>-</td><td>-</td></tr>\n");
         }
         
