@@ -38,10 +38,22 @@ public:
     void buildResponse(HttpClientState& state) override {
         auto request = HttpRequest::parse(state.request);
         
-        if (request.valid) {
-            logRequest(request, state);
+        // Validate request first (before authentication)
+        if (!request.valid) {
+            sendError(state, 400, "Bad Request", "Invalid HTTP request");
+            return;
         }
         
+        // Validate HTTP method (only GET and HEAD allowed)
+        if (request.method != "GET" && request.method != "HEAD") {
+            sendError(state, 405, "Method Not Allowed", "Only GET and HEAD methods are supported");
+            return;
+        }
+        
+        // Log valid requests
+        logRequest(request, state);
+        
+        // Check authentication
         if (!isAuthenticated(request)) {
             sendAuthRequired(state);
             return;
@@ -73,6 +85,21 @@ public:
         }
         
         HttpFileServer::buildResponse(state);
+    }
+    
+    bool isAccessAllowed(const std::string& filePath, const FileInfo& fileInfo) const override {
+        // Call base implementation first
+        if (!HttpFileServer::isAccessAllowed(filePath, fileInfo)) {
+            return false;
+        }
+        
+        // Block sensitive file types
+        std::string ext = getFileExtension(filePath);
+        if (ext == ".conf" || ext == ".log" || ext == ".tmp") {
+            return false;
+        }
+        
+        return true;
     }
     
     std::string getMimeType(const std::string& filePath) const override {
@@ -264,6 +291,17 @@ public:
             std::cerr << "❌ FAILED: " << message << std::endl;
             std::cerr << "   Expected to contain: '" << needle << "'" << std::endl;
             std::cerr << "   Actual string: '" << haystack << "'" << std::endl;
+            failedTests++;
+        } else {
+            std::cout << "✅ PASSED: " << message << std::endl;
+            passedTests++;
+        }
+    }
+    
+    static void assert_not_contains(const std::string& haystack, const std::string& needle, const std::string& message) {
+        if (haystack.find(needle) != std::string::npos) {
+            std::cerr << "❌ FAILED: " << message << std::endl;
+            std::cerr << "   Should NOT contain: '" << needle << "'" << std::endl;
             failedTests++;
         } else {
             std::cout << "✅ PASSED: " << message << std::endl;
@@ -464,6 +502,299 @@ void testFileServingBehavior() {
     }
 }
 
+/// Test error handling behavior - unhappy paths
+void testErrorHandlingBehavior() {
+    std::cout << "\n=== TESTING ERROR HANDLING (UNHAPPY PATHS) ===" << std::endl;
+    
+    HttpFileServer::Config config;
+    config.documentRoot = "test_www";
+    CustomFileServer server(ServerBind{"127.0.0.1", Port{0}}, config);
+    
+    // Unhappy Path: File not found (404)
+    {
+        std::string request = BehavioralTestHelper::makeHttpRequest("GET", "/nonexistent.html", "YWRtaW46c2VjcmV0");
+        HttpClientState state;
+        state.request = request;
+        
+        server.buildResponse(state);
+        std::string status = BehavioralTestHelper::extractStatus(state.responseBuf);
+        std::string body = BehavioralTestHelper::extractBody(state.responseBuf);
+        
+        TestFramework::assert_contains(status, "404", "Nonexistent file should return 404");
+        TestFramework::assert_contains(body, "Not Found", "404 page should explain file not found");
+    }
+    
+    // Unhappy Path: Directory without index file and listing disabled
+    {
+        std::string request = BehavioralTestHelper::makeHttpRequest("GET", "/subdir/", "YWRtaW46c2VjcmV0");
+        HttpClientState state;
+        state.request = request;
+        
+        server.buildResponse(state);
+        std::string status = BehavioralTestHelper::extractStatus(state.responseBuf);
+        
+        TestFramework::assert_contains(status, "403", "Directory without index should return 403 when listing disabled");
+    }
+    
+    // Unhappy Path: Blocked file type (.conf)
+    {
+        std::string request = BehavioralTestHelper::makeHttpRequest("GET", "/config.conf", "YWRtaW46c2VjcmV0");
+        HttpClientState state;
+        state.request = request;
+        
+        server.buildResponse(state);
+        std::string status = BehavioralTestHelper::extractStatus(state.responseBuf);
+        std::string body = BehavioralTestHelper::extractBody(state.responseBuf);
+        
+        TestFramework::assert_contains(status, "403", "Blocked file type should return 403");
+        TestFramework::assert_contains(body, "Forbidden", "Should explain access is forbidden");
+    }
+    
+    // Unhappy Path: Blocked file type (.log)
+    {
+        std::string request = BehavioralTestHelper::makeHttpRequest("GET", "/debug.log", "YWRtaW46c2VjcmV0");
+        HttpClientState state;
+        state.request = request;
+        
+        server.buildResponse(state);
+        std::string status = BehavioralTestHelper::extractStatus(state.responseBuf);
+        
+        TestFramework::assert_contains(status, "403", "Log files should be blocked");
+    }
+}
+
+/// Test invalid HTTP methods - unhappy paths
+void testInvalidMethodsBehavior() {
+    std::cout << "\n=== TESTING INVALID HTTP METHODS (UNHAPPY PATHS) ===" << std::endl;
+    
+    HttpFileServer::Config config;
+    config.documentRoot = "test_www";
+    CustomFileServer server(ServerBind{"127.0.0.1", Port{0}}, config);
+    
+    // Unhappy Path: POST method not allowed
+    {
+        StringBuilder request;
+        request.append("POST /index.html HTTP/1.1\r\n");
+        request.append("Host: localhost\r\n");
+        request.append("Authorization: Basic YWRtaW46c2VjcmV0\r\n");
+        request.append("\r\n");
+        
+        HttpClientState state;
+        state.request = request.toString();
+        
+        server.buildResponse(state);
+        std::string status = BehavioralTestHelper::extractStatus(state.responseBuf);
+        std::string body = BehavioralTestHelper::extractBody(state.responseBuf);
+        
+        TestFramework::assert_contains(status, "405", "POST method should return 405");
+        TestFramework::assert_contains(body, "Method Not Allowed", "Should explain method not allowed");
+    }
+    
+    // Unhappy Path: PUT method not allowed
+    {
+        StringBuilder request;
+        request.append("PUT /index.html HTTP/1.1\r\n");
+        request.append("Host: localhost\r\n");
+        request.append("Authorization: Basic YWRtaW46c2VjcmV0\r\n");
+        request.append("\r\n");
+        
+        HttpClientState state;
+        state.request = request.toString();
+        
+        server.buildResponse(state);
+        std::string status = BehavioralTestHelper::extractStatus(state.responseBuf);
+        
+        TestFramework::assert_contains(status, "405", "PUT method should return 405");
+    }
+    
+    // Unhappy Path: DELETE method not allowed
+    {
+        StringBuilder request;
+        request.append("DELETE /index.html HTTP/1.1\r\n");
+        request.append("Host: localhost\r\n");
+        request.append("Authorization: Basic YWRtaW46c2VjcmV0\r\n");
+        request.append("\r\n");
+        
+        HttpClientState state;
+        state.request = request.toString();
+        
+        server.buildResponse(state);
+        std::string status = BehavioralTestHelper::extractStatus(state.responseBuf);
+        
+        TestFramework::assert_contains(status, "405", "DELETE method should return 405");
+    }
+}
+
+/// Test malformed requests - unhappy paths
+void testMalformedRequestsBehavior() {
+    std::cout << "\n=== TESTING MALFORMED REQUESTS (UNHAPPY PATHS) ===" << std::endl;
+    
+    HttpFileServer::Config config;
+    config.documentRoot = "test_www";
+    CustomFileServer server(ServerBind{"127.0.0.1", Port{0}}, config);
+    
+    // Unhappy Path: Invalid HTTP request (no HTTP version)
+    {
+        std::string request = "GET /index.html\r\nHost: localhost\r\n\r\n";
+        HttpClientState state;
+        state.request = request;
+        
+        server.buildResponse(state);
+        std::string status = BehavioralTestHelper::extractStatus(state.responseBuf);
+        
+        TestFramework::assert_contains(status, "400", "Malformed request should return 400");
+    }
+    
+    // Unhappy Path: Empty request
+    {
+        std::string request = "";
+        HttpClientState state;
+        state.request = request;
+        
+        server.buildResponse(state);
+        std::string status = BehavioralTestHelper::extractStatus(state.responseBuf);
+        
+        TestFramework::assert_contains(status, "400", "Empty request should return 400");
+    }
+    
+    // Unhappy Path: Request with only whitespace
+    {
+        std::string request = "   \r\n\r\n";
+        HttpClientState state;
+        state.request = request;
+        
+        server.buildResponse(state);
+        std::string status = BehavioralTestHelper::extractStatus(state.responseBuf);
+        
+        TestFramework::assert_true(
+            status.find("400") != std::string::npos || status.find("405") != std::string::npos,
+            "Whitespace-only request should return 400 or 405"
+        );
+    }
+}
+
+/// Test path traversal attempts - unhappy paths (security)
+void testPathTraversalBehavior() {
+    std::cout << "\n=== TESTING PATH TRAVERSAL ATTACKS (UNHAPPY PATHS) ===" << std::endl;
+    
+    HttpFileServer::Config config;
+    config.documentRoot = "test_www";
+    CustomFileServer server(ServerBind{"127.0.0.1", Port{0}}, config);
+    
+    // Unhappy Path: Basic path traversal with ../
+    {
+        std::string request = BehavioralTestHelper::makeHttpRequest("GET", "/../etc/passwd", "YWRtaW46c2VjcmV0");
+        HttpClientState state;
+        state.request = request;
+        
+        server.buildResponse(state);
+        std::string status = BehavioralTestHelper::extractStatus(state.responseBuf);
+        std::string body = BehavioralTestHelper::extractBody(state.responseBuf);
+        
+        TestFramework::assert_true(
+            status.find("403") != std::string::npos || status.find("400") != std::string::npos,
+            "Path traversal should be blocked with 403 or 400"
+        );
+        TestFramework::assert_not_contains(body, "root:", "Should not leak system files");
+    }
+    
+    // Unhappy Path: URL-encoded path traversal
+    {
+        std::string request = BehavioralTestHelper::makeHttpRequest("GET", "/%2e%2e/secret/data", "YWRtaW46c2VjcmV0");
+        HttpClientState state;
+        state.request = request;
+        
+        server.buildResponse(state);
+        std::string status = BehavioralTestHelper::extractStatus(state.responseBuf);
+        
+        TestFramework::assert_true(
+            status.find("403") != std::string::npos || status.find("400") != std::string::npos || status.find("404") != std::string::npos,
+            "URL-encoded path traversal should be blocked"
+        );
+    }
+    
+    // Unhappy Path: Multiple levels of traversal
+    {
+        std::string request = BehavioralTestHelper::makeHttpRequest("GET", "/../../../../../../etc/passwd", "YWRtaW46c2VjcmV0");
+        HttpClientState state;
+        state.request = request;
+        
+        server.buildResponse(state);
+        std::string status = BehavioralTestHelper::extractStatus(state.responseBuf);
+        
+        TestFramework::assert_true(
+            status.find("403") != std::string::npos || status.find("400") != std::string::npos,
+            "Deep path traversal should be blocked"
+        );
+    }
+}
+
+/// Test authentication failures - unhappy paths
+void testAuthenticationFailuresBehavior() {
+    std::cout << "\n=== TESTING AUTHENTICATION FAILURES (UNHAPPY PATHS) ===" << std::endl;
+    
+    HttpFileServer::Config config;
+    config.documentRoot = "test_www";
+    CustomFileServer server(ServerBind{"127.0.0.1", Port{0}}, config);
+    
+    // Unhappy Path: Wrong password
+    {
+        std::string request = BehavioralTestHelper::makeHttpRequest("GET", "/index.html", "YWRtaW46d3JvbmdwYXNz"); // admin:wrongpass
+        HttpClientState state;
+        state.request = request;
+        
+        server.buildResponse(state);
+        std::string status = BehavioralTestHelper::extractStatus(state.responseBuf);
+        std::string body = BehavioralTestHelper::extractBody(state.responseBuf);
+        
+        TestFramework::assert_contains(status, "401", "Wrong password should return 401");
+        TestFramework::assert_contains(body, "Unauthorized", "Should show unauthorized message");
+        TestFramework::assert_not_contains(body, "Test Page", "Should not serve content with wrong credentials");
+    }
+    
+    // Unhappy Path: Wrong username
+    {
+        std::string request = BehavioralTestHelper::makeHttpRequest("GET", "/index.html", "dXNlcjpzZWNyZXQ="); // user:secret
+        HttpClientState state;
+        state.request = request;
+        
+        server.buildResponse(state);
+        std::string status = BehavioralTestHelper::extractStatus(state.responseBuf);
+        
+        TestFramework::assert_contains(status, "401", "Wrong username should return 401");
+    }
+    
+    // Unhappy Path: Malformed auth header
+    {
+        StringBuilder request;
+        request.append("GET /index.html HTTP/1.1\r\n");
+        request.append("Host: localhost\r\n");
+        request.append("Authorization: InvalidFormat\r\n");
+        request.append("\r\n");
+        
+        HttpClientState state;
+        state.request = request.toString();
+        
+        server.buildResponse(state);
+        std::string status = BehavioralTestHelper::extractStatus(state.responseBuf);
+        
+        TestFramework::assert_contains(status, "401", "Malformed auth should return 401");
+    }
+    
+    // Unhappy Path: Empty auth credentials
+    {
+        std::string request = BehavioralTestHelper::makeHttpRequest("GET", "/index.html", "");
+        HttpClientState state;
+        state.request = request;
+        
+        server.buildResponse(state);
+        std::string status = BehavioralTestHelper::extractStatus(state.responseBuf);
+        std::string authHeader = BehavioralTestHelper::extractHeader(state.responseBuf, "WWW-Authenticate");
+        
+        TestFramework::assert_contains(status, "401", "No credentials should return 401");
+        TestFramework::assert_contains(authHeader, "Basic", "Should prompt for Basic auth");
+    }
+}
 
 /// Main test runner - focused on behavior, not implementation
 int main() {
@@ -476,14 +807,11 @@ int main() {
         
         testAuthenticationBehavior();
         testFileServingBehavior();
-        // TODO: Refactor remaining tests to be behavior-focused
-        // testDirectoryListing();
-        // testAccessControl();
-        // testSecurityFeatures();
-        // testErrorHandling();
-        // testMimeTypeDetection();
-        // testFilePathResolution();
-        // testLogging();
+        testErrorHandlingBehavior();
+        testInvalidMethodsBehavior();
+        testMalformedRequestsBehavior();
+        testPathTraversalBehavior();
+        testAuthenticationFailuresBehavior();
         
         cleanupTestEnvironment();
         
