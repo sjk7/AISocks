@@ -392,8 +392,12 @@ int main() {
 
         server1.requestStop();
         serverThread1.join();
+        
+        // Small delay to allow port to be released
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
 
         // Create a new server on the same port — port is now a Port
+        std::cout << "DEBUG: Trying to create server2 on port: " << port.value() << std::endl;
         EchoServer server2(port);
         std::atomic<bool> ready2{false};
         auto serverThread2 = startServerInBackground(server2, ready2);

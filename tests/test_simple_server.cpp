@@ -49,14 +49,14 @@ static Port serverPort(const SimpleServer& s) {
 static void test_validity() {
     BEGIN_TEST("SimpleServer: isValid() true on valid bind");
     {
-        SimpleServer s(ServerBind{"127.0.0.1", Port::any});
+        SimpleServer s(ServerBind{"127.0.0.1", Port{18081}});
         REQUIRE(s.isValid());
         REQUIRE(serverPort(s) != Port::any); // OS chose a real port
     }
 
     BEGIN_TEST("SimpleServer: isValid() false on bad address");
     {
-        SimpleServer s(ServerBind{"999.999.999.999", Port::any});
+        SimpleServer s(ServerBind{"999.999.999.999", Port{18082}});
         REQUIRE(!s.isValid());
     }
 }
@@ -72,7 +72,7 @@ static void test_poll_clients_echo() {
     std::string echoed;
     std::atomic<bool> serverReady{false};
 
-    SimpleServer server(ServerBind{"127.0.0.1", Port::any, Backlog{5}});
+    SimpleServer server(ServerBind{"127.0.0.1", Port{18083}, Backlog{5}});
     REQUIRE(server.isValid());
     Port port = serverPort(server);
     REQUIRE(port != Port::any);
@@ -131,7 +131,7 @@ static void test_poll_clients_disconnect_on_false() {
     std::atomic<bool> serverReady{false};
     std::atomic<bool> callbackFired{false};
 
-    SimpleServer server(ServerBind{"127.0.0.1", Port::any, Backlog{5}});
+    SimpleServer server(ServerBind{"127.0.0.1", Port{18084}, Backlog{5}});
     REQUIRE(server.isValid());
     Port port = serverPort(server);
     REQUIRE(port != Port::any);
@@ -184,7 +184,7 @@ static void test_accept_clients() {
     std::atomic<int> callbackCount{0};
     std::atomic<bool> serverReady{false};
 
-    SimpleServer server(ServerBind{"127.0.0.1", Port::any, Backlog{5}});
+    SimpleServer server(ServerBind{"127.0.0.1", Port{18085}, Backlog{5}});
     REQUIRE(server.isValid());
     Port port = serverPort(server);
     REQUIRE(port != Port::any);
