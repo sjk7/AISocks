@@ -226,13 +226,15 @@ protected:
         html.append(".section h3 { color: #34495e; margin-top: 20px; }\n");
         html.append("code { background: #f1f2f6; padding: 2px 6px; border-radius: 3px; font-family: 'Courier New', monospace; color: #e74c3c; }\n");
         html.append(".url { background: #2c3e50; color: #ecf0f1; padding: 8px 12px; border-radius: 4px; font-family: 'Courier New', monospace; display: inline-block; margin: 5px 0; }\n");
+        html.append(".url a { color: #5dade2; font-weight: 500; }\n");
+        html.append(".url a:hover { color: #85c1e9; }\n");
         html.append(".checklist { list-style: none; padding: 0; }\n");
         html.append(".checklist li { margin: 8px 0; padding: 8px 0; border-bottom: 1px solid #ecf0f1; }\n");
         html.append(".checklist li:before { content: '✓ '; color: #27ae60; font-weight: bold; }\n");
         html.append(".warning { background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 4px; padding: 12px; margin: 10px 0; }\n");
         html.append(".success { background: #d4edda; border: 1px solid #c3e6cb; border-radius: 4px; padding: 12px; margin: 10px 0; }\n");
-        html.append("a { color: #3498db; text-decoration: none; }\n");
-        html.append("a:hover { text-decoration: underline; }\n");
+        html.append("a { color: #2980b9; text-decoration: none; }\n");
+        html.append("a:hover { text-decoration: underline; color: #3498db; }\n");
         html.append(".footer { background: #2c3e50; color: white; padding: 20px; text-align: center; }\n");
         html.append("</style></head><body>\n");
         
