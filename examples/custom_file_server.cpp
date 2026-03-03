@@ -50,7 +50,7 @@ protected:
         if (request.path == "/" || request.path == "/index.html") {
             std::string instructions = generateTestingInstructions();
             
-            StringBuilder response;
+            StringBuilder response(256 + instructions.size()); // Reserve for headers + body
             response.append("HTTP/1.1 200 OK\r\n");
             response.append("Content-Type: text/html; charset=utf-8\r\nContent-Length: ");
             response.appendFormat("%zu", instructions.size());
@@ -111,7 +111,7 @@ protected:
 
     /// Override to customize error pages
     std::string generateErrorHtml(int code, const std::string& status, const std::string& message) const override {
-        StringBuilder html;
+        StringBuilder html(1024); // Reserve for custom error page HTML
         html.append("<!DOCTYPE html>\n");
         html.append("<html><head><title>");
         html.appendFormat("%d", code);
@@ -146,7 +146,7 @@ protected:
         if (dirPath == getConfig().documentRoot) {
             std::string instructions = generateTestingInstructions();
             
-            StringBuilder response;
+            StringBuilder response(256 + instructions.size()); // Reserve for headers + body
             response.append("HTTP/1.1 200 OK\r\n");
             response.append("Content-Type: text/html; charset=utf-8\r\nContent-Length: ");
             response.appendFormat("%zu", instructions.size());
@@ -173,7 +173,7 @@ protected:
     }
 
     std::string generateTestingInstructions() const {
-        StringBuilder html;
+        StringBuilder html(8192); // Reserve for large testing instructions page
         html.append("<!DOCTYPE html>\n");
         html.append("<html><head>\n");
         html.append("<title>HttpFileServer - Testing Guide</title>\n");
@@ -308,7 +308,7 @@ protected:
 
     /// Override to customize directory listing
     std::string generateDirectoryListing(const std::string& dirPath) const override {
-        StringBuilder html;
+        StringBuilder html(4096); // Reserve for enhanced directory listing HTML
         html.append("<!DOCTYPE html>\n");
         html.append("<html><head>\n");
         html.append("<title>Directory: ");
@@ -466,7 +466,7 @@ private:
         std::string htmlBody = generateErrorHtml(401, "Unauthorized", 
             "This server requires authentication. Please provide valid credentials.");
         
-        StringBuilder response;
+        StringBuilder response(256 + htmlBody.size()); // Reserve for headers + body
         response.append("HTTP/1.1 401 Unauthorized\r\n");
         response.append("Content-Type: text/html\r\nContent-Length: ");
         response.appendFormat("%zu", htmlBody.size());

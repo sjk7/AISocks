@@ -99,23 +99,43 @@ int main() {
         REQUIRE(!file1.isOpen());
     }
 
-    // Test 7: File locking (exclusive lock)
-    BEGIN_TEST("File: exclusive locking");
+    // Test 7: File locking (shared read, exclusive write)
+    BEGIN_TEST("File: shared read locks, exclusive write locks");
     {
+        // Write mode gets exclusive lock
         File file1("test_lock.txt", "w");
         REQUIRE(file1.isOpen());
         file1.writeString("Locked file");
         file1.flush();
         
-        // Try to open same file again - should fail due to lock
-        File file2("test_lock.txt", "r");
-        REQUIRE(!file2.isOpen()); // Lock prevents second open
+        // Try to open for write while write-locked - should fail
+        File file2("test_lock.txt", "w");
+        REQUIRE(!file2.isOpen()); // Exclusive lock prevents second write
         
         file1.close();
         
-        // Now should succeed
+        // Multiple readers should be allowed (shared locks)
         File file3("test_lock.txt", "r");
         REQUIRE(file3.isOpen());
+        
+#ifndef _WIN32
+        // On Unix, shared locks allow concurrent reads
+        File file4("test_lock.txt", "r");
+        REQUIRE(file4.isOpen());
+        file4.close();
+#endif
+        // On Windows, we don't lock for read-only mode to allow concurrent reads
+        
+        file3.close();
+        
+        // Write lock should prevent reads on Unix (with shared locking)
+        File file5("test_lock.txt", "w");
+        REQUIRE(file5.isOpen());
+        
+#ifndef _WIN32
+        File file6("test_lock.txt", "r");
+        REQUIRE(!file6.isOpen()); // Write lock prevents read on Unix
+#endif
     }
 
     // Test 8: getInfoFromDescriptor

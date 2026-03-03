@@ -169,7 +169,7 @@ protected:
             
             // Generate ETag based on file size and modification time
             if (config_.enableETag) {
-                StringBuilder etag;
+                StringBuilder etag(64); // Reserve for ETag format
                 etag.appendFormat("\"%zu-%ld\"", 
                     info.size,
                     static_cast<long>(info.lastModified));
@@ -313,7 +313,7 @@ protected:
         if (config_.enableLastModified) {
             auto ifModifiedSince = request.headers.find("if-modified-since");
             if (ifModifiedSince != request.headers.end()) {
-                StringBuilder lastModified;
+                StringBuilder lastModified(64); // Reserve for HTTP date format
                 lastModified.append(formatHttpDate(fileInfo.lastModified));
                 if (ifModifiedSince->second == lastModified.toString()) {
                     sendNotModified(state, fileInfo);
@@ -335,7 +335,7 @@ protected:
         }
 
         // Build response
-        StringBuilder response;
+        StringBuilder response(512 + fileContent.size()); // Reserve for headers + content
         response.append("HTTP/1.1 200 OK\r\n");
         response.append("Content-Type: ");
         response.append(getMimeType(filePath));
@@ -377,7 +377,7 @@ protected:
     virtual void sendError(HttpClientState& state, int code, const std::string& status, const std::string& message) {
         std::string htmlBody = generateErrorHtml(code, status, message);
         
-        StringBuilder response;
+        StringBuilder response(256 + htmlBody.size()); // Reserve for headers + body
         response.append("HTTP/1.1 ");
         response.appendFormat("%d", code);
         response.append(" ");
@@ -403,7 +403,7 @@ protected:
 
     /// Virtual customization point: send 304 Not Modified response
     virtual void sendNotModified(HttpClientState& state, const FileInfo& fileInfo) {
-        StringBuilder response;
+        StringBuilder response(256); // Reserve for 304 response headers
         response.append("HTTP/1.1 304 Not Modified\r\n");
         
         if (config_.enableLastModified) {
@@ -439,7 +439,7 @@ protected:
         (void)request; // May be used for conditional headers in future
         
         // Build response from cached content
-        StringBuilder response;
+        StringBuilder response(512 + cached.size); // Reserve for headers + cached content
         response.append("HTTP/1.1 200 OK\r\n");
         response.append("Content-Type: ");
         response.append(getMimeType(filePath));
@@ -480,7 +480,7 @@ protected:
     virtual void sendDirectoryListing(HttpClientState& state, const std::string& dirPath) {
         std::string htmlBody = generateDirectoryListing(dirPath);
         
-        StringBuilder response;
+        StringBuilder response(256 + htmlBody.size()); // Reserve for headers + body
         response.append("HTTP/1.1 200 OK\r\n");
         response.append("Content-Type: text/html; charset=utf-8\r\nContent-Length: ");
         response.appendFormat("%zu", htmlBody.size());
@@ -503,7 +503,7 @@ protected:
 
     /// Virtual customization point: generate error HTML
     virtual std::string generateErrorHtml(int code, const std::string& status, const std::string& message) const {
-        StringBuilder html;
+        StringBuilder html(512); // Reserve for error page HTML
         html.append("<!DOCTYPE html>\n");
         html.append("<html><head><title>");
         html.appendFormat("%d", code);
@@ -525,7 +525,7 @@ protected:
 
     /// Virtual customization point: generate directory listing HTML
     virtual std::string generateDirectoryListing(const std::string& dirPath) const {
-        StringBuilder html;
+        StringBuilder html(2048); // Reserve for directory listing HTML
         html.append("<!DOCTYPE html>\n");
         html.append("<html><head><title>Directory listing for ");
         html.append(dirPath);

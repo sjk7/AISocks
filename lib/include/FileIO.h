@@ -58,29 +58,35 @@ public:
         errno_t err = fopen_s(&file_, filename, mode);
         if (err != 0 || !file_) return false;
         
-        // Lock the file for exclusive access (both read and write)
+        // Determine lock type based on mode: shared for read, exclusive for write
+        bool isWriteMode = (strchr(mode, 'w') != nullptr || strchr(mode, 'a') != nullptr || strchr(mode, '+') != nullptr);
+        
         int fd = _fileno(file_);
         if (fd != -1) {
-            // _LK_NBLCK: Non-blocking exclusive lock
-            // Lock entire file (offset 0, length 0 means whole file)
-            if (_locking(fd, _LK_NBLCK, 0x7FFFFFFF) != 0) {
-                // Lock failed, close and return false
-                fclose(file_);
-                file_ = nullptr;
-                return false;
+            if (isWriteMode) {
+                // _LK_NBLCK: Non-blocking exclusive lock for write modes
+                if (_locking(fd, _LK_NBLCK, 0x7FFFFFFF) != 0) {
+                    // Lock failed, close and return false
+                    fclose(file_);
+                    file_ = nullptr;
+                    return false;
+                }
             }
+            // Note: Windows _locking() doesn't support shared locks
+            // For read-only mode, we don't lock on Windows to allow concurrent reads
         }
         return true;
 #else
         file_ = fopen(filename, mode);
         if (!file_) return false;
         
-        // Lock the file for exclusive access
+        // Determine lock type based on mode: shared for read, exclusive for write
+        bool isWriteMode = (strchr(mode, 'w') != nullptr || strchr(mode, 'a') != nullptr || strchr(mode, '+') != nullptr);
+        
         int fd = fileno(file_);
         if (fd != -1) {
-            // LOCK_EX: Exclusive lock
-            // LOCK_NB: Non-blocking
-            if (flock(fd, LOCK_EX | LOCK_NB) != 0) {
+            int lockMode = isWriteMode ? (LOCK_EX | LOCK_NB) : (LOCK_SH | LOCK_NB);
+            if (flock(fd, lockMode) != 0) {
                 // Lock failed, close and return false
                 fclose(file_);
                 file_ = nullptr;
