@@ -38,9 +38,8 @@ int main() {
         return 1;
     }
     
-    // Print build info
+    // Print build info immediately after title
     server.printBuildInfo();
-    
     std::cout << "Server starting on http://localhost:8080/\n";
     std::cout << "Serving files from: " << config.documentRoot << "\n";
     std::cout << "Directory listing: " << (config.enableDirectoryListing ? "enabled" : "disabled") << "\n";
