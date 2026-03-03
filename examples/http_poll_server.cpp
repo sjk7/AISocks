@@ -187,32 +187,8 @@ http://localhost:8080/ 2>&1
 
 /*/
 
-static const char* buildOS() {
-#if defined(__APPLE__)
-    return "macOS";
-#elif defined(__linux__)
-    return "Linux";
-#elif defined(_WIN32)
-    return "Windows";
-#elif defined(__FreeBSD__)
-    return "FreeBSD";
-#else
-    return "Unknown";
-#endif
-}
-
-static const char* buildKind() {
-#if defined(NDEBUG)
-    return "Release";
-#else
-    return "Debug";
-#endif
-}
-
 int main() {
     printf("=== Poll-Driven HTTP Server ===\n");
-    printf("Built: %s %s  |  OS: %s  |  Build: %s\n", __DATE__, __TIME__,
-        buildOS(), buildKind());
 
     HttpServer server(ServerBind{
         "0.0.0.0", Port{8080}, Backlog{Backlog::defaultBacklog}, true});
@@ -221,7 +197,9 @@ int main() {
         return 1;
     }
 
+    server.printBuildInfo();
+    printf("Listening on 0.0.0.0:8080\n");
+
     server.run(ClientLimit::Unlimited, Milliseconds{0});
-    printf("\nShutting down cleanly.\n");
     return 0;
 }
