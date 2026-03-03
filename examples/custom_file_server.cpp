@@ -46,7 +46,33 @@ protected:
             return;
         }
         
-        // Call base implementation
+        // Special handling for root path - show testing instructions
+        if (request.path == "/" || request.path == "/index.html") {
+            std::string instructions = generateTestingInstructions();
+            
+            StringBuilder response;
+            response.append("HTTP/1.1 200 OK\r\n");
+            response.append("Content-Type: text/html; charset=utf-8\r\nContent-Length: ");
+            response.appendFormat("%zu", instructions.size());
+            response.append("\r\n");
+            
+            // Add custom headers
+            for (const auto& [name, value] : getConfig().customHeaders) {
+                response.append(name);
+                response.append(": ");
+                response.append(value);
+                response.append("\r\n");
+            }
+            
+            response.append("\r\n");
+            response.append(instructions);
+            
+            state.responseBuf = response.toString();
+            state.responseView = state.responseBuf;
+            return;
+        }
+        
+        // Call base implementation for all other paths
         HttpFileServer::buildResponse(state);
     }
 
@@ -111,6 +137,170 @@ protected:
         html.append("</p>\n");
         html.append("<a href=\"/\" class=\"back-link\">← Back to Home</a>\n");
         html.append("</div></body></html>");
+        return html.toString();
+    }
+
+    /// Override to show testing instructions as default page
+    void handleDirectoryRequest(HttpClientState& state, const std::string& dirPath, const HttpRequest& request) override {
+        // If this is the root directory, show testing instructions instead of directory listing
+        if (dirPath == getConfig().documentRoot) {
+            std::string instructions = generateTestingInstructions();
+            
+            StringBuilder response;
+            response.append("HTTP/1.1 200 OK\r\n");
+            response.append("Content-Type: text/html; charset=utf-8\r\nContent-Length: ");
+            response.appendFormat("%zu", instructions.size());
+            response.append("\r\n");
+            
+            // Add custom headers
+            for (const auto& [name, value] : getConfig().customHeaders) {
+                response.append(name);
+                response.append(": ");
+                response.append(value);
+                response.append("\r\n");
+            }
+            
+            response.append("\r\n");
+            response.append(instructions);
+            
+            state.responseBuf = response.toString();
+            state.responseView = state.responseBuf;
+            return;
+        }
+        
+        // For subdirectories, show normal directory listing
+        HttpFileServer::handleDirectoryRequest(state, dirPath, request);
+    }
+
+    std::string generateTestingInstructions() const {
+        StringBuilder html;
+        html.append("<!DOCTYPE html>\n");
+        html.append("<html><head>\n");
+        html.append("<title>HttpFileServer - Testing Guide</title>\n");
+        html.append("<style>\n");
+        html.append("body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #333; }\n");
+        html.append(".container { max-width: 1200px; margin: 0 auto; background: white; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); overflow: hidden; }\n");
+        html.append(".header { background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); color: white; padding: 30px; text-align: center; }\n");
+        html.append(".header h1 { margin: 0; font-size: 2.5em; font-weight: 300; }\n");
+        html.append(".header p { margin: 10px 0 0 0; opacity: 0.9; font-size: 1.1em; }\n");
+        html.append(".content { padding: 30px; }\n");
+        html.append(".section { margin: 30px 0; padding: 20px; border-left: 4px solid #4facfe; background: #f8f9fa; border-radius: 0 8px 8px 0; }\n");
+        html.append(".section h2 { color: #2c3e50; margin-top: 0; display: flex; align-items: center; gap: 10px; }\n");
+        html.append(".section h3 { color: #34495e; margin-top: 20px; }\n");
+        html.append("code { background: #f1f2f6; padding: 2px 6px; border-radius: 3px; font-family: 'Courier New', monospace; color: #e74c3c; }\n");
+        html.append(".url { background: #2c3e50; color: #ecf0f1; padding: 8px 12px; border-radius: 4px; font-family: 'Courier New', monospace; display: inline-block; margin: 5px 0; }\n");
+        html.append(".checklist { list-style: none; padding: 0; }\n");
+        html.append(".checklist li { margin: 8px 0; padding: 8px 0; border-bottom: 1px solid #ecf0f1; }\n");
+        html.append(".checklist li:before { content: '✓ '; color: #27ae60; font-weight: bold; }\n");
+        html.append(".warning { background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 4px; padding: 12px; margin: 10px 0; }\n");
+        html.append(".success { background: #d4edda; border: 1px solid #c3e6cb; border-radius: 4px; padding: 12px; margin: 10px 0; }\n");
+        html.append("a { color: #3498db; text-decoration: none; }\n");
+        html.append("a:hover { text-decoration: underline; }\n");
+        html.append(".footer { background: #2c3e50; color: white; padding: 20px; text-align: center; }\n");
+        html.append("</style></head><body>\n");
+        
+        html.append("<div class=\"container\">\n");
+        html.append("<div class=\"header\">\n");
+        html.append("<h1>🚀 HttpFileServer</h1>\n");
+        html.append("<p>Complete Browser Testing Guide</p>\n");
+        html.append("</div>\n");
+        
+        html.append("<div class=\"content\">\n");
+        
+        // Authentication Section
+        html.append("<div class=\"section\">\n");
+        html.append("<h2>🔐 Authentication</h2>\n");
+        html.append("<p><strong>Server Credentials:</strong></p>\n");
+        html.append("<div class=\"url\">Username: admin</div>\n");
+        html.append("<div class=\"url\">Password: secret</div>\n");
+        html.append("<p>Browser will show a login dialog when you access any URL.</p>\n");
+        html.append("<div class=\"success\">✓ All requests are logged to <code>access.log</code></div>\n");
+        html.append("</div>\n");
+        
+        // File Serving Section
+        html.append("<div class=\"section\">\n");
+        html.append("<h2>📄 File Serving</h2>\n");
+        html.append("<h3>Test Files:</h3>\n");
+        html.append("<div class=\"url\"><a href=\"/index.html\">/index.html</a></div>\n");
+        html.append("<div class=\"url\"><a href=\"/style.css\">/style.css</a></div>\n");
+        html.append("<div class=\"url\"><a href=\"/test.js\">/test.js</a></div>\n");
+        html.append("<p>Files are served with correct MIME types and UTF-8 encoding.</p>\n");
+        html.append("</div>\n");
+        
+        // Directory Listing Section
+        html.append("<div class=\"section\">\n");
+        html.append("<h2>📁 Directory Listing</h2>\n");
+        html.append("<h3>Subdirectory:</h3>\n");
+        html.append("<div class=\"url\"><a href=\"/files/\">/files/</a></div>\n");
+        html.append("<p>Enhanced directory listings with file sizes, dates, and emoji icons.</p>\n");
+        html.append("</div>\n");
+        
+        // Access Control Section
+        html.append("<div class=\"section\">\n");
+        html.append("<h2>🚫 Access Control</h2>\n");
+        html.append("<h3>Blocked Files (should return 403):</h3>\n");
+        html.append("<div class=\"url\"><a href=\"/config.conf\">/config.conf</a></div>\n");
+        html.append("<div class=\"url\"><a href=\"/server.log\">/server.log</a></div>\n");
+        html.append("<div class=\"url\"><a href=\"/temp.tmp\">/temp.tmp</a></div>\n");
+        html.append("<div class=\"warning\">⚠️ These files are blocked by access control rules</div>\n");
+        html.append("</div>\n");
+        
+        // Performance Section
+        html.append("<div class=\"section\">\n");
+        html.append("<h2>⚡ Performance Features</h2>\n");
+        html.append("<h3>1. ETag Support:</h3>\n");
+        html.append("<ul><li>Load any file twice</li><li>Second request should return <code>304 Not Modified</code></li><li>Check Network tab in browser dev tools</li></ul>\n");
+        html.append("<h3>2. Last-Modified Headers:</h3>\n");
+        html.append("<ul><li>Check Response Headers in dev tools</li><li>Should see <code>Last-Modified</code> field</li></ul>\n");
+        html.append("</div>\n");
+        
+        // Error Handling Section
+        html.append("<div class=\"section\">\n");
+        html.append("<h2>❌ Error Handling</h2>\n");
+        html.append("<h3>Test Error Pages:</h3>\n");
+        html.append("<div class=\"url\"><a href=\"/nonexistent.html\">/nonexistent.html</a> (404)</div>\n");
+        html.append("<div class=\"url\"><a href=\"/../etc/passwd\">/../etc/passwd</a> (400 - Path Traversal Blocked)</div>\n");
+        html.append("<p>Custom styled error pages with helpful information.</p>\n");
+        html.append("</div>\n");
+        
+        // Developer Tools Section
+        html.append("<div class=\"section\">\n");
+        html.append("<h2>🔍 Developer Tools Testing</h2>\n");
+        html.append("<h3>Open Chrome DevTools (F12):</h3>\n");
+        html.append("<ul><li><strong>Network Tab:</strong> See all requests, status codes, headers</li><li><strong>Console Tab:</strong> Should see no errors for valid files</li><li><strong>Application Tab:</strong> Check browser caching</li></ul>\n");
+        html.append("</div>\n");
+        
+        // Security Section
+        html.append("<div class=\"section\">\n");
+        html.append("<h2>🛡️ Security Features</h2>\n");
+        html.append("<ul><li><strong>Path Traversal Protection:</strong> Blocks <code>../</code> attacks</li><li><strong>Access Control:</strong> Blocks sensitive file types</li><li><strong>Authentication:</strong> Basic auth required</li><li><strong>Security Headers:</strong> X-Content-Type-Options, X-Frame-Options</li></ul>\n");
+        html.append("</div>\n");
+        
+        // Testing Checklist
+        html.append("<div class=\"section\">\n");
+        html.append("<h2>🧪 Testing Checklist</h2>\n");
+        html.append("<ul class=\"checklist\">\n");
+        html.append("<li>Authentication prompt appears</li>\n");
+        html.append("<li>Valid credentials grant access</li>\n");
+        html.append("<li>Invalid credentials show 401 error</li>\n");
+        html.append("<li>Directory listings show file metadata</li>\n");
+        html.append("<li>Files download with correct MIME types</li>\n");
+        html.append("<li>Sensitive files return 403 errors</li>\n");
+        html.append("<li>Non-existent files return 404 errors</li>\n");
+        html.append("<li>Path traversal attempts are blocked</li>\n");
+        html.append("<li>ETag headers work (304 responses)</li>\n");
+        html.append("<li>Access log records all requests</li>\n");
+        html.append("<li>Custom headers appear in responses</li>\n");
+        html.append("</ul>\n");
+        html.append("</div>\n");
+        
+        html.append("</div>\n");
+        html.append("<div class=\"footer\">\n");
+        html.append("<p>Custom File Server | Built with aiSocks HttpFileServer</p>\n");
+        html.append("</div>\n");
+        html.append("</div>\n");
+        html.append("</body></html>\n");
+        
         return html.toString();
     }
 
