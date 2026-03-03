@@ -20,6 +20,7 @@
 #else
     #include <sys/stat.h>
     #include <sys/types.h>
+#include "test_string_literals.h"
 #endif
 
 using namespace aiSocks;
@@ -118,11 +119,11 @@ public:
         html.append("<!DOCTYPE html>\n<html><head><title>");
         html.appendFormat("%d %s", code, status.c_str());
         html.append("</title><style>");
-        html.append("body { font-family: Arial, sans-serif; margin: 40px; background: #f5f5f5; }");
-        html.append(".error-container { max-width: 600px; margin: 0 auto; background: white; padding: 40px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }");
+        html.append(TestStringLiterals::ERROR_HTML_BODY_STYLE);
+        html.append(TestStringLiterals::ERROR_HTML_CONTAINER_STYLE);
         html.append("h1 { color: #e74c3c; margin-bottom: 20px; }");
         html.append("p { color: #555; line-height: 1.6; }");
-        html.append(".back-link { display: inline-block; margin-top: 20px; padding: 10px 20px; background: #3498db; color: white; text-decoration: none; border-radius: 4px; }");
+        html.append(TestStringLiterals::ERROR_HTML_LINK_STYLE);
         html.append(".back-link:hover { background: #2980b9; }");
         html.append("</style></head><body>");
         html.append("<div class=\"error-container\">");
@@ -152,7 +153,7 @@ protected:
         
     void sendAuthRequired(HttpClientState& state) {
         std::string htmlBody = generateErrorHtml(401, "Unauthorized", 
-            "This server requires authentication. Please provide valid credentials.");
+            TestStringLiterals::AUTH_REQUIRED_MESSAGE);
         
         StringBuilder response;
         response.append("HTTP/1.1 401 Unauthorized\r\n");
@@ -194,15 +195,15 @@ protected:
     
     std::string generateTestingInstructions() const {
         StringBuilder html;
-        html.append("<!DOCTYPE html>\n<html><head><title>HttpFileServer - Testing Guide</title>");
-        html.append("<style>body { font-family: Arial, sans-serif; margin: 20px; }</style></head><body>");
+        html.append(TestStringLiterals::TESTING_INSTRUCTIONS_TITLE);
+        html.append(TestStringLiterals::TESTING_INSTRUCTIONS_STYLE);
         html.append("<h1>🚀 HttpFileServer Testing Guide</h1>");
         html.append("<p>This is the testing interface for the CustomFileServer.</p>");
         html.append("<h2>🔐 Authentication</h2><p>Username: admin, Password: secret</p>");
-        html.append("<h2>📄 Test Files</h2><p><a href=\"/index.html\">index.html</a> | <a href=\"/style.css\">style.css</a> | <a href=\"/script.js\">script.js</a></p>");
-        html.append("<h2>📁 Directory Listing</h2><p><a href=\"/subdir/\">subdir/</a></p>");
-        html.append("<h2>🚫 Access Control</h2><p><a href=\"/config.conf\">config.conf</a> (should be blocked)</p>");
-        html.append("<h2>❌ Error Testing</h2><p><a href=\"/nonexistent.html\">404 Error</a> | <a href=\"/../etc/passwd\">Path Traversal Test</a></p>");
+        html.append(TestStringLiterals::TESTING_INSTRUCTIONS_FILES);
+        html.append(TestStringLiterals::TESTING_INSTRUCTIONS_DIR);
+        html.append(TestStringLiterals::TESTING_INSTRUCTIONS_ACCESS);
+        html.append(TestStringLiterals::TESTING_INSTRUCTIONS_ERROR);
         html.append("</body></html>");
         return html.toString();
     }
