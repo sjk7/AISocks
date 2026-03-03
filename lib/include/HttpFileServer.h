@@ -87,15 +87,6 @@ protected:
         // Resolve the file path (includes URL decoding)
         std::string filePath = resolveFilePath(request.path);
         
-        // DEBUG: Print EVERY request
-        printf("\n[DEBUG] ===== REQUEST RECEIVED =====\n");
-        printf("  Method: %s\n", request.method.c_str());
-        printf("  Request path: %s\n", request.path.c_str());
-        printf("  Resolved file path: %s\n", filePath.c_str());
-        printf("  Document root: %s\n", config_.documentRoot.c_str());
-        printf("  Contains '..'? %s\n", request.path.find("..") != std::string::npos ? "YES" : "NO");
-        fflush(stdout);
-        
         // ═══════════════════════════════════════════════════════════════════════
         // CRITICAL SECURITY CHECK: PATH TRAVERSAL PREVENTION VIA CANONICALIZATION
         // ═══════════════════════════════════════════════════════════════════════
@@ -146,15 +137,8 @@ protected:
         // the file system structure to attackers.
         //
         if (!PathHelper::isPathWithin(filePath, config_.documentRoot)) {
-            printf("[DEBUG] Path is NOT within document root - returning 403 Forbidden\n");
-            fflush(stdout);
             sendError(state, 403, "Forbidden", "Access denied");
             return;
-        }
-        
-        if (request.path.find("..") != std::string::npos) {
-            printf("[DEBUG] Path traversal check passed - continuing to file existence check\n");
-            fflush(stdout);
         }
         
         // Check if path exists and get file info

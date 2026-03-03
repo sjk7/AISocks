@@ -304,7 +304,8 @@ protected:
         html.append("<h2>❌ Error Handling</h2>\n");
         html.append("<h3>Test Error Pages:</h3>\n");
         html.append("<div class=\"url\"><a href=\"/nonexistent.html\">/nonexistent.html</a> (404)</div>\n");
-        html.append("<div class=\"url\"><a href=\"/../etc/passwd\">/../etc/passwd</a> (403 - Path Traversal Blocked)</div>\n");
+        html.append("<div class=\"url\"><a href=\"/../etc/passwd\">/../etc/passwd</a> (404 in browser*, 403 via curl --path-as-is)</div>\n");
+        html.append("<p style=\"font-size: 0.9em; color: #666;\">*Browsers normalize URLs before sending, so the server receives /etc/passwd (404). Use curl --path-as-is to test actual path traversal protection (403).</p>\n");
         html.append("<p>Custom styled error pages with helpful information.</p>\n");
         html.append("</div>\n");
         
@@ -658,7 +659,8 @@ int main() {
         std::cout << "   URL: http://localhost:8080/nonexistent.html\n";
         std::cout << "   → Custom 404 error page with styling\n";
         std::cout << "   URL: http://localhost:8080/../etc/passwd\n";
-        std::cout << "   → Custom 403 error page (path traversal blocked)\n";
+        std::cout << "   → 404 in browser (URL normalized), 403 via curl --path-as-is\n";
+        std::cout << "   → curl --path-as-is http://localhost:8080/../etc/passwd -u admin:secret\n";
         std::cout << "   URL: http://localhost:8080/ (with wrong auth)\n";
         std::cout << "   → Custom 401 error page\n";
         
