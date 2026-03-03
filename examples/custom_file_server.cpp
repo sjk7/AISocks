@@ -511,21 +511,40 @@ private:
     }
 };
 
+#ifdef _WIN32
+#include <windows.h>
+#else
 #include <csignal>
+#endif
 
 // Global flag for clean shutdown
-volatile std::sig_atomic_t shutdownRequested = 0;
+volatile bool shutdownRequested = false;
 
+#ifdef _WIN32
+BOOL WINAPI consoleHandler(DWORD signal) {
+    if (signal == CTRL_C_EVENT) {
+        shutdownRequested = true;
+        std::cout << "\n\n🛑 Shutdown requested. Cleaning up...\n";
+        return TRUE;
+    }
+    return FALSE;
+}
+#else
 void signalHandler(int signal) {
     if (signal == SIGINT) {
-        shutdownRequested = 1;
+        shutdownRequested = true;
         std::cout << "\n\n🛑 Shutdown requested. Cleaning up...\n";
     }
 }
+#endif
 
 int main() {
-    // Set up signal handler for Ctrl+C
+    // Set up console handler for Ctrl+C
+#ifdef _WIN32
+    SetConsoleCtrlHandler(consoleHandler, TRUE);
+#else
     std::signal(SIGINT, signalHandler);
+#endif
     
     std::cout << "=== Custom HTTP File Server Example ===\n";
     
