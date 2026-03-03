@@ -15,7 +15,15 @@
 #ifdef _WIN32
     #include <io.h>
     #include <sys/locking.h>
+    #include <sys/stat.h>
     #include <windows.h>
+    // Define S_ISDIR and S_ISREG if not already defined (for MSVC)
+    #ifndef S_ISDIR
+        #define S_ISDIR(m) (((m) & _S_IFMT) == _S_IFDIR)
+    #endif
+    #ifndef S_ISREG
+        #define S_ISREG(m) (((m) & _S_IFMT) == _S_IFREG)
+    #endif
 #else
     #include <unistd.h>
     #include <sys/file.h>
@@ -199,12 +207,12 @@ public:
         int fd = _fileno(file_);
         if (fd == -1) return info;
         
-        struct _stat64 st;
-        if (_fstat64(fd, &st) != 0) return info;
+        struct stat st;
+        if (fstat(fd, &st) != 0) return info;
         
         info.valid = true;
-        info.isDirectory = (st.st_mode & _S_IFDIR) != 0;
-        info.isRegular = (st.st_mode & _S_IFREG) != 0;
+        info.isDirectory = S_ISDIR(st.st_mode);
+        info.isRegular = S_ISREG(st.st_mode);
         info.size = static_cast<size_t>(st.st_size);
         info.lastModified = st.st_mtime;
         

@@ -16,8 +16,13 @@
     #include <windows.h>
     #include <direct.h>
     #define stat _stat64
-    #define S_ISDIR(m) (((m) & _S_IFMT) == _S_IFDIR)
-    #define S_ISREG(m) (((m) & _S_IFMT) == _S_IFREG)
+    // Only define these if not already defined (MinGW defines them)
+    #ifndef S_ISDIR
+        #define S_ISDIR(m) (((m) & _S_IFMT) == _S_IFDIR)
+    #endif
+    #ifndef S_ISREG
+        #define S_ISREG(m) (((m) & _S_IFMT) == _S_IFREG)
+    #endif
 #else
     #include <dirent.h>
     #include <unistd.h>
