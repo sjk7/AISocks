@@ -121,9 +121,8 @@ class HttpPollServer : public ServerBase<HttpClientState> {
         printf("\nServer stopped gracefully.\n");
     }
     
-    // Print OS/Build info banner - call this from derived class before run()
-    // Virtual so derived classes can customize the output
-    virtual void printBuildInfo() const {
+    // Print OS/Build info banner - can be called statically or as instance method
+    static void printBuildInfo() {
         printf("Built: %s %s  |  OS: %s  |  Build: %s\n", 
                __DATE__, __TIME__, buildOS(), buildKind());
     }

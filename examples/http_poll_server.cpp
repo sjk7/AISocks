@@ -189,6 +189,9 @@ http://localhost:8080/ 2>&1
 
 int main() {
     printf("=== Poll-Driven HTTP Server ===\n");
+    
+    // Print build info immediately after title
+    HttpServer::printBuildInfo();
 
     HttpServer server(ServerBind{
         "0.0.0.0", Port{8080}, Backlog{Backlog::defaultBacklog}, true});
@@ -196,9 +199,6 @@ int main() {
         printf("Server failed to start\n");
         return 1;
     }
-
-    server.printBuildInfo();
-    printf("Listening on 0.0.0.0:8080\n");
 
     server.run(ClientLimit::Unlimited, Milliseconds{0});
     return 0;
