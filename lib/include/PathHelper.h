@@ -295,63 +295,32 @@ public:
     /// - Security check: "/etc/passwd" not within "www/" → return 403
     ///
     static bool isPathWithin(const std::string& childPath, const std::string& parentPath) {
-        std::string canonicalChild = getCanonicalPath(childPath);
-        std::string canonicalParent = getCanonicalPath(parentPath);
+        // SIMPLIFIED APPROACH: Always use manual normalization for both paths
+        // This avoids OS-dependent behavior differences and works consistently
+        // across Windows, macOS, and Linux regardless of whether files exist
         
-        // Parent should always succeed (it's the document root which exists)
-        if (canonicalParent.empty()) {
-            canonicalParent = normalizePathManual(parentPath);
-        }
+        std::string normalizedChild = normalizePathManual(childPath);
+        std::string normalizedParent = normalizePathManual(parentPath);
         
-        // If child canonicalization failed (e.g., file doesn't exist), we need to
-        // canonicalize its parent directory and append the filename
-        if (canonicalChild.empty()) {
-            // Extract parent directory and filename
-            std::string normalizedChild = normalizePath(childPath);
-            size_t lastSlash = normalizedChild.find_last_of('/');
-            
-            if (lastSlash != std::string::npos) {
-                std::string parentDir = normalizedChild.substr(0, lastSlash);
-                std::string filename = normalizedChild.substr(lastSlash + 1);
-                
-                // Try to canonicalize the parent directory (which should exist)
-                std::string canonicalParentDir = getCanonicalPath(parentDir);
-                if (!canonicalParentDir.empty()) {
-                    // Success - combine canonical parent with filename
-                    canonicalChild = normalizePath(canonicalParentDir);
-                    if (!canonicalChild.empty() && canonicalChild.back() != '/') {
-                        canonicalChild += '/';
-                    }
-                    canonicalChild += filename;
-                } else {
-                    // Parent dir also doesn't exist - use manual normalization
-                    canonicalChild = normalizePathManual(childPath);
-                }
-            } else {
-                // No directory component - just a filename in current dir
-                canonicalChild = normalizePathManual(childPath);
-            }
-        }
-        
-        if (canonicalChild.empty() || canonicalParent.empty()) {
+        if (normalizedChild.empty() || normalizedParent.empty()) {
             return false;
         }
         
-        // Normalize both paths
-        canonicalChild = normalizePath(canonicalChild);
-        canonicalParent = normalizePath(canonicalParent);
+        // Normalize slashes
+        normalizedChild = normalizePath(normalizedChild);
+        normalizedParent = normalizePath(normalizedParent);
         
         // Ensure parent path ends with /
-        if (!canonicalParent.empty() && canonicalParent.back() != '/') {
-            canonicalParent += '/';
+        if (!normalizedParent.empty() && normalizedParent.back() != '/') {
+            normalizedParent += '/';
         }
         
         // Check if child starts with parent
-        if (canonicalChild.size() < canonicalParent.size()) {
+        if (normalizedChild.size() < normalizedParent.size()) {
             return false;
         }
         
-        return canonicalChild.compare(0, canonicalParent.size(), canonicalParent) == 0;
+        return normalizedChild.compare(0, normalizedParent.size(), normalizedParent) == 0;
     }
 
     /// Extract filename from path
