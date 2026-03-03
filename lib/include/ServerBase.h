@@ -16,7 +16,6 @@
 #include <csignal>
 #include <cstdint>
 #include <functional>
-#include <iostream>
 #include <memory>
 #include <vector>
 #ifndef _WIN32
