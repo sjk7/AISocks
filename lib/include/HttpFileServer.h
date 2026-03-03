@@ -9,6 +9,7 @@
 #include "FileIO.h"
 #include "UrlCodec.h"
 #include "PathHelper.h"
+#include "FileCache.h"
 #include <string>
 #include <vector>
 #include <map>
@@ -34,6 +35,7 @@ public:
         bool enableETag;                    // Generate ETag headers for files
         bool enableLastModified;            // Generate Last-Modified headers
         size_t maxFileSize;                 // Max file size to serve (100MB)
+        bool enableCache;                   // Enable file content caching
         std::map<std::string, std::string> customHeaders; // Additional headers to add
     };
 
@@ -46,6 +48,7 @@ public:
         config_.enableETag = config.enableETag ? config.enableETag : true;
         config_.enableLastModified = config.enableLastModified ? config.enableLastModified : true;
         config_.maxFileSize = config.maxFileSize ? config.maxFileSize : 100 * 1024 * 1024;
+        config_.enableCache = config.enableCache; // Default false
         config_.customHeaders = config.customHeaders;
         
         // Normalize document root path
@@ -250,6 +253,19 @@ protected:
 
     /// Virtual customization point: handle file requests
     virtual void handleFileRequest(HttpClientState& state, const std::string& filePath, const FileInfo& fileInfo, const HttpRequest& request) {
+        // Check if we should use cache (no query string in request)
+        bool useCache = config_.enableCache && request.path.find('?') == std::string::npos;
+        
+        // Try cache first if enabled
+        if (useCache) {
+            const FileCache::CachedFile* cached = fileCache_.get(filePath, fileInfo.lastModified);
+            if (cached) {
+                // Cache hit! Use cached content
+                sendCachedFile(state, filePath, *cached, fileInfo, request);
+                return;
+            }
+        }
+        
         // TOCTOU-safe file handling: open file once, lock it, check descriptor, read from same descriptor
         File file(filePath.c_str(), "rb");
         if (!file.isOpen()) {
@@ -311,6 +327,11 @@ protected:
         if (fileContent.empty() && fdInfo.size > 0) {
             sendError(state, 500, "Internal Server Error", "Failed to read file");
             return;
+        }
+        
+        // Update cache if enabled
+        if (useCache) {
+            fileCache_.put(filePath, fileContent, fileInfo.lastModified);
         }
 
         // Build response
@@ -410,6 +431,50 @@ protected:
         state.responseBuf = response.toString();
         state.responseView = state.responseBuf;
     }
+    
+    /// Send cached file content
+    void sendCachedFile(HttpClientState& state, const std::string& filePath, 
+                        const FileCache::CachedFile& cached, const FileInfo& fileInfo,
+                        const HttpRequest& request) {
+        (void)request; // May be used for conditional headers in future
+        
+        // Build response from cached content
+        StringBuilder response;
+        response.append("HTTP/1.1 200 OK\r\n");
+        response.append("Content-Type: ");
+        response.append(getMimeType(filePath));
+        if (getMimeType(filePath).find("text/") == 0 || getMimeType(filePath) == "application/javascript") {
+            response.append("; charset=utf-8");
+        }
+        response.append("\r\nContent-Length: ");
+        response.appendFormat("%zu", cached.size);
+        response.append("\r\n");
+        
+        if (config_.enableLastModified) {
+            response.append("Last-Modified: ");
+            response.append(formatHttpDate(fileInfo.lastModified));
+            response.append("\r\n");
+        }
+        
+        if (config_.enableETag && !fileInfo.etag.empty()) {
+            response.append("ETag: ");
+            response.append(fileInfo.etag);
+            response.append("\r\n");
+        }
+        
+        // Add custom headers
+        for (const auto& [name, value] : config_.customHeaders) {
+            response.append(name);
+            response.append(": ");
+            response.append(value);
+            response.append("\r\n");
+        }
+        
+        response.append("\r\n");
+        
+        state.responseBuf = response.toString() + std::string(cached.content.begin(), cached.content.end());
+        state.responseView = state.responseBuf;
+    }
 
     /// Virtual customization point: send directory listing
     virtual void sendDirectoryListing(HttpClientState& state, const std::string& dirPath) {
@@ -502,9 +567,11 @@ protected:
 
 protected:
     const Config& getConfig() const { return config_; }
+    FileCache& getFileCache() { return fileCache_; }
     
 private:
     Config config_;
+    FileCache fileCache_;
 
     std::string getFileExtension(const std::string& filePath) const {
         size_t dotPos = filePath.find_last_of('.');
