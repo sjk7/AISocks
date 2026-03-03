@@ -29,13 +29,15 @@ class HttpFileServer : public HttpPollServer {
 public:
     /// Configuration for the file server
     struct Config {
-        std::string documentRoot;           // Root directory for serving files
-        std::string indexFile;              // Default file for directory requests
-        bool enableDirectoryListing;        // Show directory contents when no index file
-        bool enableETag;                    // Generate ETag headers for files
-        bool enableLastModified;            // Generate Last-Modified headers
-        size_t maxFileSize;                 // Max file size to serve (100MB)
-        bool enableCache;                   // Enable file content caching
+        std::string documentRoot;                    // Root directory for serving files
+        std::string indexFile;                       // Default file for directory requests
+        bool enableDirectoryListing = false;         // Show directory contents when no index file
+        bool enableETag = false;                     // Generate ETag headers for files
+        bool enableLastModified = false;             // Generate Last-Modified headers
+        size_t maxFileSize = 0;                      // Max file size to serve (100MB default)
+        bool enableCache = false;                    // Enable file content caching
+        bool enableSecurityHeaders = false;          // Add security headers (X-Content-Type-Options, etc.)
+        bool hideServerVersion = false;              // Hide server version in error pages
         std::map<std::string, std::string> customHeaders; // Additional headers to add
     };
 
@@ -49,6 +51,8 @@ public:
         config_.enableLastModified = config.enableLastModified ? config.enableLastModified : true;
         config_.maxFileSize = config.maxFileSize ? config.maxFileSize : 100 * 1024 * 1024;
         config_.enableCache = config.enableCache; // Default false
+        config_.enableSecurityHeaders = config.enableSecurityHeaders ? config.enableSecurityHeaders : true;
+        config_.hideServerVersion = config.hideServerVersion ? config.hideServerVersion : true;
         config_.customHeaders = config.customHeaders;
         
         // Normalize document root path
@@ -77,29 +81,23 @@ protected:
         // Resolve the file path (includes URL decoding)
         std::string filePath = resolveFilePath(request.path);
         
-        // Security check: prevent path traversal (must be AFTER URL decoding)
-        if (filePath.find("..") != std::string::npos) {
-            sendError(state, 400, "Bad Request", "Path traversal not allowed");
+        // Security check: Use proper canonicalization to prevent path traversal
+        std::string canonicalPath = PathHelper::getCanonicalPath(filePath);
+        std::string canonicalRoot = PathHelper::getCanonicalPath(config_.documentRoot);
+        
+        if (canonicalPath.empty() || canonicalRoot.empty()) {
+            sendError(state, 400, "Bad Request", "Invalid path");
             return;
         }
         
-        // Additional security: prevent Windows backslash traversal
-        if (filePath.find("\\") != std::string::npos) {
-            sendError(state, 400, "Bad Request", "Backslash paths not allowed");
+        // Verify the canonical path is within the document root
+        if (!PathHelper::isPathWithin(canonicalPath, canonicalRoot)) {
+            sendError(state, 403, "Forbidden", "Access denied");
             return;
         }
         
-        // Additional security: prevent absolute paths
-        if (!filePath.empty() && (filePath[0] == '/' || filePath[0] == '\\')) {
-            sendError(state, 400, "Bad Request", "Absolute paths not allowed");
-            return;
-        }
-        
-        // Additional security: ensure path starts with document root
-        if (filePath.find(config_.documentRoot) != 0) {
-            sendError(state, 400, "Bad Request", "Access denied");
-            return;
-        }
+        // Use the canonical path for all subsequent operations
+        filePath = canonicalPath;
         
         // Check if path exists and get file info
         FileInfo fileInfo = getFileInfo(filePath);
@@ -129,8 +127,8 @@ protected:
             path = path.substr(0, fragmentPos);
         }
 
-        // Decode URL encoding (basic implementation)
-        path = urlDecode(path);
+        // Decode URL encoding (use path-specific decoding, not form encoding)
+        path = urlDecodePath(path);
 
         // Handle root path
         if (path == "/") {
@@ -226,7 +224,7 @@ protected:
         // Basic checks using file info
         (void)filePath; // Suppress unused parameter warning - available for derived classes
         if (!fileInfo.exists) return false;
-        if (fileInfo.size > config_.maxFileSize) return false;
+        // Note: File size is already checked via TOCTOU-safe descriptor info before this call
         
         // Additional checks can be added by derived classes
         return true;
@@ -359,6 +357,9 @@ protected:
             response.append("\r\n");
         }
         
+        // Add security headers
+        addSecurityHeaders(response);
+        
         // Add custom headers
         for (const auto& [name, value] : config_.customHeaders) {
             response.append(name);
@@ -385,6 +386,9 @@ protected:
         response.append("\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: ");
         response.appendFormat("%zu", htmlBody.size());
         response.append("\r\n");
+        
+        // Add security headers
+        addSecurityHeaders(response);
         
         // Add custom headers
         for (const auto& [name, value] : config_.customHeaders) {
@@ -417,6 +421,9 @@ protected:
             response.append(fileInfo.etag);
             response.append("\r\n");
         }
+        
+        // Add security headers
+        addSecurityHeaders(response);
         
         // Add custom headers
         for (const auto& [name, value] : config_.customHeaders) {
@@ -462,6 +469,9 @@ protected:
             response.append("\r\n");
         }
         
+        // Add security headers
+        addSecurityHeaders(response);
+        
         // Add custom headers
         for (const auto& [name, value] : config_.customHeaders) {
             response.append(name);
@@ -486,6 +496,9 @@ protected:
         response.appendFormat("%zu", htmlBody.size());
         response.append("\r\n");
         
+        // Add security headers
+        addSecurityHeaders(response);
+        
         // Add custom headers
         for (const auto& [name, value] : config_.customHeaders) {
             response.append(name);
@@ -508,17 +521,19 @@ protected:
         html.append("<html><head><title>");
         html.appendFormat("%d", code);
         html.append(" ");
-        html.append(status);
+        html.append(htmlEscape(status));
         html.append("</title></head>\n");
         html.append("<body><h1>");
         html.appendFormat("%d", code);
         html.append(" ");
-        html.append(status);
+        html.append(htmlEscape(status));
         html.append("</h1>\n");
         html.append("<p>");
-        html.append(message);
+        html.append(htmlEscape(message));
         html.append("</p>\n");
-        html.append("<hr><address>aiSocks HttpFileServer</address>\n");
+        if (!config_.hideServerVersion) {
+            html.append("<hr><address>aiSocks HttpFileServer</address>\n");
+        }
         html.append("</body></html>");
         return html.toString();
     }
@@ -527,12 +542,8 @@ protected:
     virtual std::string generateDirectoryListing(const std::string& dirPath) const {
         StringBuilder html(2048); // Reserve for directory listing HTML
         html.append("<!DOCTYPE html>\n");
-        html.append("<html><head><title>Directory listing for ");
-        html.append(dirPath);
-        html.append("</title></head>\n");
-        html.append("<body><h1>Directory listing for ");
-        html.append(dirPath);
-        html.append("</h1>\n");
+        html.append("<html><head><title>Directory listing</title></head>\n");
+        html.append("<body><h1>Directory listing</h1>\n");
         html.append("<ul>\n");
         
         std::vector<PathHelper::DirEntry> entries = PathHelper::listDirectory(dirPath);
@@ -546,12 +557,12 @@ protected:
                 bool isDir = entry.isDirectory;
                 
                 html.append("<li><a href=\"");
-                html.append(name);
+                html.append(urlEncode(name));
                 if (isDir) {
                     html.append("/");
                 }
                 html.append("\">");
-                html.append(name);
+                html.append(htmlEscape(name));
                 if (isDir) {
                     html.append("/");
                 }
@@ -560,7 +571,9 @@ protected:
         }
         
         html.append("</ul>\n");
-        html.append("<hr><address>aiSocks HttpFileServer</address>\n");
+        if (!config_.hideServerVersion) {
+            html.append("<hr><address>aiSocks HttpFileServer</address>\n");
+        }
         html.append("</body></html>");
         return html.toString();
     }
@@ -572,6 +585,66 @@ protected:
 private:
     Config config_;
     FileCache fileCache_;
+    
+    /// Add security headers to response
+    void addSecurityHeaders(StringBuilder& response) const {
+        if (!config_.enableSecurityHeaders) return;
+        
+        response.append("X-Content-Type-Options: nosniff\r\n");
+        response.append("X-Frame-Options: DENY\r\n");
+        response.append("Content-Security-Policy: default-src 'self'\r\n");
+        response.append("Referrer-Policy: no-referrer\r\n");
+    }
+    
+    /// HTML escape a string to prevent XSS
+    static std::string htmlEscape(const std::string& str) {
+        std::string escaped;
+        escaped.reserve(str.size());
+        for (char c : str) {
+            switch (c) {
+                case '&':  escaped.append("&amp;"); break;
+                case '<':  escaped.append("&lt;"); break;
+                case '>':  escaped.append("&gt;"); break;
+                case '"':  escaped.append("&quot;"); break;
+                case '\'': escaped.append("&#39;"); break;
+                default:   escaped.push_back(c); break;
+            }
+        }
+        return escaped;
+    }
+    
+    /// URL decode for paths (does NOT treat + as space, unlike form encoding)
+    static std::string urlDecodePath(const std::string& src) {
+        static const auto fromHex = []() noexcept {
+            std::array<uint8_t, 256> t{};
+            t.fill(0xFF);
+            for (int i = 0; i < 10; ++i)
+                t[static_cast<unsigned>('0' + i)] = static_cast<uint8_t>(i);
+            for (int i = 0; i < 6; ++i) {
+                t[static_cast<unsigned>('A' + i)] = static_cast<uint8_t>(10 + i);
+                t[static_cast<unsigned>('a' + i)] = static_cast<uint8_t>(10 + i);
+            }
+            return t;
+        }();
+
+        std::string out;
+        out.reserve(src.size());
+        for (size_t i = 0, n = src.size(); i < n; ++i) {
+            const unsigned char c = static_cast<unsigned char>(src[i]);
+            if (c == '%' && i + 2 < n) {
+                const uint8_t hi = fromHex[static_cast<unsigned char>(src[i + 1])];
+                const uint8_t lo = fromHex[static_cast<unsigned char>(src[i + 2])];
+                if (hi != 0xFF && lo != 0xFF) {
+                    out += static_cast<char>((hi << 4) | lo);
+                    i += 2;
+                    continue;
+                }
+            }
+            // Do NOT treat + as space in paths (only in query strings)
+            out += static_cast<char>(c);
+        }
+        return out;
+    }
 
     std::string getFileExtension(const std::string& filePath) const {
         size_t dotPos = filePath.find_last_of('.');

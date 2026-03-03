@@ -72,6 +72,32 @@ protected:
             return;
         }
         
+        // Special handling for demo.html - generate a page that executes test.js
+        if (request.path == "/demo.html") {
+            std::string demoPage = generateDemoPage();
+            
+            StringBuilder response(256 + demoPage.size()); // Reserve for headers + body
+            response.append("HTTP/1.1 200 OK\r\n");
+            response.append("Content-Type: text/html; charset=utf-8\r\nContent-Length: ");
+            response.appendFormat("%zu", demoPage.size());
+            response.append("\r\n");
+            
+            // Add custom headers
+            for (const auto& [name, value] : getConfig().customHeaders) {
+                response.append(name);
+                response.append(": ");
+                response.append(value);
+                response.append("\r\n");
+            }
+            
+            response.append("\r\n");
+            response.append(demoPage);
+            
+            state.responseBuf = response.toString();
+            state.responseView = state.responseBuf;
+            return;
+        }
+        
         // Call base implementation for all other paths
         HttpFileServer::buildResponse(state);
     }
@@ -223,7 +249,8 @@ protected:
         html.append("<h3>Test Files:</h3>\n");
         html.append("<div class=\"url\"><a href=\"/index.html\">/index.html</a></div>\n");
         html.append("<div class=\"url\"><a href=\"/style.css\">/style.css</a></div>\n");
-        html.append("<div class=\"url\"><a href=\"/test.js\">/test.js</a></div>\n");
+        html.append("<div class=\"url\"><a href=\"/test.js\">/test.js</a> (view source)</div>\n");
+        html.append("<div class=\"url\"><a href=\"/demo.html\">/demo.html</a> (runs test.js)</div>\n");
         html.append("<p>Files are served with correct MIME types and UTF-8 encoding.</p>\n");
         html.append("</div>\n");
         
@@ -301,6 +328,45 @@ protected:
         html.append("<p>Custom File Server | Built with aiSocks HttpFileServer</p>\n");
         html.append("</div>\n");
         html.append("</div>\n");
+        html.append("</body></html>\n");
+        
+        return html.toString();
+    }
+    
+    /// Generate demo page that executes test.js
+    std::string generateDemoPage() const {
+        StringBuilder html(2048);
+        html.append("<!DOCTYPE html>\n");
+        html.append("<html><head>\n");
+        html.append("<title>JavaScript Demo - test.js</title>\n");
+        html.append("<style>\n");
+        html.append("body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }\n");
+        html.append(".container { max-width: 800px; margin: 0 auto; background: white; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); padding: 30px; }\n");
+        html.append("h1 { color: #2c3e50; margin-top: 0; }\n");
+        html.append(".info { background: #e3f2fd; border-left: 4px solid #2196f3; padding: 15px; margin: 20px 0; border-radius: 4px; }\n");
+        html.append("#output { background: #f5f5f5; border: 1px solid #ddd; padding: 15px; border-radius: 4px; min-height: 100px; font-family: 'Courier New', monospace; white-space: pre-wrap; }\n");
+        html.append("button { background: #4CAF50; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-size: 16px; margin: 10px 5px 10px 0; }\n");
+        html.append("button:hover { background: #45a049; }\n");
+        html.append(".back-link { display: inline-block; margin-top: 20px; color: #3498db; text-decoration: none; }\n");
+        html.append(".back-link:hover { text-decoration: underline; }\n");
+        html.append("</style>\n");
+        html.append("<script src=\"/test.js\"></script>\n");
+        html.append("</head><body>\n");
+        html.append("<div class=\"container\">\n");
+        html.append("<h1>🎯 JavaScript Execution Demo</h1>\n");
+        html.append("<div class=\"info\">\n");
+        html.append("<strong>ℹ️ Info:</strong> This page loads and executes <code>/test.js</code> using a <code>&lt;script src=\"/test.js\"&gt;&lt;/script&gt;</code> tag.\n");
+        html.append("</div>\n");
+        html.append("<h2>Output:</h2>\n");
+        html.append("<div id=\"output\">Waiting for JavaScript to execute...</div>\n");
+        html.append("<button onclick=\"testFunction()\">Run Test Function</button>\n");
+        html.append("<button onclick=\"location.reload()\">Reload Page</button>\n");
+        html.append("<p><a href=\"/\" class=\"back-link\">← Back to Testing Guide</a></p>\n");
+        html.append("</div>\n");
+        html.append("<script>\n");
+        html.append("// Display that the script loaded\n");
+        html.append("document.getElementById('output').textContent = 'test.js loaded successfully!\\n\\nClick \"Run Test Function\" to execute the test function from test.js';\n");
+        html.append("</script>\n");
         html.append("</body></html>\n");
         
         return html.toString();

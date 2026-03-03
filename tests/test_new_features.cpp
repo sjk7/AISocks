@@ -427,7 +427,7 @@ static void test_bulk_throughput() {
         UdpSocket cli;
         REQUIRE(cli.setSendBufferSize(8 * 1024 * 1024));
         Endpoint dest{"127.0.0.1", Port{BASE + 60}, AddressFamily::IPv4};
-        std::vector<char> pkt(DGRAM, 0xAB);
+        std::vector<char> pkt(DGRAM, static_cast<char>(0xAB));
 
         auto t0 = std::chrono::steady_clock::now();
 
@@ -463,7 +463,7 @@ static void test_bulk_throughput() {
         constexpr size_t TOTAL = 4 * 1024
             * 1024; // 4 MB -- enough for a throughput reading, fast on CI
 
-        std::vector<char> sendBuf(CHUNK, 0xCD);
+        std::vector<char> sendBuf(CHUNK, static_cast<char>(0xCD));
         std::vector<char> recvBuf(CHUNK);
         std::atomic<size_t> recvTotal{0};
         std::atomic<bool> ready{false};

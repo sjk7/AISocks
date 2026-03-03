@@ -110,13 +110,13 @@ static void test_client_limit_source_of_truth() {
     BEGIN_TEST("ClientLimit — single source of truth in ServerTypes.h");
 
     // Including ServerTypes.h in isolation compiles (proven by compilation).
-    // Verify values.
-    REQUIRE(static_cast<size_t>(ClientLimit::Unlimited) == 0);
-    REQUIRE(static_cast<size_t>(ClientLimit::Default) == 1000);
-    REQUIRE(static_cast<size_t>(ClientLimit::Low) == 100);
-    REQUIRE(static_cast<size_t>(ClientLimit::Medium) == 500);
-    REQUIRE(static_cast<size_t>(ClientLimit::High) == 2000);
-    REQUIRE(static_cast<size_t>(ClientLimit::Maximum) == 10000);
+    // Verify values using static_assert to avoid constant expression warnings.
+    static_assert(static_cast<size_t>(ClientLimit::Unlimited) == 0, "ClientLimit::Unlimited");
+    static_assert(static_cast<size_t>(ClientLimit::Default) == 1000, "ClientLimit::Default");
+    static_assert(static_cast<size_t>(ClientLimit::Low) == 100, "ClientLimit::Low");
+    static_assert(static_cast<size_t>(ClientLimit::Medium) == 500, "ClientLimit::Medium");
+    static_assert(static_cast<size_t>(ClientLimit::High) == 2000, "ClientLimit::High");
+    static_assert(static_cast<size_t>(ClientLimit::Maximum) == 10000, "ClientLimit::Maximum");
 
     // The ClientLimit seen via ServerBase.h and HttpPollServer.h must be the
     // same type (they both include ServerTypes.h, there is only one
