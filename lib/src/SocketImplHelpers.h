@@ -83,14 +83,14 @@ bool setSocketOption(SocketHandle socketHandle, int level, int optname,
         fprintf(stderr, "  Error code: %d\n", errorCode);
 
 #ifdef _WIN32
-        LPSTR errorText = nullptr;
+        LPSTR errorCodeText = nullptr;
         FormatMessageA(FORMAT_MESSAGE_ALLOCATE_BUFFER
                 | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
             nullptr, errorCode, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
-            (LPSTR)&errorText, 0, nullptr);
-        if (errorText) {
-            fprintf(stderr, "  Error message: %s", errorText);
-            LocalFree(errorText);
+            (LPSTR)&errorCodeText, 0, nullptr);
+        if (errorCodeText) {
+            fprintf(stderr, "  Error message: %s", errorCodeText);
+            LocalFree(errorCodeText);
         }
 #else
         fprintf(stderr, "  Error message: %s\n", strerror(errorCode));
