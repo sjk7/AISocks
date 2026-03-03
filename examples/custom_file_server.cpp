@@ -7,9 +7,8 @@
 // Demonstrates how to derive from HttpFileServer and override virtual functions
 
 #include "HttpFileServer.h"
+#include "FileIO.h"
 #include <iostream>
-#include <fstream>
-#include <sstream>
 #include <chrono>
 
 using namespace aiSocks;
@@ -21,15 +20,13 @@ public:
         : HttpFileServer(bind, config) {
         
         // Open log file
-        logFile_.open("access.log", std::ios::app);
+        logFile_.open("access.log", "a");
         
         // Note: Authentication header will be added by the base class
     }
 
     ~CustomFileServer() {
-        if (logFile_.is_open()) {
-            logFile_.close();
-        }
+        logFile_.close();
     }
 
 protected:
@@ -88,48 +85,61 @@ protected:
 
     /// Override to customize error pages
     std::string generateErrorHtml(int code, const std::string& status, const std::string& message) const override {
-        std::ostringstream html;
-        html << "<!DOCTYPE html>\n";
-        html << "<html><head>\n";
-        html << "<title>" << code << " " << status << "</title>\n";
-        html << "<style>\n";
-        html << "body { font-family: Arial, sans-serif; margin: 40px; background: #f5f5f5; }\n";
-        html << ".error-container { background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }\n";
-        html << "h1 { color: #e74c3c; }\n";
-        html << ".back-link { color: #3498db; text-decoration: none; }\n";
-        html << "</style>\n";
-        html << "</head><body>\n";
-        html << "<div class=\"error-container\">\n";
-        html << "<h1>" << code << " " << status << "</h1>\n";
-        html << "<p>" << message << "</p>\n";
-        html << "<p><a href=\"/\" class=\"back-link\">← Back to Home</a></p>\n";
-        html << "<hr><p><small>Custom File Server | " << getCurrentTime() << "</small></p>\n";
-        html << "</div></body></html>";
-        return html.str();
+        StringBuilder html;
+        html.append("<!DOCTYPE html>\n");
+        html.append("<html><head><title>");
+        html.appendFormat("%d", code);
+        html.append(" ");
+        html.append(status);
+        html.append("</title>\n");
+        html.append("<style>\n");
+        html.append("body { font-family: Arial, sans-serif; margin: 40px; background-color: #f5f5f5; }\n");
+        html.append(".error-container { max-width: 600px; margin: 0 auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }\n");
+        html.append("h1 { color: #e74c3c; margin-bottom: 20px; }\n");
+        html.append("p { color: #555; line-height: 1.6; }\n");
+        html.append(".back-link { display: inline-block; margin-top: 20px; padding: 10px 20px; background: #3498db; color: white; text-decoration: none; border-radius: 4px; }\n");
+        html.append(".back-link:hover { background: #2980b9; }\n");
+        html.append("</style></head>\n");
+        html.append("<body><div class=\"error-container\">\n");
+        html.append("<h1>");
+        html.appendFormat("%d", code);
+        html.append(" ");
+        html.append(status);
+        html.append("</h1>\n");
+        html.append("<p>");
+        html.append(message);
+        html.append("</p>\n");
+        html.append("<a href=\"/\" class=\"back-link\">← Back to Home</a>\n");
+        html.append("</div></body></html>");
+        return html.toString();
     }
 
     /// Override to customize directory listing
     std::string generateDirectoryListing(const std::string& dirPath) const override {
-        std::ostringstream html;
-        html << "<!DOCTYPE html>\n";
-        html << "<html><head>\n";
-        html << "<title>Directory: " << dirPath << "</title>\n";
-        html << "<style>\n";
-        html << "body { font-family: Arial, sans-serif; margin: 20px; }\n";
-        html << "table { border-collapse: collapse; width: 100%; }\n";
-        html << "th, td { padding: 8px; text-align: left; border-bottom: 1px solid #ddd; }\n";
-        html << "th { background-color: #f2f2f2; }\n";
-        html << "a { text-decoration: none; color: #3498db; }\n";
-        html << "a:hover { text-decoration: underline; }\n";
-        html << "</style>\n";
-        html << "</head><body>\n";
-        html << "<h1>📁 Directory listing: " << dirPath << "</h1>\n";
-        html << "<table>\n";
-        html << "<tr><th>Name</th><th>Type</th><th>Size</th><th>Modified</th></tr>\n";
+        StringBuilder html;
+        html.append("<!DOCTYPE html>\n");
+        html.append("<html><head>\n");
+        html.append("<title>Directory: ");
+        html.append(dirPath);
+        html.append("</title>\n");
+        html.append("<style>\n");
+        html.append("body { font-family: Arial, sans-serif; margin: 20px; }\n");
+        html.append("table { border-collapse: collapse; width: 100%; }\n");
+        html.append("th, td { padding: 8px; text-align: left; border-bottom: 1px solid #ddd; }\n");
+        html.append("th { background-color: #f2f2f2; }\n");
+        html.append("a { text-decoration: none; color: #3498db; }\n");
+        html.append("a:hover { text-decoration: underline; }\n");
+        html.append("</style>\n");
+        html.append("</head><body>\n");
+        html.append("<h1>📁 Directory listing: ");
+        html.append(dirPath);
+        html.append("</h1>\n");
+        html.append("<table>\n");
+        html.append("<tr><th>Name</th><th>Type</th><th>Size</th><th>Modified</th></tr>\n");
         
         // Add parent directory link
         if (dirPath != getConfig().documentRoot) {
-            html << "<tr><td><a href=\"../\">📁 ../</a></td><td>Directory</td><td>-</td><td>-</td></tr>\n";
+            html.append("<tr><td><a href=\"../\">📁 ../</a></td><td>Directory</td><td>-</td><td>-</td></tr>\n");
         }
         
         try {
@@ -139,26 +149,27 @@ protected:
                 std::string name = entry.path().filename().string();
                 if (name.empty() || name[0] == '.') continue; // Skip hidden files
                 
-                entries.emplace_back(name, entry.is_directory());
+                std::string fullPath = dirPath + "/" + name;
+                bool isDir = entry.is_directory();
+                entries.emplace_back(name, isDir);
             }
             
-            // Sort: directories first, then files, both alphabetically
+            // Sort entries: directories first, then files, both alphabetically
             std::sort(entries.begin(), entries.end(), 
                 [](const auto& a, const auto& b) {
-                    if (a.second != b.second) return a.second; // directories first
+                    if (a.second != b.second) return a.second > b.second; // directories first
                     return a.first < b.first; // alphabetical
                 });
             
             for (const auto& [name, isDir] : entries) {
                 std::string fullPath = dirPath + "/" + name;
-                std::string icon = isDir ? "📁" : "📄";
-                std::string type = isDir ? "Directory" : getMimeType(fullPath);
+                std::string type = isDir ? "Directory" : getFileExtension(name);
                 std::string size = "-";
                 std::string modified = "-";
                 
                 if (!isDir) {
                     try {
-                        auto fileSize = std::filesystem::file_size(fullPath);
+                        size_t fileSize = std::filesystem::file_size(fullPath);
                         if (fileSize < 1024) {
                             size = std::to_string(fileSize) + " B";
                         } else if (fileSize < 1024 * 1024) {
@@ -171,42 +182,65 @@ protected:
                         auto sctp = std::chrono::time_point_cast<std::chrono::system_clock::duration>(
                             modTime - std::filesystem::file_time_type::clock::now() + std::chrono::system_clock::now());
                         std::time_t cftime = std::chrono::system_clock::to_time_t(sctp);
-                        std::ostringstream oss;
+                        
+                        char buffer[32];
 #ifdef _WIN32
                         struct tm timeinfo = {};
                         localtime_s(&timeinfo, &cftime);
-                        oss << std::put_time(&timeinfo, "%Y-%m-%d %H:%M");
+                        std::strftime(buffer, sizeof(buffer), "%Y-%m-%d %H:%M", &timeinfo);
 #else
-                        oss << std::put_time(std::localtime(&cftime), "%Y-%m-%d %H:%M");
+                        struct tm* timeinfo = std::localtime(&cftime);
+                        std::strftime(buffer, sizeof(buffer), "%Y-%m-%d %H:%M", timeinfo);
 #endif
-                        modified = oss.str();
+                        modified = std::string(buffer);
                     } catch (...) {
                         // Ignore errors for file stats
                     }
                 }
                 
-                html << "<tr><td><a href=\"" << name << (isDir ? "/" : "") << "\">";
-                html << icon << " " << name << (isDir ? "/" : "") << "</a></td>";
-                html << "<td>" << type << "</td>";
-                html << "<td>" << size << "</td>";
-                html << "<td>" << modified << "</td></tr>\n";
+                html.append("<tr><td><a href=\"");
+                html.append(name);
+                if (isDir) {
+                    html.append("/");
+                }
+                html.append("\">");
+                html.append(isDir ? "📁" : "📄");
+                html.append(" ");
+                html.append(name);
+                if (isDir) {
+                    html.append("/");
+                }
+                html.append("</a></td>");
+                html.append("<td>");
+                html.append(type);
+                html.append("</td>");
+                html.append("<td>");
+                html.append(size);
+                html.append("</td>");
+                html.append("<td>");
+                html.append(modified);
+                html.append("</td></tr>\n");
             }
         } catch (const std::exception& e) {
-            html << "<tr><td colspan=\"4\">Error reading directory: " << e.what() << "</td></tr>\n";
+            html.append("<tr><td colspan=\"4\">Error reading directory: ");
+            html.append(e.what());
+            html.append("</td></tr>\n");
         }
         
-        html << "</table>\n";
-        html << "<hr><p><small>Custom File Server | " << getCurrentTime() << "</small></p>\n";
-        html << "</body></html>";
-        return html.str();
+        html.append("</table>\n");
+        html.append("<hr><p><small>Custom File Server | ");
+        html.append(getCurrentTime());
+        html.append("</small></p>\n");
+        html.append("</body></html>");
+        return html.toString();
     }
 
 private:
-    std::ofstream logFile_;
+    File logFile_;
     
     void logRequest(const HttpRequest& request, const HttpClientState& state) {
         (void)state; // Suppress unused parameter warning - available for future enhancements
-        if (!logFile_.is_open()) return;
+        if (!logFile_.isOpen()) return;
         
         auto now = std::chrono::system_clock::now();
         auto time_t = std::chrono::system_clock::to_time_t(now);
@@ -214,13 +248,17 @@ private:
 #ifdef _WIN32
         struct tm timeinfo = {};
         localtime_s(&timeinfo, &time_t);
-        logFile_ << std::put_time(&timeinfo, "%Y-%m-%d %H:%M:%S");
+        logFile_.printf("%04d-%02d-%02d %02d:%02d:%02d %s %s from client\n",
+            timeinfo.tm_year + 1900, timeinfo.tm_mon + 1, timeinfo.tm_mday,
+            timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec,
+            request.method.c_str(), request.path.c_str());
 #else
-        logFile_ << std::put_time(std::localtime(&time_t), "%Y-%m-%d %H:%M:%S");
+        struct tm* timeinfo = std::localtime(&time_t);
+        logFile_.printf("%04d-%02d-%02d %02d:%02d:%02d %s %s from client\n",
+            timeinfo->tm_year + 1900, timeinfo->tm_mon + 1, timeinfo->tm_mday,
+            timeinfo->tm_hour, timeinfo->tm_min, timeinfo->tm_sec,
+            request.method.c_str(), request.path.c_str());
 #endif
-        logFile_ << " " << request.method << " " << request.path;
-        logFile_ << " from client";
-        logFile_ << std::endl;
         logFile_.flush();
     }
     
@@ -245,29 +283,32 @@ private:
         std::string htmlBody = generateErrorHtml(401, "Unauthorized", 
             "This server requires authentication. Please provide valid credentials.");
         
-        std::ostringstream response;
-        response << "HTTP/1.1 401 Unauthorized\r\n";
-        response << "Content-Type: text/html\r\n";
-        response << "Content-Length: " << htmlBody.size() << "\r\n";
-        response << "WWW-Authenticate: Basic realm=\"Secure Area\"\r\n";
-        response << "\r\n" << htmlBody;
+        StringBuilder response;
+        response.append("HTTP/1.1 401 Unauthorized\r\n");
+        response.append("Content-Type: text/html\r\nContent-Length: ");
+        response.appendFormat("%zu", htmlBody.size());
+        response.append("\r\nWWW-Authenticate: Basic realm=\"Secure Area\"\r\n\r\n");
+        response.append(htmlBody);
         
-        state.responseBuf = response.str();
+        state.responseBuf = response.toString();
         state.responseView = state.responseBuf;
     }
     
     std::string getCurrentTime() const {
         auto now = std::chrono::system_clock::now();
         auto time_t = std::chrono::system_clock::to_time_t(now);
-        std::ostringstream oss;
+        
+        char buffer[32];
 #ifdef _WIN32
         struct tm timeinfo = {};
         localtime_s(&timeinfo, &time_t);
-        oss << std::put_time(&timeinfo, "%Y-%m-%d %H:%M:%S");
+        std::strftime(buffer, sizeof(buffer), "%Y-%m-%d %H:%M:%S", &timeinfo);
 #else
-        oss << std::put_time(std::localtime(&time_t), "%Y-%m-%d %H:%M:%S");
+        struct tm* timeinfo = std::localtime(&time_t);
+        std::strftime(buffer, sizeof(buffer), "%Y-%m-%d %H:%M:%S", timeinfo);
 #endif
-        return oss.str();
+        
+        return std::string(buffer);
     }
     
     std::string getFileExtension(const std::string& filePath) const {

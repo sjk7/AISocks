@@ -6,13 +6,13 @@
 
 #include "HttpPollServer.h"
 #include "HttpRequest.h"
-#include <fstream>
-#include <sstream>
+#include "FileIO.h"
 #include <string>
 #include <vector>
 #include <map>
 #include <ctime>
 #include <iomanip>
+#include <sstream>
 #include <filesystem>
 
 namespace aiSocks {
@@ -272,28 +272,37 @@ protected:
         }
 
         // Build response
-        std::ostringstream response;
-        response << "HTTP/1.1 200 OK\r\n";
-        response << "Content-Type: " << getMimeType(filePath) << "\r\n";
-        response << "Content-Length: " << fileContent.size() << "\r\n";
+        StringBuilder response;
+        response.append("HTTP/1.1 200 OK\r\n");
+        response.append("Content-Type: ");
+        response.append(getMimeType(filePath));
+        response.append("\r\nContent-Length: ");
+        response.appendFormat("%zu", fileContent.size());
+        response.append("\r\n");
         
         if (config_.enableLastModified) {
-            response << "Last-Modified: " << formatHttpDate(fileInfo.lastModified) << "\r\n";
+            response.append("Last-Modified: ");
+            response.append(formatHttpDate(fileInfo.lastModified));
+            response.append("\r\n");
         }
         
         if (config_.enableETag && !fileInfo.etag.empty()) {
-            response << "ETag: " << fileInfo.etag << "\r\n";
+            response.append("ETag: ");
+            response.append(fileInfo.etag);
+            response.append("\r\n");
         }
         
         // Add custom headers
         for (const auto& [name, value] : config_.customHeaders) {
-            response << name << ": " << value << "\r\n";
+            response.append(name);
+            response.append(": ");
+            response.append(value);
+            response.append("\r\n");
         }
         
-        response << "\r\n";
+        response.append("\r\n");
         
-        std::string headerStr = response.str();
-        state.responseBuf = headerStr + std::string(fileContent.begin(), fileContent.end());
+        state.responseBuf = response.toString() + std::string(fileContent.begin(), fileContent.end());
         state.responseView = state.responseBuf;
     }
 
@@ -301,43 +310,58 @@ protected:
     virtual void sendError(HttpClientState& state, int code, const std::string& status, const std::string& message) {
         std::string htmlBody = generateErrorHtml(code, status, message);
         
-        std::ostringstream response;
-        response << "HTTP/1.1 " << code << " " << status << "\r\n";
-        response << "Content-Type: text/html\r\n";
-        response << "Content-Length: " << htmlBody.size() << "\r\n";
+        StringBuilder response;
+        response.append("HTTP/1.1 ");
+        response.appendFormat("%d", code);
+        response.append(" ");
+        response.append(status);
+        response.append("\r\nContent-Type: text/html\r\nContent-Length: ");
+        response.appendFormat("%zu", htmlBody.size());
+        response.append("\r\n");
         
         // Add custom headers
         for (const auto& [name, value] : config_.customHeaders) {
-            response << name << ": " << value << "\r\n";
+            response.append(name);
+            response.append(": ");
+            response.append(value);
+            response.append("\r\n");
         }
         
-        response << "\r\n" << htmlBody;
+        response.append("\r\n");
+        response.append(htmlBody);
         
-        state.responseBuf = response.str();
+        state.responseBuf = response.toString();
         state.responseView = state.responseBuf;
     }
 
     /// Virtual customization point: send 304 Not Modified response
     virtual void sendNotModified(HttpClientState& state, const FileInfo& fileInfo) {
-        std::ostringstream response;
-        response << "HTTP/1.1 304 Not Modified\r\n";
+        StringBuilder response;
+        response.append("HTTP/1.1 304 Not Modified\r\n");
         
         if (config_.enableLastModified) {
-            response << "Last-Modified: " << formatHttpDate(fileInfo.lastModified) << "\r\n";
+            response.append("Last-Modified: ");
+            response.append(formatHttpDate(fileInfo.lastModified));
+            response.append("\r\n");
         }
         
         if (config_.enableETag && !fileInfo.etag.empty()) {
-            response << "ETag: " << fileInfo.etag << "\r\n";
+            response.append("ETag: ");
+            response.append(fileInfo.etag);
+            response.append("\r\n");
         }
         
         // Add custom headers
         for (const auto& [name, value] : config_.customHeaders) {
-            response << name << ": " << value << "\r\n";
+            response.append(name);
+            response.append(": ");
+            response.append(value);
+            response.append("\r\n");
         }
         
-        response << "\r\n";
+        response.append("\r\n");
         
-        state.responseBuf = response.str();
+        state.responseBuf = response.toString();
         state.responseView = state.responseBuf;
     }
 
@@ -345,41 +369,60 @@ protected:
     virtual void sendDirectoryListing(HttpClientState& state, const std::string& dirPath) {
         std::string htmlBody = generateDirectoryListing(dirPath);
         
-        std::ostringstream response;
-        response << "HTTP/1.1 200 OK\r\n";
-        response << "Content-Type: text/html\r\n";
-        response << "Content-Length: " << htmlBody.size() << "\r\n";
+        StringBuilder response;
+        response.append("HTTP/1.1 200 OK\r\n");
+        response.append("Content-Type: text/html\r\nContent-Length: ");
+        response.appendFormat("%zu", htmlBody.size());
+        response.append("\r\n");
         
         // Add custom headers
         for (const auto& [name, value] : config_.customHeaders) {
-            response << name << ": " << value << "\r\n";
+            response.append(name);
+            response.append(": ");
+            response.append(value);
+            response.append("\r\n");
         }
         
-        response << "\r\n" << htmlBody;
+        response.append("\r\n");
+        response.append(htmlBody);
         
-        state.responseBuf = response.str();
+        state.responseBuf = response.toString();
         state.responseView = state.responseBuf;
     }
 
     /// Virtual customization point: generate error HTML
     virtual std::string generateErrorHtml(int code, const std::string& status, const std::string& message) const {
-        std::ostringstream html;
-        html << "<!DOCTYPE html>\n";
-        html << "<html><head><title>" << code << " " << status << "</title></head>\n";
-        html << "<body><h1>" << code << " " << status << "</h1>\n";
-        html << "<p>" << message << "</p>\n";
-        html << "<hr><address>aiSocks HttpFileServer</address>\n";
-        html << "</body></html>";
-        return html.str();
+        StringBuilder html;
+        html.append("<!DOCTYPE html>\n");
+        html.append("<html><head><title>");
+        html.appendFormat("%d", code);
+        html.append(" ");
+        html.append(status);
+        html.append("</title></head>\n");
+        html.append("<body><h1>");
+        html.appendFormat("%d", code);
+        html.append(" ");
+        html.append(status);
+        html.append("</h1>\n");
+        html.append("<p>");
+        html.append(message);
+        html.append("</p>\n");
+        html.append("<hr><address>aiSocks HttpFileServer</address>\n");
+        html.append("</body></html>");
+        return html.toString();
     }
 
     /// Virtual customization point: generate directory listing HTML
     virtual std::string generateDirectoryListing(const std::string& dirPath) const {
-        std::ostringstream html;
-        html << "<!DOCTYPE html>\n";
-        html << "<html><head><title>Directory listing for " << dirPath << "</title></head>\n";
-        html << "<body><h1>Directory listing for " << dirPath << "</h1>\n";
-        html << "<ul>\n";
+        StringBuilder html;
+        html.append("<!DOCTYPE html>\n");
+        html.append("<html><head><title>Directory listing for ");
+        html.append(dirPath);
+        html.append("</title></head>\n");
+        html.append("<body><h1>Directory listing for ");
+        html.append(dirPath);
+        html.append("</h1>\n");
+        html.append("<ul>\n");
         
         try {
             for (const auto& entry : std::filesystem::directory_iterator(dirPath)) {
@@ -389,17 +432,26 @@ protected:
                 std::string path = entry.path().string();
                 bool isDir = entry.is_directory();
                 
-                html << "<li><a href=\"" << name << (isDir ? "/" : "") << "\">";
-                html << name << (isDir ? "/" : "") << "</a></li>\n";
+                html.append("<li><a href=\"");
+                html.append(name);
+                if (isDir) {
+                    html.append("/");
+                }
+                html.append("\">");
+                html.append(name);
+                if (isDir) {
+                    html.append("/");
+                }
+                html.append("</a></li>\n");
             }
         } catch (const std::exception&) {
-            html << "<li>Error reading directory</li>\n";
+            html.append("<li>Error reading directory</li>\n");
         }
         
-        html << "</ul>\n";
-        html << "<hr><address>aiSocks HttpFileServer</address>\n";
-        html << "</body></html>";
-        return html.str();
+        html.append("</ul>\n");
+        html.append("<hr><address>aiSocks HttpFileServer</address>\n");
+        html.append("</body></html>");
+        return html.toString();
     }
 
 protected:
@@ -438,19 +490,10 @@ private:
     }
 
     std::vector<char> readFileContent(const std::string& filePath) const {
-        std::ifstream file(filePath, std::ios::binary);
+        File file(filePath.c_str(), "rb");
         if (!file) return {};
         
-        file.seekg(0, std::ios::end);
-        size_t size = file.tellg();
-        file.seekg(0, std::ios::beg);
-        
-        std::vector<char> content(size);
-        if (!file.read(content.data(), size)) {
-            return {};
-        }
-        
-        return content;
+        return file.readAll();
     }
 
     std::string formatHttpDate(const std::filesystem::file_time_type& fileTime) const {
@@ -458,15 +501,18 @@ private:
             fileTime - std::filesystem::file_time_type::clock::now() + std::chrono::system_clock::now());
         std::time_t cftime = std::chrono::system_clock::to_time_t(sctp);
         
-        std::ostringstream oss;
+        // Use strftime directly for proper HTTP date format
+        char buffer[32];
 #ifdef _WIN32
         struct tm timeinfo = {};
         gmtime_s(&timeinfo, &cftime);
-        oss << std::put_time(&timeinfo, "%a, %d %b %Y %H:%M:%S GMT");
+        std::strftime(buffer, sizeof(buffer), "%a, %d %b %Y %H:%M:%S GMT", &timeinfo);
 #else
-        oss << std::put_time(std::gmtime(&cftime), "%a, %d %b %Y %H:%M:%S GMT");
+        struct tm* timeinfo = std::gmtime(&cftime);
+        std::strftime(buffer, sizeof(buffer), "%a, %d %b %Y %H:%M:%S GMT", timeinfo);
 #endif
-        return oss.str();
+        
+        return std::string(buffer);
     }
 };
 
