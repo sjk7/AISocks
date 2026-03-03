@@ -597,13 +597,14 @@ bool SocketImpl::setBlocking(bool blocking) {
 
 bool SocketImpl::setReuseAddress(bool reuse) {
     RETURN_IF_INVALID();
-    
+
 #ifdef _WIN32
     // ═══════════════════════════════════════════════════════════════════════
     // WINDOWS SOCKET REUSE BEHAVIOR - CRITICAL PLATFORM DIFFERENCES
     // ═══════════════════════════════════════════════════════════════════════
     //
-    // PROBLEM: SO_REUSEADDR has COMPLETELY DIFFERENT semantics on Windows vs Unix.
+    // PROBLEM: SO_REUSEADDR has COMPLETELY DIFFERENT semantics on Windows vs
+    // Unix.
     //
     // On Unix/Linux, SO_REUSEADDR:
     //   ✓ Prevents multiple processes from binding to the same active port
@@ -611,10 +612,11 @@ bool SocketImpl::setReuseAddress(bool reuse) {
     //   ✓ This is the desired behavior for server sockets
     //
     // On Windows, SO_REUSEADDR:
-    //   ✗ ALLOWS multiple processes to bind to the same active port simultaneously!
-    //   ✗ Only the first socket receives connections; others are in zombie state
-    //   ✗ This is a security vulnerability (port hijacking/wildcard hijacking)
-    //   ✗ Example: Two http_file_server.exe instances can both bind to port 8080
+    //   ✗ ALLOWS multiple processes to bind to the same active port
+    //   simultaneously! ✗ Only the first socket receives connections; others
+    //   are in zombie state ✗ This is a security vulnerability (port
+    //   hijacking/wildcard hijacking) ✗ Example: Two http_file_server.exe
+    //   instances can both bind to port 8080
     //
     // SOLUTION: Platform-specific handling to achieve consistent behavior:
     //   Goal 1: Prevent simultaneous binds (second bind() should fail)
@@ -655,12 +657,12 @@ bool SocketImpl::setReuseAddress(bool reuse) {
         // Explicitly request exclusive use (stricter than default)
         int exclusive = 1;
         return setSocketOption(socketHandle, SOL_SOCKET, SO_EXCLUSIVEADDRUSE,
-                             exclusive, "Failed to set exclusive address use");
+            exclusive, "Failed to set exclusive address use");
     }
     // When reuse=true (default), don't set any flags.
     // Default Windows behavior provides exclusive binding + quick rebind.
     return true;
-    
+
 #else
     // ───────────────────────────────────────────────────────────────────────
     // UNIX/LINUX IMPLEMENTATION:
@@ -688,9 +690,11 @@ bool SocketImpl::setReuseAddress(bool reuse) {
     //
     // Testing:
     //   - Start server on port 8080 → succeeds
-    //   - Start second server on port 8080 → fails with "address already in use"
+    //   - Start second server on port 8080 → fails with "address already in
+    //   use"
     //   - Stop first server (Ctrl+C or kill)
-    //   - Start new server on port 8080 → succeeds immediately (no TIME_WAIT wait)
+    //   - Start new server on port 8080 → succeeds immediately (no TIME_WAIT
+    //   wait)
     //
     int optval = reuse ? 1 : 0;
     return setSocketOption(socketHandle, SOL_SOCKET, SO_REUSEADDR, optval,

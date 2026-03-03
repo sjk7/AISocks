@@ -108,22 +108,27 @@ class HttpPollServer : public ServerBase<HttpClientState> {
 
     // Run the server with startup/shutdown messages
     void run(ClientLimit maxClients = ClientLimit::Default,
-             Milliseconds timeout = Milliseconds{-1}) {
+        Milliseconds timeout = Milliseconds{-1}) {
+        printf("DEBUG: HttpPollServer::run() called\n");
         if (!this->isValid()) {
+            printf("DEBUG: Server is not valid! Exiting early.\n");
+            printf("ERROR: Server failed to start - port 8080 is already in use or invalid\n");
             return; // Server not valid, exit early
         }
-        
+
+        printf("DEBUG: Server is valid, calling base class run()\n");
         // Call base class run()
         ServerBase<HttpClientState>::run(maxClients, timeout);
-        
+
         // Print shutdown message
         printf("\nServer stopped gracefully.\n");
     }
-    
-    // Print OS/Build info banner - can be called statically or as instance method
+
+    // Print OS/Build info banner - can be called statically or as instance
+    // method
     static void printBuildInfo() {
-        printf("Built: %s %s  |  OS: %s  |  Build: %s\n", 
-               __DATE__, __TIME__, buildOS(), buildKind());
+        printf("Built: %s %s  |  OS: %s  |  Build: %s\n", __DATE__, __TIME__,
+            buildOS(), buildKind());
     }
 
     protected:
@@ -149,8 +154,8 @@ class HttpPollServer : public ServerBase<HttpClientState> {
     }
 
     virtual void printStartupBanner() {
-        printf("Built: %s %s  |  OS: %s  |  Build: %s\n", 
-               __DATE__, __TIME__, buildOS(), buildKind());
+        printf("Built: %s %s  |  OS: %s  |  Build: %s\n", __DATE__, __TIME__,
+            buildOS(), buildKind());
     }
     // -------------------------------------------------------------------------
     // Must override: fill s.response from s.request.

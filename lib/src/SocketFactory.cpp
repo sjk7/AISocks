@@ -99,9 +99,7 @@ Result<SocketType> SocketFactory::bindSocket(
     // Bind the socket
     if (!socket.bind(config.address, config.port)) {
         return Result<SocketType>::failure(socket.getLastError(),
-            ("bind(" + config.address + ":"
-                + std::to_string(config.port.value()) + ")")
-                .c_str(),
+            "bind() failed - address already in use or invalid",
             SocketFactory::captureLastError(), false);
     }
 
@@ -176,8 +174,7 @@ Result<TcpSocket> SocketFactory::createTcpServer(
     // Bind the socket
     auto bind_result = bindSocket(std::move(socket_result.value()), config);
     if (bind_result.isError()) {
-        return Result<TcpSocket>::failure(
-            bind_result.error(), bind_result.message().c_str(), 0, false);
+        return bind_result; // NRVO will move the Result to preserve error info
     }
 
     // Start listening

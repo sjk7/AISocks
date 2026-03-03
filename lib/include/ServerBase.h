@@ -8,6 +8,7 @@
 #include "ServerSignal.h"
 #include "ServerTypes.h"
 #include "TcpSocket.h"
+#include <cstdlib>
 #include "SocketFactory.h"
 #include <algorithm>
 #include <atomic>
@@ -102,6 +103,7 @@ template <typename ClientData> class ServerBase {
         // Use SocketFactory to create server without exceptions
         auto result = SocketFactory::createTcpServer(family, args);
         if (result.isSuccess()) {
+            printf("DEBUG: SocketFactory::createTcpServer() succeeded\n");
             *listener_ = std::move(result.value());
             // CRITICAL: Server listening socket must be non-blocking so the
             // poller can check stop flags and handle timeouts properly.
@@ -117,8 +119,12 @@ template <typename ClientData> class ServerBase {
             (void)listener_->setReceiveBufferSize(256 * 1024);
             (void)listener_->setSendBufferSize(256 * 1024);
         } else {
-            // Server creation failed - socket remains invalid
-            listener_.reset();
+            // Server creation failed - fatal error, exit immediately
+            fprintf(stderr, "FATAL: SocketFactory::createTcpServer() failed with error "
+                   "code %d: %s\n",
+                   static_cast<int>(result.error()), result.message().c_str());
+            fprintf(stderr, "FATAL: Cannot start server - port 8080 is already in use or invalid\n");
+            exit(1);
         }
     }
 
@@ -293,6 +299,11 @@ template <typename ClientData> class ServerBase {
                 }
             }
         }
+
+        printf(
+            "DEBUG: Event loop exited - stop=%d, accepting=%d, clients=%zu\n",
+            stop_.load(std::memory_order_relaxed), accepting,
+            clientFds_.size());
 
         // Flush any accumulated keep-alive timeout count before exiting.
         if (timeoutLogCount_ > 0) {

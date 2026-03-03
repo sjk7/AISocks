@@ -8,6 +8,7 @@
 
 #include "HttpFileServer.h"
 #include "custom_file_server_strings.h"
+#include "CustomFileServerHtmlHelpers.h"
 #include "FileIO.h"
 #include <iostream>
 #include <chrono>
@@ -322,11 +323,7 @@ protected:
         html.append("</div>\n");
         
         html.append("</div>\n");
-        html.append("<div class=\"footer\">\n");
-        html.append("<p>Custom File Server | Built with aiSocks HttpFileServer</p>\n");
-        html.append("</div>\n");
-        html.append("</div>\n");
-        html.append("</body></html>\n");
+        html.append(CustomFileServerHtmlHelpers::generateDirectoryListingFooter());
         
         return html.toString();
     }
@@ -334,11 +331,7 @@ protected:
     /// Generate demo page that executes test.js
     std::string generateDemoPage() const {
         StringBuilder html(2048);
-        html.append("<!DOCTYPE html>\n");
-        html.append("<html><head>\n");
-        html.append("<title>JavaScript Demo - test.js</title>\n");
-        html.append("<style>\n");
-        html.append("body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }\n");
+        html.append(CustomFileServerHtmlHelpers::generateDemoPageStart());
         html.append(".container { max-width: 800px; margin: 0 auto; background: white; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); padding: 30px; }\n");
         html.append("h1 { color: #2c3e50; margin-top: 0; }\n");
         html.append(".info { background: #e3f2fd; border-left: 4px solid #2196f3; padding: 15px; margin: 20px 0; border-radius: 4px; }\n");
@@ -413,8 +406,10 @@ protected:
             remaining -= chunkSize;
         }
         
+        
         state.responseView = state.responseBuf;
     }
+    
 
     /// Override to customize directory listing
     std::string generateDirectoryListing(const std::string& dirPath) const override {
@@ -527,6 +522,7 @@ protected:
         html.append("</body></html>");
         return html.toString();
     }
+    
 
 private:
     File logFile_;
