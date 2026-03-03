@@ -511,7 +511,22 @@ private:
     }
 };
 
+#include <csignal>
+
+// Global flag for clean shutdown
+volatile std::sig_atomic_t shutdownRequested = 0;
+
+void signalHandler(int signal) {
+    if (signal == SIGINT) {
+        shutdownRequested = 1;
+        std::cout << "\n\n🛑 Shutdown requested. Cleaning up...\n";
+    }
+}
+
 int main() {
+    // Set up signal handler for Ctrl+C
+    std::signal(SIGINT, signalHandler);
+    
     std::cout << "=== Custom HTTP File Server Example ===\n";
     
     // Configure the file server
@@ -630,6 +645,13 @@ int main() {
         
         // Run the server (blocking call)
         server.run(ClientLimit::Unlimited, Milliseconds{0});
+        
+        // Server has stopped (likely due to Ctrl+C)
+        if (shutdownRequested) {
+            std::cout << "✅ Server stopped cleanly.\n";
+            std::cout << "📝 Access log saved to: access.log\n";
+            std::cout << "👋 Thank you for using HttpFileServer!\n";
+        }
         
     } catch (const std::exception& e) {
         std::cerr << "Error: " << e.what() << std::endl;
