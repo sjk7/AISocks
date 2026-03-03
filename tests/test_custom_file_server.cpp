@@ -10,6 +10,7 @@
 #include "HttpFileServer.h"
 #include "FileIO.h"
 #include "PathHelper.h"
+#include "test_string_literals.h"
 #include <iostream>
 #include <string>
 #include <thread>
@@ -22,7 +23,6 @@
 #else
 #include <sys/stat.h>
 #include <sys/types.h>
-#include "test_string_literals.h"
 #endif
 
 using namespace aiSocks;
