@@ -70,14 +70,32 @@ protected:
             return;
         }
 
-        // Security check: prevent path traversal
-        if (request.path.find("..") != std::string::npos) {
+        // Resolve the file path (includes URL decoding)
+        std::string filePath = resolveFilePath(request.path);
+        
+        // Security check: prevent path traversal (must be AFTER URL decoding)
+        if (filePath.find("..") != std::string::npos) {
             sendError(state, 400, "Bad Request", "Path traversal not allowed");
             return;
         }
-
-        // Resolve the file path
-        std::string filePath = resolveFilePath(request.path);
+        
+        // Additional security: prevent Windows backslash traversal
+        if (filePath.find("\\") != std::string::npos) {
+            sendError(state, 400, "Bad Request", "Backslash paths not allowed");
+            return;
+        }
+        
+        // Additional security: prevent absolute paths
+        if (!filePath.empty() && (filePath[0] == '/' || filePath[0] == '\\')) {
+            sendError(state, 400, "Bad Request", "Absolute paths not allowed");
+            return;
+        }
+        
+        // Additional security: ensure path starts with document root
+        if (filePath.find(config_.documentRoot) != 0) {
+            sendError(state, 400, "Bad Request", "Access denied");
+            return;
+        }
         
         // Check if path exists and get file info
         FileInfo fileInfo = getFileInfo(filePath);
