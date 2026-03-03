@@ -268,59 +268,59 @@ class TestFramework {
 public:
     static void assert_true(bool condition, const std::string& message) {
         if (!condition) {
-            std::cerr << "❌ FAILED: " << message << std::endl;
+            fprintf(stderr, "[X] FAILED: %s\n", message.c_str());
             failedTests++;
         } else {
-            std::cout << "✅ PASSED: " << message << std::endl;
+            printf("[OK] PASSED: %s\n", message.c_str());
             passedTests++;
         }
     }
     
     static void assert_equals(const std::string& expected, const std::string& actual, const std::string& message) {
         if (expected != actual) {
-            std::cerr << "❌ FAILED: " << message << std::endl;
-            std::cerr << "   Expected: '" << expected << "'" << std::endl;
-            std::cerr << "   Actual:   '" << actual << "'" << std::endl;
+            fprintf(stderr, "[X] FAILED: %s\n", message.c_str());
+            fprintf(stderr, "   Expected: \'%s\'\n", expected.c_str());
+            fprintf(stderr, "   Actual:   \'%s\'\n", actual.c_str());
             failedTests++;
         } else {
-            std::cout << "✅ PASSED: " << message << std::endl;
+            printf("[OK] PASSED: %s\n", message.c_str());
             passedTests++;
         }
     }
     
     static void assert_contains(const std::string& haystack, const std::string& needle, const std::string& message) {
         if (haystack.find(needle) == std::string::npos) {
-            std::cerr << "❌ FAILED: " << message << std::endl;
-            std::cerr << "   Expected to contain: '" << needle << "'" << std::endl;
-            std::cerr << "   Actual string: '" << haystack << "'" << std::endl;
+            fprintf(stderr, "[X] FAILED: %s\n", message.c_str());
+            fprintf(stderr, "   Expected to contain: \'%s\'\n", needle.c_str());
+            fprintf(stderr, "   Actual string: \'%s\'\n", haystack.c_str());
             failedTests++;
         } else {
-            std::cout << "✅ PASSED: " << message << std::endl;
+            printf("[OK] PASSED: %s\n", message.c_str());
             passedTests++;
         }
     }
     
     static void assert_not_contains(const std::string& haystack, const std::string& needle, const std::string& message) {
         if (haystack.find(needle) != std::string::npos) {
-            std::cerr << "❌ FAILED: " << message << std::endl;
-            std::cerr << "   Should NOT contain: '" << needle << "'" << std::endl;
+            fprintf(stderr, "[X] FAILED: %s\n", message.c_str());
+            fprintf(stderr, "   Should NOT contain: \'%s\'\n", needle.c_str());
             failedTests++;
         } else {
-            std::cout << "✅ PASSED: " << message << std::endl;
+            printf("[OK] PASSED: %s\n", message.c_str());
             passedTests++;
         }
     }
     
     static void printSummary() {
-        std::cout << "\n=== TEST SUMMARY ===" << std::endl;
-        std::cout << "Passed: " << passedTests << std::endl;
-        std::cout << "Failed: " << failedTests << std::endl;
-        std::cout << "Total:  " << (passedTests + failedTests) << std::endl;
+        printf("\n=== TEST SUMMARY ===\n");
+        printf("Passed: %d\n", passedTests);
+        printf("Failed: %d\n", failedTests);
+        printf("Total:  %d\n", (passedTests + failedTests));
         
         if (failedTests == 0) {
-            std::cout << "🎉 ALL TESTS PASSED!" << std::endl;
+            printf("[SUCCESS] ALL TESTS PASSED!\n");
         } else {
-            std::cout << "💥 SOME TESTS FAILED!" << std::endl;
+            printf("[ERROR] SOME TESTS FAILED!\n");
         }
     }
     
@@ -401,7 +401,7 @@ void cleanupTestEnvironment() {
 
 /// Test authentication behavior - what users experience
 void testAuthenticationBehavior() {
-    std::cout << "\n=== TESTING AUTHENTICATION BEHAVIOR ===" << std::endl;
+    printf("\n=== TESTING AUTHENTICATION BEHAVIOR ===\n");
     
     HttpFileServer::Config config;
     config.documentRoot = "test_www";
@@ -456,7 +456,7 @@ void testAuthenticationBehavior() {
 
 /// Test file serving behavior - what users experience when requesting files
 void testFileServingBehavior() {
-    std::cout << "\n=== TESTING FILE SERVING BEHAVIOR ===" << std::endl;
+    printf("\n=== TESTING FILE SERVING BEHAVIOR ===\n");
     
     HttpFileServer::Config config;
     config.documentRoot = "test_www";
@@ -517,7 +517,7 @@ void testFileServingBehavior() {
 
 /// Test error handling behavior - unhappy paths
 void testErrorHandlingBehavior() {
-    std::cout << "\n=== TESTING ERROR HANDLING (UNHAPPY PATHS) ===" << std::endl;
+    printf("\n=== TESTING ERROR HANDLING (UNHAPPY PATHS) ===\n");
     
     HttpFileServer::Config config;
     config.documentRoot = "test_www";
@@ -620,7 +620,7 @@ void testErrorHandlingBehavior() {
 
 /// Test invalid HTTP methods - unhappy paths
 void testInvalidMethodsBehavior() {
-    std::cout << "\n=== TESTING INVALID HTTP METHODS (UNHAPPY PATHS) ===" << std::endl;
+    printf("\n=== TESTING INVALID HTTP METHODS (UNHAPPY PATHS) ===\n");
     
     HttpFileServer::Config config;
     config.documentRoot = "test_www";
@@ -682,7 +682,7 @@ void testInvalidMethodsBehavior() {
 
 /// Test malformed requests - unhappy paths
 void testMalformedRequestsBehavior() {
-    std::cout << "\n=== TESTING MALFORMED REQUESTS (UNHAPPY PATHS) ===" << std::endl;
+    printf("\n=== TESTING MALFORMED REQUESTS (UNHAPPY PATHS) ===\n");
     
     HttpFileServer::Config config;
     config.documentRoot = "test_www";
@@ -730,7 +730,7 @@ void testMalformedRequestsBehavior() {
 
 /// Test path traversal attempts - unhappy paths (security)
 void testPathTraversalBehavior() {
-    std::cout << "\n=== TESTING PATH TRAVERSAL ATTACKS (UNHAPPY PATHS) ===" << std::endl;
+    printf("\n=== TESTING PATH TRAVERSAL ATTACKS (UNHAPPY PATHS) ===\n");
     
     HttpFileServer::Config config;
     config.documentRoot = "test_www";
@@ -747,7 +747,7 @@ void testPathTraversalBehavior() {
         std::string body = BehavioralTestHelper::extractBody(state.responseBuf);
         
         // Print actual status for debugging
-        std::cout << "   DEBUG: Path traversal /../etc/passwd returns: " << status << std::endl;
+        printf("   DEBUG: Path traversal /../etc/passwd returns: %s\n", status.c_str());
         
         TestFramework::assert_true(
             status.find("403") != std::string::npos || status.find("404") != std::string::npos,
@@ -783,7 +783,7 @@ void testPathTraversalBehavior() {
 
 /// Test authentication failures - unhappy paths
 void testAuthenticationFailuresBehavior() {
-    std::cout << "\n=== TESTING AUTHENTICATION FAILURES (UNHAPPY PATHS) ===" << std::endl;
+    printf("\n=== TESTING AUTHENTICATION FAILURES (UNHAPPY PATHS) ===\n");
     
     HttpFileServer::Config config;
     config.documentRoot = "test_www";
@@ -850,9 +850,9 @@ void testAuthenticationFailuresBehavior() {
 
 /// Main test runner - focused on behavior, not implementation
 int main() {
-    std::cout << "🧪 CustomFileServer Behavioral Test Suite" << std::endl;
-    std::cout << "=========================================" << std::endl;
-    std::cout << "Testing user-facing behavior, not internal implementation" << std::endl;
+    printf("[TEST] CustomFileServer Behavioral Test Suite\n");
+    printf("=========================================\n");
+    printf("Testing user-facing behavior, not internal implementation\n");
     
     try {
         setupTestEnvironment();
@@ -872,7 +872,7 @@ int main() {
         return TestFramework::failedTests > 0 ? 1 : 0;
         
     } catch (const std::exception& e) {
-        std::cerr << "💥 Test suite failed with exception: " << e.what() << std::endl;
+        fprintf(stderr, "Test suite failed with exception: %s\n", e.what());
         cleanupTestEnvironment();
         return 1;
     }
