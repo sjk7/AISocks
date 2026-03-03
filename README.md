@@ -62,40 +62,129 @@ aiSocks/
 
 ## Building
 
-### Debug (default)
-```bash
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DBUILD_EXAMPLES=ON -G Ninja
-cmake --build build --target http_server
-```
+### Release with Debug Info (Recommended)
 
-### Release
-```bash
-cmake -S . -B build-mac-rel -DCMAKE_BUILD_TYPE=Release -DBUILD_EXAMPLES=ON -G Ninja
-cmake --build build-mac-rel --target http_server
-```
-
-### With sanitizers
-```bash
-# AddressSanitizer
-cmake -S . -B build-asan -DCMAKE_BUILD_TYPE=Debug -DENABLE_ASAN=ON -DBUILD_EXAMPLES=ON -G Ninja
-
-# MemorySanitizer
-cmake -S . -B build-msan -DCMAKE_BUILD_TYPE=Debug -DENABLE_MSAN=ON -DBUILD_EXAMPLES=ON -G Ninja
-
-# UndefinedBehaviorSanitizer
-cmake -S . -B build-ubsan -DCMAKE_BUILD_TYPE=RelWithDebInfo -DENABLE_UBSAN=ON -DBUILD_EXAMPLES=ON -G Ninja
-```
-
-### Windows
+#### Windows (MSVC)
 ```powershell
-cmake -S . -B build -DBUILD_EXAMPLES=ON
-cmake --build build --config Release
+cmake -S . -B build-release -G "Visual Studio 17 2022" -A x64 -DCMAKE_BUILD_TYPE=RelWithDebInfo -DBUILD_TESTS=ON -DBUILD_EXAMPLES=ON
+cmake --build build-release --config RelWithDebInfo --parallel
+```
+
+#### macOS (Clang)
+```bash
+cmake -S . -B build-release -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DBUILD_TESTS=ON -DBUILD_EXAMPLES=ON
+cmake --build build-release --parallel
+```
+
+#### Linux (GCC or Clang)
+```bash
+cmake -S . -B build-release -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DBUILD_TESTS=ON -DBUILD_EXAMPLES=ON
+cmake --build build-release --parallel
+```
+
+### Debug Build
+
+#### Windows (MSVC)
+```powershell
+cmake -S . -B build-debug -G "Visual Studio 17 2022" -A x64 -DCMAKE_BUILD_TYPE=Debug -DBUILD_TESTS=ON -DBUILD_EXAMPLES=ON
+cmake --build build-debug --config Debug --parallel
+```
+
+#### macOS & Linux
+```bash
+cmake -S . -B build-debug -G Ninja -DCMAKE_BUILD_TYPE=Debug -DBUILD_TESTS=ON -DBUILD_EXAMPLES=ON
+cmake --build build-debug --parallel
+```
+
+### With Sanitizers
+
+#### AddressSanitizer (Linux/macOS)
+```bash
+cmake -S . -B build-asan -G Ninja -DCMAKE_BUILD_TYPE=Debug -DENABLE_ASAN=ON -DBUILD_TESTS=ON -DBUILD_EXAMPLES=ON
+cmake --build build-asan --parallel
+```
+
+#### MemorySanitizer (Linux only)
+```bash
+cmake -S . -B build-msan -G Ninja -DCMAKE_BUILD_TYPE=Debug -DENABLE_MSAN=ON -DBUILD_TESTS=ON -DBUILD_EXAMPLES=ON
+cmake --build build-msan --parallel
+```
+
+#### UndefinedBehaviorSanitizer (Linux/macOS)
+```bash
+cmake -S . -B build-ubsan -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DENABLE_UBSAN=ON -DBUILD_TESTS=ON -DBUILD_EXAMPLES=ON
+cmake --build build-ubsan --parallel
+```
+
+## Running Tests
+
+### All Tests
+```bash
+# Linux/macOS
+cd build-release
+ctest --output-on-failure
+
+# Windows
+cd build-release
+ctest --output-on-failure -C RelWithDebInfo
+```
+
+### Parallel Test Execution
+```bash
+# Run with 4 parallel jobs
+ctest --output-on-failure -j 4
+
+# Windows
+ctest --output-on-failure -j 4 -C RelWithDebInfo
+```
+
+### Specific Test
+```bash
+# Run only TCP socket tests
+ctest --output-on-failure -R "test_tcp_socket"
+
+# Windows
+ctest --output-on-failure -R "test_tcp_socket" -C RelWithDebInfo
+```
+
+### List Available Tests
+```bash
+ctest --show-only
+
+# Windows
+ctest --show-only -C RelWithDebInfo
+```
+
+### Test Output
+```
+Test project /path/to/build-release
+    Start  1: test_socket_basics
+1/22 Test #1: test_socket_basics ...............   Passed    0.02 sec
+    Start  2: test_ip_utils
+2/22 Test #2: test_ip_utils ....................   Passed    0.03 sec
+...
+100% tests passed, 0 tests failed out of 22
+
+Total Test time (real) =   8.74 sec
+```
+
+### Slow Tests
+The `test_timeout_heap` test is disabled by default (takes ~20 seconds). Enable with:
+```bash
+cmake -S . -B build-release -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DBUILD_TESTS=ON -DBUILD_EXAMPLES=ON -DALLOW_SLOW_TESTS=ON
+cmake --build build-release --parallel
+ctest --output-on-failure
 ```
 
 ## Running the HTTP server
 
 ```bash
-./build-mac-rel/http_server
+# Linux/macOS
+./build-release/http_server
+
+# Windows
+.\build-release\http_server.exe
+
 # === Poll-Driven HTTP Server ===
 # Built: Mar  1 2026 05:31:23  |  OS: macOS  |  Build: Release
 # Listening on 0.0.0.0:8080

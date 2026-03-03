@@ -7,6 +7,7 @@
 // application-level response logic.
 
 #include "HttpPollServer.h"
+#include "Socket.h"
 #include "SocketTypes.h"
 #include <cstdio>
 #include <cstdlib>
@@ -19,35 +20,40 @@
 
 using namespace aiSocks;
 
-// Response body matching the reference server exactly (251 bytes, no trailing
-// newline).
+// Static response body served for GET / (612 bytes, no trailing newline).
 static const char body[]
     = "<!DOCTYPE html>\n"
-      "<html lang=\"en\">\n"
-      "\n"
+      "<html>\n"
       "<head>\n"
-      "    <meta charset=\"UTF-8\">\n"
-      "    <meta name=\"viewport\" content=\"width=device-width, "
-      "initial-scale=1.0\">\n"
-      "    <title>C++ App</title>\n"
-      "    <h1>\n"
-      "        Welcome to my world!\n"
-      "    </h1>\n"
+      "<title>Welcome to nginx!</title>\n"
+      "<style>\n"
+      "html { color-scheme: light dark; }\n"
+      "body { width: 35em; margin: 0 auto;\n"
+      "font-family: Tahoma, Verdana, Arial, sans-serif; }\n"
+      "</style>\n"
       "</head>\n"
-      "\n"
       "<body>\n"
+      "<h1>Welcome to C++ http_server</h1>\n"
+      "<p>If you see this page, the web server is successfully installed and\n"
+      "working. Further configuration is required.</p>\n"
       "\n"
+      "<p>For online documentation and support please refer to\n"
+      "<a href=\"http://nginx.org/\">nginx.org</a>.<br/>\n"
+      "Commercial support is available at\n"
+      "<a href=\"http://nginx.com/\">nginx.com</a>.</p>\n"
+      "\n"
+      "<p><em>Thank you for using nginx.</em></p>\n"
       "</body>\n"
-      "\n"
       "</html>";
 
-// Header template: %s = RFC 7231 date, %s = "keep-alive" or "close"
+// Header template: %s = RFC 7231 date, %zu = content-length,
+// %s = "keep-alive" or "close"
 static const char headerFmt[]
     = "HTTP/1.1 200 OK\r\n"
       "Server: nginx/1.29.5\r\n"
       "Date: %s\r\n"
       "Content-Type: text/html\r\n"
-      "Content-Length: 251\r\n"
+      "Content-Length: %zu\r\n"
       "Last-Modified: Fri, 11 Oct 2024 01:06:56 GMT\r\n"
       "Connection: %s\r\n"
       "ETag: \"67087a30-fb\"\r\n"
@@ -96,10 +102,11 @@ class HttpServer : public HttpPollServer {
             date_buf, sizeof(date_buf), "%a, %d %b %Y %H:%M:%S GMT", &tm_buf);
 
         char hdr[512];
-        snprintf(hdr, sizeof(hdr), headerFmt, date_buf, "keep-alive");
+        snprintf(
+            hdr, sizeof(hdr), headerFmt, date_buf, sizeof(body) - 1, "keep-alive");
         ka_response_ = std::string(hdr) + body;
 
-        snprintf(hdr, sizeof(hdr), headerFmt, date_buf, "close");
+        snprintf(hdr, sizeof(hdr), headerFmt, date_buf, sizeof(body) - 1, "close");
         close_response_ = std::string(hdr) + body;
 
         char bigHdr[256];
@@ -123,8 +130,26 @@ class HttpServer : public HttpPollServer {
 
         rebuildResponses(); // warm the cache before the first request
         setKeepAliveTimeout(std::chrono::milliseconds{5000});
-        printf("Listening on %s:%d\n", bind.address.c_str(),
-            static_cast<int>(bind.port.value()));
+
+        const int port = static_cast<int>(bind.port.value());
+        const bool isWildcard = (bind.address == "0.0.0.0"
+            || bind.address == "::" || bind.address == "[::]" );
+
+        if (isWildcard) {
+            printf("Listening on <all> interfaces, port %d:\n", port);
+            auto ifaces = Socket::getLocalAddresses();
+            for (const auto& iface : ifaces) {
+                // When bound to 0.0.0.0 show IPv4; when bound to :: show all.
+                if (bind.address == "0.0.0.0"
+                    && iface.family != AddressFamily::IPv4)
+                    continue;
+                printf("  %s%s\n", iface.address.c_str(),
+                    iface.isLoopback ? "  (loopback)" : "");
+            }
+            printf("\n");
+        } else {
+            printf("Listening on %s:%d\n", bind.address.c_str(), port);
+        }
     }
 
     protected:

@@ -83,7 +83,7 @@ enum class ServerResult {
 //   MyServer srv(ServerBind{"0.0.0.0", Port{9000}});
 //   srv.run();
 //
-// On failure (bind, listen, or Poller registration), the server is left
+// On failure (bind, listen, or Poller registration), the server is leftimeour
 // invalid; check isValid(). run() blocks until there are no more clients and
 // accepting has stopped.
 // ---------------------------------------------------------------------------
@@ -336,6 +336,13 @@ template <typename ClientData> class ServerBase {
     //   lastActivitySnap will no longer match the ClientEntry's lastActivity.
     //   This is the core of the lazy-deletion strategy: O(log n) push, zero
     //   removal cost.
+    //
+    //   To prevent unbounded heap growth under high-throughput workloads
+    //   (e.g. wrk with 15 000 keep-alive connections), we only push a new
+    //   entry when at least keepAliveTimeout_/4 has elapsed since the last
+    //   push for this client.  This bounds the heap to roughly
+    //   O(clients * 4) entries instead of O(clients * requests_per_second *
+    //   keepAliveTimeout).  Worst-case timeout accuracy is +25%.
     void touchClient(const TcpSocket& sock) {
         const uintptr_t fd = sock.getNativeHandle();
         ClientEntry* ce = findClient(fd);
@@ -345,7 +352,13 @@ template <typename ClientData> class ServerBase {
         ce->lastActivity = now;
 
         // Only bother pushing if keep-alive timeouts are enabled.
-        if (keepAliveTimeout_.count() > 0) pushTimeoutEntry(fd, now);
+        if (keepAliveTimeout_.count() > 0) {
+            const auto sincePush = now - ce->lastTimeoutPush;
+            if (sincePush >= keepAliveTimeout_ / 4) {
+                pushTimeoutEntry(fd, now);
+                ce->lastTimeoutPush = now;
+            }
+        }
     }
 
     // Enable or disable Writable interest for a client socket.
@@ -470,6 +483,7 @@ template <typename ClientData> class ServerBase {
         std::unique_ptr<TcpSocket> socket;
         ClientData data;
         SteadyClock::time_point lastActivity{SteadyClock::now()};
+        SteadyClock::time_point lastTimeoutPush{}; // throttle heap pushes
         size_t activeIdx{0}; // index into clientFds_ for O(1) erase
 
         ClientEntry() = default;
@@ -480,6 +494,7 @@ template <typename ClientData> class ServerBase {
             : socket(std::move(other.socket))
             , data(std::move(other.data))
             , lastActivity(other.lastActivity)
+            , lastTimeoutPush(other.lastTimeoutPush)
             , activeIdx(other.activeIdx) {}
 
         ClientEntry(std::unique_ptr<TcpSocket> sock)

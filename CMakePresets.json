@@ -1,196 +1,265 @@
 {
-  "version": 3,
-  "cmakeMinimumRequired": {
-    "major": 3,
-    "minor": 15,
-    "patch": 0
-  },
-  "configurePresets": [
-    {
-      "name": "base",
-      "hidden": true,
-      "generator": "Ninja",
-      "binaryDir": "${sourceDir}/build",
-      "toolset": {
-        "value": "host",
-        "strategy": "external"
-      }
+    "version": 3,
+    "cmakeMinimumRequired": {
+        "major": 3,
+        "minor": 15,
+        "patch": 0
     },
-    {
-      "name": "debug",
-      "inherits": "base",
-      "displayName": "Debug",
-      "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Debug",
-        "BUILD_EXAMPLES": "ON"
-      }
-    },
-    {
-      "name": "msan-debug",
-      "inherits": "base",
-      "displayName": "MemorySanitizer Debug",
-      "binaryDir": "${sourceDir}/build-msan",
-      "condition": {
-        "type": "notEquals",
-        "lhs": "${hostSystemName}",
-        "rhs": "Darwin"
-      },
-      "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Debug",
-        "BUILD_EXAMPLES": "ON",
-        "ENABLE_MSAN": "ON"
-      }
-    },
-    {
-      "name": "asan-debug",
-      "inherits": "base", 
-      "displayName": "AddressSanitizer Debug",
-      "binaryDir": "${sourceDir}/build-asan",
-      "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Debug",
-        "BUILD_EXAMPLES": "ON",
-        "ENABLE_ASAN": "ON"
-      }
-    },
-    {
-      "name": "ubsan-release",
-      "inherits": "base",
-      "displayName": "UBSan RelWithDebInfo",
-      "binaryDir": "${sourceDir}/build-ubsan",
-      "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
-        "BUILD_EXAMPLES": "ON",
-        "ENABLE_UBSAN": "ON"
-      }
-    },
-    {
-      "name": "mac-release",
-      "inherits": "base",
-      "displayName": "macOS Release -O3 with symbols",
-      "binaryDir": "${sourceDir}/build-mac-rel",
-      "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Release",
-        "BUILD_EXAMPLES": "ON",
-        "CMAKE_CXX_FLAGS_RELEASE": "-O2 -DNDEBUG -fno-exceptions"
-      }
-    }
-  ],
-  "buildPresets": [
-    {
-      "name": "debug",
-      "configurePreset": "debug",
-      "displayName": "Build Debug"
-    },
-    {
-      "name": "http-server-debug",
-      "configurePreset": "debug",
-      "displayName": "Build http_server (Debug)",
-      "targets": ["http_server"]
-    },
-    {
-      "name": "msan-debug",
-      "configurePreset": "msan-debug", 
-      "displayName": "Build MemorySanitizer Debug"
-    },
-    {
-      "name": "http-server-msan",
-      "configurePreset": "msan-debug",
-      "displayName": "Build http_server (MemorySanitizer)",
-      "targets": ["http_server"]
-    },
-    {
-      "name": "asan-debug",
-      "configurePreset": "asan-debug",
-      "displayName": "Build AddressSanitizer Debug"
-    },
-    {
-      "name": "http-server-asan",
-      "configurePreset": "asan-debug",
-      "displayName": "Build http_server (AddressSanitizer)",
-      "targets": ["http_server"]
-    },
-    {
-      "name": "ubsan-release",
-      "configurePreset": "ubsan-release",
-      "displayName": "Build UBSan RelWithDebInfo"
-    },
-    {
-      "name": "http-server-ubsan",
-      "configurePreset": "ubsan-release",
-      "displayName": "Build http_server (UBSan RelWithDebInfo)",
-      "targets": ["http_server"]
-    },
-    {
-      "name": "mac-release",
-      "configurePreset": "mac-release",
-      "displayName": "Build macOS Release -O3"
-    },
-    {
-      "name": "http-server-mac-rel",
-      "configurePreset": "mac-release",
-      "displayName": "Build http_server (macOS Release -O3)",
-      "targets": ["http_server"]
-    },
-    {
-      "name": "test-socket-basics",
-      "configurePreset": "debug",
-      "displayName": "Build test_socket_basics",
-      "targets": ["test_socket_basics"]
-    },
-    {
-      "name": "test-blocking",
-      "configurePreset": "debug",
-      "displayName": "Build test_blocking",
-      "targets": ["test_blocking"]
-    },
-    {
-      "name": "test-loopback-tcp",
-      "configurePreset": "debug",
-      "displayName": "Build test_loopback_tcp",
-      "targets": ["test_loopback_tcp"]
-    },
-    {
-      "name": "test-construction",
-      "configurePreset": "debug",
-      "displayName": "Build test_construction",
-      "targets": ["test_construction"]
-    },
-    {
-      "name": "test-new-features",
-      "configurePreset": "debug",
-      "displayName": "Build test_new_features",
-      "targets": ["test_new_features"]
-    },
-    {
-      "name": "test-error-messages",
-      "configurePreset": "debug",
-      "displayName": "Build test_error_messages",
-      "targets": ["test_error_messages"]
-    },
-    {
-      "name": "test-poller",
-      "configurePreset": "debug",
-      "displayName": "Build test_poller",
-      "targets": ["test_poller"]
-    },
-    {
-      "name": "test-tcp-socket",
-      "configurePreset": "debug",
-      "displayName": "Build test_tcp_socket (SEGFAULT)",
-      "targets": ["test_tcp_socket"]
-    },
-    {
-      "name": "test-socket-factory",
-      "configurePreset": "debug",
-      "displayName": "Build test_socket_factory",
-      "targets": ["test_socket_factory"]
-    }
-  ],
-  "testPresets": [
-    {
-      "name": "debug",
-      "configurePreset": "debug",
-      "displayName": "Run Tests (Debug)"
-    }
-  ]
+    "configurePresets": [
+        {
+            "name": "base",
+            "hidden": true,
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/build",
+            "toolset": {
+                "value": "host",
+                "strategy": "external"
+            }
+        },
+        {
+            "name": "debug",
+            "inherits": "base",
+            "displayName": "Debug",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "BUILD_EXAMPLES": "ON"
+            }
+        },
+        {
+            "name": "msan-debug",
+            "inherits": "base",
+            "displayName": "MemorySanitizer Debug",
+            "binaryDir": "${sourceDir}/build-msan",
+            "condition": {
+                "type": "notEquals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Darwin"
+            },
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "BUILD_EXAMPLES": "ON",
+                "ENABLE_MSAN": "ON"
+            }
+        },
+        {
+            "name": "asan-debug",
+            "inherits": "base",
+            "displayName": "AddressSanitizer Debug",
+            "binaryDir": "${sourceDir}/build-asan",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "BUILD_EXAMPLES": "ON",
+                "ENABLE_ASAN": "ON"
+            }
+        },
+        {
+            "name": "ubsan-release",
+            "inherits": "base",
+            "displayName": "UBSan RelWithDebInfo",
+            "binaryDir": "${sourceDir}/build-ubsan",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+                "BUILD_EXAMPLES": "ON",
+                "ENABLE_UBSAN": "ON"
+            }
+        },
+        {
+            "name": "mac-release",
+            "inherits": "base",
+            "displayName": "macOS Release -O3 with symbols",
+            "binaryDir": "${sourceDir}/build-mac-rel",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "BUILD_EXAMPLES": "ON",
+                "CMAKE_CXX_FLAGS_RELEASE": "-O2 -DNDEBUG -fno-exceptions"
+            }
+        },
+        {
+            "name": "relwithdebinfo",
+            "inherits": "base",
+            "displayName": "RelWithDebInfo",
+            "binaryDir": "${sourceDir}/build-relwithdebinfo",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+                "BUILD_EXAMPLES": "ON"
+            }
+        },
+        {
+            "name": "msvc",
+            "displayName": "Visual Studio (MSVC) - x64",
+            "description": "Using Visual Studio 17 2022 generator with x64 architecture",
+            "generator": "Visual Studio 17 2022",
+            "toolset": "host=x64",
+            "architecture": "x64",
+            "binaryDir": "${sourceDir}/out/build/${presetName}",
+            "cacheVariables": {
+                "CMAKE_INSTALL_PREFIX": "${sourceDir}/out/install/${presetName}"
+            }
+        }
+    ],
+    "buildPresets": [
+        {
+            "name": "debug",
+            "configurePreset": "debug",
+            "displayName": "Build Debug"
+        },
+        {
+            "name": "http-server-debug",
+            "configurePreset": "debug",
+            "displayName": "Build http_server (Debug)",
+            "targets": [
+                "http_server"
+            ]
+        },
+        {
+            "name": "msan-debug",
+            "configurePreset": "msan-debug",
+            "displayName": "Build MemorySanitizer Debug"
+        },
+        {
+            "name": "http-server-msan",
+            "configurePreset": "msan-debug",
+            "displayName": "Build http_server (MemorySanitizer)",
+            "targets": [
+                "http_server"
+            ]
+        },
+        {
+            "name": "asan-debug",
+            "configurePreset": "asan-debug",
+            "displayName": "Build AddressSanitizer Debug"
+        },
+        {
+            "name": "http-server-asan",
+            "configurePreset": "asan-debug",
+            "displayName": "Build http_server (AddressSanitizer)",
+            "targets": [
+                "http_server"
+            ]
+        },
+        {
+            "name": "ubsan-release",
+            "configurePreset": "ubsan-release",
+            "displayName": "Build UBSan RelWithDebInfo"
+        },
+        {
+            "name": "http-server-ubsan",
+            "configurePreset": "ubsan-release",
+            "displayName": "Build http_server (UBSan RelWithDebInfo)",
+            "targets": [
+                "http_server"
+            ]
+        },
+        {
+            "name": "mac-release",
+            "configurePreset": "mac-release",
+            "displayName": "Build macOS Release -O3"
+        },
+        {
+            "name": "http-server-mac-rel",
+            "configurePreset": "mac-release",
+            "displayName": "Build http_server (macOS Release -O3)",
+            "targets": [
+                "http_server"
+            ]
+        },
+        {
+            "name": "relwithdebinfo",
+            "configurePreset": "relwithdebinfo",
+            "displayName": "Build RelWithDebInfo"
+        },
+        {
+            "name": "http-server-relwithdebinfo",
+            "configurePreset": "relwithdebinfo",
+            "displayName": "Build http_server (RelWithDebInfo)",
+            "targets": [
+                "http_server"
+            ]
+        },
+        {
+            "name": "test-socket-basics",
+            "configurePreset": "debug",
+            "displayName": "Build test_socket_basics",
+            "targets": [
+                "test_socket_basics"
+            ]
+        },
+        {
+            "name": "test-blocking",
+            "configurePreset": "debug",
+            "displayName": "Build test_blocking",
+            "targets": [
+                "test_blocking"
+            ]
+        },
+        {
+            "name": "test-loopback-tcp",
+            "configurePreset": "debug",
+            "displayName": "Build test_loopback_tcp",
+            "targets": [
+                "test_loopback_tcp"
+            ]
+        },
+        {
+            "name": "test-construction",
+            "configurePreset": "debug",
+            "displayName": "Build test_construction",
+            "targets": [
+                "test_construction"
+            ]
+        },
+        {
+            "name": "test-new-features",
+            "configurePreset": "debug",
+            "displayName": "Build test_new_features",
+            "targets": [
+                "test_new_features"
+            ]
+        },
+        {
+            "name": "test-error-messages",
+            "configurePreset": "debug",
+            "displayName": "Build test_error_messages",
+            "targets": [
+                "test_error_messages"
+            ]
+        },
+        {
+            "name": "test-poller",
+            "configurePreset": "debug",
+            "displayName": "Build test_poller",
+            "targets": [
+                "test_poller"
+            ]
+        },
+        {
+            "name": "test-tcp-socket",
+            "configurePreset": "debug",
+            "displayName": "Build test_tcp_socket (SEGFAULT)",
+            "targets": [
+                "test_tcp_socket"
+            ]
+        },
+        {
+            "name": "test-socket-factory",
+            "configurePreset": "debug",
+            "displayName": "Build test_socket_factory",
+            "targets": [
+                "test_socket_factory"
+            ]
+        },
+        {
+            "name": "msvc-debug",
+            "displayName": "Visual Studio (MSVC) - Debug",
+            "configurePreset": "msvc",
+            "configuration": "Debug"
+        }
+    ],
+    "testPresets": [
+        {
+            "name": "debug",
+            "configurePreset": "debug",
+            "displayName": "Run Tests (Debug)"
+        }
+    ]
 }

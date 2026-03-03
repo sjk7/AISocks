@@ -70,6 +70,7 @@ set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT a
 
 # Enable CTest
 if(BUILD_TESTS)
+    include(CTest)
     enable_testing()
     add_subdirectory(tests)
 endif()
