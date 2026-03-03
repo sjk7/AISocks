@@ -547,13 +547,13 @@ static void test_happy_send_chunked() {
         "TcpSocket: sendChunked() delivers a multi-chunk payload (200 KB)");
     {
         // 200 KB forces at least 3 iterations of the 64 KB inner chunk loop.
-        constexpr size_t kSize = 200 * 1024;
-        std::string payload(kSize, '\0');
-        for (size_t i = 0; i < kSize; ++i)
+        constexpr size_t payloadSize = 200 * 1024;
+        std::string payload(payloadSize, '\0');
+        for (size_t i = 0; i < payloadSize; ++i)
             payload[i] = static_cast<char>(i & 0xFF);
 
         std::string received;
-        received.reserve(kSize);
+        received.reserve(payloadSize);
         std::atomic<bool> ready{false};
         std::atomic<uint16_t> port{0};
 
@@ -570,7 +570,7 @@ static void test_happy_send_chunked() {
             auto peer = srv.accept(); // blocking: waits for client
             if (peer) {
                 char buf[8192];
-                while (received.size() < kSize) {
+                while (received.size() < payloadSize) {
                     int n = peer->receive(buf, sizeof(buf));
                     if (n > 0)
                         received.append(buf, static_cast<size_t>(n));
@@ -593,18 +593,18 @@ static void test_happy_send_chunked() {
         // On loopback this completes in one call, but the loop inside
         // sendChunked still iterates through each 64 KB slice.
         size_t totalSent = 0;
-        while (totalSent < kSize) {
+        while (totalSent < payloadSize) {
             int n
-                = c.sendChunked(payload.data() + totalSent, kSize - totalSent);
+                = c.sendChunked(payload.data() + totalSent, payloadSize - totalSent);
             REQUIRE(n > 0);
             if (n <= 0) break;
             totalSent += static_cast<size_t>(n);
         }
-        REQUIRE(totalSent == kSize);
+        REQUIRE(totalSent == payloadSize);
         c.close();
 
         srvThread.join();
-        REQUIRE(received.size() == kSize);
+        REQUIRE(received.size() == payloadSize);
         REQUIRE(received == payload);
     }
 }
