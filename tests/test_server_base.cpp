@@ -397,7 +397,6 @@ int main() {
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
         // Create a new server using Port::any to avoid TIME_WAIT conflicts
-        std::cout << "DEBUG: Creating server2 with Port::any (original port was: " << port.value() << ")" << std::endl;
         EchoServer server2(Port::any);
         std::atomic<bool> ready2{false};
         auto serverThread2 = startServerInBackground(server2, ready2);
@@ -405,7 +404,6 @@ int main() {
 
         // Should be able to connect again to server2
         Port port2 = server2.getActualPort();
-        std::cout << "DEBUG: Connecting to server2 on port: " << port2.value() << std::endl;
         auto result2 = SocketFactory::createTcpClient(AddressFamily::IPv4,
             ConnectArgs{"127.0.0.1", Port{port2}, Milliseconds{200}});
         REQUIRE(result2.isSuccess());

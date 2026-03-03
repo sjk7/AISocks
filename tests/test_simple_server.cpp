@@ -56,7 +56,7 @@ static void test_validity() {
 
     BEGIN_TEST("SimpleServer: isValid() false on bad address");
     {
-        SimpleServer s(ServerBind{"999.999.999.999", Port{65535}});
+        SimpleServer s(ServerBind{"999.999.999.999", Port{59123}});
         REQUIRE(!s.isValid());
     }
 }
