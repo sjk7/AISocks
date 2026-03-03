@@ -12,7 +12,6 @@
 #include <map>
 #include <ctime>
 #include <iomanip>
-#include <sstream>
 #include <filesystem>
 
 namespace aiSocks {
@@ -147,13 +146,14 @@ protected:
                 info.size = std::filesystem::file_size(path);
                 info.lastModified = std::filesystem::last_write_time(path);
                 
-                // Generate ETag based on size and modification time
+                // Generate ETag based on file size and modification time
                 if (config_.enableETag) {
-                    std::ostringstream etag;
-                    etag << "\"" << info.size << "-" 
-                         << std::chrono::duration_cast<std::chrono::seconds>(
-                                info.lastModified.time_since_epoch()).count() << "\"";
-                    info.etag = etag.str();
+                    StringBuilder etag;
+                    etag.appendFormat("\"%zu-%ld\"", 
+                        info.size,
+                        std::chrono::duration_cast<std::chrono::seconds>(
+                            info.lastModified.time_since_epoch()).count());
+                    info.etag = etag.toString();
                 }
             }
         } catch (const std::exception&) {
@@ -255,9 +255,9 @@ protected:
             if (ifModifiedSince != request.headers.end()) {
                 // Simple string comparison for If-Modified-Since
                 // In production, you'd want proper date parsing
-                std::ostringstream lastModified;
-                lastModified << formatHttpDate(fileInfo.lastModified);
-                if (ifModifiedSince->second == lastModified.str()) {
+                StringBuilder lastModified;
+                lastModified.append(formatHttpDate(fileInfo.lastModified));
+                if (ifModifiedSince->second == lastModified.toString()) {
                     sendNotModified(state, fileInfo);
                     return;
                 }
@@ -472,14 +472,23 @@ private:
         std::string decoded;
         for (size_t i = 0; i < encoded.length(); ++i) {
             if (encoded[i] == '%' && i + 2 < encoded.length()) {
-                int hex;
-                std::istringstream hexStream(encoded.substr(i + 1, 2));
-                if (hexStream >> std::hex >> hex) {
-                    decoded += static_cast<char>(hex);
-                    i += 2;
-                } else {
-                    decoded += encoded[i];
-                }
+                // Parse hex digits manually
+                int hex = 0;
+                char c1 = encoded[i + 1];
+                char c2 = encoded[i + 2];
+                
+                if (c1 >= '0' && c1 <= '9') hex = (c1 - '0') << 4;
+                else if (c1 >= 'A' && c1 <= 'F') hex = (c1 - 'A' + 10) << 4;
+                else if (c1 >= 'a' && c1 <= 'f') hex = (c1 - 'a' + 10) << 4;
+                else { decoded += encoded[i]; continue; }
+                
+                if (c2 >= '0' && c2 <= '9') hex |= (c2 - '0');
+                else if (c2 >= 'A' && c2 <= 'F') hex |= (c2 - 'A' + 10);
+                else if (c2 >= 'a' && c2 <= 'f') hex |= (c2 - 'a' + 10);
+                else { decoded += encoded[i]; continue; }
+                
+                decoded += static_cast<char>(hex);
+                i += 2;
             } else if (encoded[i] == '+') {
                 decoded += ' ';
             } else {
