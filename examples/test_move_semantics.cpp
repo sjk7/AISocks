@@ -107,10 +107,19 @@ int main() {
     std::cout << "  socket7 valid before self-assignment: " << socket7.isValid()
               << std::endl;
 
+#ifdef __clang__
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wself-move"
+#elif defined(__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wself-move"
+#endif
     socket7 = std::move(socket7); //-V570
+#ifdef __clang__
 #pragma clang diagnostic pop
+#elif defined(__GNUC__)
+#pragma GCC diagnostic pop
+#endif
     std::cout << "  socket7 valid after self-assignment: " << socket7.isValid()
               << std::endl;
 
