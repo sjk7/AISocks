@@ -92,6 +92,6 @@ int main() {
 
     std::cout << "8765 Example finished with code: " << ret << "\n";
 
-    ret = ret = httpConnect(
+    ret = httpConnect(
         ConnectArgs{"google.com", Port{8765}, Milliseconds{1000}}, httpRequest);
 }
