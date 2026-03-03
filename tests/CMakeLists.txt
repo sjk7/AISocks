@@ -22,6 +22,8 @@ set(TEST_SOURCES
     test_fixes
     test_simple_server
     test_custom_file_server
+    test_file_io
+    test_file_cache
 )
 
 # Slow tests (disabled by default, enable with -DALLOW_SLOW_TESTS=ON)

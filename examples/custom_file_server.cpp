@@ -248,9 +248,11 @@ protected:
         // Performance Section
         html.append("<div class=\"section\">\n");
         html.append("<h2>⚡ Performance Features</h2>\n");
-        html.append("<h3>1. ETag Support:</h3>\n");
+        html.append("<h3>1. File Cache:</h3>\n");
+        html.append("<ul><li>Enable with <code>config.enableCache = true</code></li><li>Caches file content in memory for faster serving</li><li>Auto-invalidates when file modification time changes</li><li>Skips cache for URLs with query strings (<code>?param=value</code>)</li><li>View cache stats: <code>server.getFileCache().size()</code> and <code>totalBytes()</code></li></ul>\n");
+        html.append("<h3>2. ETag Support:</h3>\n");
         html.append("<ul><li>Load any file twice</li><li>Second request should return <code>304 Not Modified</code></li><li>Check Network tab in browser dev tools</li></ul>\n");
-        html.append("<h3>2. Last-Modified Headers:</h3>\n");
+        html.append("<h3>3. Last-Modified Headers:</h3>\n");
         html.append("<ul><li>Check Response Headers in dev tools</li><li>Should see <code>Last-Modified</code> field</li></ul>\n");
         html.append("</div>\n");
         
