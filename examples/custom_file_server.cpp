@@ -46,8 +46,14 @@ protected:
             return;
         }
         
+        // Special handling for large test file - generate on-the-fly
+        if (request.path == "/large500MB.bin") {
+            generateLargeFile(state, request);
+            return;
+        }
+        
         // Special handling for root path - show testing instructions
-        if (request.path == "/" || request.path == "/index.html") {
+        if (request.path == "/") {
             std::string instructions = generateTestingInstructions();
             
             StringBuilder response(256 + instructions.size()); // Reserve for headers + body
@@ -72,33 +78,7 @@ protected:
             return;
         }
         
-        // Special handling for demo.html - generate a page that executes test.js
-        if (request.path == "/demo.html") {
-            std::string demoPage = generateDemoPage();
-            
-            StringBuilder response(256 + demoPage.size()); // Reserve for headers + body
-            response.append("HTTP/1.1 200 OK\r\n");
-            response.append("Content-Type: text/html; charset=utf-8\r\nContent-Length: ");
-            response.appendFormat("%zu", demoPage.size());
-            response.append("\r\n");
-            
-            // Add custom headers
-            for (const auto& [name, value] : getConfig().customHeaders) {
-                response.append(name);
-                response.append(": ");
-                response.append(value);
-                response.append("\r\n");
-            }
-            
-            response.append("\r\n");
-            response.append(demoPage);
-            
-            state.responseBuf = response.toString();
-            state.responseView = state.responseBuf;
-            return;
-        }
-        
-        // Call base implementation for all other paths
+// Call base implementation for all other paths
         HttpFileServer::buildResponse(state);
     }
 
@@ -262,8 +242,8 @@ protected:
         html.append("<h3>Test Files:</h3>\n");
         html.append("<div class=\"url\"><a href=\"/index.html\">/index.html</a></div>\n");
         html.append("<div class=\"url\"><a href=\"/style.css\">/style.css</a></div>\n");
-        html.append("<div class=\"url\"><a href=\"/test.js\">/test.js</a> (view source)</div>\n");
-        html.append("<div class=\"url\"><a href=\"/demo.html\">/demo.html</a> (runs test.js)</div>\n");
+        html.append("<div class=\"url\"><a href=\"/app.js\">/app.js</a> (view source)</div>\n");
+        html.append("<div class=\"url\"><a href=\"/jstest.html\">/jstest.html</a> (runs test.js)</div>\n");
         html.append("<h3>Large File Download Test:</h3>\n");
         html.append("<div class=\"url\"><a href=\"/large500MB.bin\">/large500MB.bin</a> (500 MB binary file)</div>\n");
         html.append("<p>Files are served with correct MIME types and UTF-8 encoding. Large file tests download speed and keep-alive behavior.</p>\n");
@@ -367,12 +347,12 @@ protected:
         html.append(".back-link { display: inline-block; margin-top: 20px; color: #3498db; text-decoration: none; }\n");
         html.append(".back-link:hover { text-decoration: underline; }\n");
         html.append("</style>\n");
-        html.append("<script src=\"/test.js\"></script>\n");
+        html.append("<script src=\"/app.js\"></script>\n");
         html.append("</head><body>\n");
         html.append("<div class=\"container\">\n");
         html.append("<h1>🎯 JavaScript Execution Demo</h1>\n");
         html.append("<div class=\"info\">\n");
-        html.append("<strong>ℹ️ Info:</strong> This page loads and executes <code>/test.js</code> using a <code>&lt;script src=\"/test.js\"&gt;&lt;/script&gt;</code> tag.\n");
+        html.append("<strong>ℹ️ Info:</strong> This page loads and executes <code>/app.js</code> using a <code>&lt;script src=\"/app.js\"&gt;&lt;/script&gt;</code> tag.\n");
         html.append("</div>\n");
         html.append("<h2>Output:</h2>\n");
         html.append("<div id=\"output\">Waiting for JavaScript to execute...</div>\n");
@@ -387,6 +367,52 @@ protected:
         html.append("</body></html>\n");
         
         return html.toString();
+    }
+    
+    /// Generate 500MB test file on-the-fly
+    void generateLargeFile(HttpClientState& state, const HttpRequest& request) {
+        const size_t fileSize = 500 * 1024 * 1024; // 500 MB
+        
+        StringBuilder response(256);
+        response.append("HTTP/1.1 200 OK\r\n");
+        response.append("Content-Type: application/octet-stream\r\n");
+        response.append("Content-Disposition: attachment; filename=\"large500MB.bin\"\r\n");
+        response.appendFormat("Content-Length: %zu\r\n", fileSize);
+        
+        // Add custom headers
+        for (const auto& [name, value] : getConfig().customHeaders) {
+            response.append(name);
+            response.append(": ");
+            response.append(value);
+            response.append("\r\n");
+        }
+        
+        response.append("\r\n");
+        
+        // For HEAD requests, just send headers
+        if (request.method == "HEAD") {
+            state.responseBuf = response.toString();
+            state.responseView = state.responseBuf;
+            return;
+        }
+        
+        // For GET requests, generate the file content
+        std::string headers = response.toString();
+        state.responseBuf.reserve(headers.size() + fileSize);
+        state.responseBuf = headers;
+        
+        // Generate 500MB of repeating pattern data
+        const char pattern[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+        const size_t patternLen = sizeof(pattern) - 1;
+        
+        size_t remaining = fileSize;
+        while (remaining > 0) {
+            size_t chunkSize = (remaining < patternLen) ? remaining : patternLen;
+            state.responseBuf.append(pattern, chunkSize);
+            remaining -= chunkSize;
+        }
+        
+        state.responseView = state.responseBuf;
     }
 
     /// Override to customize directory listing
