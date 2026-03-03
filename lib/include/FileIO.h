@@ -15,6 +15,7 @@
 #ifdef _WIN32
     #include <io.h>
     #include <sys/locking.h>
+    #include <windows.h>
 #else
     #include <unistd.h>
     #include <sys/file.h>
@@ -170,6 +171,61 @@ public:
         
         seek(current, SEEK_SET);
         return fileSize > 0 ? static_cast<size_t>(fileSize) : 0;
+    }
+    
+    /// File information structure for descriptor-based checks
+    struct FileInfo {
+        bool valid = false;
+        bool isSymlink = false;
+        bool isRegular = false;
+        bool isDirectory = false;
+        size_t size = 0;
+        time_t lastModified = 0;
+    };
+    
+    /// Get file info from the already-open file descriptor (TOCTOU-safe)
+    /// This checks the actual file we have open, not the path
+    FileInfo getInfoFromDescriptor() const {
+        FileInfo info;
+        if (!file_) return info;
+        
+#ifdef _WIN32
+        int fd = _fileno(file_);
+        if (fd == -1) return info;
+        
+        struct _stat64 st;
+        if (_fstat64(fd, &st) != 0) return info;
+        
+        info.valid = true;
+        info.isDirectory = (st.st_mode & _S_IFDIR) != 0;
+        info.isRegular = (st.st_mode & _S_IFREG) != 0;
+        info.size = static_cast<size_t>(st.st_size);
+        info.lastModified = st.st_mtime;
+        
+        // Check for reparse point (symlink) on Windows
+        HANDLE h = reinterpret_cast<HANDLE>(_get_osfhandle(fd));
+        if (h != INVALID_HANDLE_VALUE) {
+            BY_HANDLE_FILE_INFORMATION fileInfo;
+            if (GetFileInformationByHandle(h, &fileInfo)) {
+                info.isSymlink = (fileInfo.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT) != 0;
+            }
+        }
+#else
+        int fd = fileno(file_);
+        if (fd == -1) return info;
+        
+        struct stat st;
+        if (fstat(fd, &st) != 0) return info;
+        
+        info.valid = true;
+        info.isSymlink = S_ISLNK(st.st_mode);
+        info.isDirectory = S_ISDIR(st.st_mode);
+        info.isRegular = S_ISREG(st.st_mode);
+        info.size = static_cast<size_t>(st.st_size);
+        info.lastModified = st.st_mtime;
+#endif
+        
+        return info;
     }
     
     std::vector<char> readAll() {

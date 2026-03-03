@@ -250,12 +250,42 @@ protected:
 
     /// Virtual customization point: handle file requests
     virtual void handleFileRequest(HttpClientState& state, const std::string& filePath, const FileInfo& fileInfo, const HttpRequest& request) {
+        // TOCTOU-safe file handling: open file once, lock it, check descriptor, read from same descriptor
+        File file(filePath.c_str(), "rb");
+        if (!file.isOpen()) {
+            sendError(state, 500, "Internal Server Error", "Failed to open file");
+            return;
+        }
+        
+        // Get file info from the locked descriptor (TOCTOU-safe)
+        File::FileInfo fdInfo = file.getInfoFromDescriptor();
+        if (!fdInfo.valid) {
+            sendError(state, 500, "Internal Server Error", "Failed to get file information");
+            return;
+        }
+        
+        // Security checks on the locked file descriptor
+        if (fdInfo.isSymlink) {
+            sendError(state, 403, "Forbidden", "Symlinks are not allowed");
+            return;
+        }
+        
+        if (!fdInfo.isRegular) {
+            sendError(state, 403, "Forbidden", "Not a regular file");
+            return;
+        }
+        
+        if (fdInfo.size > config_.maxFileSize) {
+            sendError(state, 403, "Forbidden", "File too large");
+            return;
+        }
+        
         if (!isAccessAllowed(filePath, fileInfo)) {
             sendError(state, 403, "Forbidden", "Access to this file is not allowed");
             return;
         }
 
-        // Check conditional headers
+        // Check conditional headers using original fileInfo (from path-based check)
         if (config_.enableETag && !fileInfo.etag.empty()) {
             auto ifNoneMatch = request.headers.find("if-none-match");
             if (ifNoneMatch != request.headers.end() && ifNoneMatch->second == fileInfo.etag) {
@@ -267,8 +297,6 @@ protected:
         if (config_.enableLastModified) {
             auto ifModifiedSince = request.headers.find("if-modified-since");
             if (ifModifiedSince != request.headers.end()) {
-                // Simple string comparison for If-Modified-Since
-                // In production, you'd want proper date parsing
                 StringBuilder lastModified;
                 lastModified.append(formatHttpDate(fileInfo.lastModified));
                 if (ifModifiedSince->second == lastModified.toString()) {
@@ -278,9 +306,9 @@ protected:
             }
         }
 
-        // Read and send file
-        std::vector<char> fileContent = readFileContent(filePath);
-        if (fileContent.empty()) {
+        // Read from the locked file descriptor (TOCTOU-safe)
+        std::vector<char> fileContent = file.readAll();
+        if (fileContent.empty() && fdInfo.size > 0) {
             sendError(state, 500, "Internal Server Error", "Failed to read file");
             return;
         }
@@ -484,14 +512,6 @@ private:
             return filePath.substr(dotPos);
         }
         return "";
-    }
-
-
-    std::vector<char> readFileContent(const std::string& filePath) const {
-        File file(filePath.c_str(), "rb");
-        if (!file) return {};
-        
-        return file.readAll();
     }
 
     std::string formatHttpDate(time_t fileTime) const {
