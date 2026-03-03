@@ -23,6 +23,13 @@
 
 namespace aiSocks {
 
+/// File locking mode
+enum class LockMode {
+    None,      // No locking
+    Shared,    // Shared lock (multiple readers allowed)
+    Exclusive  // Exclusive lock (single writer, no readers)
+};
+
 /// Simple C-style file I/O wrapper - no exceptions, no iostreams
 /// Lightweight alternative to std::fstream for better performance and simplicity
 class File {
@@ -54,44 +61,28 @@ public:
     
     bool open(const char* filename, const char* mode) {
         close();
+        
+        // Determine lock mode based on file mode
+        LockMode lockMode = determineLockMode(mode);
+        
 #ifdef _WIN32
         errno_t err = fopen_s(&file_, filename, mode);
         if (err != 0 || !file_) return false;
         
-        // Determine lock type based on mode: shared for read, exclusive for write
-        bool isWriteMode = (strchr(mode, 'w') != nullptr || strchr(mode, 'a') != nullptr || strchr(mode, '+') != nullptr);
-        
-        int fd = _fileno(file_);
-        if (fd != -1) {
-            if (isWriteMode) {
-                // _LK_NBLCK: Non-blocking exclusive lock for write modes
-                if (_locking(fd, _LK_NBLCK, 0x7FFFFFFF) != 0) {
-                    // Lock failed, close and return false
-                    fclose(file_);
-                    file_ = nullptr;
-                    return false;
-                }
-            }
-            // Note: Windows _locking() doesn't support shared locks
-            // For read-only mode, we don't lock on Windows to allow concurrent reads
+        if (!applyLock(lockMode)) {
+            fclose(file_);
+            file_ = nullptr;
+            return false;
         }
         return true;
 #else
         file_ = fopen(filename, mode);
         if (!file_) return false;
         
-        // Determine lock type based on mode: shared for read, exclusive for write
-        bool isWriteMode = (strchr(mode, 'w') != nullptr || strchr(mode, 'a') != nullptr || strchr(mode, '+') != nullptr);
-        
-        int fd = fileno(file_);
-        if (fd != -1) {
-            int lockMode = isWriteMode ? (LOCK_EX | LOCK_NB) : (LOCK_SH | LOCK_NB);
-            if (flock(fd, lockMode) != 0) {
-                // Lock failed, close and return false
-                fclose(file_);
-                file_ = nullptr;
-                return false;
-            }
+        if (!applyLock(lockMode)) {
+            fclose(file_);
+            file_ = nullptr;
+            return false;
         }
         return true;
 #endif
@@ -99,22 +90,30 @@ public:
     
     void close() {
         if (file_) {
+            releaseLock();
+            fclose(file_);
+            file_ = nullptr;
+            lockMode_ = LockMode::None;
+        }
+    }
+    
+    /// Release file lock
+    void releaseLock() {
+        if (!file_ || lockMode_ == LockMode::None) return;
+        
 #ifdef _WIN32
-            // Unlock the file before closing
+        if (lockMode_ == LockMode::Exclusive) {
             int fd = _fileno(file_);
             if (fd != -1) {
                 _locking(fd, _LK_UNLCK, 0x7FFFFFFF);
             }
-#else
-            // Unlock the file before closing
-            int fd = fileno(file_);
-            if (fd != -1) {
-                flock(fd, LOCK_UN);
-            }
-#endif
-            fclose(file_);
-            file_ = nullptr;
         }
+#else
+        int fd = fileno(file_);
+        if (fd != -1) {
+            flock(fd, LOCK_UN);
+        }
+#endif
     }
     
     bool isOpen() const {
@@ -258,6 +257,72 @@ public:
 
 private:
     FILE* file_ = nullptr;
+    LockMode lockMode_ = LockMode::None;
+    
+    /// Determine lock mode from file open mode string
+    static LockMode determineLockMode(const char* mode) {
+        if (!mode) return LockMode::None;
+        
+        // Check for write modes: 'w', 'a', or '+' (read-write)
+        bool hasWrite = (strchr(mode, 'w') != nullptr);
+        bool hasAppend = (strchr(mode, 'a') != nullptr);
+        bool hasPlus = (strchr(mode, '+') != nullptr);
+        
+        if (hasWrite || hasAppend || hasPlus) {
+            return LockMode::Exclusive;
+        }
+        
+        // Read-only mode
+        return LockMode::Shared;
+    }
+    
+    /// Apply file lock based on lock mode
+    bool applyLock(LockMode mode) {
+        if (mode == LockMode::None || !file_) {
+            lockMode_ = LockMode::None;
+            return true;
+        }
+        
+#ifdef _WIN32
+        int fd = _fileno(file_);
+        if (fd == -1) return true; // Can't get fd, proceed without lock
+        
+        if (mode == LockMode::Exclusive) {
+            // Windows _locking() only supports exclusive locks
+            // _LK_NBLCK: Non-blocking exclusive lock
+            if (_locking(fd, _LK_NBLCK, 0x7FFFFFFF) != 0) {
+                return false; // Lock failed
+            }
+            lockMode_ = LockMode::Exclusive;
+        } else {
+            // Windows doesn't support shared locks via _locking()
+            // For read-only, we don't lock to allow concurrent reads
+            lockMode_ = LockMode::None;
+        }
+        return true;
+#else
+        int fd = fileno(file_);
+        if (fd == -1) return true; // Can't get fd, proceed without lock
+        
+        int lockFlags = 0;
+        switch (mode) {
+            case LockMode::Shared:
+                lockFlags = LOCK_SH | LOCK_NB;
+                break;
+            case LockMode::Exclusive:
+                lockFlags = LOCK_EX | LOCK_NB;
+                break;
+            case LockMode::None:
+                return true;
+        }
+        
+        if (flock(fd, lockFlags) != 0) {
+            return false; // Lock failed
+        }
+        lockMode_ = mode;
+        return true;
+#endif
+    }
 };
 
 /// Simple string builder using C-style allocation
