@@ -103,8 +103,8 @@ struct HttpClientState {
 // ---------------------------------------------------------------------------
 class HttpPollServer : public ServerBase<HttpClientState> {
     public:
-    explicit HttpPollServer(const ServerBind& bind)
-        : ServerBase<HttpClientState>(bind), bind_(bind) {}
+    explicit HttpPollServer(const ServerBind& bind, Result<TcpSocket>* result = nullptr)
+        : ServerBase<HttpClientState>(bind, AddressFamily::IPv4, result), bind_(bind) {}
 
     // Run the server with startup/shutdown messages
     void run(ClientLimit maxClients = ClientLimit::Default,

@@ -18,8 +18,9 @@ using namespace aiSocks;
 /// Custom file server with authentication and access logging
 class CustomFileServer : public HttpFileServer {
 public:
-    explicit CustomFileServer(const ServerBind& bind, const Config& config)
-        : HttpFileServer(bind, config) {
+    explicit CustomFileServer(const ServerBind& bind, const Config& config, 
+                             Result<TcpSocket>* result = nullptr)
+        : HttpFileServer(bind, config, result) {
         
         // Open log file
         logFile_.open("access.log", "a");
@@ -628,8 +629,19 @@ int main() {
     config.customHeaders["X-Frame-Options"] = "DENY";
     
     try {
-        // Create and start the custom server
-        CustomFileServer server(ServerBind{"0.0.0.0", Port{8080}}, config);
+        // Create and start the custom server with detailed error information
+        Result<TcpSocket> serverResult = Result<TcpSocket>::failure(SocketError::Unknown, "initial");
+        CustomFileServer server(ServerBind{"0.0.0.0", Port{8080}}, config, &serverResult);
+        
+        // Check if server creation succeeded (bind/listen)
+        if (!server.isValid()) {
+            fprintf(stderr, "ERROR: Server failed to start: %s\n", serverResult.message().c_str());
+            fprintf(stderr, "Error code: %d\n", static_cast<int>(serverResult.error()));
+            printf("%s", ServerStrings::SERVER_STOPPED);
+            printf("%s", ServerStrings::LOG_SAVED);
+            printf("%s", ServerStrings::THANK_YOU);
+            return 1;
+        }
         
         printf("%s", ServerStrings::STARTING);
         printf("%s%s\n", ServerStrings::SERVING_FROM, config.documentRoot.c_str());

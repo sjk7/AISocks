@@ -50,8 +50,9 @@ class HttpFileServer : public HttpPollServer {
             customHeaders; // Additional headers to add
     };
 
-    explicit HttpFileServer(const ServerBind& bind, const Config& config)
-        : HttpPollServer(bind) {
+    explicit HttpFileServer(const ServerBind& bind, const Config& config,
+                         Result<TcpSocket>* result = nullptr)
+        : HttpPollServer(bind, result) {
         // Set default values
         config_.documentRoot
             = config.documentRoot.empty() ? "." : config.documentRoot;
