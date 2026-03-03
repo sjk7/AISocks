@@ -38,6 +38,7 @@ int main() {
         // Not guaranteed to fail on every OS, but getLastError must not be None
         // when it does fail; if it succeeds that's also acceptable (OS
         // behavior)
+        (void)listen_result; // May succeed or fail depending on OS
         REQUIRE_MSG(true, "listen() without bind completed without crash");
     }
 

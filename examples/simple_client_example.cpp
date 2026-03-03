@@ -26,7 +26,7 @@ int main() {
                               "Connection: close\r\n"
                               "\r\n";
 
-        if (!sock.sendAll(request, std::strlen(request))) {
+        if (!sock.sendAll(request, strlen(request))) {
             std::cerr << "Failed to send request\n";
             return;
         }

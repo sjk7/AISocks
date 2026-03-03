@@ -77,15 +77,15 @@ SocketError resolveToSockaddr(const std::string& address, Port port,
                 if (gaiErr) *gaiErr = gai;
                 return SocketError::ConnectFailed;
             }
-            std::memcpy(
+            memcpy(
                 &a6, res->ai_addr, static_cast<size_t>(res->ai_addrlen));
             a6.sin6_port = htons(port.value());
             freeaddrinfo(res);
         } else {
             return SocketError::BindFailed;
         }
-        std::memset(&out, 0, sizeof(out));
-        std::memcpy(&out, &a6, sizeof(a6));
+        memset(&out, 0, sizeof(out));
+        memcpy(&out, &a6, sizeof(a6));
         outLen = static_cast<socklen_t>(sizeof(sockaddr_in6));
     } else {
         sockaddr_in a4{};
@@ -105,15 +105,15 @@ SocketError resolveToSockaddr(const std::string& address, Port port,
                 if (gaiErr) *gaiErr = gai;
                 return SocketError::ConnectFailed;
             }
-            std::memcpy(
+            memcpy(
                 &a4, res->ai_addr, static_cast<size_t>(res->ai_addrlen));
             a4.sin_port = htons(port.value());
             freeaddrinfo(res);
         } else {
             return SocketError::BindFailed;
         }
-        std::memset(&out, 0, sizeof(out));
-        std::memcpy(&out, &a4, sizeof(a4));
+        memset(&out, 0, sizeof(out));
+        memcpy(&out, &a4, sizeof(a4));
         outLen = static_cast<socklen_t>(sizeof(sockaddr_in));
     }
     return SocketError::None;

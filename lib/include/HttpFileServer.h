@@ -7,12 +7,13 @@
 #include "HttpPollServer.h"
 #include "HttpRequest.h"
 #include "FileIO.h"
+#include "UrlCodec.h"
+#include "PathHelper.h"
 #include <string>
 #include <vector>
 #include <map>
 #include <ctime>
 #include <iomanip>
-#include <filesystem>
 
 namespace aiSocks {
 
@@ -142,7 +143,7 @@ protected:
         bool exists = false;
         bool isDirectory = false;
         size_t size = 0;
-        std::filesystem::file_time_type lastModified;
+        time_t lastModified = 0;
         std::string etag;
     };
 
@@ -151,26 +152,25 @@ protected:
         FileInfo info;
         
         try {
-            std::filesystem::path path(filePath);
+            PathHelper::FileInfo pathInfo = PathHelper::getFileInfo(filePath);
             
-            if (!std::filesystem::exists(path)) {
+            if (!pathInfo.exists) {
                 return info; // exists = false
             }
 
             info.exists = true;
-            info.isDirectory = std::filesystem::is_directory(path);
+            info.isDirectory = pathInfo.isDirectory;
             
             if (!info.isDirectory) {
-                info.size = std::filesystem::file_size(path);
-                info.lastModified = std::filesystem::last_write_time(path);
+                info.size = pathInfo.size;
+                info.lastModified = pathInfo.lastModified;
                 
                 // Generate ETag based on file size and modification time
                 if (config_.enableETag) {
                     StringBuilder etag;
                     etag.appendFormat("\"%zu-%ld\"", 
                         info.size,
-                        std::chrono::duration_cast<std::chrono::seconds>(
-                            info.lastModified.time_since_epoch()).count());
+                        static_cast<long>(info.lastModified));
                     info.etag = etag.toString();
                 }
             }
@@ -447,12 +447,12 @@ protected:
         html.append("<ul>\n");
         
         try {
-            for (const auto& entry : std::filesystem::directory_iterator(dirPath)) {
-                std::string name = entry.path().filename().string();
+            std::vector<PathHelper::DirEntry> entries = PathHelper::listDirectory(dirPath);
+            for (const auto& entry : entries) {
+                const std::string& name = entry.name;
                 if (name.empty() || name[0] == '.') continue; // Skip hidden files
                 
-                std::string path = entry.path().string();
-                bool isDir = entry.is_directory();
+                bool isDir = entry.isDirectory;
                 
                 html.append("<li><a href=\"");
                 html.append(name);
@@ -490,35 +490,6 @@ private:
         return "";
     }
 
-    std::string urlDecode(const std::string& encoded) const {
-        std::string decoded;
-        for (size_t i = 0; i < encoded.length(); ++i) {
-            if (encoded[i] == '%' && i + 2 < encoded.length()) {
-                // Parse hex digits manually
-                int hex = 0;
-                char c1 = encoded[i + 1];
-                char c2 = encoded[i + 2];
-                
-                if (c1 >= '0' && c1 <= '9') hex = (c1 - '0') << 4;
-                else if (c1 >= 'A' && c1 <= 'F') hex = (c1 - 'A' + 10) << 4;
-                else if (c1 >= 'a' && c1 <= 'f') hex = (c1 - 'a' + 10) << 4;
-                else { decoded += encoded[i]; continue; }
-                
-                if (c2 >= '0' && c2 <= '9') hex |= (c2 - '0');
-                else if (c2 >= 'A' && c2 <= 'F') hex |= (c2 - 'A' + 10);
-                else if (c2 >= 'a' && c2 <= 'f') hex |= (c2 - 'a' + 10);
-                else { decoded += encoded[i]; continue; }
-                
-                decoded += static_cast<char>(hex);
-                i += 2;
-            } else if (encoded[i] == '+') {
-                decoded += ' ';
-            } else {
-                decoded += encoded[i];
-            }
-        }
-        return decoded;
-    }
 
     std::vector<char> readFileContent(const std::string& filePath) const {
         File file(filePath.c_str(), "rb");
@@ -527,20 +498,16 @@ private:
         return file.readAll();
     }
 
-    std::string formatHttpDate(const std::filesystem::file_time_type& fileTime) const {
-        auto sctp = std::chrono::time_point_cast<std::chrono::system_clock::duration>(
-            fileTime - std::filesystem::file_time_type::clock::now() + std::chrono::system_clock::now());
-        std::time_t cftime = std::chrono::system_clock::to_time_t(sctp);
-        
+    std::string formatHttpDate(time_t fileTime) const {
         // Use strftime directly for proper HTTP date format
         char buffer[32];
 #ifdef _WIN32
         struct tm timeinfo = {};
-        gmtime_s(&timeinfo, &cftime);
-        std::strftime(buffer, sizeof(buffer), "%a, %d %b %Y %H:%M:%S GMT", &timeinfo);
+        gmtime_s(&timeinfo, &fileTime);
+        strftime(buffer, sizeof(buffer), "%a, %d %b %Y %H:%M:%S GMT", &timeinfo);
 #else
-        struct tm* timeinfo = std::gmtime(&cftime);
-        std::strftime(buffer, sizeof(buffer), "%a, %d %b %Y %H:%M:%S GMT", timeinfo);
+        struct tm* timeinfo = gmtime(&fileTime);
+        strftime(buffer, sizeof(buffer), "%a, %d %b %Y %H:%M:%S GMT", timeinfo);
 #endif
         
         return std::string(buffer);

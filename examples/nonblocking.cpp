@@ -15,7 +15,6 @@ using namespace aiSocks;
 // Configuration
 constexpr size_t CHUNK_SIZE = 64 * 1024; // 64 KB chunks
 constexpr size_t TOTAL_DATA = 100 * 1024 * 1024; // 100 MB total
-constexpr int POLL_DELAY_MS = 1; // Polling delay
 
 void runServerNonBlocking() {
     std::cout << "Starting non-blocking server on port 8080..." << std::endl;

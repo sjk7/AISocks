@@ -297,7 +297,7 @@ static void test_udp_transfer() {
             // Build a payload with a recognisable sequence number embedded.
             char payload[64];
             int payloadLen
-                = std::snprintf(payload, sizeof(payload), "datagram-%03d", i);
+                = snprintf(payload, sizeof(payload), "datagram-%03d", i);
             REQUIRE(payloadLen > 0);
 
             int s = cli.sendTo(payload, static_cast<size_t>(payloadLen), dest);

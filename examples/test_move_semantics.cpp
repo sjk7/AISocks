@@ -107,7 +107,10 @@ int main() {
     std::cout << "  socket7 valid before self-assignment: " << socket7.isValid()
               << std::endl;
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wself-move"
     socket7 = std::move(socket7); //-V570
+#pragma clang diagnostic pop
     std::cout << "  socket7 valid after self-assignment: " << socket7.isValid()
               << std::endl;
 

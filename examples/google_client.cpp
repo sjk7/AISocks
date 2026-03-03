@@ -29,7 +29,7 @@ int httpConnect(const ConnectArgs& args, const char* httpRequest) {
         std::cout << "Connected! Socket is valid.\n";
 
         std::cout << "Sending HTTP request...\n";
-        if (!sock.sendAll(httpRequest, std::strlen(httpRequest))) {
+        if (!sock.sendAll(httpRequest, strlen(httpRequest))) {
             std::cerr << "Failed to send request\n";
             return;
         }

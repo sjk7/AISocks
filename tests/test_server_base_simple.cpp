@@ -31,6 +31,7 @@ class SimpleServer : public ServerBase<SimpleState> {
     }
 
     ServerResult onWritable(TcpSocket& sock, SimpleState& s) override {
+        (void)sock; (void)s;
         return ServerResult::KeepConnection;
     }
 

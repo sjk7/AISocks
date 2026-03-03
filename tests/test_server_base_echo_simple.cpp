@@ -93,7 +93,7 @@ int main() {
 
             // Send some data
             const char* msg = "Hello Echo!";
-            bool sent = client->send(msg, std::strlen(msg));
+            bool sent = client->send(msg, strlen(msg));
             if (sent) {
                 std::cout << "Data sent successfully\n";
 

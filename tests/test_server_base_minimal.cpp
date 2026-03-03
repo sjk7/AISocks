@@ -47,10 +47,12 @@ class MinimalServer : public ServerBase<MinimalState> {
 
     protected:
     ServerResult onReadable(TcpSocket& sock, MinimalState& s) override {
+        (void)sock; (void)s;
         return ServerResult::KeepConnection;
     }
 
     ServerResult onWritable(TcpSocket& sock, MinimalState& s) override {
+        (void)sock; (void)s;
         return ServerResult::KeepConnection;
     }
 

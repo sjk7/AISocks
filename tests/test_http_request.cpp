@@ -54,13 +54,13 @@ using namespace aiSocks;
 // -- helpers ----------------------------------------------------------------
 
 // Build a minimal well-formed GET request.
-static std::string makeGet(const std::string& target,
+[[maybe_unused]] static std::string makeGet(const std::string& target,
                            const std::string& version = "HTTP/1.1") {
     return "GET " + target + " " + version + "\r\n\r\n";
 }
 
 // Build a request with headers (each entry = "Key: Value").
-static std::string makeRequest(const std::string& method,
+[[maybe_unused]] static std::string makeRequest(const std::string& method,
                                const std::string& target,
                                const std::string& version,
                                const std::string& headers,

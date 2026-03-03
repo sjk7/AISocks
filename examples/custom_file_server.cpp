@@ -336,12 +336,12 @@ protected:
         try {
             std::vector<std::pair<std::string, bool>> entries; // name, isDirectory
             
-            for (const auto& entry : std::filesystem::directory_iterator(dirPath)) {
-                std::string name = entry.path().filename().string();
+            std::vector<PathHelper::DirEntry> dirEntries = PathHelper::listDirectory(dirPath);
+            for (const auto& entry : dirEntries) {
+                const std::string& name = entry.name;
                 if (name.empty() || name[0] == '.') continue; // Skip hidden files
                 
-                std::string fullPath = dirPath + "/" + name;
-                bool isDir = entry.is_directory();
+                bool isDir = entry.isDirectory;
                 entries.emplace_back(name, isDir);
             }
             
@@ -353,37 +353,37 @@ protected:
                 });
             
             for (const auto& [name, isDir] : entries) {
-                std::string fullPath = dirPath + "/" + name;
+                std::string fullPath = PathHelper::joinPath(dirPath, name);
                 std::string type = isDir ? "Directory" : getFileExtension(name);
                 std::string size = "-";
                 std::string modified = "-";
                 
                 if (!isDir) {
                     try {
-                        size_t fileSize = std::filesystem::file_size(fullPath);
-                        if (fileSize < 1024) {
-                            size = std::to_string(fileSize) + " B";
-                        } else if (fileSize < 1024 * 1024) {
-                            size = std::to_string(fileSize / 1024) + " KB";
-                        } else {
-                            size = std::to_string(fileSize / (1024 * 1024)) + " MB";
-                        }
-                        
-                        auto modTime = std::filesystem::last_write_time(fullPath);
-                        auto sctp = std::chrono::time_point_cast<std::chrono::system_clock::duration>(
-                            modTime - std::filesystem::file_time_type::clock::now() + std::chrono::system_clock::now());
-                        std::time_t cftime = std::chrono::system_clock::to_time_t(sctp);
-                        
-                        char buffer[32];
+                        PathHelper::FileInfo fileInfo = PathHelper::getFileInfo(fullPath);
+                        if (fileInfo.exists) {
+                            size_t fileSize = fileInfo.size;
+                            if (fileSize < 1024) {
+                                size = std::to_string(fileSize) + " B";
+                            } else if (fileSize < 1024 * 1024) {
+                                size = std::to_string(fileSize / 1024) + " KB";
+                            } else {
+                                size = std::to_string(fileSize / (1024 * 1024)) + " MB";
+                            }
+                            
+                            std::time_t cftime = fileInfo.lastModified;
+                            
+                            char buffer[32];
 #ifdef _WIN32
-                        struct tm timeinfo = {};
-                        localtime_s(&timeinfo, &cftime);
-                        std::strftime(buffer, sizeof(buffer), "%Y-%m-%d %H:%M", &timeinfo);
+                            struct tm timeinfo = {};
+                            localtime_s(&timeinfo, &cftime);
+                            strftime(buffer, sizeof(buffer), "%Y-%m-%d %H:%M", &timeinfo);
 #else
-                        struct tm* timeinfo = std::localtime(&cftime);
-                        std::strftime(buffer, sizeof(buffer), "%Y-%m-%d %H:%M", timeinfo);
+                            struct tm* timeinfo = localtime(&cftime);
+                            strftime(buffer, sizeof(buffer), "%Y-%m-%d %H:%M", timeinfo);
 #endif
-                        modified = std::string(buffer);
+                            modified = std::string(buffer);
+                        }
                     } catch (...) {
                         // Ignore errors for file stats
                     }
@@ -444,7 +444,7 @@ private:
             timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec,
             request.method.c_str(), request.path.c_str());
 #else
-        struct tm* timeinfo = std::localtime(&time_t);
+        struct tm* timeinfo = localtime(&time_t);
         logFile_.printf("%04d-%02d-%02d %02d:%02d:%02d %s %s from client\n",
             timeinfo->tm_year + 1900, timeinfo->tm_mon + 1, timeinfo->tm_mday,
             timeinfo->tm_hour, timeinfo->tm_min, timeinfo->tm_sec,
@@ -493,10 +493,10 @@ private:
 #ifdef _WIN32
         struct tm timeinfo = {};
         localtime_s(&timeinfo, &time_t);
-        std::strftime(buffer, sizeof(buffer), "%Y-%m-%d %H:%M:%S", &timeinfo);
+        strftime(buffer, sizeof(buffer), "%Y-%m-%d %H:%M:%S", &timeinfo);
 #else
-        struct tm* timeinfo = std::localtime(&time_t);
-        std::strftime(buffer, sizeof(buffer), "%Y-%m-%d %H:%M:%S", timeinfo);
+        struct tm* timeinfo = localtime(&time_t);
+        strftime(buffer, sizeof(buffer), "%Y-%m-%d %H:%M:%S", timeinfo);
 #endif
         
         return std::string(buffer);

@@ -49,6 +49,7 @@ class NoTimeoutServer : public ServerBase<NoTimeoutState> {
 
     protected:
     ServerResult onReadable(TcpSocket& sock, NoTimeoutState& s) override {
+        (void)s;
         char buf[256];
         int n = sock.receive(buf, sizeof(buf));
         if (n <= 0) {
@@ -58,12 +59,14 @@ class NoTimeoutServer : public ServerBase<NoTimeoutState> {
     }
 
     ServerResult onWritable(TcpSocket& sock, NoTimeoutState& s) override {
+        (void)sock; (void)s;
         return ServerResult::KeepConnection;
     }
 
     ServerResult onIdle() override { return ServerResult::KeepConnection; }
 
     void onDisconnect(NoTimeoutState& s) override {
+        (void)s;
         // No-op
     }
 };

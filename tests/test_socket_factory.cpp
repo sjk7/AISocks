@@ -114,12 +114,12 @@ int main() {
 
         // Test send/receive
         const char* msg = "Hello Factory!";
-        bool sent = client.send(msg, std::strlen(msg));
+        bool sent = client.send(msg, strlen(msg));
         REQUIRE(sent);
 
         char buf[256] = {};
         int received = client.receive(buf, sizeof(buf) - 1);
-        REQUIRE(received == static_cast<int>(std::strlen(msg)));
+        REQUIRE(received == static_cast<int>(strlen(msg)));
         REQUIRE(std::string(buf, received) == msg);
 
         server_thread.join();

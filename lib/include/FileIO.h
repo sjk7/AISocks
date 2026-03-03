@@ -4,13 +4,13 @@
 
 #pragma once
 
-#include <cstdio>
-#include <cstring>
+#include <stdio.h>
+#include <string.h>
 #include <string>
 #include <vector>
 #include <memory>
-#include <cstdarg>
-#include <cerrno>
+#include <stdarg.h>
+#include <errno.h>
 
 namespace aiSocks {
 
@@ -49,14 +49,14 @@ public:
         errno_t err = fopen_s(&file_, filename, mode);
         return err == 0 && file_ != nullptr;
 #else
-        file_ = std::fopen(filename, mode);
+        file_ = fopen(filename, mode);
         return file_ != nullptr;
 #endif
     }
     
     void close() {
         if (file_) {
-            std::fclose(file_);
+            fclose(file_);
             file_ = nullptr;
         }
     }
@@ -66,20 +66,20 @@ public:
     }
     
     bool eof() const {
-        return file_ ? std::feof(file_) != 0 : true;
+        return file_ ? feof(file_) != 0 : true;
     }
     
     size_t read(void* buffer, size_t size, size_t count) {
-        return file_ ? std::fread(buffer, size, count, file_) : 0;
+        return file_ ? fread(buffer, size, count, file_) : 0;
     }
     
     size_t write(const void* buffer, size_t size, size_t count) {
-        return file_ ? std::fwrite(buffer, size, count, file_) : 0;
+        return file_ ? fwrite(buffer, size, count, file_) : 0;
     }
     
     bool writeString(const char* str) {
         if (!file_ || !str) return false;
-        size_t len = std::strlen(str);
+        size_t len = strlen(str);
         return write(str, 1, len) == len;
     }
     
@@ -92,22 +92,22 @@ public:
         
         va_list args;
         va_start(args, format);
-        int result = std::vfprintf(file_, format, args);
+        int result = vfprintf(file_, format, args);
         va_end(args);
         
         return result >= 0;
     }
     
     bool flush() {
-        return file_ ? std::fflush(file_) == 0 : false;
+        return file_ ? fflush(file_) == 0 : false;
     }
     
     bool seek(long offset, int whence) {
-        return file_ ? std::fseek(file_, offset, whence) == 0 : false;
+        return file_ ? fseek(file_, offset, whence) == 0 : false;
     }
     
     long tell() {
-        return file_ ? std::ftell(file_) : -1;
+        return file_ ? ftell(file_) : -1;
     }
     
     size_t size() {
@@ -160,7 +160,7 @@ public:
     
     ~StringBuilder() {
         if (buffer_) {
-            std::free(buffer_);
+            free(buffer_);
         }
     }
     
@@ -177,7 +177,7 @@ public:
     StringBuilder& operator=(StringBuilder&& other) noexcept {
         if (this != &other) {
             if (buffer_) {
-                std::free(buffer_);
+                free(buffer_);
             }
             buffer_ = other.buffer_;
             size_ = other.size_;
@@ -192,7 +192,7 @@ public:
     void reserve(size_t newCapacity) {
         if (newCapacity <= capacity_) return;
         
-        char* newBuffer = static_cast<char*>(std::realloc(buffer_, newCapacity));
+        char* newBuffer = static_cast<char*>(realloc(buffer_, newCapacity));
         if (!newBuffer) return; // Out of memory
         
         buffer_ = newBuffer;
@@ -202,7 +202,7 @@ public:
     void append(const char* str) {
         if (!str) return;
         
-        size_t len = std::strlen(str);
+        size_t len = strlen(str);
         append(str, len);
     }
     
@@ -219,7 +219,7 @@ public:
         }
         
         if (buffer_ && size_ + len <= capacity_) {
-            std::memcpy(buffer_ + size_, str, len);
+            memcpy(buffer_ + size_, str, len);
             size_ = newSize;
         }
     }
@@ -238,7 +238,7 @@ public:
         
         // First, try with a small buffer
         char smallBuf[256];
-        int needed = std::snprintf(smallBuf, sizeof(smallBuf), format, args...);
+        int needed = snprintf(smallBuf, sizeof(smallBuf), format, args...);
         
         if (needed < 0) return false;
         
@@ -253,7 +253,7 @@ public:
         
         if (!buffer_) return false;
         
-        int result = std::snprintf(buffer_ + size_, requiredSize, format, args...);
+        int result = snprintf(buffer_ + size_, requiredSize, format, args...);
         if (result > 0) {
             size_ += static_cast<size_t>(result);
             return true;

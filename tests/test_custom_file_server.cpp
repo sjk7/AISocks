@@ -7,12 +7,20 @@
 
 #include "HttpFileServer.h"
 #include "FileIO.h"
+#include "PathHelper.h"
 #include <iostream>
 #include <string>
 #include <thread>
 #include <chrono>
-#include <filesystem>
 #include <cassert>
+
+#ifdef _WIN32
+    #include <direct.h>
+    #define mkdir(path, mode) _mkdir(path)
+#else
+    #include <sys/stat.h>
+    #include <sys/types.h>
+#endif
 
 using namespace aiSocks;
 using namespace std::chrono_literals;
@@ -138,10 +146,10 @@ protected:
 #ifdef _WIN32
         struct tm timeinfo = {};
         localtime_s(&timeinfo, &time_t);
-        std::strftime(buffer, sizeof(buffer), "%Y-%m-%d %H:%M:%S", &timeinfo);
+        strftime(buffer, sizeof(buffer), "%Y-%m-%d %H:%M:%S", &timeinfo);
 #else
-        struct tm* timeinfo = std::localtime(&time_t);
-        std::strftime(buffer, sizeof(buffer), "%Y-%m-%d %H:%M:%S", timeinfo);
+        struct tm* timeinfo = localtime(&time_t);
+        strftime(buffer, sizeof(buffer), "%Y-%m-%d %H:%M:%S", timeinfo);
 #endif
         
         (void)state; // Suppress unused parameter warning
@@ -286,8 +294,13 @@ int TestFramework::failedTests = 0;
 /// Create test environment
 void setupTestEnvironment() {
     // Create test directories and files
-    std::filesystem::create_directories("test_www");
-    std::filesystem::create_directories("test_www/subdir");
+#ifdef _WIN32
+    _mkdir("test_www");
+    _mkdir("test_www\\subdir");
+#else
+    mkdir("test_www", 0755);
+    mkdir("test_www/subdir", 0755);
+#endif
     
     // Create test files
     File htmlFile("test_www/index.html", "w");
@@ -318,8 +331,21 @@ void setupTestEnvironment() {
 
 /// Clean up test environment
 void cleanupTestEnvironment() {
-    std::filesystem::remove_all("test_www");
-    std::filesystem::remove("test_access.log");
+    // Simple cleanup - remove files first, then directories
+    std::remove("test_www/index.html");
+    std::remove("test_www/style.css");
+    std::remove("test_www/script.js");
+    std::remove("test_www/config.conf");
+    std::remove("test_www/debug.log");
+    std::remove("test_www/subdir/readme.txt");
+#ifdef _WIN32
+    _rmdir("test_www\\subdir");
+    _rmdir("test_www");
+#else
+    rmdir("test_www/subdir");
+    rmdir("test_www");
+#endif
+    std::remove("test_access.log");
 }
 
 /// Test authentication behavior - what users experience

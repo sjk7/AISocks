@@ -65,7 +65,7 @@ int main() {
         client.run([&](TcpSocket& sock) {
             callbackFired = true;
             const char* msg = "Hello echo";
-            sock.sendAll(msg, std::strlen(msg));
+            sock.sendAll(msg, strlen(msg));
             char buf[256]{};
             int n = sock.receive(buf, sizeof(buf) - 1);
             if (n > 0) REQUIRE(std::string(buf, n) == msg);
@@ -106,7 +106,7 @@ int main() {
         REQUIRE(sock.isValid());
 
         const char* msg = "factory test";
-        sock.sendAll(msg, std::strlen(msg));
+        sock.sendAll(msg, strlen(msg));
         char buf[256]{};
         int n = sock.receive(buf, sizeof(buf) - 1);
         REQUIRE(n > 0);
@@ -139,7 +139,7 @@ int main() {
         REQUIRE(client.getSocket()->isValid());
 
         const char* msg = "direct socket";
-        client.getSocket()->sendAll(msg, std::strlen(msg));
+        client.getSocket()->sendAll(msg, strlen(msg));
         char buf[256]{};
         int n = client.getSocket()->receive(buf, sizeof(buf) - 1);
         REQUIRE(n > 0);

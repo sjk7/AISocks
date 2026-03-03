@@ -30,7 +30,7 @@ int main() {
             std::cout << "\n[Sending] " << msg << "\n";
 
             // Send the message
-            size_t len = std::strlen(msg);
+            size_t len = strlen(msg);
             if (!sock.sendAll(msg, len)) {
                 std::cerr << "[Error] Failed to send: "
                           << static_cast<int>(sock.getLastError()) << "\n";

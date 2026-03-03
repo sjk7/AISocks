@@ -203,6 +203,7 @@ static void test_server_bind_failures() {
             ServerBind{"127.0.0.1", Port{BASE + 10}, Backlog{5}, false});
         REQUIRE(first_result.isSuccess());
         auto& first = first_result.value();
+        (void)first; // Keep port bound
 
         // Second socket tries same port without reuseAddr
         auto second_result = SocketFactory::createTcpServer(

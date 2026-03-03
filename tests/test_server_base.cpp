@@ -241,7 +241,7 @@ int main() {
 
                 // Send some data to establish the connection
                 const char* msg = "test";
-                bool sent = client->send(msg, std::strlen(msg));
+                bool sent = client->send(msg, strlen(msg));
                 REQUIRE(sent);
 
                 // Give server time to process the sent data
