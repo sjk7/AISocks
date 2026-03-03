@@ -155,6 +155,14 @@ class HttpFileServer : public HttpPollServer {
             return;
         }
 
+        // Block symlink / reparse-point traversal within the document root.
+        // This prevents escapes via symlinked directories under documentRoot.
+        if (PathHelper::hasSymlinkComponentWithin(
+                filePath, config_.documentRoot)) {
+            sendError(state, 403, "Forbidden", "Symlinks are not allowed");
+            return;
+        }
+
         // Check if path exists and get file info
         FileInfo fileInfo = getFileInfo(filePath);
 
@@ -276,14 +284,34 @@ class HttpFileServer : public HttpPollServer {
         // Note: File size is already checked via TOCTOU-safe descriptor info
         // before this call
 
-        // Block access to hidden files (dotfiles) - prevents access to
-        // .htpasswd, .git, etc.
-        size_t lastSlash = filePath.find_last_of("/\\");
-        std::string filename = (lastSlash != std::string::npos)
-            ? filePath.substr(lastSlash + 1)
-            : filePath;
-        if (!filename.empty() && filename[0] == '.') {
-            return false;
+        // Block access to hidden files (dotfiles) and hidden directories.
+        // Allow "/.well-known/" for ACME and similar conventions.
+        {
+            std::string root = PathHelper::normalizePath(config_.documentRoot);
+            std::string path = PathHelper::normalizePath(filePath);
+            if (!root.empty() && root.back() != '/') root.push_back('/');
+            if (path.size() >= root.size()
+                && path.compare(0, root.size(), root) == 0) {
+                const std::string rel = path.substr(root.size());
+                size_t i = 0;
+                bool firstComponent = true;
+                while (i < rel.size()) {
+                    while (i < rel.size() && rel[i] == '/') ++i;
+                    if (i >= rel.size()) break;
+                    const size_t j = rel.find('/', i);
+                    const std::string comp = (j == std::string::npos)
+                        ? rel.substr(i)
+                        : rel.substr(i, j - i);
+                    if (!comp.empty() && comp[0] == '.') {
+                        if (!(firstComponent && comp == ".well-known")) {
+                            return false;
+                        }
+                    }
+                    firstComponent = false;
+                    if (j == std::string::npos) break;
+                    i = j + 1;
+                }
+            }
         }
 
         // Additional checks can be added by derived classes

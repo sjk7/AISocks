@@ -157,6 +157,7 @@ bool SocketImpl::bind(const std::string& address, Port port) {
     if (::bind(socketHandle, reinterpret_cast<sockaddr*>(&addr), addrLen)
         == SOCKET_ERROR_CODE) {
         setError(SocketError::BindFailed, "Failed to bind socket");
+        this->close(); // so that at least isValid() will return false.
         return false;
     }
 
@@ -172,6 +173,7 @@ bool SocketImpl::listen(int backlog) {
 
     if (::listen(socketHandle, backlog) == SOCKET_ERROR_CODE) {
         setError(SocketError::ListenFailed, "Failed to listen on socket");
+        this->close();
         return false;
     }
 

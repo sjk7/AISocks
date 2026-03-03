@@ -8,7 +8,6 @@
 
 #include "HttpFileServer.h"
 #include "custom_file_server_strings.h"
-#include "CustomFileServerHtmlHelpers.h"
 #include "FileIO.h"
 #include <iostream>
 #include <chrono>
@@ -323,7 +322,11 @@ protected:
         html.append("</div>\n");
         
         html.append("</div>\n");
-        html.append(CustomFileServerHtmlHelpers::generateDirectoryListingFooter());
+        html.append("<div class=\"footer\">\n");
+        html.append("<p>Custom File Server | Built with aiSocks HttpFileServer</p>\n");
+        html.append("</div>\n");
+        html.append("</div>\n");
+        html.append("</body></html>\n");
         
         return html.toString();
     }
@@ -331,7 +334,11 @@ protected:
     /// Generate demo page that executes test.js
     std::string generateDemoPage() const {
         StringBuilder html(2048);
-        html.append(CustomFileServerHtmlHelpers::generateDemoPageStart());
+        html.append("<!DOCTYPE html>\n");
+        html.append("<html><head>\n");
+        html.append("<title>JavaScript Demo - test.js</title>\n");
+        html.append("<style>\n");
+        html.append("body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }\n");
         html.append(".container { max-width: 800px; margin: 0 auto; background: white; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); padding: 30px; }\n");
         html.append("h1 { color: #2c3e50; margin-top: 0; }\n");
         html.append(".info { background: #e3f2fd; border-left: 4px solid #2196f3; padding: 15px; margin: 20px 0; border-radius: 4px; }\n");
@@ -406,10 +413,8 @@ protected:
             remaining -= chunkSize;
         }
         
-        
         state.responseView = state.responseBuf;
     }
-    
 
     /// Override to customize directory listing
     std::string generateDirectoryListing(const std::string& dirPath) const override {
@@ -522,7 +527,6 @@ protected:
         html.append("</body></html>");
         return html.toString();
     }
-    
 
 private:
     File logFile_;
@@ -609,18 +613,19 @@ private:
     }
     
 };
+
 int main() {
     
     printf("%s", ServerStrings::HEADER);
     
     // Configure the file server
     HttpFileServer::Config config;
-    config.documentRoot = "./www";
-    config.indexFile = "index.html";
-    config.enableDirectoryListing = true;
-    config.enableETag = true;
-    config.enableLastModified = true;
-    config.maxFileSize = 50 * 1024 * 1024;
+    config.documentRoot = "./www";          // Serve files from ./www directory
+    config.indexFile = "index.html";        // Default file for directories
+    config.enableDirectoryListing = true;   // Show directory contents
+    config.enableETag = true;               // Enable ETag headers
+    config.enableLastModified = true;       // Enable Last-Modified headers
+    config.maxFileSize = 50 * 1024 * 1024;  // 50MB max file size (large500MB.bin bypasses via override)
     
     // Add custom headers
     config.customHeaders["Server"] = "Custom-FileServer/1.0";
@@ -633,15 +638,111 @@ int main() {
         
         printf("%s", ServerStrings::STARTING);
         printf("%s%s\n", ServerStrings::SERVING_FROM, config.documentRoot.c_str());
+        printf("%s", ServerStrings::GUIDE_HEADER);
+        std::cout << "\n🔐 BASIC AUTHENTICATION:\n";
+        std::cout << "   URL: http://localhost:8080/\n";
+        std::cout << "   Username: admin\n";
+        std::cout << "   Password: secret\n";
+        std::cout << "   → Browser will show login dialog\n";
+        std::cout << "   → Check access.log for authentication attempts\n";
         
-        server.run();
+        std::cout << "\n📁 DIRECTORY LISTING:\n";
+        std::cout << "   URL: http://localhost:8080/\n";
+        std::cout << "   → Shows enhanced directory listing with file sizes and dates\n";
+        std::cout << "   → Click on subdirectories to navigate\n";
+        std::cout << "   → Click on files to view them (browser displays or downloads based on MIME type)\n";
         
+        std::cout << "\n📄 FILE SERVING:\n";
+        std::cout << "   URL: http://localhost:8080/index.html\n";
+        std::cout << "   URL: http://localhost:8080/style.css\n";
+        std::cout << "   URL: http://localhost:8080/script.js\n";
+        std::cout << "   → Files are served with correct MIME types\n";
+        std::cout << "   → Check browser developer tools for headers\n";
+        
+        std::cout << "\n🚫 ACCESS CONTROL:\n";
+        std::cout << "   URL: http://localhost:8080/config.conf\n";
+        std::cout << "   URL: http://localhost:8080/server.log\n";
+        std::cout << "   URL: http://localhost:8080/temp.tmp\n";
+        std::cout << "   → Should return 403 Forbidden\n";
+        std::cout << "   → Custom error page with styling\n";
+        
+        std::cout << "\n📋 CUSTOM MIME TYPES:\n";
+        std::cout << "   Create test files: test.wasm, test.ts, test.jsx, test.tsx\n";
+        std::cout << "   URL: http://localhost:8080/test.wasm\n";
+        std::cout << "   → Served as 'application/wasm'\n";
+        std::cout << "   URL: http://localhost:8080/test.ts\n";
+        std::cout << "   → Served as 'application/typescript'\n";
+        
+        std::cout << "\n⚡ PERFORMANCE FEATURES:\n";
+        std::cout << "   1. ETag Support:\n";
+        std::cout << "      - Load any file twice\n";
+        std::cout << "      - Second request should return 304 Not Modified\n";
+        std::cout << "      - Check Network tab in browser dev tools\n";
+        
+        std::cout << "   2. Last-Modified Headers:\n";
+        std::cout << "      - Check Response Headers in dev tools\n";
+        std::cout << "      - Should see 'Last-Modified' field\n";
+        
+        std::cout << "\n❌ ERROR HANDLING:\n";
+        std::cout << "   URL: http://localhost:8080/nonexistent.html\n";
+        std::cout << "   → Custom 404 error page with styling\n";
+        std::cout << "   URL: http://localhost:8080/../etc/passwd\n";
+        std::cout << "   → 404 in browser (URL normalized), 403 via curl --path-as-is\n";
+        std::cout << "   → curl --path-as-is http://localhost:8080/../etc/passwd -u admin:secret\n";
+        std::cout << "   URL: http://localhost:8080/ (with wrong auth)\n";
+        std::cout << "   → Custom 401 error page\n";
+        
+        std::cout << "\n🔍 DEVELOPER TOOLS TESTING:\n";
+        std::cout << "   1. Open Chrome DevTools (F12)\n";
+        std::cout << "   2. Network Tab:\n";
+        std::cout << "      - See all requests with status codes\n";
+        std::cout << "      - Check Response Headers for custom headers\n";
+        std::cout << "      - Verify ETag and Last-Modified headers\n";
+        std::cout << "   3. Console Tab:\n";
+        std::cout << "      - Should see no errors for valid files\n";
+        std::cout << "   4. Application/Storage Tab:\n";
+        std::cout << "      - Check if browser caches responses properly\n";
+        
+        std::cout << "\n📝 ACCESS LOG:\n";
+        std::cout << "   File: access.log (in same directory as server)\n";
+        std::cout << "   → Shows timestamp, method, path for each request\n";
+        std::cout << "   → Updates in real-time as you browse\n";
+        
+        std::cout << "\n🧪 TESTING CHECKLIST:\n";
+        std::cout << "   □ Authentication prompt appears\n";
+        std::cout << "   □ Valid credentials grant access\n";
+        std::cout << "   □ Invalid credentials show 401 error\n";
+        std::cout << "   □ Directory listing shows file metadata\n";
+        std::cout << "   □ Files download with correct MIME types\n";
+        std::cout << "   □ Sensitive files return 403 errors\n";
+        std::cout << "   □ Non-existent files return 404 errors\n";
+        std::cout << "   □ Path traversal attempts are blocked\n";
+        std::cout << "   □ ETag headers work (304 responses on reload)\n";
+        std::cout << "   □ Access log records all requests\n";
+        std::cout << "   □ Custom headers appear in responses\n";
+        
+        std::cout << "\n⚙️  SERVER FEATURES:\n";
+        std::cout << "  - Basic authentication (admin:secret)\n";
+        std::cout << "  - Access logging to access.log\n";
+        std::cout << "  - Enhanced directory listings with file info\n";
+        std::cout << "  - Custom error pages with CSS styling\n";
+        std::cout << "  - Access control (denies .conf, .log, .tmp files)\n";
+        std::cout << "  - Custom MIME types for modern web files\n";
+        std::cout << "  - ETag and Last-Modified support\n";
+        std::cout << "  - Security headers (X-Content-Type-Options, X-Frame-Options)\n";
+        std::cout << "  - Path traversal protection\n";
+        std::cout << "\nPress Ctrl+C to stop the server\n";
+        
+        // Run the server (blocking call)
+        server.run(ClientLimit::Unlimited, Milliseconds{0});
+        
+        // Server has stopped
         printf("%s", ServerStrings::SERVER_STOPPED);
         printf("%s", ServerStrings::LOG_SAVED);
-        printf("%s", ServerStrings::THANK_YOU);
+        std::cout << "👋 Thank you for using HttpFileServer!\n";
         
     } catch (const std::exception& e) {
-        fprintf(stderr, "Error: %s\n", e.what());
+        std::cerr << "Error: " << e.what() << std::endl;
         return 1;
     }
     

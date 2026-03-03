@@ -44,36 +44,74 @@ std::string formatErrorContext(const ErrorContext& ctx);
 std::vector<NetworkInterface> getLocalAddresses();
 
 // Generic socket option setter template
-template<typename T>
-bool setSocketOption(SocketHandle socketHandle, int level, int optname, const T& value, const char* errMsg) {
+template <typename T>
+bool setSocketOption(SocketHandle socketHandle, int level, int optname,
+    const T& value, const char* errMsg) {
     (void)errMsg; // Suppress unused parameter warning
     int result = setsockopt(socketHandle, level, optname,
-            reinterpret_cast<const char*>(&value),
-            static_cast<socklen_t>(sizeof(value)));
-    assert(result == 0 && "setsockopt failed - check socket handle and option parameters");
+        reinterpret_cast<const char*>(&value),
+        static_cast<socklen_t>(sizeof(value)));
+
+    if (result != 0) {
+        // Get the actual error instead of just asserting
+#ifdef _WIN32
+        int errorCode = WSAGetLastError();
+#else
+        int errorCode = errno;
+#endif
+
+        // Print detailed error information for debugging
+        fprintf(stderr, "errno: %d : %s\n", errno, strerror(errno));
+        fprintf(stderr, "setsockopt FAILED: %s\n", errMsg);
+        fprintf(
+            stderr, "  Socket handle: %d\n", static_cast<int>(socketHandle));
+        fprintf(stderr, "  Level: %d, Optname: %d\n", level, optname);
+        fprintf(stderr, "  Error code: %d\n", errorCode);
+
+#ifdef _WIN32
+        LPSTR errorText = nullptr;
+        FormatMessageA(FORMAT_MESSAGE_ALLOCATE_BUFFER
+                | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+            nullptr, errorCode, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+            (LPSTR)&errorText, 0, nullptr);
+        if (errorText) {
+            fprintf(stderr, "  Error message: %s", errorText);
+            LocalFree(errorText);
+        }
+#else
+        fprintf(stderr, "  Error message: %s\n", strerror(errorCode));
+#endif
+
+        // In debug mode, we want to know about this failure
+        // but we shouldn't crash - just return false
+        assert(false
+            && "setsockopt failed - see stderr for detailed error information");
+    }
+
     return result == 0;
 }
 
 // Specialized timeout setter (platform-specific logic)
-bool setSocketOptionTimeout(SocketHandle socketHandle, int optname, std::chrono::milliseconds timeout, const char* errMsg);
+bool setSocketOptionTimeout(SocketHandle socketHandle, int optname,
+    std::chrono::milliseconds timeout, const char* errMsg);
 
 // IP address validation utilities
 bool isValidIPv4(const std::string& address);
 bool isValidIPv6(const std::string& address);
 
 // Validation helper macro for public-facing functions
-#define RETURN_IF_INVALID() \
-    do { \
-        if (!isValid()) { \
-            setError(SocketError::InvalidSocket, "Socket is not valid"); \
-            return false; \
-        } \
-    } while(0)
+#define RETURN_IF_INVALID()                                                    \
+    do {                                                                       \
+        if (!isValid()) {                                                      \
+            setError(SocketError::InvalidSocket, "Socket is not valid");       \
+            return false;                                                      \
+        }                                                                      \
+    } while (0)
 
-#define SET_SUCCESS() \
-    do { \
-        lastError = SocketError::None; \
-    } while(0)
+#define SET_SUCCESS()                                                          \
+    do {                                                                       \
+        lastError = SocketError::None;                                         \
+    } while (0)
 
 } // namespace aiSocks
 

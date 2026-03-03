@@ -5,122 +5,233 @@
       "label": "build test_socket_basics",
       "type": "shell",
       "command": "cmake",
-      "args": ["--build", "build-debug-windows", "--target", "test_socket_basics"],
+      "args": [
+        "--build",
+        "build-debug-windows",
+        "--target",
+        "test_socket_basics"
+      ],
       "group": {
         "kind": "build",
         "isDefault": false
       },
-      "problemMatcher": ["$gcc"]
+      "problemMatcher": [
+        "$gcc"
+      ]
     },
     {
       "label": "build test_blocking",
       "type": "shell",
       "command": "cmake",
-      "args": ["--build", "build-debug-windows", "--target", "test_blocking"],
+      "args": [
+        "--build",
+        "build-debug-windows",
+        "--target",
+        "test_blocking"
+      ],
       "group": {
         "kind": "build",
         "isDefault": false
       },
-      "problemMatcher": ["$gcc"]
+      "problemMatcher": [
+        "$gcc"
+      ]
     },
     {
       "label": "build test_loopback_tcp",
       "type": "shell",
       "command": "cmake",
-      "args": ["--build", "build-debug-windows", "--target", "test_loopback_tcp"],
+      "args": [
+        "--build",
+        "build-debug-windows",
+        "--target",
+        "test_loopback_tcp"
+      ],
       "group": {
         "kind": "build",
         "isDefault": false
       },
-      "problemMatcher": ["$gcc"]
+      "problemMatcher": [
+        "$gcc"
+      ]
     },
     {
       "label": "build test_construction",
       "type": "shell",
       "command": "cmake",
-      "args": ["--build", "build-debug-windows", "--target", "test_construction"],
+      "args": [
+        "--build",
+        "build-debug-windows",
+        "--target",
+        "test_construction"
+      ],
       "group": {
         "kind": "build",
         "isDefault": false
       },
-      "problemMatcher": ["$gcc"]
+      "problemMatcher": [
+        "$gcc"
+      ]
     },
     {
       "label": "build test_new_features",
       "type": "shell",
       "command": "cmake",
-      "args": ["--build", "build-debug-windows", "--target", "test_new_features"],
+      "args": [
+        "--build",
+        "build-debug-windows",
+        "--target",
+        "test_new_features"
+      ],
       "group": {
         "kind": "build",
         "isDefault": false
       },
-      "problemMatcher": ["$gcc"]
+      "problemMatcher": [
+        "$gcc"
+      ]
     },
     {
       "label": "build test_error_messages",
       "type": "shell",
       "command": "cmake",
-      "args": ["--build", "build-debug-windows", "--target", "test_error_messages"],
+      "args": [
+        "--build",
+        "build-debug-windows",
+        "--target",
+        "test_error_messages"
+      ],
       "group": {
         "kind": "build",
         "isDefault": false
       },
-      "problemMatcher": ["$gcc"]
+      "problemMatcher": [
+        "$gcc"
+      ]
     },
     {
       "label": "build test_poller",
       "type": "shell",
       "command": "cmake",
-      "args": ["--build", "build-debug-windows", "--target", "test_poller"],
+      "args": [
+        "--build",
+        "build-debug-windows",
+        "--target",
+        "test_poller"
+      ],
       "group": {
         "kind": "build",
         "isDefault": false
       },
-      "problemMatcher": ["$gcc"]
+      "problemMatcher": [
+        "$gcc"
+      ]
     },
     {
       "label": "build test_tcp_socket",
       "type": "shell",
       "command": "cmake",
-      "args": ["--build", "build-debug-windows", "--target", "test_tcp_socket"],
+      "args": [
+        "--build",
+        "build-debug-windows",
+        "--target",
+        "test_tcp_socket"
+      ],
       "group": {
         "kind": "build",
         "isDefault": false
       },
-      "problemMatcher": ["$gcc"]
+      "problemMatcher": [
+        "$gcc"
+      ]
     },
     {
       "label": "build test_socket_factory",
       "type": "shell",
       "command": "cmake",
-      "args": ["--build", "build-debug-windows", "--target", "test_socket_factory"],
+      "args": [
+        "--build",
+        "build-debug-windows",
+        "--target",
+        "test_socket_factory"
+      ],
       "group": {
         "kind": "build",
         "isDefault": false
       },
-      "problemMatcher": ["$gcc"]
+      "problemMatcher": [
+        "$gcc"
+      ]
     },
     {
       "label": "Build All",
       "type": "shell",
       "command": "cmake",
-      "args": ["--build", "build-debug-windows"],
+      "args": [
+        "--build",
+        "build-debug-windows"
+      ],
       "group": {
         "kind": "build",
         "isDefault": true
       },
-      "problemMatcher": ["$gcc"]
+      "problemMatcher": [
+        "$gcc"
+      ]
     },
     {
       "label": "build test_server_base_minimal",
       "type": "shell",
       "command": "cmake",
-      "args": ["--build", "build-debug-windows", "--target", "test_server_base_minimal"],
+      "args": [
+        "--build",
+        "build-debug-windows",
+        "--target",
+        "test_server_base_minimal"
+      ],
       "group": {
         "kind": "build",
         "isDefault": false
       },
-      "problemMatcher": ["$gcc"]
+      "problemMatcher": [
+        "$gcc"
+      ]
+    },
+    {
+      "label": "build custom_file_server (debug)",
+      "type": "shell",
+      "command": "cmake",
+      "args": [
+        "--build",
+        "build-mac",
+        "--target",
+        "custom_file_server"
+      ],
+      "group": {
+        "kind": "build",
+        "isDefault": false
+      },
+      "problemMatcher": [
+        "$gcc"
+      ]
+    },
+    {
+      "label": "build custom_file_server (relwithdebinfo)",
+      "type": "shell",
+      "command": "cmake",
+      "args": [
+        "--build",
+        "build-mac-rel",
+        "--target",
+        "custom_file_server"
+      ],
+      "group": {
+        "kind": "build",
+        "isDefault": false
+      },
+      "problemMatcher": [
+        "$gcc"
+      ]
     }
   ]
 }

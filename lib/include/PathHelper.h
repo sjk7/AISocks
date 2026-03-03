@@ -13,20 +13,20 @@
 #include <sys/types.h>
 
 #ifdef _WIN32
-    #include <windows.h>
-    #include <direct.h>
-    #define stat _stat64
-    // Only define these if not already defined (MinGW defines them)
-    #ifndef S_ISDIR
-        #define S_ISDIR(m) (((m) & _S_IFMT) == _S_IFDIR)
-    #endif
-    #ifndef S_ISREG
-        #define S_ISREG(m) (((m) & _S_IFMT) == _S_IFREG)
-    #endif
+#include <windows.h>
+#include <direct.h>
+#define stat _stat64
+// Only define these if not already defined (MinGW defines them)
+#ifndef S_ISDIR
+#define S_ISDIR(m) (((m) & _S_IFMT) == _S_IFDIR)
+#endif
+#ifndef S_ISREG
+#define S_ISREG(m) (((m) & _S_IFMT) == _S_IFREG)
+#endif
 #else
-    #include <dirent.h>
-    #include <unistd.h>
-    #include <limits.h>
+#include <dirent.h>
+#include <unistd.h>
+#include <limits.h>
 #endif
 
 namespace aiSocks {
@@ -34,7 +34,7 @@ namespace aiSocks {
 /// Helper class for file system operations using C library functions
 /// Replaces std::filesystem to improve compile times
 class PathHelper {
-public:
+    public:
     struct FileInfo {
         bool exists = false;
         bool isDirectory = false;
@@ -51,18 +51,18 @@ public:
     /// Get information about a file or directory
     static FileInfo getFileInfo(const std::string& path) {
         FileInfo info;
-        
+
 #ifdef _WIN32
         struct _stat64 st;
         if (_stat64(path.c_str(), &st) != 0) {
             return info; // exists = false
         }
-        
+
         info.exists = true;
         info.isDirectory = S_ISDIR(st.st_mode);
         info.size = static_cast<size_t>(st.st_size);
         info.lastModified = st.st_mtime;
-        
+
         // Check for symlink/reparse point on Windows
         DWORD attrs = GetFileAttributesA(path.c_str());
         if (attrs != INVALID_FILE_ATTRIBUTES) {
@@ -73,14 +73,14 @@ public:
         if (lstat(path.c_str(), &st) != 0) {
             return info; // exists = false
         }
-        
+
         info.exists = true;
         info.isDirectory = S_ISDIR(st.st_mode);
         info.isSymlink = S_ISLNK(st.st_mode);
         info.size = static_cast<size_t>(st.st_size);
         info.lastModified = st.st_mtime;
 #endif
-        
+
         return info;
     }
 
@@ -121,6 +121,58 @@ public:
 #endif
     }
 
+    /// Returns true if any existing path component under rootPath is a symlink
+    /// (POSIX) or reparse-point (Windows). This is used to prevent escaping
+    /// the document root via symlinked directories.
+    ///
+    /// Behavior notes:
+    /// - If a component does not exist, this function returns false (so callers
+    ///   can still return 404 rather than turning missing-paths into 403).
+    /// - If fullPath is not within rootPath by simple prefix comparison after
+    ///   normalization, this returns true (defensive; callers should already
+    ///   have checked isPathWithin()).
+    static bool hasSymlinkComponentWithin(
+        const std::string& fullPath, const std::string& rootPath) {
+        std::string root = normalizePath(rootPath);
+        std::string path = normalizePath(fullPath);
+
+        if (!root.empty() && root.back() != '/') root.push_back('/');
+        if (root.empty()) return true;
+        if (path.size() < root.size()) return true;
+        if (path.compare(0, root.size(), root) != 0) return true;
+
+        std::string current = root;
+        if (!current.empty() && current.back() == '/') current.pop_back();
+
+        const std::string rel = path.substr(root.size());
+        size_t i = 0;
+        while (i < rel.size()) {
+            while (i < rel.size() && rel[i] == '/') ++i;
+            if (i >= rel.size()) break;
+            const size_t j = rel.find('/', i);
+            const std::string comp = (j == std::string::npos)
+                ? rel.substr(i)
+                : rel.substr(i, j - i);
+            if (comp.empty()) break;
+
+            current += "/";
+            current += comp;
+
+            // Only evaluate symlink status for components that actually exist.
+            if (!exists(current)) {
+                return false;
+            }
+            if (isSymlink(current)) {
+                return true;
+            }
+
+            if (j == std::string::npos) break;
+            i = j + 1;
+        }
+
+        return false;
+    }
+
     /// Get file size
     static size_t fileSize(const std::string& path) {
 #ifdef _WIN32
@@ -150,65 +202,68 @@ public:
     /// List directory contents
     static std::vector<DirEntry> listDirectory(const std::string& path) {
         std::vector<DirEntry> entries;
-        
+
 #ifdef _WIN32
         std::string searchPath = path;
-        if (!searchPath.empty() && searchPath.back() != '/' && searchPath.back() != '\\') {
+        if (!searchPath.empty() && searchPath.back() != '/'
+            && searchPath.back() != '\\') {
             searchPath += "\\*";
         } else {
             searchPath += "*";
         }
-        
+
         WIN32_FIND_DATAA findData;
         HANDLE hFind = FindFirstFileA(searchPath.c_str(), &findData);
-        
+
         if (hFind == INVALID_HANDLE_VALUE) {
             return entries;
         }
-        
+
         do {
             std::string name = findData.cFileName;
             if (name != "." && name != "..") {
                 DirEntry entry;
                 entry.name = name;
-                entry.isDirectory = (findData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0;
+                entry.isDirectory
+                    = (findData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
+                    != 0;
                 entries.push_back(entry);
             }
         } while (FindNextFileA(hFind, &findData));
-        
+
         FindClose(hFind);
 #else
         DIR* dir = opendir(path.c_str());
         if (!dir) {
             return entries;
         }
-        
+
         struct dirent* ent;
         while ((ent = readdir(dir)) != nullptr) {
             std::string name = ent->d_name;
             if (name != "." && name != "..") {
                 DirEntry entry;
                 entry.name = name;
-                
+
                 // Try to determine if it's a directory
                 std::string fullPath = path;
                 if (!fullPath.empty() && fullPath.back() != '/') {
                     fullPath += '/';
                 }
                 fullPath += name;
-                
+
                 struct stat st;
                 if (stat(fullPath.c_str(), &st) == 0) {
                     entry.isDirectory = S_ISDIR(st.st_mode);
                 }
-                
+
                 entries.push_back(entry);
             }
         }
-        
+
         closedir(dir);
 #endif
-        
+
         return entries;
     }
 
@@ -221,19 +276,23 @@ public:
         return normalized;
     }
 
-    /// Get canonical/absolute path (resolves . and .. but doesn't follow symlinks)
-    /// 
+    /// Get canonical/absolute path (resolves . and .. but doesn't follow
+    /// symlinks)
+    ///
     /// WHAT IS CANONICALIZATION?
-    /// Canonicalization converts a path to its "canonical" (standard, absolute) form by:
-    /// 1. Converting to an absolute path (e.g., "test.txt" -> "/home/user/test.txt")
-    /// 2. Resolving "." (current directory) and ".." (parent directory) components
+    /// Canonicalization converts a path to its "canonical" (standard, absolute)
+    /// form by:
+    /// 1. Converting to an absolute path (e.g., "test.txt" ->
+    /// "/home/user/test.txt")
+    /// 2. Resolving "." (current directory) and ".." (parent directory)
+    /// components
     /// 3. Removing redundant separators (e.g., "a//b" -> "a/b")
     /// 4. On some systems, resolving symlinks (we avoid this for security)
     ///
     /// WHY IS THIS CRITICAL FOR FILE SERVING?
     /// Path traversal attacks use ".." to escape the document root:
     ///   Request: GET /../../../etc/passwd
-    ///   Without canonicalization: documentRoot + "/../../../etc/passwd" 
+    ///   Without canonicalization: documentRoot + "/../../../etc/passwd"
     ///                            = "www/../../../etc/passwd" (looks safe!)
     ///   After canonicalization: "/etc/passwd" (clearly outside www/)
     ///
@@ -242,11 +301,13 @@ public:
     /// - Unix/Linux: realpath() FAILS for nonexistent paths (returns NULL)
     ///   This is why we need normalizePathManual() as a fallback
     ///
-    /// Returns empty string on error (e.g., invalid path, nonexistent file on Unix)
+    /// Returns empty string on error (e.g., invalid path, nonexistent file on
+    /// Unix)
     static std::string getCanonicalPath(const std::string& path) {
 #ifdef _WIN32
         char buffer[MAX_PATH];
-        DWORD result = GetFullPathNameA(path.c_str(), MAX_PATH, buffer, nullptr);
+        DWORD result
+            = GetFullPathNameA(path.c_str(), MAX_PATH, buffer, nullptr);
         if (result == 0 || result >= MAX_PATH) {
             return "";
         }
@@ -263,9 +324,9 @@ public:
     }
 
     /// Check if childPath is within parentPath (after canonicalization)
-    /// 
+    ///
     /// THIS IS THE KEY SECURITY FUNCTION FOR FILE SERVING
-    /// 
+    ///
     /// PURPOSE: Prevent path traversal attacks that try to access files outside
     /// the document root using ".." (parent directory) components.
     ///
@@ -276,16 +337,17 @@ public:
     /// EXAMPLE ATTACK PREVENTION:
     ///   Document root: "/var/www"
     ///   Requested file: "/var/www/../../../etc/passwd"
-    ///   
+    ///
     ///   After canonicalization:
     ///     childPath:  "/etc/passwd"
     ///     parentPath: "/var/www/"
-    ///   
+    ///
     ///   Check: Does "/etc/passwd" start with "/var/www/"? NO → BLOCKED (403)
     ///
     /// HANDLING NONEXISTENT FILES:
     /// Problem: On Unix, realpath() fails for nonexistent files (returns NULL)
-    /// Solution: Use normalizePathManual() fallback which manually resolves ".."
+    /// Solution: Use normalizePathManual() fallback which manually resolves
+    /// ".."
     ///           This allows us to return 404 for missing files instead of 403
     ///
     /// RELATIONSHIP TO FILE SERVING:
@@ -299,33 +361,36 @@ public:
     /// - normalizePathManual() resolves to "/etc/passwd"
     /// - Security check: "/etc/passwd" not within "www/" → return 403
     ///
-    static bool isPathWithin(const std::string& childPath, const std::string& parentPath) {
+    static bool isPathWithin(
+        const std::string& childPath, const std::string& parentPath) {
         // SIMPLIFIED APPROACH: Always use manual normalization for both paths
         // This avoids OS-dependent behavior differences and works consistently
         // across Windows, macOS, and Linux regardless of whether files exist
-        
+
         std::string normalizedChild = normalizePathManual(childPath);
         std::string normalizedParent = normalizePathManual(parentPath);
-        
+
         if (normalizedChild.empty() || normalizedParent.empty()) {
             return false;
         }
-        
+
         // Normalize slashes
         normalizedChild = normalizePath(normalizedChild);
         normalizedParent = normalizePath(normalizedParent);
-        
+
         // Ensure parent path ends with /
         if (!normalizedParent.empty() && normalizedParent.back() != '/') {
             normalizedParent += '/';
         }
-        
+
         // Check if child starts with parent
         if (normalizedChild.size() < normalizedParent.size()) {
             return false;
         }
-        
-        return normalizedChild.compare(0, normalizedParent.size(), normalizedParent) == 0;
+
+        return normalizedChild.compare(
+                   0, normalizedParent.size(), normalizedParent)
+            == 0;
     }
 
     /// Extract filename from path
@@ -349,38 +414,40 @@ public:
     }
 
     /// Join two path components
-    static std::string joinPath(const std::string& base, const std::string& component) {
+    static std::string joinPath(
+        const std::string& base, const std::string& component) {
         if (base.empty()) return component;
         if (component.empty()) return base;
-        
+
         std::string result = normalizePath(base);
         std::string comp = normalizePath(component);
-        
+
         // Remove leading slash from component
         if (!comp.empty() && comp[0] == '/') {
             comp = comp.substr(1);
         }
-        
+
         // Ensure base ends with slash
         if (!result.empty() && result.back() != '/') {
             result += '/';
         }
-        
+
         return result + comp;
     }
 
-private:
+    private:
     /// Manual path normalization for systems where realpath fails
-    /// Resolves . and .. components while preserving relative vs absolute path nature
+    /// Resolves . and .. components while preserving relative vs absolute path
+    /// nature
     static std::string normalizePathManual(const std::string& path) {
         std::string normalized = normalizePath(path);
-        
+
         // Check if path is absolute (starts with /)
         bool isAbsolute = !normalized.empty() && normalized[0] == '/';
-        
+
         std::vector<std::string> components;
         std::string current;
-        
+
         for (size_t i = 0; i < normalized.size(); ++i) {
             char c = normalized[i];
             if (c == '/') {
@@ -398,7 +465,7 @@ private:
                 current += c;
             }
         }
-        
+
         if (!current.empty()) {
             if (current == "..") {
                 if (!components.empty()) {
@@ -408,7 +475,7 @@ private:
                 components.push_back(current);
             }
         }
-        
+
         // Build result preserving absolute/relative nature
         std::string result;
         if (isAbsolute) {

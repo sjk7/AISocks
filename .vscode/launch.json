@@ -110,6 +110,24 @@
       "args": [],
       "cwd": "${workspaceFolder}",
       "preLaunchTask": "build test_server_base_minimal"
+    },
+    {
+      "name": "Debug custom_file_server (debug)",
+      "type": "lldb",
+      "request": "launch",
+      "program": "${workspaceFolder}/build-mac/custom_file_server",
+      "args": [],
+      "cwd": "${workspaceFolder}",
+      "preLaunchTask": "build custom_file_server (debug)"
+    },
+    {
+      "name": "Debug custom_file_server (relwithdebinfo)",
+      "type": "lldb",
+      "request": "launch",
+      "program": "${workspaceFolder}/build-mac-rel/custom_file_server",
+      "args": [],
+      "cwd": "${workspaceFolder}",
+      "preLaunchTask": "build custom_file_server (relwithdebinfo)"
     }
   ]
 }
