@@ -89,11 +89,13 @@ Result<SocketType> SocketFactory::bindSocket(
 
     // Set reuse address if requested
     if (config.reuseAddr) {
+        printf("DEBUG: Setting SO_REUSEADDR on server socket\n");
         if (!socket.setReuseAddress(true)) {
             return Result<SocketType>::failure(socket.getLastError(),
                 "setsockopt(SO_REUSEADDR)", SocketFactory::captureLastError(),
                 false);
         }
+        printf("DEBUG: SO_REUSEADDR set successfully\n");
     }
 
     // Bind the socket
