@@ -26,22 +26,25 @@ int main() {
     config.customHeaders["Server"] = "aiSocks-FileServer/1.0";
     config.customHeaders["X-Content-Type-Options"] = "nosniff";
     
-    try {
-        // Create and start the server
-        HttpFileServer server(ServerBind{"0.0.0.0", Port{8080}}, config);
-        
-        std::cout << "Server starting on http://localhost:8080/\n";
-        std::cout << "Serving files from: " << config.documentRoot << "\n";
-        std::cout << "Directory listing: " << (config.enableDirectoryListing ? "enabled" : "disabled") << "\n";
-        std::cout << "Press Ctrl+C to stop the server\n\n";
-        
-        // Run the server (blocking call)
-        server.run(ClientLimit::Unlimited, Milliseconds{0});
-        
-    } catch (const std::exception& e) {
-        std::cerr << "Error: " << e.what() << std::endl;
+    // Create the server
+    HttpFileServer server(ServerBind{"0.0.0.0", Port{8080}}, config);
+    
+    // Check if server creation succeeded (bind/listen)
+    if (!server.isValid()) {
+        std::cerr << "Error: Failed to start server on port 8080\n";
+        std::cerr << "This usually means:\n";
+        std::cerr << "  - Another process is already using port 8080\n";
+        std::cerr << "  - Insufficient permissions to bind to the port\n";
         return 1;
     }
+    
+    std::cout << "Server starting on http://localhost:8080/\n";
+    std::cout << "Serving files from: " << config.documentRoot << "\n";
+    std::cout << "Directory listing: " << (config.enableDirectoryListing ? "enabled" : "disabled") << "\n";
+    std::cout << "Press Ctrl+C to stop the server\n\n";
+    
+    // Run the server (blocking call)
+    server.run(ClientLimit::Unlimited, Milliseconds{0});
     
     return 0;
 }

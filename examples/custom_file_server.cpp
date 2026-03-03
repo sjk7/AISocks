@@ -16,7 +16,7 @@ using namespace aiSocks;
 /// Custom file server with authentication and access logging
 class CustomFileServer : public HttpFileServer {
 public:
-    explicit CustomFileServer(const ServerBind& bind, const Config& config = {})
+    explicit CustomFileServer(const ServerBind& bind, const Config& config)
         : HttpFileServer(bind, config) {
         
         // Open log file

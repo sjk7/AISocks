@@ -597,9 +597,105 @@ bool SocketImpl::setBlocking(bool blocking) {
 
 bool SocketImpl::setReuseAddress(bool reuse) {
     RETURN_IF_INVALID();
+    
+#ifdef _WIN32
+    // ═══════════════════════════════════════════════════════════════════════
+    // WINDOWS SOCKET REUSE BEHAVIOR - CRITICAL PLATFORM DIFFERENCES
+    // ═══════════════════════════════════════════════════════════════════════
+    //
+    // PROBLEM: SO_REUSEADDR has COMPLETELY DIFFERENT semantics on Windows vs Unix.
+    //
+    // On Unix/Linux, SO_REUSEADDR:
+    //   ✓ Prevents multiple processes from binding to the same active port
+    //   ✓ Allows binding to ports in TIME_WAIT state (quick rebind after crash)
+    //   ✓ This is the desired behavior for server sockets
+    //
+    // On Windows, SO_REUSEADDR:
+    //   ✗ ALLOWS multiple processes to bind to the same active port simultaneously!
+    //   ✗ Only the first socket receives connections; others are in zombie state
+    //   ✗ This is a security vulnerability (port hijacking/wildcard hijacking)
+    //   ✗ Example: Two http_file_server.exe instances can both bind to port 8080
+    //
+    // SOLUTION: Platform-specific handling to achieve consistent behavior:
+    //   Goal 1: Prevent simultaneous binds (second bind() should fail)
+    //   Goal 2: Allow quick rebind after server crash (no TIME_WAIT wait)
+    //
+    // ───────────────────────────────────────────────────────────────────────
+    // WINDOWS IMPLEMENTATION (reuse=true, the default for server sockets):
+    // ───────────────────────────────────────────────────────────────────────
+    //
+    // Strategy: Don't set SO_REUSEADDR at all. Use default Windows behavior.
+    //
+    // Why this works:
+    //   1. EXCLUSIVE BINDING: Without SO_REUSEADDR, Windows prevents multiple
+    //      processes from binding to the same port. Second bind() fails with
+    //      WSAEADDRINUSE. This achieves Goal 1.
+    //
+    //   2. QUICK REBIND: Windows does NOT enforce strict TIME_WAIT like Unix.
+    //      When a process terminates (even forcefully via taskkill /F), Windows
+    //      releases the port IMMEDIATELY - there is no 60-120 second wait.
+    //      This achieves Goal 2 without needing SO_REUSEADDR.
+    //
+    //   3. NORMAL SHUTDOWN: Even on graceful shutdown, Windows TIME_WAIT is
+    //      much shorter than Unix (typically a few seconds vs 60-120 seconds).
+    //
+    // Alternative considered: SO_EXCLUSIVEADDRUSE
+    //   - This flag explicitly prevents all reuse, including TIME_WAIT reuse
+    //   - Would make rebinding slower after graceful shutdown
+    //   - Not needed since default behavior already provides exclusive binding
+    //   - Only used when reuse=false is explicitly requested
+    //
+    // Testing:
+    //   - Start server on port 8080 → succeeds
+    //   - Start second server on port 8080 → fails with "port already in use"
+    //   - Kill first server with taskkill /F
+    //   - Start new server on port 8080 → succeeds IMMEDIATELY (no delay)
+    //
+    if (!reuse) {
+        // Explicitly request exclusive use (stricter than default)
+        int exclusive = 1;
+        return setSocketOption(socketHandle, SOL_SOCKET, SO_EXCLUSIVEADDRUSE,
+                             exclusive, "Failed to set exclusive address use");
+    }
+    // When reuse=true (default), don't set any flags.
+    // Default Windows behavior provides exclusive binding + quick rebind.
+    return true;
+    
+#else
+    // ───────────────────────────────────────────────────────────────────────
+    // UNIX/LINUX IMPLEMENTATION:
+    // ───────────────────────────────────────────────────────────────────────
+    //
+    // Strategy: Use SO_REUSEADDR when reuse=true (the default).
+    //
+    // Why this works:
+    //   1. EXCLUSIVE BINDING: SO_REUSEADDR on Unix does NOT allow multiple
+    //      processes to bind to the same active port. Second bind() fails
+    //      with EADDRINUSE. This achieves Goal 1.
+    //
+    //   2. QUICK REBIND: SO_REUSEADDR allows binding to ports in TIME_WAIT
+    //      state. Without this flag, you'd have to wait 60-120 seconds after
+    //      server shutdown before the port becomes available again.
+    //      This achieves Goal 2.
+    //
+    // TIME_WAIT explanation:
+    //   - When a TCP connection closes, the socket enters TIME_WAIT state
+    //   - This prevents delayed packets from interfering with new connections
+    //   - Unix enforces this strictly: ports in TIME_WAIT cannot be reused
+    //   - SO_REUSEADDR overrides this restriction for server sockets
+    //   - This is safe because server sockets use bind() before listen(),
+    //     and the kernel ensures no connection state conflicts
+    //
+    // Testing:
+    //   - Start server on port 8080 → succeeds
+    //   - Start second server on port 8080 → fails with "address already in use"
+    //   - Stop first server (Ctrl+C or kill)
+    //   - Start new server on port 8080 → succeeds immediately (no TIME_WAIT wait)
+    //
     int optval = reuse ? 1 : 0;
     return setSocketOption(socketHandle, SOL_SOCKET, SO_REUSEADDR, optval,
         "Failed to set reuse address option");
+#endif
 }
 
 bool SocketImpl::setTimeout(Milliseconds timeout) {

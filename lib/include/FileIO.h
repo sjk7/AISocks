@@ -19,6 +19,7 @@
 #else
     #include <unistd.h>
     #include <sys/file.h>
+    #include <sys/stat.h>
 #endif
 
 namespace aiSocks {
