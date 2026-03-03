@@ -333,24 +333,23 @@ protected:
             html.append("<tr><td><a href=\"../\">📁 ../</a></td><td>Directory</td><td>-</td><td>-</td></tr>\n");
         }
         
-        try {
-            std::vector<std::pair<std::string, bool>> entries; // name, isDirectory
+        std::vector<std::pair<std::string, bool>> entries; // name, isDirectory
+        
+        std::vector<PathHelper::DirEntry> dirEntries = PathHelper::listDirectory(dirPath);
+        for (const auto& entry : dirEntries) {
+            const std::string& name = entry.name;
+            if (name.empty() || name[0] == '.') continue; // Skip hidden files
             
-            std::vector<PathHelper::DirEntry> dirEntries = PathHelper::listDirectory(dirPath);
-            for (const auto& entry : dirEntries) {
-                const std::string& name = entry.name;
-                if (name.empty() || name[0] == '.') continue; // Skip hidden files
-                
-                bool isDir = entry.isDirectory;
-                entries.emplace_back(name, isDir);
-            }
-            
-            // Sort entries: directories first, then files, both alphabetically
-            std::sort(entries.begin(), entries.end(), 
-                [](const auto& a, const auto& b) {
-                    if (a.second != b.second) return a.second > b.second; // directories first
-                    return a.first < b.first; // alphabetical
-                });
+            bool isDir = entry.isDirectory;
+            entries.emplace_back(name, isDir);
+        }
+        
+        // Sort entries: directories first, then files, both alphabetically
+        std::sort(entries.begin(), entries.end(), 
+            [](const auto& a, const auto& b) {
+                if (a.second != b.second) return a.second > b.second; // directories first
+                return a.first < b.first; // alphabetical
+            });
             
             for (const auto& [name, isDir] : entries) {
                 std::string fullPath = PathHelper::joinPath(dirPath, name);
@@ -359,33 +358,29 @@ protected:
                 std::string modified = "-";
                 
                 if (!isDir) {
-                    try {
-                        PathHelper::FileInfo fileInfo = PathHelper::getFileInfo(fullPath);
-                        if (fileInfo.exists) {
-                            size_t fileSize = fileInfo.size;
-                            if (fileSize < 1024) {
-                                size = std::to_string(fileSize) + " B";
-                            } else if (fileSize < 1024 * 1024) {
-                                size = std::to_string(fileSize / 1024) + " KB";
-                            } else {
-                                size = std::to_string(fileSize / (1024 * 1024)) + " MB";
-                            }
-                            
-                            std::time_t cftime = fileInfo.lastModified;
-                            
-                            char buffer[32];
-#ifdef _WIN32
-                            struct tm timeinfo = {};
-                            localtime_s(&timeinfo, &cftime);
-                            strftime(buffer, sizeof(buffer), "%Y-%m-%d %H:%M", &timeinfo);
-#else
-                            struct tm* timeinfo = localtime(&cftime);
-                            strftime(buffer, sizeof(buffer), "%Y-%m-%d %H:%M", timeinfo);
-#endif
-                            modified = std::string(buffer);
+                    PathHelper::FileInfo fileInfo = PathHelper::getFileInfo(fullPath);
+                    if (fileInfo.exists) {
+                        size_t fileSize = fileInfo.size;
+                        if (fileSize < 1024) {
+                            size = std::to_string(fileSize) + " B";
+                        } else if (fileSize < 1024 * 1024) {
+                            size = std::to_string(fileSize / 1024) + " KB";
+                        } else {
+                            size = std::to_string(fileSize / (1024 * 1024)) + " MB";
                         }
-                    } catch (...) {
-                        // Ignore errors for file stats
+                        
+                        std::time_t cftime = fileInfo.lastModified;
+                        
+                        char buffer[32];
+#ifdef _WIN32
+                        struct tm timeinfo = {};
+                        localtime_s(&timeinfo, &cftime);
+                        strftime(buffer, sizeof(buffer), "%Y-%m-%d %H:%M", &timeinfo);
+#else
+                        struct tm* timeinfo = localtime(&cftime);
+                        strftime(buffer, sizeof(buffer), "%Y-%m-%d %H:%M", timeinfo);
+#endif
+                        modified = std::string(buffer);
                     }
                 }
                 
@@ -412,11 +407,6 @@ protected:
                 html.append(modified);
                 html.append("</td></tr>\n");
             }
-        } catch (const std::exception& e) {
-            html.append("<tr><td colspan=\"4\">Error reading directory: ");
-            html.append(e.what());
-            html.append("</td></tr>\n");
-        }
         
         html.append("</table>\n");
         html.append("<hr><p><small>Custom File Server | ");

@@ -151,31 +151,27 @@ protected:
     virtual FileInfo getFileInfo(const std::string& filePath) const {
         FileInfo info;
         
-        try {
-            PathHelper::FileInfo pathInfo = PathHelper::getFileInfo(filePath);
-            
-            if (!pathInfo.exists) {
-                return info; // exists = false
-            }
+        PathHelper::FileInfo pathInfo = PathHelper::getFileInfo(filePath);
+        
+        if (!pathInfo.exists) {
+            return info; // exists = false
+        }
 
-            info.exists = true;
-            info.isDirectory = pathInfo.isDirectory;
+        info.exists = true;
+        info.isDirectory = pathInfo.isDirectory;
+        
+        if (!info.isDirectory) {
+            info.size = pathInfo.size;
+            info.lastModified = pathInfo.lastModified;
             
-            if (!info.isDirectory) {
-                info.size = pathInfo.size;
-                info.lastModified = pathInfo.lastModified;
-                
-                // Generate ETag based on file size and modification time
-                if (config_.enableETag) {
-                    StringBuilder etag;
-                    etag.appendFormat("\"%zu-%ld\"", 
-                        info.size,
-                        static_cast<long>(info.lastModified));
-                    info.etag = etag.toString();
-                }
+            // Generate ETag based on file size and modification time
+            if (config_.enableETag) {
+                StringBuilder etag;
+                etag.appendFormat("\"%zu-%ld\"", 
+                    info.size,
+                    static_cast<long>(info.lastModified));
+                info.etag = etag.toString();
             }
-        } catch (const std::exception&) {
-            // Return default info (exists = false) on any error
         }
         
         return info;
@@ -446,8 +442,10 @@ protected:
         html.append("</h1>\n");
         html.append("<ul>\n");
         
-        try {
-            std::vector<PathHelper::DirEntry> entries = PathHelper::listDirectory(dirPath);
+        std::vector<PathHelper::DirEntry> entries = PathHelper::listDirectory(dirPath);
+        if (entries.empty()) {
+            html.append("<li>Error reading directory</li>\n");
+        } else {
             for (const auto& entry : entries) {
                 const std::string& name = entry.name;
                 if (name.empty() || name[0] == '.') continue; // Skip hidden files
@@ -466,8 +464,6 @@ protected:
                 }
                 html.append("</a></li>\n");
             }
-        } catch (const std::exception&) {
-            html.append("<li>Error reading directory</li>\n");
         }
         
         html.append("</ul>\n");
