@@ -102,11 +102,11 @@ static void test_basic_get() {
 // 2. Common HTTP methods
 static void test_methods() {
     BEGIN_TEST("HTTP methods");
-    for (const std::string& m : {"POST", "PUT", "DELETE", "PATCH",
-                                  "HEAD", "OPTIONS", "TRACE"}) {
-        auto req = HttpRequest::parse(m + " / HTTP/1.1\r\n\r\n");
-        REQUIRE_MSG(req.valid, "valid for method " + m);
-        REQUIRE_MSG(req.method == m, "method field == " + m);
+    for (const char* m : {"POST", "PUT", "DELETE", "PATCH",
+                          "HEAD", "OPTIONS", "TRACE"}) {
+        auto req = HttpRequest::parse(std::string(m) + " / HTTP/1.1\r\n\r\n");
+        REQUIRE_MSG(req.valid, std::string("valid for method ") + m);
+        REQUIRE_MSG(req.method == m, std::string("method field == ") + m);
     }
 }
 
