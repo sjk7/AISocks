@@ -442,10 +442,14 @@ static void test_sad_operations() {
         auto s = TcpSocket::createRaw();
         // listen() on unbound socket is OS-dependent but should not crash
         bool ok = s.listen(1);
-        // We only require it doesn't crash; some OSes let loopback-assign
-        // succeed, others fail.
-        (void)ok;
-        REQUIRE(s.isValid()); // fd still valid even if listen failed
+        // If listen() fails, the socket should be invalidated
+        if (!ok) {
+            REQUIRE(!s.isValid()); // socket should be invalid after listen failure
+            REQUIRE(s.getLastError() == SocketError::ListenFailed);
+        } else {
+            // If listen() succeeded (some OSes auto-bind), socket should be valid
+            REQUIRE(s.isValid());
+        }
     }
 }
 
