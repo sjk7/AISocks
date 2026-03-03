@@ -81,6 +81,19 @@ enum class ServerResult {
 //   };
 //
 //   MyServer srv(ServerBind{"0.0.0.0", Port{9000}});
+//   if (!srv.isValid()) {
+//       // Handle server creation failure
+//       return;
+//   }
+//   srv.run();
+//
+//   // With detailed error information:
+//   Result<TcpSocket> serverResult;
+//   MyServer srv(ServerBind{"0.0.0.0", Port{9000}}, AddressFamily::IPv4, &serverResult);
+//   if (!srv.isValid()) {
+//       fprintf(stderr, "Server failed: %s\n", serverResult.message().c_str());
+//       return;
+//   }
 //   srv.run();
 //
 // On failure (bind, listen, or Poller registration), the server is leftimeour
@@ -92,8 +105,10 @@ template <typename ClientData> class ServerBase {
     public:
     // Construct and start listening.  Does not accept until run() is called.
     // Returns invalid server if bind or listen fails - check isValid().
+    // The detailed error information is moved into the result parameter.
     explicit ServerBase(
-        const ServerBind& args, AddressFamily family = AddressFamily::IPv4)
+        const ServerBind& args, AddressFamily family = AddressFamily::IPv4,
+        Result<TcpSocket>* result = nullptr)
         : listener_(std::make_unique<TcpSocket>(TcpSocket::createRaw(family))) {
         // Pre-size the sparse fd→client table to the process fd ceiling
         // here in the constructor, before any threading or accept() calls.
@@ -101,10 +116,10 @@ template <typename ClientData> class ServerBase {
         // resizing clientSlots_ in the hot path.
         clientSlots_.resize(getFdCeiling());
         // Use SocketFactory to create server without exceptions
-        auto result = SocketFactory::createTcpServer(family, args);
-        if (result.isSuccess()) {
+        auto createResult = SocketFactory::createTcpServer(family, args);
+        if (createResult.isSuccess()) {
             printf("DEBUG: SocketFactory::createTcpServer() succeeded\n");
-            *listener_ = std::move(result.value());
+            *listener_ = std::move(createResult.value());
             // CRITICAL: Server listening socket must be non-blocking so the
             // poller can check stop flags and handle timeouts properly.
             // Sockets default to blocking mode, so we must explicitly set
@@ -119,10 +134,16 @@ template <typename ClientData> class ServerBase {
             (void)listener_->setReceiveBufferSize(256 * 1024);
             (void)listener_->setSendBufferSize(256 * 1024);
         } else {
-            // Server creation failed - fatal error, exit immediately
+            // Server creation failed - move error info to result parameter
+            if (result) {
+                *result = std::move(createResult);
+            }
+            // Reset the listener to make the server invalid
+            listener_.reset();
+            // Still print the error for backward compatibility
             fprintf(stderr, "FATAL: SocketFactory::createTcpServer() failed with error "
                    "code %d: %s\n",
-                   static_cast<int>(result.error()), result.message().c_str());
+                   static_cast<int>(createResult.error()), createResult.message().c_str());
             fprintf(stderr, "FATAL: Cannot start server - port %d is already in use or invalid\n",
                    args.port.value());
             // exit(1); // NO! Bad form!
