@@ -116,6 +116,7 @@ class HttpServer : public HttpPollServer {
 
         snprintf(bigHdr, sizeof(bigHdr), bigHeaderFmt, date_buf, bigBody.size(),
             "close");
+        
         big_close_response_ = bigHdr + bigBody;
     }
 
