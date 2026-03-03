@@ -9,7 +9,6 @@
 #include "HttpFileServer.h"
 #include "FileIO.h"
 #include "PathHelper.h"
-#include <iostream>
 #include <string>
 #include <thread>
 #include <chrono>
