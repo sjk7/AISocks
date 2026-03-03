@@ -13,6 +13,7 @@
 #include <cstring>
 #include <thread>
 #include <chrono>
+#include <atomic>
 
 using namespace aiSocks;
 
@@ -106,7 +107,7 @@ int main() {
         REQUIRE(srvPort.load() != 0);
 
         auto clt_result = SocketFactory::createTcpClient(AddressFamily::IPv4,
-            ConnectArgs{"127.0.0.1", Port{srvPort.load()}, Milliseconds{2000}});
+            ConnectArgs{"127.0.0.1", Port{static_cast<uint16_t>(srvPort.load())}, Milliseconds{2000}});
         REQUIRE(clt_result.isSuccess());
         auto& client = clt_result.value();
         REQUIRE(client.isValid());
