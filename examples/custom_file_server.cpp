@@ -259,7 +259,8 @@ protected:
         html.append("<h2>📁 Directory Listing</h2>\n");
         html.append("<h3>Subdirectory:</h3>\n");
         html.append("<div class=\"url\"><a href=\"/files/\">/files/</a></div>\n");
-        html.append("<p>Enhanced directory listings with file sizes, dates, and emoji icons.</p>\n");
+        html.append("<p>Enhanced directory listings with file sizes, dates, and emoji icons. ");
+        html.append("Click on files to view them (browser will display or download based on MIME type).</p>\n");
         html.append("</div>\n");
         
         // Access Control Section
@@ -605,7 +606,7 @@ int main() {
         std::cout << "   URL: http://localhost:8080/\n";
         std::cout << "   → Shows enhanced directory listing with file sizes and dates\n";
         std::cout << "   → Click on subdirectories to navigate\n";
-        std::cout << "   → Click on files to download them\n";
+        std::cout << "   → Click on files to view them (browser displays or downloads based on MIME type)\n";
         
         std::cout << "\n📄 FILE SERVING:\n";
         std::cout << "   URL: http://localhost:8080/index.html\n";
