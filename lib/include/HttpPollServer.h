@@ -122,7 +122,8 @@ class HttpPollServer : public ServerBase<HttpClientState> {
     }
     
     // Print OS/Build info banner - call this from derived class before run()
-    void printBuildInfo() const {
+    // Virtual so derived classes can customize the output
+    virtual void printBuildInfo() const {
         printf("Built: %s %s  |  OS: %s  |  Build: %s\n", 
                __DATE__, __TIME__, buildOS(), buildKind());
     }
