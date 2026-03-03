@@ -61,7 +61,21 @@ bool setSocketOption(SocketHandle socketHandle, int level, int optname,
 #endif
 
         // Print detailed error information for debugging
+#ifdef _WIN32
+        LPSTR errorText = nullptr;
+        FormatMessageA(FORMAT_MESSAGE_ALLOCATE_BUFFER
+                | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+            nullptr, errno, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+            (LPSTR)&errorText, 0, nullptr);
+        if (errorText) {
+            fprintf(stderr, "errno: %d : %s\n", errno, errorText);
+            LocalFree(errorText);
+        } else {
+            fprintf(stderr, "errno: %d : (unable to get error message)\n", errno);
+        }
+#else
         fprintf(stderr, "errno: %d : %s\n", errno, strerror(errno));
+#endif
         fprintf(stderr, "setsockopt FAILED: %s\n", errMsg);
         fprintf(
             stderr, "  Socket handle: %d\n", static_cast<int>(socketHandle));
