@@ -85,9 +85,21 @@ protected:
         std::string canonicalPath = PathHelper::getCanonicalPath(filePath);
         std::string canonicalRoot = PathHelper::getCanonicalPath(config_.documentRoot);
         
-        if (canonicalPath.empty() || canonicalRoot.empty()) {
-            sendError(state, 400, "Bad Request", "Invalid path");
+        // Document root must be valid
+        if (canonicalRoot.empty()) {
+            sendError(state, 500, "Internal Server Error", "Invalid document root configuration");
             return;
+        }
+        
+        // If canonicalization failed for the requested path, it might not exist
+        // We'll check existence later and return 404 if needed
+        if (canonicalPath.empty()) {
+            // Try manual normalization for nonexistent paths
+            canonicalPath = PathHelper::normalizePath(filePath);
+            if (canonicalPath.empty()) {
+                sendError(state, 400, "Bad Request", "Invalid path");
+                return;
+            }
         }
         
         // Verify the canonical path is within the document root
