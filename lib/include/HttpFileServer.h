@@ -165,6 +165,7 @@ protected:
 
     /// Virtual customization point: get MIME type for file
     virtual std::string getMimeType(const std::string& filePath) const {
+        // Extract extension from file path to determine MIME type
         std::string ext = getFileExtension(filePath);
         
         // Common MIME types
@@ -457,7 +458,13 @@ private:
         std::time_t cftime = std::chrono::system_clock::to_time_t(sctp);
         
         std::ostringstream oss;
+#ifdef _WIN32
+        struct tm timeinfo = {};
+        gmtime_s(&timeinfo, &cftime);
+        oss << std::put_time(&timeinfo, "%a, %d %b %Y %H:%M:%S GMT");
+#else
         oss << std::put_time(std::gmtime(&cftime), "%a, %d %b %Y %H:%M:%S GMT");
+#endif
         return oss.str();
     }
 };
