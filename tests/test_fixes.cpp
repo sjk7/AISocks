@@ -63,18 +63,29 @@ class BaseServer : public ServerBase<TS> {
     std::atomic<int> readableCalls{0};
     std::atomic<int> errorCalls{0};
     ServerResult errorReturn{ServerResult::Disconnect};
+    bool partialReadMode{false};  // For onIdle test: read only small chunks
 
     protected:
     ServerResult onReadable(TcpSocket& sock, TS& s) override {
         ++readableCalls;
         char tmp[256];
-        for (;;) {
+        if (partialReadMode) {
+            // Only read once per onReadable call to keep socket readable
+            // across multiple poll cycles
             int n = sock.receive(tmp, sizeof(tmp));
             if (n > 0) {
                 s.buf.append(tmp, n);
-                continue;
             }
-            break;
+        } else {
+            // Normal mode: drain the entire buffer
+            for (;;) {
+                int n = sock.receive(tmp, sizeof(tmp));
+                if (n > 0) {
+                    s.buf.append(tmp, n);
+                    continue;
+                }
+                break;
+            }
         }
         return ServerResult::KeepConnection;
     }
@@ -294,12 +305,12 @@ static void test_on_idle_only_on_timeout() {
                 + std::to_string(idleNoClients) + ")");
     }
 
-    // Phase 2: a client continuously writes data → poll returns with Readable
-    // events every cycle → onIdle should NOT be called (no timeout fires).
+    // Phase 2: Verify that onIdle is NOT called on every poll wake when events
+    // are present. We measure total onIdle calls over the entire test duration.
     {
         BaseServer server(Port::any);
+        server.partialReadMode = true;  // Read only small chunks to keep socket readable
 
-        // Read back the OS-assigned port before starting the server thread.
         Port srvPort104 = Port::any;
         {
             auto ep = server.getSocket().getLocalEndpoint();
@@ -322,35 +333,39 @@ static void test_on_idle_only_on_timeout() {
 
         waitFor([&] { return server.clientCount() == 1; });
 
-        // Write data repeatedly with small delays to ensure multiple poll cycles
-        // with readable events. Without delays, the server's onReadable() drains
-        // the entire socket buffer in one call, so we only get 1 readable event.
-        const char chunk[256]{};
-        auto endTime
-            = std::chrono::steady_clock::now() + std::chrono::milliseconds{150};
-        while (std::chrono::steady_clock::now() < endTime) {
-            client->send(chunk, sizeof(chunk));
-            // Small delay to allow server to poll and process, ensuring multiple
-            // readable events across different poll cycles
-            std::this_thread::sleep_for(std::chrono::milliseconds{5});
-        }
+        int idleBeforeData = server.idleCalls.load();
+        int readableBeforeData = server.readableCalls.load();
 
-        int idleWithClient = server.idleCalls.load();
-        int readableWithClient = server.readableCalls.load();
+        // Send large amounts of data to keep the socket buffer full and
+        // ensure the poller consistently finds readable events
+        const char chunk[4096]{};
+        for (int i = 0; i < 100; ++i) {
+            client->send(chunk, sizeof(chunk));
+        }
+        
+        // Give server time to process the data
+        std::this_thread::sleep_for(std::chrono::milliseconds{150});
+
+        int idleAfterData = server.idleCalls.load();
+        int readableAfterData = server.readableCalls.load();
+        
+        int idleDelta = idleAfterData - idleBeforeData;
+        int readableDelta = readableAfterData - readableBeforeData;
 
         server.requestStop();
         client.reset();
         t.join();
 
-        // The poller was continuously busy with Readable events, so
-        // onIdle (which only fires on empty-ready sets) should have been
-        // called far fewer times than onReadable.
-        REQUIRE_MSG(readableWithClient > 0, "onReadable should have fired");
-        REQUIRE_MSG(idleWithClient < readableWithClient,
-            "onIdle calls (" + std::to_string(idleWithClient)
-                + ") should be less than onReadable calls ("
-                + std::to_string(readableWithClient)
-                + ") when events are continuously firing");
+        // Behavior verification: If onIdle were called on every poll wake,
+        // it would be called as often as onReadable. Since it should only
+        // fire on timeouts (when no events are ready), it should be called
+        // much less frequently. We verify idleDelta is at most 50% of readableDelta.
+        REQUIRE_MSG(readableDelta > 0, "onReadable should have fired");
+        REQUIRE_MSG(idleDelta <= readableDelta / 2,
+            "onIdle calls (" + std::to_string(idleDelta)
+                + ") should be at most half of onReadable calls ("
+                + std::to_string(readableDelta)
+                + ") when events are available");
     }
 }
 
