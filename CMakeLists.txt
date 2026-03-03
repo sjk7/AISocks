@@ -9,6 +9,13 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 # Always generate compile_commands.json so clangd can find headers.
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+# Enable warnings as errors
+if(MSVC)
+    add_compile_options(/W4 /WX)
+else()
+    add_compile_options(-Wall -Wextra -Werror)
+endif()
+
 # Build options
 # Tests and extra examples are opt-in so a plain `cmake .. && ninja` only
 # builds the library and the primary example (main.cpp).

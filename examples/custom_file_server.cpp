@@ -172,7 +172,13 @@ protected:
                             modTime - std::filesystem::file_time_type::clock::now() + std::chrono::system_clock::now());
                         std::time_t cftime = std::chrono::system_clock::to_time_t(sctp);
                         std::ostringstream oss;
+#ifdef _WIN32
+                        struct tm timeinfo = {};
+                        localtime_s(&timeinfo, &cftime);
+                        oss << std::put_time(&timeinfo, "%Y-%m-%d %H:%M");
+#else
                         oss << std::put_time(std::localtime(&cftime), "%Y-%m-%d %H:%M");
+#endif
                         modified = oss.str();
                     } catch (...) {
                         // Ignore errors for file stats
@@ -199,12 +205,19 @@ private:
     std::ofstream logFile_;
     
     void logRequest(const HttpRequest& request, const HttpClientState& state) {
+        (void)state; // Suppress unused parameter warning - available for future enhancements
         if (!logFile_.is_open()) return;
         
         auto now = std::chrono::system_clock::now();
         auto time_t = std::chrono::system_clock::to_time_t(now);
         
+#ifdef _WIN32
+        struct tm timeinfo = {};
+        localtime_s(&timeinfo, &time_t);
+        logFile_ << std::put_time(&timeinfo, "%Y-%m-%d %H:%M:%S");
+#else
         logFile_ << std::put_time(std::localtime(&time_t), "%Y-%m-%d %H:%M:%S");
+#endif
         logFile_ << " " << request.method << " " << request.path;
         logFile_ << " from client";
         logFile_ << std::endl;
@@ -247,7 +260,13 @@ private:
         auto now = std::chrono::system_clock::now();
         auto time_t = std::chrono::system_clock::to_time_t(now);
         std::ostringstream oss;
+#ifdef _WIN32
+        struct tm timeinfo = {};
+        localtime_s(&timeinfo, &time_t);
+        oss << std::put_time(&timeinfo, "%Y-%m-%d %H:%M:%S");
+#else
         oss << std::put_time(std::localtime(&time_t), "%Y-%m-%d %H:%M:%S");
+#endif
         return oss.str();
     }
     

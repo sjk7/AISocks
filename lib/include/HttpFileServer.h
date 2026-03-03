@@ -206,7 +206,8 @@ protected:
 
     /// Virtual customization point: check if file access is allowed
     virtual bool isAccessAllowed(const std::string& filePath, const FileInfo& fileInfo) const {
-        // Basic checks
+        // Basic checks using file info
+        (void)filePath; // Suppress unused parameter warning - available for derived classes
         if (!fileInfo.exists) return false;
         if (fileInfo.size > config_.maxFileSize) return false;
         
