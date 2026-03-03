@@ -82,7 +82,6 @@ protected:
         std::string filePath = resolveFilePath(request.path);
         
         // Security check: Use proper canonicalization to prevent path traversal
-        std::string canonicalPath = PathHelper::getCanonicalPath(filePath);
         std::string canonicalRoot = PathHelper::getCanonicalPath(config_.documentRoot);
         
         // Document root must be valid
@@ -91,10 +90,12 @@ protected:
             return;
         }
         
-        // If canonicalization failed for the requested path, it might not exist
-        // We'll check existence later and return 404 if needed
+        // Try to canonicalize the requested path
+        std::string canonicalPath = PathHelper::getCanonicalPath(filePath);
+        
+        // If canonicalization failed (e.g., file doesn't exist), use manual normalization
+        // This allows us to properly return 404 for nonexistent files
         if (canonicalPath.empty()) {
-            // Try manual normalization for nonexistent paths
             canonicalPath = PathHelper::normalizePath(filePath);
             if (canonicalPath.empty()) {
                 sendError(state, 400, "Bad Request", "Invalid path");
@@ -102,8 +103,17 @@ protected:
             }
         }
         
-        // Verify the canonical path is within the document root
-        if (!PathHelper::isPathWithin(canonicalPath, canonicalRoot)) {
+        // Normalize both paths for comparison
+        std::string normalizedPath = PathHelper::normalizePath(canonicalPath);
+        std::string normalizedRoot = PathHelper::normalizePath(canonicalRoot);
+        
+        // Ensure root ends with /
+        if (!normalizedRoot.empty() && normalizedRoot.back() != '/') {
+            normalizedRoot += '/';
+        }
+        
+        // Check if the normalized path starts with the normalized root
+        if (normalizedPath.find(normalizedRoot) != 0) {
             sendError(state, 403, "Forbidden", "Access denied");
             return;
         }
