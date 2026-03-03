@@ -251,7 +251,9 @@ protected:
         html.append("<div class=\"url\"><a href=\"/style.css\">/style.css</a></div>\n");
         html.append("<div class=\"url\"><a href=\"/test.js\">/test.js</a> (view source)</div>\n");
         html.append("<div class=\"url\"><a href=\"/demo.html\">/demo.html</a> (runs test.js)</div>\n");
-        html.append("<p>Files are served with correct MIME types and UTF-8 encoding.</p>\n");
+        html.append("<h3>Large File Download Test:</h3>\n");
+        html.append("<div class=\"url\"><a href=\"/large500MB.bin\">/large500MB.bin</a> (500 MB binary file)</div>\n");
+        html.append("<p>Files are served with correct MIME types and UTF-8 encoding. Large file tests download speed and keep-alive behavior.</p>\n");
         html.append("</div>\n");
         
         // Directory Listing Section

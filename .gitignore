@@ -429,3 +429,7 @@ windows-test/*.exe
 windows-test/lib/*.a
 windows-test/lib/CMakeFiles/
 build-mingw/
+
+# Large test files for download testing
+www/large*.bin
+www/*MB.bin
