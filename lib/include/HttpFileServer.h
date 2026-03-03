@@ -87,8 +87,55 @@ protected:
         // Resolve the file path (includes URL decoding)
         std::string filePath = resolveFilePath(request.path);
         
-        // Security check: Prevent path traversal using PathHelper::isPathWithin
-        // This properly handles .. resolution and canonicalization
+        // ═══════════════════════════════════════════════════════════════════════
+        // CRITICAL SECURITY CHECK: PATH TRAVERSAL PREVENTION VIA CANONICALIZATION
+        // ═══════════════════════════════════════════════════════════════════════
+        //
+        // WHAT WE'RE PROTECTING AGAINST:
+        // Path traversal attacks attempt to access files outside the document root
+        // by using ".." (parent directory) components in the URL path.
+        //
+        // ATTACK EXAMPLES:
+        //   GET /../../../etc/passwd
+        //   GET /../../../Windows/System32/config/SAM
+        //   GET /images/../../config/database.yml
+        //
+        // HOW THE ATTACK WORKS:
+        // 1. User requests: GET /../../../etc/passwd
+        // 2. resolveFilePath() combines: documentRoot + requestPath
+        //    Result: "www/../../../etc/passwd"
+        // 3. Without canonicalization, simple string check would see "www/" prefix
+        //    and incorrectly allow access!
+        //
+        // HOW CANONICALIZATION PREVENTS THIS:
+        // 1. PathHelper::isPathWithin() canonicalizes both paths:
+        //    - "www/../../../etc/passwd" → "/etc/passwd" (resolves all ..)
+        //    - "www/" → "/home/user/project/www/" (absolute path)
+        // 2. Checks if "/etc/passwd" starts with "/home/user/project/www/"
+        // 3. NO → Returns false → We send 403 Forbidden
+        //
+        // LEGITIMATE FILE ACCESS:
+        // 1. User requests: GET /images/logo.png
+        // 2. resolveFilePath(): "www/images/logo.png"
+        // 3. Canonicalization:
+        //    - "www/images/logo.png" → "/home/user/project/www/images/logo.png"
+        //    - "www/" → "/home/user/project/www/"
+        // 4. Check passes → Continue to file existence check
+        //
+        // NONEXISTENT FILES (404 vs 403):
+        // 1. User requests: GET /missing.html
+        // 2. resolveFilePath(): "www/missing.html" (doesn't exist)
+        // 3. On Unix, realpath() fails for nonexistent files
+        // 4. isPathWithin() uses normalizePathManual() fallback
+        // 5. Manual normalization still resolves ".." correctly
+        // 6. Security check passes → File doesn't exist → Return 404 (not 403)
+        //
+        // WHY THIS MATTERS:
+        // - 403 Forbidden: "You're not allowed to access this" (security block)
+        // - 404 Not Found: "This file doesn't exist" (normal behavior)
+        // Returning 403 for nonexistent files would leak information about
+        // the file system structure to attackers.
+        //
         if (!PathHelper::isPathWithin(filePath, config_.documentRoot)) {
             sendError(state, 403, "Forbidden", "Access denied");
             return;

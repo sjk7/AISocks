@@ -217,7 +217,27 @@ public:
     }
 
     /// Get canonical/absolute path (resolves . and .. but doesn't follow symlinks)
-    /// Returns empty string on error
+    /// 
+    /// WHAT IS CANONICALIZATION?
+    /// Canonicalization converts a path to its "canonical" (standard, absolute) form by:
+    /// 1. Converting to an absolute path (e.g., "test.txt" -> "/home/user/test.txt")
+    /// 2. Resolving "." (current directory) and ".." (parent directory) components
+    /// 3. Removing redundant separators (e.g., "a//b" -> "a/b")
+    /// 4. On some systems, resolving symlinks (we avoid this for security)
+    ///
+    /// WHY IS THIS CRITICAL FOR FILE SERVING?
+    /// Path traversal attacks use ".." to escape the document root:
+    ///   Request: GET /../../../etc/passwd
+    ///   Without canonicalization: documentRoot + "/../../../etc/passwd" 
+    ///                            = "www/../../../etc/passwd" (looks safe!)
+    ///   After canonicalization: "/etc/passwd" (clearly outside www/)
+    ///
+    /// PLATFORM DIFFERENCES:
+    /// - Windows: GetFullPathName() works for nonexistent paths
+    /// - Unix/Linux: realpath() FAILS for nonexistent paths (returns NULL)
+    ///   This is why we need normalizePathManual() as a fallback
+    ///
+    /// Returns empty string on error (e.g., invalid path, nonexistent file on Unix)
     static std::string getCanonicalPath(const std::string& path) {
 #ifdef _WIN32
         char buffer[MAX_PATH];
@@ -238,7 +258,42 @@ public:
     }
 
     /// Check if childPath is within parentPath (after canonicalization)
-    /// This is the key security function to prevent path traversal
+    /// 
+    /// THIS IS THE KEY SECURITY FUNCTION FOR FILE SERVING
+    /// 
+    /// PURPOSE: Prevent path traversal attacks that try to access files outside
+    /// the document root using ".." (parent directory) components.
+    ///
+    /// HOW IT WORKS:
+    /// 1. Canonicalize both paths to resolve all "." and ".." components
+    /// 2. Compare the canonical paths to ensure child is within parent
+    ///
+    /// EXAMPLE ATTACK PREVENTION:
+    ///   Document root: "/var/www"
+    ///   Requested file: "/var/www/../../../etc/passwd"
+    ///   
+    ///   After canonicalization:
+    ///     childPath:  "/etc/passwd"
+    ///     parentPath: "/var/www/"
+    ///   
+    ///   Check: Does "/etc/passwd" start with "/var/www/"? NO → BLOCKED (403)
+    ///
+    /// HANDLING NONEXISTENT FILES:
+    /// Problem: On Unix, realpath() fails for nonexistent files (returns NULL)
+    /// Solution: Use normalizePathManual() fallback which manually resolves ".."
+    ///           This allows us to return 404 for missing files instead of 403
+    ///
+    /// RELATIONSHIP TO FILE SERVING:
+    /// - User requests: GET /nonexistent.html
+    /// - Resolved path: "www/nonexistent.html" (doesn't exist)
+    /// - getCanonicalPath() fails on Unix → use normalizePathManual()
+    /// - Security check passes → proceed to existence check → return 404
+    ///
+    /// - User requests: GET /../etc/passwd (path traversal attack)
+    /// - Resolved path: "www/../etc/passwd"
+    /// - normalizePathManual() resolves to "/etc/passwd"
+    /// - Security check: "/etc/passwd" not within "www/" → return 403
+    ///
     static bool isPathWithin(const std::string& childPath, const std::string& parentPath) {
         std::string canonicalChild = getCanonicalPath(childPath);
         std::string canonicalParent = getCanonicalPath(parentPath);
@@ -317,8 +372,13 @@ public:
 
 private:
     /// Manual path normalization for systems where realpath fails
+    /// Resolves . and .. components while preserving relative vs absolute path nature
     static std::string normalizePathManual(const std::string& path) {
         std::string normalized = normalizePath(path);
+        
+        // Check if path is absolute (starts with /)
+        bool isAbsolute = !normalized.empty() && normalized[0] == '/';
+        
         std::vector<std::string> components;
         std::string current;
         
@@ -350,12 +410,22 @@ private:
             }
         }
         
+        // Build result preserving absolute/relative nature
         std::string result;
-        for (size_t i = 0; i < components.size(); ++i) {
-            result += "/" + components[i];
+        if (isAbsolute) {
+            // Absolute path: start with /
+            for (size_t i = 0; i < components.size(); ++i) {
+                result += "/" + components[i];
+            }
+            return result.empty() ? "/" : result;
+        } else {
+            // Relative path: don't start with /
+            for (size_t i = 0; i < components.size(); ++i) {
+                if (i > 0) result += "/";
+                result += components[i];
+            }
+            return result.empty() ? "." : result;
         }
-        
-        return result.empty() ? "/" : result;
     }
 };
 
