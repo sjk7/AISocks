@@ -20,5 +20,12 @@
   "cmake.configurePreset": "asan-debug",
   "cmake.buildPreset": "asan-debug",
   "cmake.generator": "Ninja",
-  "cmake.buildBeforeRun": true
+  "cmake.buildBeforeRun": true,
+
+  // clangd settings
+  "clangd.inlayHints.enable": false,
+  "clangd.arguments": [
+    "--header-insertion=never",
+    "--completion-style=detailed"
+  ]
 }

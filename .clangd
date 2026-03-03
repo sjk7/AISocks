@@ -27,6 +27,14 @@ Diagnostics:
   Suppress:
     - unused-includes
 
+# Disable inline hints (inlay hints) that clutter the code
+InlayHints:
+  Enabled: false
+  # Or be more selective:
+  # ParameterNames: false
+  # DeducedTypes: false
+  # Designators: false
+
 # ------------------------------------------------------------------
 # Per-path overrides: silence diagnostics and skip background
 # indexing for system SDK, OS, and socket headers (cross-platform).
