@@ -87,59 +87,12 @@ protected:
         // Resolve the file path (includes URL decoding)
         std::string filePath = resolveFilePath(request.path);
         
-        // Security check: Use proper canonicalization to prevent path traversal
-        std::string canonicalRoot = PathHelper::getCanonicalPath(config_.documentRoot);
-        
-        // Document root must be valid
-        if (canonicalRoot.empty()) {
-            sendError(state, 500, "Internal Server Error", "Invalid document root configuration");
-            return;
-        }
-        
-        // Try to canonicalize the requested path
-        std::string canonicalPath = PathHelper::getCanonicalPath(filePath);
-        
-        // If canonicalization failed (e.g., file doesn't exist), we need to build
-        // an absolute path manually for security checking
-        if (canonicalPath.empty()) {
-            // If filePath is relative, make it absolute by prepending current directory
-            std::string absPath = filePath;
-            if (!filePath.empty() && filePath[0] != '/' && filePath[0] != '\\') {
-                // Relative path - need to make it absolute for comparison
-                // Get current working directory and combine
-                char cwd[4096];
-#ifdef _WIN32
-                if (_getcwd(cwd, sizeof(cwd)) != nullptr) {
-#else
-                if (getcwd(cwd, sizeof(cwd)) != nullptr) {
-#endif
-                    absPath = std::string(cwd) + "/" + filePath;
-                }
-            }
-            canonicalPath = PathHelper::normalizePath(absPath);
-            if (canonicalPath.empty()) {
-                sendError(state, 400, "Bad Request", "Invalid path");
-                return;
-            }
-        }
-        
-        // Normalize both paths for comparison
-        std::string normalizedPath = PathHelper::normalizePath(canonicalPath);
-        std::string normalizedRoot = PathHelper::normalizePath(canonicalRoot);
-        
-        // Ensure root ends with /
-        if (!normalizedRoot.empty() && normalizedRoot.back() != '/') {
-            normalizedRoot += '/';
-        }
-        
-        // Check if the normalized path starts with the normalized root
-        if (normalizedPath.find(normalizedRoot) != 0) {
+        // Security check: Prevent path traversal using PathHelper::isPathWithin
+        // This properly handles .. resolution and canonicalization
+        if (!PathHelper::isPathWithin(filePath, config_.documentRoot)) {
             sendError(state, 403, "Forbidden", "Access denied");
             return;
         }
-        
-        // Use the canonical path for all subsequent operations
-        filePath = canonicalPath;
         
         // Check if path exists and get file info
         FileInfo fileInfo = getFileInfo(filePath);

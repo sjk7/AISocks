@@ -243,6 +243,16 @@ public:
         std::string canonicalChild = getCanonicalPath(childPath);
         std::string canonicalParent = getCanonicalPath(parentPath);
         
+        // If child canonicalization failed (e.g., file doesn't exist), use manual normalization
+        if (canonicalChild.empty()) {
+            canonicalChild = normalizePathManual(childPath);
+        }
+        
+        // Parent should always succeed (it's the document root which exists)
+        if (canonicalParent.empty()) {
+            canonicalParent = normalizePathManual(parentPath);
+        }
+        
         if (canonicalChild.empty() || canonicalParent.empty()) {
             return false;
         }
