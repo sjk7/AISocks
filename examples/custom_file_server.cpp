@@ -511,40 +511,7 @@ private:
     }
 };
 
-#ifdef _WIN32
-#include <windows.h>
-#else
-#include <csignal>
-#endif
-
-// Global flag for clean shutdown
-volatile bool shutdownRequested = false;
-
-#ifdef _WIN32
-BOOL WINAPI consoleHandler(DWORD signal) {
-    if (signal == CTRL_C_EVENT) {
-        shutdownRequested = true;
-        std::cout << "\n\n🛑 Shutdown requested. Cleaning up...\n";
-        return TRUE;
-    }
-    return FALSE;
-}
-#else
-void signalHandler(int signal) {
-    if (signal == SIGINT) {
-        shutdownRequested = true;
-        std::cout << "\n\n🛑 Shutdown requested. Cleaning up...\n";
-    }
-}
-#endif
-
 int main() {
-    // Set up console handler for Ctrl+C
-#ifdef _WIN32
-    SetConsoleCtrlHandler(consoleHandler, TRUE);
-#else
-    std::signal(SIGINT, signalHandler);
-#endif
     
     std::cout << "=== Custom HTTP File Server Example ===\n";
     
@@ -665,12 +632,10 @@ int main() {
         // Run the server (blocking call)
         server.run(ClientLimit::Unlimited, Milliseconds{0});
         
-        // Server has stopped (likely due to Ctrl+C)
-        if (shutdownRequested) {
-            std::cout << "✅ Server stopped cleanly.\n";
-            std::cout << "📝 Access log saved to: access.log\n";
-            std::cout << "👋 Thank you for using HttpFileServer!\n";
-        }
+        // Server has stopped
+        std::cout << "\n✅ Server stopped.\n";
+        std::cout << "📝 Access log saved to: access.log\n";
+        std::cout << "👋 Thank you for using HttpFileServer!\n";
         
     } catch (const std::exception& e) {
         std::cerr << "Error: " << e.what() << std::endl;
