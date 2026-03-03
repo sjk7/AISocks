@@ -365,6 +365,15 @@ void setupTestEnvironment() {
     File logFile("test_www/debug.log", "w");
     logFile.writeString("Debug log entry");
     logFile.close();
+    
+    // Create dotfiles (should return 403, not 404)
+    File htpasswdFile("test_www/.htpasswd", "w");
+    htpasswdFile.writeString("admin:$apr1$...");
+    htpasswdFile.close();
+    
+    File envFile("test_www/.env", "w");
+    envFile.writeString("SECRET_KEY=abc123");
+    envFile.close();
 }
 
 /// Clean up test environment
@@ -375,6 +384,8 @@ void cleanupTestEnvironment() {
     std::remove("test_www/script.js");
     std::remove("test_www/config.conf");
     std::remove("test_www/debug.log");
+    std::remove("test_www/.htpasswd");
+    std::remove("test_www/.env");
     std::remove("test_www/subdir/readme.txt");
 #ifdef _WIN32
     _rmdir("test_www\\subdir");
@@ -560,6 +571,48 @@ void testErrorHandlingBehavior() {
         std::string status = BehavioralTestHelper::extractStatus(state.responseBuf);
         
         TestFramework::assert_contains(status, "403", "Log files should be blocked");
+    }
+    
+    // Unhappy Path: Dotfile (.htpasswd) should return 403, not 404
+    {
+        std::string request = BehavioralTestHelper::makeHttpRequest("GET", "/.htpasswd", "YWRtaW46c2VjcmV0");
+        HttpClientState state;
+        state.request = request;
+        
+        server.buildResponse(state);
+        std::string status = BehavioralTestHelper::extractStatus(state.responseBuf);
+        std::string body = BehavioralTestHelper::extractBody(state.responseBuf);
+        
+        TestFramework::assert_contains(status, "403", "Dotfiles should return 403 Forbidden, not 404");
+        TestFramework::assert_contains(body, "Forbidden", "Should explain access is forbidden");
+        TestFramework::assert_not_contains(body, "Not Found", "Should not say 'Not Found' for existing dotfiles");
+    }
+    
+    // Unhappy Path: Dotfile (.env) should return 403, not 404
+    {
+        std::string request = BehavioralTestHelper::makeHttpRequest("GET", "/.env", "YWRtaW46c2VjcmV0");
+        HttpClientState state;
+        state.request = request;
+        
+        server.buildResponse(state);
+        std::string status = BehavioralTestHelper::extractStatus(state.responseBuf);
+        
+        TestFramework::assert_contains(status, "403", ".env files should return 403 Forbidden, not 404");
+    }
+    
+    // Unhappy Path: Nonexistent dotfile should return 404 (file doesn't exist)
+    {
+        std::string request = BehavioralTestHelper::makeHttpRequest("GET", "/.nonexistent", "YWRtaW46c2VjcmV0");
+        HttpClientState state;
+        state.request = request;
+        
+        server.buildResponse(state);
+        std::string status = BehavioralTestHelper::extractStatus(state.responseBuf);
+        std::string body = BehavioralTestHelper::extractBody(state.responseBuf);
+        
+        TestFramework::assert_contains(status, "404", "Nonexistent dotfile should return 404 Not Found");
+        TestFramework::assert_contains(body, "Not Found", "Should explain file not found");
+        TestFramework::assert_not_contains(body, "Forbidden", "Should not say 'Forbidden' for nonexistent files");
     }
 }
 
