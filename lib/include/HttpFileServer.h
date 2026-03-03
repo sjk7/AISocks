@@ -148,6 +148,12 @@ protected:
         std::string etag;
     };
 
+    /// Virtual customization point: validate file size
+    /// Returns true if the file size is acceptable, false otherwise
+    virtual bool isFileSizeAcceptable(const std::string& /*filePath*/, size_t fileSize) const {
+        return fileSize <= config_.maxFileSize;
+    }
+
     /// Virtual customization point: get file information
     virtual FileInfo getFileInfo(const std::string& filePath) const {
         FileInfo info;
@@ -289,7 +295,7 @@ protected:
             return;
         }
         
-        if (fdInfo.size > config_.maxFileSize) {
+        if (!isFileSizeAcceptable(filePath, fdInfo.size)) {
             sendError(state, 403, "Forbidden", "File too large");
             return;
         }
