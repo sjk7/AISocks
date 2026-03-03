@@ -107,7 +107,52 @@ class HttpPollServer : public ServerBase<HttpClientState> {
     explicit HttpPollServer(const ServerBind& bind)
         : ServerBase<HttpClientState>(bind) {}
 
+    // Run the server with startup/shutdown messages
+    void run(ClientLimit maxClients = ClientLimit::Default,
+             Milliseconds timeout = Milliseconds{-1}) {
+        if (!this->isValid()) {
+            return; // Server not valid, exit early
+        }
+        
+        // Call base class run()
+        ServerBase<HttpClientState>::run(maxClients, timeout);
+        
+        // Print shutdown message
+        printf("\nServer stopped gracefully.\n");
+    }
+    
+    // Print OS/Build info banner - call this from derived class before run()
+    void printBuildInfo() const {
+        printf("Built: %s %s  |  OS: %s  |  Build: %s\n", 
+               __DATE__, __TIME__, buildOS(), buildKind());
+    }
+
     protected:
+    // Static helpers for OS/Build info
+    static const char* buildOS() {
+#if defined(__APPLE__)
+        return "macOS";
+#elif defined(__linux__)
+        return "Linux";
+#elif defined(_WIN32)
+        return "Windows";
+#else
+        return "Unknown";
+#endif
+    }
+
+    static const char* buildKind() {
+#if defined(NDEBUG)
+        return "Release";
+#else
+        return "Debug";
+#endif
+    }
+
+    virtual void printStartupBanner() {
+        printf("Built: %s %s  |  OS: %s  |  Build: %s\n", 
+               __DATE__, __TIME__, buildOS(), buildKind());
+    }
     // -------------------------------------------------------------------------
     // Must override: fill s.response from s.request.
     // s.closeAfterSend is already set according to HTTP/1.0 vs 1.1 keep-alive
