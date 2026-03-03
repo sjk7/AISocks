@@ -610,6 +610,17 @@ private:
         }
         return "";
     }
+    
+    /// Override to allow inline JavaScript (for demo purposes)
+    void addSecurityHeaders(StringBuilder& response) const {
+        if (!getConfig().enableSecurityHeaders) return;
+        
+        response.append("X-Content-Type-Options: nosniff\r\n");
+        response.append("X-Frame-Options: DENY\r\n");
+        // Allow inline JavaScript for demo purposes
+        response.append("Content-Security-Policy: default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'\r\n");
+        response.append("Referrer-Policy: no-referrer\r\n");
+    }
 };
 
 int main() {
