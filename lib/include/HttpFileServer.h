@@ -270,9 +270,15 @@ protected:
     /// Virtual customization point: check if file access is allowed
     virtual bool isAccessAllowed(const std::string& filePath, const FileInfo& fileInfo) const {
         // Basic checks using file info
-        (void)filePath; // Suppress unused parameter warning - available for derived classes
         if (!fileInfo.exists) return false;
         // Note: File size is already checked via TOCTOU-safe descriptor info before this call
+        
+        // Block access to hidden files (dotfiles) - prevents access to .htpasswd, .git, etc.
+        size_t lastSlash = filePath.find_last_of("/\\");
+        std::string filename = (lastSlash != std::string::npos) ? filePath.substr(lastSlash + 1) : filePath;
+        if (!filename.empty() && filename[0] == '.') {
+            return false;
+        }
         
         // Additional checks can be added by derived classes
         return true;
@@ -640,7 +646,7 @@ private:
         
         response.append("X-Content-Type-Options: nosniff\r\n");
         response.append("X-Frame-Options: DENY\r\n");
-        response.append("Content-Security-Policy: default-src 'self'\r\n");
+        response.append("Content-Security-Policy: default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'\r\n");
         response.append("Referrer-Policy: no-referrer\r\n");
     }
     

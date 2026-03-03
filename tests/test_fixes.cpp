@@ -322,12 +322,17 @@ static void test_on_idle_only_on_timeout() {
 
         waitFor([&] { return server.clientCount() == 1; });
 
-        // Write data in a tight loop for 150 ms to keep the poller busy.
+        // Write data repeatedly with small delays to ensure multiple poll cycles
+        // with readable events. Without delays, the server's onReadable() drains
+        // the entire socket buffer in one call, so we only get 1 readable event.
         const char chunk[256]{};
         auto endTime
             = std::chrono::steady_clock::now() + std::chrono::milliseconds{150};
         while (std::chrono::steady_clock::now() < endTime) {
             client->send(chunk, sizeof(chunk));
+            // Small delay to allow server to poll and process, ensuring multiple
+            // readable events across different poll cycles
+            std::this_thread::sleep_for(std::chrono::milliseconds{5});
         }
 
         int idleWithClient = server.idleCalls.load();
