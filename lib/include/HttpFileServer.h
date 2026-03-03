@@ -16,6 +16,12 @@
 #include <ctime>
 #include <iomanip>
 
+#ifdef _WIN32
+    #include <direct.h>
+#else
+    #include <unistd.h>
+#endif
+
 namespace aiSocks {
 
 /// HTTP file server that serves files from the current directory.
@@ -93,10 +99,24 @@ protected:
         // Try to canonicalize the requested path
         std::string canonicalPath = PathHelper::getCanonicalPath(filePath);
         
-        // If canonicalization failed (e.g., file doesn't exist), use manual normalization
-        // This allows us to properly return 404 for nonexistent files
+        // If canonicalization failed (e.g., file doesn't exist), we need to build
+        // an absolute path manually for security checking
         if (canonicalPath.empty()) {
-            canonicalPath = PathHelper::normalizePath(filePath);
+            // If filePath is relative, make it absolute by prepending current directory
+            std::string absPath = filePath;
+            if (!filePath.empty() && filePath[0] != '/' && filePath[0] != '\\') {
+                // Relative path - need to make it absolute for comparison
+                // Get current working directory and combine
+                char cwd[4096];
+#ifdef _WIN32
+                if (_getcwd(cwd, sizeof(cwd)) != nullptr) {
+#else
+                if (getcwd(cwd, sizeof(cwd)) != nullptr) {
+#endif
+                    absPath = std::string(cwd) + "/" + filePath;
+                }
+            }
+            canonicalPath = PathHelper::normalizePath(absPath);
             if (canonicalPath.empty()) {
                 sendError(state, 400, "Bad Request", "Invalid path");
                 return;
