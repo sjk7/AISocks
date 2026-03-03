@@ -744,10 +744,7 @@ void testPathTraversalBehavior() {
         std::string status = BehavioralTestHelper::extractStatus(state.responseBuf);
         std::string body = BehavioralTestHelper::extractBody(state.responseBuf);
         
-        TestFramework::assert_true(
-            status.find("403") != std::string::npos || status.find("400") != std::string::npos,
-            "Path traversal should be blocked with 403 or 400"
-        );
+        TestFramework::assert_contains(status, "403", "Path traversal should return 403 Forbidden (blocked by canonicalization check)");
         TestFramework::assert_not_contains(body, "root:", "Should not leak system files");
     }
     
@@ -760,10 +757,7 @@ void testPathTraversalBehavior() {
         server.buildResponse(state);
         std::string status = BehavioralTestHelper::extractStatus(state.responseBuf);
         
-        TestFramework::assert_true(
-            status.find("403") != std::string::npos || status.find("400") != std::string::npos || status.find("404") != std::string::npos,
-            "URL-encoded path traversal should be blocked"
-        );
+        TestFramework::assert_contains(status, "403", "URL-encoded path traversal should return 403 Forbidden");
     }
     
     // Unhappy Path: Multiple levels of traversal
@@ -775,10 +769,7 @@ void testPathTraversalBehavior() {
         server.buildResponse(state);
         std::string status = BehavioralTestHelper::extractStatus(state.responseBuf);
         
-        TestFramework::assert_true(
-            status.find("403") != std::string::npos || status.find("400") != std::string::npos,
-            "Deep path traversal should be blocked"
-        );
+        TestFramework::assert_contains(status, "403", "Deep path traversal should return 403 Forbidden");
     }
 }
 
