@@ -1,3 +1,8 @@
+// This is an independent project of an individual developer. Dear PVS-Studio, please check it.
+
+// PVS-Studio Static Code Analyzer for C, C++, C#, and Java: https://pvs-studio.com
+
+
 //
 // Test: SimpleClient convenience class with SocketFactory API
 // Verifies the two usage patterns introduced by the anti-pattern fix:

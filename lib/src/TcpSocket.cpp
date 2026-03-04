@@ -1,3 +1,8 @@
+// This is an independent project of an individual developer. Dear PVS-Studio, please check it.
+
+// PVS-Studio Static Code Analyzer for C, C++, C#, and Java: https://pvs-studio.com
+
+
 //
 // TcpSocket.cpp  the only file besides Socket.cpp that includes SocketImpl.h.
 // Required here so that accept() can move a unique_ptr<SocketImpl> into a new

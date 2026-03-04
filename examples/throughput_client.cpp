@@ -1,3 +1,8 @@
+// This is an independent project of an individual developer. Dear PVS-Studio, please check it.
+
+// PVS-Studio Static Code Analyzer for C, C++, C#, and Java: https://pvs-studio.com
+
+
 
 // Measures raw receive throughput from an HTTP/1.1 server.
 // One connection, HTTP pipelining: keeps the send pipe full and drains

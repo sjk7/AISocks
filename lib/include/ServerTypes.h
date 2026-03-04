@@ -1,3 +1,8 @@
+// This is an independent project of an individual developer. Dear PVS-Studio, please check it.
+
+// PVS-Studio Static Code Analyzer for C, C++, C#, and Java: https://pvs-studio.com
+
+
 #ifndef AISOCKS_SERVER_TYPES_H
 #define AISOCKS_SERVER_TYPES_H
 
