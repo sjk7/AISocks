@@ -1,6 +1,3 @@
-// This is a personal academic project. Dear PVS-Studio, please check it.
-// PVS-Studio Static Code Analyzer for C, C++, C#, and Java:
-// https://pvs-studio.com
 
 // Tests for ServerBase<T> with ClientLimit enum:
 //   1. requestStop() from another thread causes run() to return cleanly.

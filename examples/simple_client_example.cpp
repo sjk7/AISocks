@@ -1,6 +1,3 @@
-// This is a personal academic project. Dear PVS-Studio, please check it.
-// PVS-Studio Static Code Analyzer for C, C++, C#, and Java:
-// https://pvs-studio.com
 
 // Example: SimpleClient one-liner HTTP client
 // Demonstrates how to use SimpleClient for a quick GET request.

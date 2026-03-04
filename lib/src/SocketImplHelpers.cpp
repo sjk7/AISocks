@@ -1,5 +1,3 @@
-// This is a personal academic project. Dear PVS-Studio, please check it.
-// https://pvs-studio.com
 
 // SocketImplHelpers.cpp - Helper functions for SocketImpl
 // Extracted for better code organization

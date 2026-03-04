@@ -1,6 +1,3 @@
-// This is a personal academic project. Dear PVS-Studio, please check it.
-// PVS-Studio Static Code Analyzer for C, C++, C#, and Java:
-// https://pvs-studio.com Tests: Error reporting and graceful failure for
 // invalid/misused operations using SocketFactory Result<T> API.
 
 #include "TcpSocket.h"

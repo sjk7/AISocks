@@ -1,7 +1,3 @@
-// This is a personal academic project. Dear PVS-Studio, please check it.
-// PVS-Studio, please check it.
-// PVS-Studio Static Code Analyzer for C, C++, C#, and Java:
-// https://pvs-studio.com
 
 // Example: Custom HTTP file server with authentication and logging
 // Demonstrates how to derive from HttpFileServer and override virtual functions

@@ -1,6 +1,3 @@
-// This is a personal academic project. Dear PVS-Studio, please check it.
-// PVS-Studio Static Code Analyzer for C, C++, C#, and Java:
-// https://pvs-studio.com
 
 // Poll-driven HTTP/1.x server built on HttpPollServer.
 // HttpPollServer handles all HTTP framing; this file only contains the
