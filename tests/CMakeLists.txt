@@ -44,6 +44,40 @@ if(APPLE AND NOT MSVC)
     endif()
 endif()
 
+# ---------------------------------------------------------------------------
+# Shared precompiled header for all test targets.
+# test_pch_host compiles test_pch.h once; every test executable reuses it via
+# REUSE_FROM, avoiding 25 separate PCH compilations (saves ~5-7 s wall time).
+# The compile flags on test_pch_host must exactly match those applied to the
+# test executables so clang/MSVC accepts the shared PCH.
+# ---------------------------------------------------------------------------
+add_library(test_pch_host STATIC EXCLUDE_FROM_ALL
+    ${CMAKE_CURRENT_SOURCE_DIR}/pch_stub.cpp
+)
+target_link_libraries(test_pch_host PRIVATE aiSocksLib)
+target_include_directories(test_pch_host PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/lib/include
+)
+if(NOT MSVC)
+    target_compile_options(test_pch_host PRIVATE
+        $<$<CONFIG:Release>:-O1>
+        $<$<CONFIG:Release>:-fno-lto>
+        $<$<CONFIG:Debug>:-g>
+        $<$<CONFIG:Debug>:-O0>
+    )
+else()
+    target_compile_options(test_pch_host PRIVATE
+        /utf-8
+        $<$<CONFIG:Release>:/O1>
+        $<$<CONFIG:Debug>:/Zi>
+        $<$<CONFIG:Debug>:/Od>
+    )
+endif()
+target_precompile_headers(test_pch_host PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/test_pch.h
+)
+
 foreach(TEST_NAME ${TEST_SOURCES})
     add_executable(${TEST_NAME} ${TEST_NAME}.cpp)
     target_link_libraries(${TEST_NAME} PRIVATE aiSocksLib)
@@ -51,6 +85,7 @@ foreach(TEST_NAME ${TEST_SOURCES})
         ${CMAKE_CURRENT_SOURCE_DIR}
         ${CMAKE_SOURCE_DIR}/lib/include
     )
+    target_precompile_headers(${TEST_NAME} REUSE_FROM test_pch_host)
     add_test(NAME ${TEST_NAME} COMMAND ${TEST_NAME})
     set_tests_properties(${TEST_NAME} PROPERTIES TIMEOUT 30)
     
