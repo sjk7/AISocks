@@ -1,7 +1,8 @@
-// This is an independent project of an individual developer. Dear PVS-Studio, please check it.
+// This is an independent project of an individual developer. Dear PVS-Studio,
+// please check it.
 
-// PVS-Studio Static Code Analyzer for C, C++, C#, and Java: https://pvs-studio.com
-
+// PVS-Studio Static Code Analyzer for C, C++, C#, and Java:
+// https://pvs-studio.com
 
 #include "TcpSocket.h"
 #include <iostream>
@@ -70,8 +71,8 @@ void runServerNonBlocking() {
     size_t currentChunkSize = CHUNK_SIZE;
 
     auto startTime = std::chrono::high_resolution_clock::now();
-    int wouldBlockCount = 0;
-    int sendCount = 0;
+    size_t wouldBlockCount = 0;
+    size_t sendCount = 0;
 
     // Send data in non-blocking mode
     while (totalSent < TOTAL_DATA) {
@@ -89,7 +90,7 @@ void runServerNonBlocking() {
 
             // If we sent the whole chunk, reset for next chunk
             if (bufferOffset >= currentChunkSize) {
-                totalSent += bufferOffset;
+                totalSent += static_cast<size_t>(bufferOffset);
                 bufferOffset = 0;
             }
         } else {
@@ -110,7 +111,7 @@ void runServerNonBlocking() {
         endTime - startTime);
 
     double seconds = duration.count() / 1000.0;
-    double megabytes = totalSent / (1024.0 * 1024.0);
+    double megabytes = static_cast<double>(totalSent) / (1024.0 * 1024.0);
     double speedMBps = megabytes / seconds;
     double speedMbps = speedMBps * 8;
 
@@ -161,8 +162,8 @@ void runClientNonBlocking() {
     // Prepare receive buffer
     std::vector<char> buffer(CHUNK_SIZE);
     size_t totalReceived = 0;
-    int wouldBlockCount = 0;
-    int recvCount = 0;
+    size_t wouldBlockCount = 0;
+    size_t recvCount = 0;
 
     auto startTime = std::chrono::high_resolution_clock::now();
 
@@ -171,7 +172,7 @@ void runClientNonBlocking() {
         int bytesReceived = clientSocket.receive(buffer.data(), buffer.size());
 
         if (bytesReceived > 0) {
-            totalReceived += bytesReceived;
+            totalReceived += static_cast<size_t>(bytesReceived);
             recvCount++;
         } else if (bytesReceived == 0) {
             std::cout << "Server closed connection" << std::endl;
@@ -194,7 +195,7 @@ void runClientNonBlocking() {
         endTime - startTime);
 
     double seconds = duration.count() / 1000.0;
-    double megabytes = totalReceived / (1024.0 * 1024.0);
+    double megabytes = static_cast<double>(totalReceived) / (1024.0 * 1024.0);
     double speedMBps = megabytes / seconds;
     double speedMbps = speedMBps * 8;
 

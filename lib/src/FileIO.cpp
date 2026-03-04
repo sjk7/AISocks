@@ -1,7 +1,12 @@
-// This is an independent project of an individual developer. Dear PVS-Studio, please check it.
-// PVS-Studio Static Code Analyzer for C, C++, C#, and Java: https://pvs-studio.com
+// This is an independent project of an individual developer. Dear PVS-Studio,
+// please check it. PVS-Studio Static Code Analyzer for C, C++, C#, and Java:
+// https://pvs-studio.com
 
-
+#ifndef _WIN32
+#ifndef _FILE_OFFSET_BITS
+#define _FILE_OFFSET_BITS 64
+#endif
+#endif
 
 #include "FileIO.h"
 
@@ -147,22 +152,40 @@ bool File::flush() {
     return file_ ? fflush(file_) == 0 : false;
 }
 
-bool File::seek(long offset, int whence) {
-    return file_ ? fseek(file_, offset, whence) == 0 : false;
+#ifdef _WIN32
+bool File::seek(long long offset, int whence) {
+    return file_ ? _fseeki64(file_, offset, whence) == 0 : false;
 }
 
-long File::tell() {
-    return file_ ? ftell(file_) : -1;
+long long File::tell() {
+    return file_ ? _ftelli64(file_) : -1;
 }
+#else
+bool File::seek(int64_t offset, int whence) {
+    return file_ ? fseeko(file_, offset, whence) == 0 : false;
+}
+
+int64_t File::tell() {
+    return file_ ? ftello(file_) : -1;
+}
+#endif
 
 size_t File::size() {
     if (!file_) return 0;
 
-    long current = tell();
+#ifdef _WIN32
+    long long current = tell();
+#else
+    int64_t current = tell();
+#endif
     if (current < 0) return 0;
 
     if (!seek(0, SEEK_END)) return 0;
-    long fileSize = tell();
+#ifdef _WIN32
+    long long fileSize = tell();
+#else
+    int64_t fileSize = tell();
+#endif
 
     seek(current, SEEK_SET);
     return fileSize > 0 ? static_cast<size_t>(fileSize) : 0;

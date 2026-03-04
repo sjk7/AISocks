@@ -1,7 +1,8 @@
-// This is an independent project of an individual developer. Dear PVS-Studio, please check it.
+// This is an independent project of an individual developer. Dear PVS-Studio,
+// please check it.
 
-// PVS-Studio Static Code Analyzer for C, C++, C#, and Java: https://pvs-studio.com
-
+// PVS-Studio Static Code Analyzer for C, C++, C#, and Java:
+// https://pvs-studio.com
 
 //
 // test_tcp_socket.cpp  Happy and sad path tests for TcpSocket specifically.
@@ -105,11 +106,8 @@ static void test_happy_accept() {
         REQUIRE(srvPort != 0);
 
         std::thread clt([srvPort] {
-            try {
-                auto c = TcpSocket::createRaw();
-                (void)c.connect("127.0.0.1", Port{srvPort});
-            } catch (...) {
-            }
+            auto c = TcpSocket::createRaw();
+            (void)c.connect("127.0.0.1", Port{srvPort});
         });
 
         auto peer = srv.accept();
@@ -446,10 +444,12 @@ static void test_sad_operations() {
         bool ok = s.listen(1);
         // If listen() fails, the socket should be invalidated
         if (!ok) {
-            REQUIRE(!s.isValid()); // socket should be invalid after listen failure
+            REQUIRE(
+                !s.isValid()); // socket should be invalid after listen failure
             REQUIRE(s.getLastError() == SocketError::ListenFailed);
         } else {
-            // If listen() succeeded (some OSes auto-bind), socket should be valid
+            // If listen() succeeded (some OSes auto-bind), socket should be
+            // valid
             REQUIRE(s.isValid());
         }
     }
@@ -600,8 +600,8 @@ static void test_happy_send_chunked() {
         // sendChunked still iterates through each 64 KB slice.
         size_t totalSent = 0;
         while (totalSent < payloadSize) {
-            int n
-                = c.sendChunked(payload.data() + totalSent, payloadSize - totalSent);
+            int n = c.sendChunked(
+                payload.data() + totalSent, payloadSize - totalSent);
             REQUIRE(n > 0);
             if (n <= 0) break;
             totalSent += static_cast<size_t>(n);

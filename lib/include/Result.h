@@ -1,7 +1,8 @@
-// This is an independent project of an individual developer. Dear PVS-Studio, please check it.
+// This is an independent project of an individual developer. Dear PVS-Studio,
+// please check it.
 
-// PVS-Studio Static Code Analyzer for C, C++, C#, and Java: https://pvs-studio.com
-
+// PVS-Studio Static Code Analyzer for C, C++, C#, and Java:
+// https://pvs-studio.com
 
 #ifndef AISOCKS_RESULT_H
 #define AISOCKS_RESULT_H
@@ -136,10 +137,10 @@ template <typename T> class [[nodiscard]] Result {
                 new (value_storage_) T(std::move(other.value_ref()));
             } else {
                 has_value_ = false;
-                new (&error_ref()) ErrorInfo{other.error_ref().error,
-                    other.error_ref().description, other.error_ref().sysCode,
-                    other.error_ref().isDns,
-                    std::move(other.error_ref().cachedMessage_)};
+                auto& other_err = other.error_ref();
+                new (&error_ref()) ErrorInfo{other_err.error,
+                    other_err.description, other_err.sysCode, other_err.isDns,
+                    std::move(other_err.cachedMessage_)};
             }
         }
         return *this;
@@ -391,9 +392,9 @@ template <> class [[nodiscard]] Result<Endpoint> {
         if (has_value_) {
             new (endpoint_storage_) Endpoint(other.endpoint_ref());
         } else {
-            new (&error_ref()) ErrorInfo{other.error_ref().error,
-                other.error_ref().description, other.error_ref().sysCode,
-                other.error_ref().isDns, other.error_ref().cachedMessage_};
+            const auto& other_err = other.error_ref();
+            new (&error_ref()) ErrorInfo{other_err.error, other_err.description,
+                other_err.sysCode, other_err.isDns, other_err.cachedMessage_};
         }
     }
 
@@ -401,10 +402,10 @@ template <> class [[nodiscard]] Result<Endpoint> {
         if (has_value_) {
             new (endpoint_storage_) Endpoint(std::move(other.endpoint_ref()));
         } else {
-            new (&error_ref()) ErrorInfo{other.error_ref().error,
-                other.error_ref().description, other.error_ref().sysCode,
-                other.error_ref().isDns,
-                std::move(other.error_ref().cachedMessage_)};
+            auto& other_err = other.error_ref();
+            new (&error_ref()) ErrorInfo{other_err.error, other_err.description,
+                other_err.sysCode, other_err.isDns,
+                std::move(other_err.cachedMessage_)};
         }
     }
 
@@ -417,9 +418,10 @@ template <> class [[nodiscard]] Result<Endpoint> {
                 new (endpoint_storage_) Endpoint(other.endpoint_ref());
             } else {
                 has_value_ = false;
-                new (&error_ref()) ErrorInfo{other.error_ref().error,
-                    other.error_ref().description, other.error_ref().sysCode,
-                    other.error_ref().isDns, other.error_ref().cachedMessage_};
+                const auto& other_err = other.error_ref();
+                new (&error_ref()) ErrorInfo{other_err.error,
+                    other_err.description, other_err.sysCode, other_err.isDns,
+                    other_err.cachedMessage_};
             }
         }
         return *this;
@@ -434,10 +436,10 @@ template <> class [[nodiscard]] Result<Endpoint> {
                     Endpoint(std::move(other.endpoint_ref()));
             } else {
                 has_value_ = false;
-                new (&error_ref()) ErrorInfo{other.error_ref().error,
-                    other.error_ref().description, other.error_ref().sysCode,
-                    other.error_ref().isDns,
-                    std::move(other.error_ref().cachedMessage_)};
+                auto& other_err = other.error_ref();
+                new (&error_ref()) ErrorInfo{other_err.error,
+                    other_err.description, other_err.sysCode, other_err.isDns,
+                    std::move(other_err.cachedMessage_)};
             }
         }
         return *this;

@@ -47,6 +47,10 @@ If:
     - /usr/include/.*
     - /usr/local/include/.*
     - /Library/Developer/.*
+    # Ignore generated CMake PCH files and CI configuration
+    - .*/cmake_pch\.hxx\.cxx
+    - .*\.github/workflows/ci\.yml
+    - .*/\.github/workflows/ci\.yml
     # Windows system headers
     - .*\\Windows Kits\\.*
     - .*\\Microsoft Visual Studio\\.*

@@ -1,7 +1,8 @@
-// This is an independent project of an individual developer. Dear PVS-Studio, please check it.
+// This is an independent project of an individual developer. Dear PVS-Studio,
+// please check it.
 
-// PVS-Studio Static Code Analyzer for C, C++, C#, and Java: https://pvs-studio.com
-
+// PVS-Studio Static Code Analyzer for C, C++, C#, and Java:
+// https://pvs-studio.com
 
 #ifndef AISOCKS_TCP_SOCKET_H
 #define AISOCKS_TCP_SOCKET_H
@@ -137,11 +138,20 @@ class TcpSocket : public Socket {
             const size_t remaining = size - sent;
             const size_t toSend = remaining < chunkSize ? remaining : chunkSize;
             int n = doSend(data + sent, toSend);
-            if (n <= 0) return sent > 0 ? static_cast<int>(sent) : n;
-            sent += static_cast<size_t>(n);
-            if (static_cast<size_t>(n) < toSend) break; // buffer full
+            if (n <= 0)
+                return sent > 0 ? (sent > static_cast<size_t>(
+                                       std::numeric_limits<int>::max())
+                                          ? std::numeric_limits<int>::max()
+                                          : static_cast<int>(sent))
+                                : n;
+            sent += static_cast<size_t>(static_cast<unsigned int>(n));
+            if (static_cast<size_t>(static_cast<unsigned int>(n)) < toSend)
+                break; // buffer full
         }
-        return static_cast<int>(sent);
+        if (sent > static_cast<size_t>(std::numeric_limits<int>::max())) {
+            return std::numeric_limits<int>::max();
+        }
+        return static_cast<int>(static_cast<unsigned int>(sent));
     }
 
     // sendAll with a per-chunk progress callback.

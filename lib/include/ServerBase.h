@@ -1,7 +1,8 @@
-// This is an independent project of an individual developer. Dear PVS-Studio, please check it.
+// This is an independent project of an individual developer. Dear PVS-Studio,
+// please check it.
 
-// PVS-Studio Static Code Analyzer for C, C++, C#, and Java: https://pvs-studio.com
-
+// PVS-Studio Static Code Analyzer for C, C++, C#, and Java:
+// https://pvs-studio.com
 
 #ifndef AISOCKS_SERVER_BASE_H
 #define AISOCKS_SERVER_BASE_H
@@ -391,7 +392,8 @@ template <typename ClientData> class ServerBase {
         // Only bother pushing if keep-alive timeouts are enabled.
         if (keepAliveTimeout_.count() > 0) {
             const auto sincePush = now - ce->lastTimeoutPush;
-            if (sincePush >= keepAliveTimeout_ / 4) {
+            const int64_t PVS_FIX_DOWNSAMPLE_FACTOR = 4;
+            if (sincePush >= keepAliveTimeout_ / PVS_FIX_DOWNSAMPLE_FACTOR) {
                 pushTimeoutEntry(fd, now);
                 ce->lastTimeoutPush = now;
             }
@@ -533,6 +535,17 @@ template <typename ClientData> class ServerBase {
             , lastActivity(other.lastActivity)
             , lastTimeoutPush(other.lastTimeoutPush)
             , activeIdx(other.activeIdx) {}
+
+        ClientEntry& operator=(ClientEntry&& other) noexcept {
+            if (this != &other) {
+                socket = std::move(other.socket);
+                data = std::move(other.data);
+                lastActivity = other.lastActivity;
+                lastTimeoutPush = other.lastTimeoutPush;
+                activeIdx = other.activeIdx;
+            }
+            return *this;
+        }
 
         ClientEntry(std::unique_ptr<TcpSocket> sock)
             : socket(std::move(sock)), data() {}

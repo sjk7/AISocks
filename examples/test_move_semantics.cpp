@@ -1,9 +1,11 @@
-// This is an independent project of an individual developer. Dear PVS-Studio, please check it.
+// This is an independent project of an individual developer. Dear PVS-Studio,
+// please check it.
 
-// PVS-Studio Static Code Analyzer for C, C++, C#, and Java: https://pvs-studio.com
-
+// PVS-Studio Static Code Analyzer for C, C++, C#, and Java:
+// https://pvs-studio.com
 
 #include "TcpSocket.h"
+#include <cstring>
 #include <iostream>
 #include <vector>
 
@@ -76,7 +78,8 @@ int main() {
               << std::endl;
 
     char buffer[10];
-    int sendResult = socket5.send("test", 4);
+    const char* testData = "test";
+    int sendResult = socket5.send(testData, strlen(testData));
     std::cout << "    send() returned: " << sendResult << " (expected: -1)"
               << std::endl;
 
@@ -127,8 +130,7 @@ int main() {
               << std::endl;
 
     if (socket7.isValid()) {
-        std::cout << "   PASS - Self-assignment handled correctly"
-                  << std::endl;
+        std::cout << "   PASS - Self-assignment handled correctly" << std::endl;
     } else {
         std::cout << "   FAIL - Self-assignment broke the object" << std::endl;
         return 1;

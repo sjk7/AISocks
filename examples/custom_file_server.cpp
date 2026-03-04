@@ -654,15 +654,23 @@ class CustomFileServer : public HttpFileServer {
         struct tm timeinfo = {};
         localtime_s(&timeinfo, &time_t);
         logFile_.printf("%04d-%02d-%02d %02d:%02d:%02d %s %s from client\n",
-            timeinfo.tm_year + 1900, timeinfo.tm_mon + 1, timeinfo.tm_mday,
-            timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec,
-            request.method.c_str(), request.path.c_str());
+            static_cast<int>(timeinfo.tm_year + 1900),
+            static_cast<int>(timeinfo.tm_mon + 1),
+            static_cast<int>(timeinfo.tm_mday),
+            static_cast<int>(timeinfo.tm_hour),
+            static_cast<int>(timeinfo.tm_min),
+            static_cast<int>(timeinfo.tm_sec), request.method.c_str(),
+            request.path.c_str());
 #else
         struct tm* timeinfo = localtime(&time_t);
         logFile_.printf("%04d-%02d-%02d %02d:%02d:%02d %s %s from client\n",
-            timeinfo->tm_year + 1900, timeinfo->tm_mon + 1, timeinfo->tm_mday,
-            timeinfo->tm_hour, timeinfo->tm_min, timeinfo->tm_sec,
-            request.method.c_str(), request.path.c_str());
+            static_cast<int>(timeinfo->tm_year + 1900),
+            static_cast<int>(timeinfo->tm_mon + 1),
+            static_cast<int>(timeinfo->tm_mday),
+            static_cast<int>(timeinfo->tm_hour),
+            static_cast<int>(timeinfo->tm_min),
+            static_cast<int>(timeinfo->tm_sec), request.method.c_str(),
+            request.path.c_str());
 #endif
         logFile_.flush();
     }
@@ -745,39 +753,32 @@ int main() {
     config.customHeaders["X-Content-Type-Options"] = "nosniff";
     config.customHeaders["X-Frame-Options"] = "DENY";
 
-    try {
-        // Create and start the custom server with detailed error information
-        Result<TcpSocket> serverResult
-            = Result<TcpSocket>::failure(SocketError::Unknown, "initial");
-        CustomFileServer server(
-            ServerBind{"0.0.0.0", Port{8080}}, config, &serverResult);
+    // Create and start the custom server with detailed error information
+    Result<TcpSocket> serverResult
+        = Result<TcpSocket>::failure(SocketError::Unknown, "initial");
+    CustomFileServer server(
+        ServerBind{"0.0.0.0", Port{8080}}, config, &serverResult);
 
-        // Check if server creation succeeded (bind/listen)
-        if (!server.isValid()) {
-            fprintf(stderr, "ERROR: Server failed to start: %s\n",
-                serverResult.message().c_str());
-            fprintf(stderr, "Error code: %d\n",
-                static_cast<int>(serverResult.error()));
-            printf("%s", ServerStrings::SERVER_STOPPED);
-            printf("%s", ServerStrings::LOG_SAVED);
-            printf("%s", ServerStrings::THANK_YOU);
-            return 1;
-        }
-
-        printf("%s", ServerStrings::STARTING);
-        printf(
-            "%s%s\n", ServerStrings::SERVING_FROM, config.documentRoot.c_str());
-
-        server.run();
-
+    // Check if server creation succeeded (bind/listen)
+    if (!server.isValid()) {
+        fprintf(stderr, "ERROR: Server failed to start: %s\n",
+            serverResult.message().c_str());
+        fprintf(
+            stderr, "Error code: %d\n", static_cast<int>(serverResult.error()));
         printf("%s", ServerStrings::SERVER_STOPPED);
         printf("%s", ServerStrings::LOG_SAVED);
         printf("%s", ServerStrings::THANK_YOU);
-
-    } catch (const std::exception& e) {
-        fprintf(stderr, "Error: %s\n", e.what());
         return 1;
     }
+
+    printf("%s", ServerStrings::STARTING);
+    printf("%s%s\n", ServerStrings::SERVING_FROM, config.documentRoot.c_str());
+
+    server.run();
+
+    printf("%s", ServerStrings::SERVER_STOPPED);
+    printf("%s", ServerStrings::LOG_SAVED);
+    printf("%s", ServerStrings::THANK_YOU);
 
     return 0;
 }

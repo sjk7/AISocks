@@ -1,7 +1,8 @@
-// This is an independent project of an individual developer. Dear PVS-Studio, please check it.
+// This is an independent project of an individual developer. Dear PVS-Studio,
+// please check it.
 
-// PVS-Studio Static Code Analyzer for C, C++, C#, and Java: https://pvs-studio.com
-
+// PVS-Studio Static Code Analyzer for C, C++, C#, and Java:
+// https://pvs-studio.com
 
 #ifndef AISOCKS_SOCKET_TYPES_H
 #define AISOCKS_SOCKET_TYPES_H
@@ -70,7 +71,7 @@ struct Backlog {
     // Windows: SOMAXCONN = 0x7fffffff in <winsock2.h>.
     // This is a sentinel value — the TCP/IP stack picks the real cap (~200).
     // Passing any integer has the same effect; there is no user-tunable sysctl.
-    static constexpr int somaxconnWindows = 0x7fff'ffff;
+    static constexpr int somaxconnWindows = (int)0x7fff'ffff;
 
     // Maximum backlog for the current platform, selected at compile time.
 #if defined(_WIN32)

@@ -1,7 +1,8 @@
-// This is an independent project of an individual developer. Dear PVS-Studio, please check it.
+// This is an independent project of an individual developer. Dear PVS-Studio,
+// please check it.
 
-// PVS-Studio Static Code Analyzer for C, C++, C#, and Java: https://pvs-studio.com
-
+// PVS-Studio Static Code Analyzer for C, C++, C#, and Java:
+// https://pvs-studio.com
 
 #include "TcpSocket.h"
 #include <iostream>
@@ -130,7 +131,7 @@ void runServer(const std::string& bindAddr) {
                       << "\n";
             break;
         }
-        totalSent += bytesSent;
+        totalSent += static_cast<size_t>(bytesSent);
     }
 
     auto endTime = std::chrono::high_resolution_clock::now();
@@ -138,7 +139,7 @@ void runServer(const std::string& bindAddr) {
                          endTime - startTime)
                          .count()
         / 1000.0;
-    double mb = totalSent / (1024.0 * 1024.0);
+    double mb = static_cast<double>(totalSent) / (1024.0 * 1024.0);
 
     std::cout << std::fixed << std::setprecision(2);
     std::cout << "  [server] sent " << mb << " MB in " << seconds
@@ -195,7 +196,7 @@ void runClient(const std::string& addr) {
                          endTime - startTime)
                          .count()
         / 1000.0;
-    double mb = totalReceived / (1024.0 * 1024.0);
+    double mb = static_cast<double>(totalReceived) / (1024.0 * 1024.0);
 
     std::cout << std::fixed << std::setprecision(2);
     std::cout << "  [client] received " << mb << " MB in " << seconds

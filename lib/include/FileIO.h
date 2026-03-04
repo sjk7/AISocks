@@ -1,8 +1,8 @@
-// This is an independent project of an individual developer. Dear PVS-Studio, please check it.
+// This is an independent project of an individual developer. Dear PVS-Studio,
+// please check it.
 
-// PVS-Studio Static Code Analyzer for C, C++, C#, and Java: https://pvs-studio.com
-
-
+// PVS-Studio Static Code Analyzer for C, C++, C#, and Java:
+// https://pvs-studio.com
 
 #pragma once
 
@@ -50,8 +50,13 @@ class File {
     bool writeString(const std::string& str);
     bool printf(const char* format, ...);
     bool flush();
-    bool seek(long offset, int whence);
-    long tell();
+#ifdef _WIN32
+    bool seek(long long offset, int whence);
+    long long tell();
+#else
+    bool seek(int64_t offset, int whence);
+    int64_t tell();
+#endif
     size_t size();
 
     /// File information structure for descriptor-based checks
@@ -109,19 +114,22 @@ class StringBuilder {
 
         if (needed < 0) return false;
 
-        if (static_cast<size_t>(needed) < sizeof(smallBuf)) {
-            append(smallBuf, static_cast<size_t>(needed));
+        if (static_cast<size_t>(static_cast<unsigned int>(needed))
+            < sizeof(smallBuf)) {
+            append(smallBuf,
+                static_cast<size_t>(static_cast<unsigned int>(needed)));
             return true;
         }
 
-        size_t requiredSize = static_cast<size_t>(needed) + 1;
+        size_t requiredSize
+            = static_cast<size_t>(static_cast<unsigned int>(needed)) + 1;
         reserve(size_ + requiredSize);
 
         if (!buffer_) return false;
 
         int result = snprintf(buffer_ + size_, requiredSize, format, args...);
         if (result > 0) {
-            size_ += static_cast<size_t>(result);
+            size_ += static_cast<size_t>(static_cast<unsigned int>(result));
             return true;
         }
 

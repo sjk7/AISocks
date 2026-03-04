@@ -1,7 +1,8 @@
-// This is an independent project of an individual developer. Dear PVS-Studio, please check it.
+// This is an independent project of an individual developer. Dear PVS-Studio,
+// please check it.
 
-// PVS-Studio Static Code Analyzer for C, C++, C#, and Java: https://pvs-studio.com
-
+// PVS-Studio Static Code Analyzer for C, C++, C#, and Java:
+// https://pvs-studio.com
 
 //
 // peer_logger.cpp  demonstrates getPeerEndpoint() /
@@ -86,7 +87,7 @@ static void runEchoServer(Port port) {
         buf[r] = '\0';
         std::cout << "[server] echoing " << r << " byte(s): \"" << buf
                   << "\"\n";
-        conn->send(buf, static_cast<size_t>(r));
+        conn->send(buf, static_cast<size_t>(static_cast<unsigned int>(r)));
     }
 }
 
@@ -140,7 +141,9 @@ static void runUdpPeerLog(Port port) {
     int r = server.receiveFrom(buf, sizeof(buf), from);
     if (r > 0) {
         std::cout << "[udp-server] datagram from " << from.toString() << ": \""
-                  << std::string(buf, static_cast<size_t>(r)) << "\"\n";
+                  << std::string(
+                         buf, static_cast<size_t>(static_cast<unsigned int>(r)))
+                  << "\"\n";
     }
 }
 

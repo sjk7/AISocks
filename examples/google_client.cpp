@@ -17,7 +17,7 @@ using namespace aiSocks;
 // Connects to a server, sends an HTTP request, and receives the response
 // Returns 0 on success, 1 on failure
 int httpConnect(const ConnectArgs& args, const char* httpRequest) {
-    unsigned long totalBytesRead = 0;
+    size_t totalBytesRead = 0;
 
     SimpleClient client(args);
     if (!client.isConnected()) {
@@ -62,7 +62,7 @@ int httpConnect(const ConnectArgs& args, const char* httpRequest) {
                 isFirstChunk = false;
             }
 
-            totalBytesRead += bytesRead;
+            totalBytesRead += static_cast<size_t>(bytesRead);
         }
 
         if (totalBytesRead == 0 && retval < 0) {
