@@ -663,7 +663,8 @@ template <typename ClientData> class ServerBase {
     // Drain all expired entries from the front of the timeout_heap_ and
     // close the corresponding connections.
     //
-    // Called every loop iteration.  The fast-path (nothing expired) costs
+    // Called from the main event loop (throttled to once per 100ms under
+    // heavy load ≥1000 clients).  The fast-path (nothing expired) costs
     // one time comparison against the heap front and then returns -- O(1).
     void sweepTimeouts(Poller& poller) {
         if (keepAliveTimeout_.count() == 0 || timeout_heap_.empty()) return;
