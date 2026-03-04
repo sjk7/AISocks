@@ -2,6 +2,27 @@
   "version": "0.2.0",
   "configurations": [
     {
+      "name": "🐛 Debug advanced_file_server",
+      "type": "lldb",
+      "request": "launch",
+      "program": "${workspaceFolder}/build-debug-mac/advanced_file_server",
+      "args": [],
+      "cwd": "${workspaceFolder}",
+      "preLaunchTask": "build advanced_file_server (debug)",
+      "stopOnEntry": false,
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "🚀 Run advanced_file_server (RelWithDebInfo)",
+      "type": "lldb",
+      "request": "launch",
+      "program": "${workspaceFolder}/build-mac-rel/advanced_file_server",
+      "args": [],
+      "cwd": "${workspaceFolder}",
+      "preLaunchTask": "build advanced_file_server (relwithdebinfo)",
+      "console": "integratedTerminal"
+    },
+    {
       "name": "Debug test_socket_basics",
       "type": "lldb",
       "request": "launch",
@@ -112,22 +133,22 @@
       "preLaunchTask": "build test_server_base_minimal"
     },
     {
-      "name": "Debug custom_file_server (debug)",
+      "name": "Debug advanced_file_server (debug)",
       "type": "lldb",
       "request": "launch",
-      "program": "${workspaceFolder}/build-mac/custom_file_server",
+      "program": "${workspaceFolder}/build-debug-mac/advanced_file_server",
       "args": [],
       "cwd": "${workspaceFolder}",
-      "preLaunchTask": "build custom_file_server (debug)"
+      "preLaunchTask": "build advanced_file_server (debug)"
     },
     {
-      "name": "Debug custom_file_server (relwithdebinfo)",
+      "name": "Debug advanced_file_server (relwithdebinfo)",
       "type": "lldb",
       "request": "launch",
-      "program": "${workspaceFolder}/build-mac-rel/custom_file_server",
+      "program": "${workspaceFolder}/build-mac-rel/advanced_file_server",
       "args": [],
       "cwd": "${workspaceFolder}",
-      "preLaunchTask": "build custom_file_server (relwithdebinfo)"
+      "preLaunchTask": "build advanced_file_server (relwithdebinfo)"
     }
   ]
 }

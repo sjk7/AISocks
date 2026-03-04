@@ -4,12 +4,31 @@
 // PVS-Studio Static Code Analyzer for C, C++, C#, and Java:
 // https://pvs-studio.com
 
-// Example: Custom HTTP file server with authentication and logging
+//
+// LEVEL 3: ADVANCED FILE SERVER (Extending HttpFileServer)
+//
+// This example demonstrates inheritance and customization of HttpFileServer.
+// By deriving from HttpFileServer and overriding virtual methods, you can:
+//   - Add authentication (onAuthenticate)
+//   - Add custom logging (onResponseSent)
+//   - Customize error pages (generateErrorHtml)
+//   - Add custom headers, validation, etc.
+//
+// ✓ Use this approach when you need to extend file server behavior
+// ✓ Shows the power of the virtual method hooks
+// ✓ Production example with authentication, access logs, and styled error pages
+//
+// For simpler examples, see:
+//   → simple_file_server.cpp    (basic HttpFileServer usage, ~50 lines)
+//   → low_level_http_server.cpp (manual HTTP response building)
+//
+
+// Example: Advanced HTTP file server with authentication and logging
 // Demonstrates how to derive from HttpFileServer and override virtual functions
 
 #include "HttpFileServer.h"
 #include "PathHelper.h"
-#include "custom_file_server_strings.h"
+#include "advanced_file_server_strings.h"
 #include "CustomFileServerHtmlHelpers.h"
 #include "FileIO.h"
 #include <cstdio>
@@ -17,7 +36,24 @@
 
 using namespace aiSocks;
 
-/// Custom file server with authentication and access logging
+// ============================================================================
+// CustomFileServer - Extends HttpFileServer with authentication and logging
+// ============================================================================
+//
+// This class demonstrates the extensibility of HttpFileServer:
+//   • Adds Basic Authentication (username/password)
+//   • Logs all requests to access.log file
+//   • Provides custom styled error pages (404, 401, 403)
+//
+// Key virtual methods overridden:
+//   • onAuthenticate()   - Validates Basic Auth credentials
+//   • onResponseSent()   - Logs completed requests to file
+//   • generateErrorHtml() - Creates styled HTML error pages
+//
+// See simple_file_server.cpp for basic HttpFileServer usage without
+// customization. See low_level_http_server.cpp for manual HTTP response
+// building.
+//
 class CustomFileServer : public HttpFileServer {
     public:
     explicit CustomFileServer(const ServerBind& bind, const Config& config,
@@ -141,7 +177,7 @@ class CustomFileServer : public HttpFileServer {
         html.append("<html><head><title>");
         html.appendFormat("%d", code);
         html.append(" ");
-        html.append(status);
+        html.append(HttpPollServer::escapeHtml(status));
         html.append("</title>\n");
         html.append("<style>\n");
         html.append("body { font-family: Arial, sans-serif; margin: 40px; "
@@ -160,10 +196,10 @@ class CustomFileServer : public HttpFileServer {
         html.append("<h1>");
         html.appendFormat("%d", code);
         html.append(" ");
-        html.append(status);
+        html.append(HttpPollServer::escapeHtml(status));
         html.append("</h1>\n");
         html.append("<p>");
-        html.append(message);
+        html.append(HttpPollServer::escapeHtml(message));
         html.append("</p>\n");
         html.append("<a href=\"/\" class=\"back-link\">← Back to Home</a>\n");
         html.append("</div></body></html>");
@@ -735,13 +771,49 @@ class CustomFileServer : public HttpFileServer {
         return "";
     }
 };
-int main() {
+int main(int argc, char* argv[]) {
 
     printf("%s", ServerStrings::HEADER);
 
+    // Print build information
+    printf("%s", ServerStrings::BUILD_INFO_PREFIX);
+#if defined(__linux__)
+    printf("Linux");
+#elif defined(__APPLE__)
+    printf("macOS");
+#elif defined(_WIN32)
+    printf("Windows");
+#else
+    printf("Unknown OS");
+#endif
+
+#if defined(CMAKE_BUILD_TYPE)
+    printf(" (%s)", CMAKE_BUILD_TYPE);
+#elif defined(NDEBUG)
+    printf(" (Release)");
+#else
+    printf(" (Debug)");
+#endif
+
+    printf(", built %s %s\n", __DATE__, __TIME__);
+
+    // Print max clients limit
+    printf("%s%zu\n", ServerStrings::MAX_CLIENTS_PREFIX,
+        static_cast<size_t>(ClientLimit::Default));
+
+    uint16_t port = 8080;
+    std::string root = "./www";
+
+    if (argc > 1) {
+        port = static_cast<uint16_t>(std::atoi(argv[1]));
+    }
+    if (argc > 2) {
+        root = argv[2];
+    }
+
     // Configure the file server
     HttpFileServer::Config config;
-    config.documentRoot = "./www";
+    config.documentRoot = root;
     config.indexFile = "index.html";
     config.enableDirectoryListing = true;
     config.enableETag = true;
@@ -757,7 +829,7 @@ int main() {
     Result<TcpSocket> serverResult
         = Result<TcpSocket>::failure(SocketError::Unknown, "initial");
     CustomFileServer server(
-        ServerBind{"0.0.0.0", Port{8080}}, config, &serverResult);
+        ServerBind{"0.0.0.0", Port{port}}, config, &serverResult);
 
     // Check if server creation succeeded (bind/listen)
     if (!server.isValid()) {

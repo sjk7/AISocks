@@ -37,7 +37,7 @@ Benchmarked on macOS (Apple Silicon), Release build, `wrk -t12 -c5000 -d30s`:
 | 3 | `sweepTimeouts` throttled to once per 100 ms when > 1000 clients | `ServerBase.h` |
 | 4 | `EV_DISABLE` instead of `EV_DELETE` for Writable toggle; flat byte array replaces `unordered_map` in `wait()` merge | `PollerKqueue.cpp` |
 | 5 | `clients_` hash map replaced with `clientSlots_[]` sparse array + `clientFds_[]` dense list — O(1) insert / lookup / erase, no hashing | `ServerBase.h` |
-| 6 | `HttpClientState::response` (owned `std::string`) replaced with `responseView` (`string_view`) + `responseBuf` — static responses are zero-copy views into pre-built strings | `HttpPollServer.h`, `http_poll_server.cpp` |
+| 6 | `HttpClientState::response` (owned `std::string`) replaced with `responseView` (`string_view`) + `responseBuf` — static responses are zero-copy views into pre-built strings | `HttpPollServer.h`, `low_level_http_server.cpp` |
 
 ## Project Structure
 
@@ -56,7 +56,9 @@ aiSocks/
 │       ├── PollerKqueue.cpp    # kqueue backend (macOS/BSD)
 │       └── PollerEpoll.cpp     # epoll backend (Linux)
 └── examples/
-    ├── http_poll_server.cpp    # Production HTTP server example
+    ├── low_level_http_server.cpp    # Level 1: Manual HTTP response building
+    ├── simple_file_server.cpp       # Level 2: Basic HttpFileServer usage (~50 lines)
+    ├── advanced_file_server.cpp     # Level 3: Extends HttpFileServer (auth, logging)
     └── ...
 ```
 

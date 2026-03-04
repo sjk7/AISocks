@@ -1,7 +1,8 @@
-// This is an independent project of an individual developer. Dear PVS-Studio, please check it.
+// This is an independent project of an individual developer. Dear PVS-Studio,
+// please check it.
 
-// PVS-Studio Static Code Analyzer for C, C++, C#, and Java: https://pvs-studio.com
-
+// PVS-Studio Static Code Analyzer for C, C++, C#, and Java:
+// https://pvs-studio.com
 
 #ifndef AISOCKS_HTTP_POLL_SERVER_H
 #define AISOCKS_HTTP_POLL_SERVER_H
@@ -203,6 +204,10 @@ class HttpPollServer : public ServerBase<HttpClientState> {
     std::vector<double> intervals_;
     int call_count_ = 0;
     bool first_output_done_ = false;
+
+    protected:
+    /// (Used for Reflected XSS prevention)
+    static std::string escapeHtml(const std::string& input);
 };
 
 } // namespace aiSocks

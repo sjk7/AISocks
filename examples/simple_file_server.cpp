@@ -4,6 +4,23 @@
 // PVS-Studio Static Code Analyzer for C, C++, C#, and Java:
 // https://pvs-studio.com
 
+//
+// LEVEL 2: SIMPLE FILE SERVER (Using HttpFileServer Class)
+//
+// This example shows basic usage of the HttpFileServer class.
+// Just configure and run - the class handles all HTTP protocol details,
+// file I/O, MIME types, caching, directory listings, etc.
+//
+// ✓ Use this approach for quick file serving with minimal code (~50 lines)
+// ✓ Handles all common file server features out of the box
+// ✓ Production-ready with ETag, Last-Modified, and caching support
+//
+// For more control, see:
+//   → low_level_http_server.cpp  (manual HTTP response building)
+//   → advanced_file_server.cpp   (extends HttpFileServer with authentication,
+//   logging, etc.)
+//
+
 // Example: Simple HTTP file server using HttpFileServer
 // Serves files from the current directory
 

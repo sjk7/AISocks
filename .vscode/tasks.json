@@ -220,16 +220,16 @@
       ]
     },
     {
-      "label": "build custom_file_server (debug)",
+      "label": "build advanced_file_server (debug)",
       "type": "shell",
       "command": "cmake",
       "args": [
         "--build",
-        "build-mac",
+        "build-debug-mac",
         "--parallel",
         "8",
         "--target",
-        "custom_file_server"
+        "advanced_file_server"
       ],
       "group": {
         "kind": "build",
@@ -240,7 +240,7 @@
       ]
     },
     {
-      "label": "build custom_file_server (relwithdebinfo)",
+      "label": "build advanced_file_server (relwithdebinfo)",
       "type": "shell",
       "command": "cmake",
       "args": [
@@ -249,7 +249,7 @@
         "--parallel",
         "8",
         "--target",
-        "custom_file_server"
+        "advanced_file_server"
       ],
       "group": {
         "kind": "build",

@@ -1,8 +1,24 @@
-// This is an independent project of an individual developer. Dear PVS-Studio, please check it.
+// This is an independent project of an individual developer. Dear PVS-Studio,
+// please check it.
 
-// PVS-Studio Static Code Analyzer for C, C++, C#, and Java: https://pvs-studio.com
+// PVS-Studio Static Code Analyzer for C, C++, C#, and Java:
+// https://pvs-studio.com
 
-
+//
+// LEVEL 1: LOW-LEVEL HTTP SERVER (Manual Response Building)
+//
+// This example demonstrates how to build HTTP responses manually using
+// HttpPollServer. You control every byte of the response - headers, status
+// codes, body content.
+//
+// ✓ Use this approach when you need complete control over HTTP responses
+// ✓ Good for learning HTTP protocol internals
+// ✓ Useful for high-performance scenarios with fixed responses
+//
+// For easier file serving, see:
+//   → simple_file_server.cpp    (uses HttpFileServer class directly)
+//   → advanced_file_server.cpp  (extends HttpFileServer with custom behavior)
+//
 
 // Poll-driven HTTP/1.x server built on HttpPollServer.
 // HttpPollServer handles all HTTP framing; this file only contains the
@@ -104,11 +120,12 @@ class HttpServer : public HttpPollServer {
             date_buf, sizeof(date_buf), "%a, %d %b %Y %H:%M:%S GMT", &tm_buf);
 
         char hdr[512];
-        snprintf(
-            hdr, sizeof(hdr), headerFmt, date_buf, sizeof(body) - 1, "keep-alive");
+        snprintf(hdr, sizeof(hdr), headerFmt, date_buf, sizeof(body) - 1,
+            "keep-alive");
         ka_response_ = std::string(hdr) + body;
 
-        snprintf(hdr, sizeof(hdr), headerFmt, date_buf, sizeof(body) - 1, "close");
+        snprintf(
+            hdr, sizeof(hdr), headerFmt, date_buf, sizeof(body) - 1, "close");
         close_response_ = std::string(hdr) + body;
 
         char bigHdr[256];
@@ -118,7 +135,7 @@ class HttpServer : public HttpPollServer {
 
         snprintf(bigHdr, sizeof(bigHdr), bigHeaderFmt, date_buf, bigBody.size(),
             "close");
-        
+
         big_close_response_ = bigHdr + bigBody;
     }
 
@@ -136,7 +153,7 @@ class HttpServer : public HttpPollServer {
 
         const int port = static_cast<int>(bind.port.value());
         const bool isWildcard = (bind.address == "0.0.0.0"
-            || bind.address == "::" || bind.address == "[::]" );
+            || bind.address == "::" || bind.address == "[::]");
 
         if (isWildcard) {
             printf("Listening on <all> interfaces, port %d:\n", port);
@@ -191,7 +208,7 @@ http://localhost:8080/ 2>&1
 
 int main() {
     printf("=== Poll-Driven HTTP Server ===\n");
-    
+
     // Print build info immediately after title
     HttpServer::printBuildInfo();
 

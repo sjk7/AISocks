@@ -1,8 +1,8 @@
-// This is an independent project of an individual developer. Dear PVS-Studio, please check it.
+// This is an independent project of an individual developer. Dear PVS-Studio,
+// please check it.
 
-// PVS-Studio Static Code Analyzer for C, C++, C#, and Java: https://pvs-studio.com
-
-
+// PVS-Studio Static Code Analyzer for C, C++, C#, and Java:
+// https://pvs-studio.com
 
 #ifndef AISOCKS_SOCKET_IMPL_HELPERS_H
 #define AISOCKS_SOCKET_IMPL_HELPERS_H
@@ -73,7 +73,8 @@ bool setSocketOption(SocketHandle socketHandle, int level, int optname,
             fprintf(stderr, "errno: %d : %s\n", errno, errorText);
             LocalFree(errorText);
         } else {
-            fprintf(stderr, "errno: %d : (unable to get error message)\n", errno);
+            fprintf(
+                stderr, "errno: %d : (unable to get error message)\n", errno);
         }
 #else
         fprintf(stderr, "errno: %d : %s\n", errno, strerror(errno));
@@ -100,8 +101,9 @@ bool setSocketOption(SocketHandle socketHandle, int level, int optname,
 
         // In debug mode, we want to know about this failure
         // but we shouldn't crash - just return false
-        assert(false
-            && "setsockopt failed - see stderr for detailed error information");
+        // assert(false
+        //   && "setsockopt failed - see stderr for detailed error//
+        //   information");
     }
 
     return result == 0;

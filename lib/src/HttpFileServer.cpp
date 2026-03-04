@@ -1,9 +1,8 @@
-// This is an independent project of an individual developer. Dear PVS-Studio, please check it.
+// This is an independent project of an individual developer. Dear PVS-Studio,
+// please check it.
 
-// PVS-Studio Static Code Analyzer for C, C++, C#, and Java: https://pvs-studio.com
-
-
-
+// PVS-Studio Static Code Analyzer for C, C++, C#, and Java:
+// https://pvs-studio.com
 
 #include "HttpFileServer.h"
 
@@ -344,6 +343,8 @@ void HttpFileServer::handleFileRequest(HttpClientState& state,
 
 void HttpFileServer::sendError(HttpClientState& state, int code,
     const std::string& status, const std::string& message) {
+    // Note: message is HTML-escaped in generateErrorHtml(), so it's safe to
+    // include user input (e.g., request paths) in error messages
     std::string htmlBody = generateErrorHtml(code, status, message);
 
     StringBuilder response(256 + htmlBody.size());

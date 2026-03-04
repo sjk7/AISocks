@@ -17,5 +17,20 @@
   "clangd.arguments": [
     "--header-insertion=never",
     "--completion-style=detailed"
-  ]
+  ],
+
+  // CMake Tools configuration
+  "cmake.buildDirectory": "${workspaceFolder}/build-debug-mac",
+  "cmake.configureOnOpen": false,
+  "cmake.debugConfig": {
+    "MIMode": "lldb"
+  },
+  "cmake.launchTarget": {
+    "name": "advanced_file_server"
+  },
+  "cmake.defaultVariants": {
+    "buildType": {
+      "default": "debug"
+    }
+  }
 }

@@ -294,10 +294,44 @@ template <typename ClientData> class ServerBase {
                     ce->socket->shutdown(ShutdownHow::Both);
                     (void)poller.remove(*ce->socket);
                     eraseClient(cfd);
+
+                    // Re-enable accepting if we were at the limit and now have
+                    // room
+                    if (!accepting && maxClients != ClientLimit::Unlimited
+                        && clientFds_.size()
+                            < static_cast<size_t>(maxClients)) {
+                        if (poller.add(*listener_,
+                                PollEvent::Readable | PollEvent::Error)) {
+                            accepting = true;
+                        }
+                    }
 #ifdef SERVER_STATS
                     printf("[stats] clients: %zu  peak: %zu\n",
                         clientFds_.size(), peak_clients_);
 #endif
+                }
+            }
+
+            // Dynamic timeout adjustment: under high load (>256 clients),
+            // switch to aggressive 5s timeout to quickly reclaim connections.
+            // Restore normal timeout when load drops.
+            {
+                constexpr size_t HIGH_LOAD_THRESHOLD = 256;
+                constexpr auto AGGRESSIVE_TIMEOUT = std::chrono::milliseconds{5000};
+                
+                if (!inHighLoadMode_ && clientFds_.size() > HIGH_LOAD_THRESHOLD) {
+                    // Entering high-load mode: save normal timeout and switch to aggressive
+                    normalKeepAliveTimeout_ = keepAliveTimeout_;
+                    keepAliveTimeout_ = AGGRESSIVE_TIMEOUT;
+                    inHighLoadMode_ = true;
+                    printf("[ServerBase] High load detected (%zu clients), switching to aggressive %lld ms timeout\n",
+                           clientFds_.size(), static_cast<long long>(AGGRESSIVE_TIMEOUT.count()));
+                } else if (inHighLoadMode_ && clientFds_.size() <= HIGH_LOAD_THRESHOLD) {
+                    // Exiting high-load mode: restore normal timeout
+                    keepAliveTimeout_ = normalKeepAliveTimeout_;
+                    inHighLoadMode_ = false;
+                    printf("[ServerBase] Load normalized (%zu clients), restoring normal %lld ms timeout\n",
+                           clientFds_.size(), static_cast<long long>(normalKeepAliveTimeout_.count()));
                 }
             }
 
@@ -312,6 +346,16 @@ template <typename ClientData> class ServerBase {
                         >= std::chrono::milliseconds{100}) {
                     sweepTimeouts(poller);
                     lastSweepTime_ = sweepNow;
+
+                    // Re-enable accepting if timeouts freed up space
+                    if (!accepting && maxClients != ClientLimit::Unlimited
+                        && clientFds_.size()
+                            < static_cast<size_t>(maxClients)) {
+                        if (poller.add(*listener_,
+                                PollEvent::Readable | PollEvent::Error)) {
+                            accepting = true;
+                        }
+                    }
                 }
             }
 
@@ -414,7 +458,15 @@ template <typename ClientData> class ServerBase {
     // Accepts milliseconds so callers can specify sub-second timeouts without
     // the silent truncation-to-zero that chrono::seconds would cause.
     void setKeepAliveTimeout(std::chrono::milliseconds timeout) {
-        keepAliveTimeout_ = timeout;
+        if (inHighLoadMode_) {
+            // In high-load mode: save the new timeout for later restoration,
+            // but keep the aggressive timeout active to handle current load
+            normalKeepAliveTimeout_ = timeout;
+        } else {
+            // Normal mode: apply immediately and keep backup in sync
+            keepAliveTimeout_ = timeout;
+            normalKeepAliveTimeout_ = timeout;
+        }
     }
     std::chrono::milliseconds getKeepAliveTimeout() const {
         return keepAliveTimeout_;
@@ -620,7 +672,10 @@ template <typename ClientData> class ServerBase {
 
         // Fast-path: the soonest-expiring entry in the whole heap hasn't
         // fired yet, so nothing else can have fired either.  Return now.
-        if (timeout_heap_.front().expiry > now) return;
+        if (timeout_heap_.front().expiry > now) {
+ 
+            return;
+        }
 
         size_t closedCount = 0;
 
@@ -697,6 +752,8 @@ template <typename ClientData> class ServerBase {
     // may contain stale entries (lazily removed during sweepTimeouts()).
     std::vector<TimeoutEntry> timeout_heap_;
     std::chrono::milliseconds keepAliveTimeout_{65'000};
+    std::chrono::milliseconds normalKeepAliveTimeout_{65'000};
+    bool inHighLoadMode_{false};
     size_t peak_clients_{0};
 
     // --- Flat client map helpers
@@ -778,7 +835,7 @@ template <typename ClientData> class ServerBase {
 #endif
 
             if (maxClients != ClientLimit::Unlimited
-                && accepted >= static_cast<size_t>(maxClients)) {
+                && clientFds_.size() >= static_cast<size_t>(maxClients)) {
                 (void)poller.remove(*listener_);
                 accepting = false;
                 break;

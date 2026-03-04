@@ -1,7 +1,6 @@
-// This is an independent project of an individual developer. Dear PVS-Studio, please check it.
-// PVS-Studio Static Code Analyzer for C, C++, C#, and Java: https://pvs-studio.com
-
-
+// This is an independent project of an individual developer. Dear PVS-Studio,
+// please check it. PVS-Studio Static Code Analyzer for C, C++, C#, and Java:
+// https://pvs-studio.com
 
 #include "HttpPollServer.h"
 
@@ -82,6 +81,19 @@ std::string HttpPollServer::makeResponse(const char* statusLine,
 }
 
 void HttpPollServer::dispatchBuildResponse(HttpClientState& s) {
+    // Only allow GET and HEAD methods for security.
+    // We check the first few bytes of the request for basic method detection.
+    if (s.request.compare(0, 4, "GET ") != 0
+        && s.request.compare(0, 5, "HEAD ") != 0) {
+        s.responseBuf = makeResponse("HTTP/1.1 405 Method Not Allowed",
+            "text/plain; charset=utf-8",
+            "405 Method Not Allowed\nOnly GET and HEAD are supported.\n",
+            false);
+        s.responseView = s.responseBuf;
+        s.closeAfterSend = true;
+        return;
+    }
+
     bool http10 = s.request.find("HTTP/1.0") != std::string::npos;
     bool hasKeepAlive
         = s.request.find("Connection: keep-alive") != std::string::npos
@@ -97,6 +109,18 @@ void HttpPollServer::dispatchBuildResponse(HttpClientState& s) {
 ServerResult HttpPollServer::onReadable(TcpSocket& sock, HttpClientState& s) {
     char buf[RECV_BUF_SIZE];
     for (;;) {
+        // Security: Header timeout (Slowloris protection)
+        // If we haven't finished reading headers within 5 seconds, drop the
+        // connection.
+        if (s.responseView.empty()) {
+            auto now = std::chrono::steady_clock::now();
+            auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(
+                now - s.startTime);
+            if (elapsed.count() > 5) {
+                return ServerResult::Disconnect;
+            }
+        }
+
         int n = sock.receive(buf, sizeof(buf));
         if (n > 0) {
             touchClient(sock);
@@ -194,6 +218,22 @@ ServerResult HttpPollServer::onIdle() {
     }
 
     return ServerBase<HttpClientState>::onIdle();
+}
+
+std::string HttpPollServer::escapeHtml(const std::string& input) {
+    std::string output;
+    output.reserve(input.size());
+    for (char c : input) {
+        switch (c) {
+            case '&': output += "&amp;"; break;
+            case '<': output += "&lt;"; break;
+            case '>': output += "&gt;"; break;
+            case '"': output += "&quot;"; break;
+            case '\'': output += "&#39;"; break;
+            default: output += c; break;
+        }
+    }
+    return output;
 }
 
 } // namespace aiSocks

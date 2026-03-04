@@ -97,9 +97,9 @@ if(BUILD_EXAMPLES)
         aiSocksPeerLogger       examples/peer_logger.cpp
         aiSocksGoogleClient     examples/google_client.cpp
         aiSocksSocketFactoryDemo examples/socket_factory_demo.cpp
-        http_server             examples/http_poll_server.cpp
-        http_file_server        examples/http_file_server.cpp
-        custom_file_server      examples/custom_file_server.cpp
+        low_level_http_server   examples/low_level_http_server.cpp
+        simple_file_server      examples/simple_file_server.cpp
+        advanced_file_server    examples/advanced_file_server.cpp
         throughput_client       examples/throughput_client.cpp
     )
     list(LENGTH _EXAMPLES _len)
