@@ -23,6 +23,7 @@
 #else
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <unistd.h>
 #endif
 
 using namespace aiSocks;

@@ -12,6 +12,11 @@ add_library(aiSocksLib STATIC
     src/SocketFactory.cpp
     src/Result.cpp
     src/ServerSignal.cpp
+    src/PathHelper.cpp
+    src/FileIO.cpp
+    src/FileCache.cpp
+    src/HttpPollServer.cpp
+    src/HttpFileServer.cpp
 )
 
 # Platform-specific Poller backend (exactly one is compiled)

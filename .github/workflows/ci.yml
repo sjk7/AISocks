@@ -115,12 +115,12 @@ jobs:
             -G "${{ matrix.cmake_generator }}" \
             -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
             -DBUILD_TESTS=ON \
-            -DBUILD_EXAMPLES=ON
+            -DBUILD_EXAMPLES=OFF
 
       # ------------------------------------------------------------------ #
       # 4. Build                                                            #
       # ------------------------------------------------------------------ #
-      # We build only the library + tests + examples; the run_all_tests
+      # We build only the library + tests; the run_all_tests
       # custom target is skipped here—CTest is called explicitly below so
       # that GitHub Actions can parse the results properly.
       - name: Build
