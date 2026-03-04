@@ -120,18 +120,6 @@ class SocketFactory {
         TcpSocket&& socket, const ConnectArgs& config);
 };
 
-// ---------------------------------------------------------------------------
-// Inline implementations for performance-critical methods
-// ---------------------------------------------------------------------------
-
-inline Result<TcpSocket> SocketFactory::createTcpSocket(AddressFamily family) {
-    return createTcpSocketRaw(family);
-}
-
-inline Result<UdpSocket> SocketFactory::createUdpSocket(AddressFamily family) {
-    return createUdpSocketRaw(family);
-}
-
 } // namespace aiSocks
 
 #endif // AISOCKS_SOCKET_FACTORY_H

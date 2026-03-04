@@ -17,6 +17,8 @@ add_library(aiSocksLib STATIC
     src/FileCache.cpp
     src/HttpPollServer.cpp
     src/HttpFileServer.cpp
+    src/HttpRequest.cpp
+    src/UrlCodec.cpp
 )
 
 # Platform-specific Poller backend (exactly one is compiled)

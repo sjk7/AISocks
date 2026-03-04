@@ -279,4 +279,12 @@ template Result<TcpSocket> SocketFactory::bindSocket<TcpSocket>(
 template Result<UdpSocket> SocketFactory::bindSocket<UdpSocket>(
     UdpSocket&& socket, const ServerBind& config);
 
+Result<TcpSocket> SocketFactory::createTcpSocket(AddressFamily family) {
+    return createTcpSocketRaw(family);
+}
+
+Result<UdpSocket> SocketFactory::createUdpSocket(AddressFamily family) {
+    return createUdpSocketRaw(family);
+}
+
 } // namespace aiSocks

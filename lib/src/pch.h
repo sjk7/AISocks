@@ -9,18 +9,22 @@
 
 // Standard library headers used across multiple translation units
 // Note: Avoid <chrono> to prevent conflicts with aiSocks::Milliseconds
+#include <algorithm>
+#include <atomic>
+#include <cassert>
+#include <chrono>
 #include <cstddef>
 #include <cstdint>
-#include <string>
-#include <vector>
+#include <cstring>
+#include <exception>
+#include <functional>
+#include <limits>
 #include <memory>
 #include <optional>
-#include <exception>
 #include <stdexcept>
+#include <string>
 #include <system_error>
-#include <limits>
-#include <cassert>
-#include <cstring>
+#include <vector>
 
 // Platform-specific headers
 #ifdef _WIN32
