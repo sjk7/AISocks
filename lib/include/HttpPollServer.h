@@ -81,6 +81,39 @@ struct HttpClientState {
         other.responseView = {};
     }
 
+    HttpClientState& operator=(const HttpClientState& other) {
+        if (this == &other) return *this;
+        request = other.request;
+        responseView = other.responseView;
+        responseBuf = other.responseBuf;
+        sent = other.sent;
+        startTime = other.startTime;
+        responseStarted = other.responseStarted;
+        closeAfterSend = other.closeAfterSend;
+        requestScanPos = other.requestScanPos;
+        // If view pointed into the original's responseBuf, redirect into ours.
+        if (!responseBuf.empty()
+            && other.responseView.data() == other.responseBuf.data())
+            responseView = responseBuf;
+        return *this;
+    }
+
+    HttpClientState& operator=(HttpClientState&& other) noexcept {
+        if (this == &other) return *this;
+        request = std::move(other.request);
+        responseView = other.responseView;
+        responseBuf = std::move(other.responseBuf);
+        sent = other.sent;
+        startTime = other.startTime;
+        responseStarted = other.responseStarted;
+        closeAfterSend = other.closeAfterSend;
+        requestScanPos = other.requestScanPos;
+        // After the move, fix up view if it was backed by the (now moved) buf.
+        if (!responseBuf.empty()) responseView = responseBuf;
+        other.responseView = {};
+        return *this;
+    }
+
     ~HttpClientState() = default;
 };
 

@@ -79,11 +79,11 @@ template <typename T> class [[nodiscard]] Result {
                 T(other.value_ref()); // <- Placement new: copy construct T in
                                       // raw memory
         } else {
-            new (&error_ref()) ErrorInfo{other.error_ref().error,
-                other.error_ref().description, other.error_ref().sysCode,
-                other.error_ref().isDns,
-                other.error_ref().cachedMessage_}; // <- Placement new: copy
-                                                   // construct ErrorInfo
+            const auto& otherErr = other.error_ref();
+            new (&error_ref()) ErrorInfo{otherErr.error, otherErr.description,
+                otherErr.sysCode, otherErr.isDns,
+                otherErr.cachedMessage_}; // <- Placement new: copy
+                                          // construct ErrorInfo
         }
     }
 
@@ -91,10 +91,10 @@ template <typename T> class [[nodiscard]] Result {
         if (has_value_) {
             new (value_storage_) T(std::move(other.value_ref()));
         } else {
-            new (&error_ref()) ErrorInfo{other.error_ref().error,
-                other.error_ref().description, other.error_ref().sysCode,
-                other.error_ref().isDns,
-                std::move(other.error_ref().cachedMessage_)};
+            auto& otherErr = other.error_ref();
+            new (&error_ref()) ErrorInfo{otherErr.error, otherErr.description,
+                otherErr.sysCode, otherErr.isDns,
+                std::move(otherErr.cachedMessage_)};
         }
     }
 
@@ -114,11 +114,11 @@ template <typename T> class [[nodiscard]] Result {
                     T(other.value_ref()); // <- Placement new: copy construct T
             } else {
                 has_value_ = false;
-                new (&error_ref()) ErrorInfo{other.error_ref().error,
-                    other.error_ref().description, other.error_ref().sysCode,
-                    other.error_ref().isDns,
-                    other.error_ref().cachedMessage_}; // <- Placement new: copy
-                                                       // construct ErrorInfo
+                const auto& otherErr = other.error_ref();
+                new (&error_ref()) ErrorInfo{otherErr.error,
+                    otherErr.description, otherErr.sysCode, otherErr.isDns,
+                    otherErr.cachedMessage_}; // <- Placement new: copy
+                                              // construct ErrorInfo
             }
         }
         return *this;

@@ -134,7 +134,8 @@ class TcpSocket : public Socket {
         // Send in chunks to handle partial sends gracefully
         size_t sent = 0;
         while (sent < size) {
-            const size_t toSend = size - sent < chunkSize ? size - sent : chunkSize;
+            const size_t remaining = size - sent;
+            const size_t toSend = remaining < chunkSize ? remaining : chunkSize;
             int n = doSend(data + sent, toSend);
             if (n <= 0) return sent > 0 ? static_cast<int>(sent) : n;
             sent += static_cast<size_t>(n);

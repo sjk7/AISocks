@@ -1,11 +1,14 @@
-// This is an independent project of an individual developer. Dear PVS-Studio, please check it.
+// This is an independent project of an individual developer. Dear PVS-Studio,
+// please check it.
 
-// PVS-Studio Static Code Analyzer for C, C++, C#, and Java: https://pvs-studio.com
-
+// PVS-Studio Static Code Analyzer for C, C++, C#, and Java:
+// https://pvs-studio.com
 
 #include "TcpSocket.h"
 #include <iostream>
 #include <iomanip>
+#include <array>
+#include <string>
 
 #ifdef SOMAXCONN
 error("SOMAXCONN is defined, which may cause issues with our "
@@ -44,13 +47,12 @@ int main() {
 
     // Test 2: Validate IPv4 addresses
     std::cout << "=== IPv4 Address Validation ===" << std::endl;
-    std::vector<std::string> ipv4Tests = {
-        //-V826
+    std::array<std::string, 6> ipv4Tests = {{
         "127.0.0.1", "192.168.1.1", "10.0.0.1",
         "256.256.256.256", // Invalid
         "192.168.1", // Invalid
         "abc.def.ghi.jkl" // Invalid
-    };
+    }};
 
     for (const auto& addr : ipv4Tests) {
         bool valid = Socket::isValidIPv4(addr);
@@ -61,13 +63,14 @@ int main() {
 
     // Test 3: Validate IPv6 addresses
     std::cout << "=== IPv6 Address Validation ===" << std::endl;
-    std::vector<std::string> ipv6Tests = {
-        //-V826
-        "::1", "fe80::1", "2001:0db8:85a3:0000:0000:8a2e:0370:7334",
+    std::array<std::string, 6> ipv6Tests = {{
+        "::1",
+        "fe80::1",
+        "2001:0db8:85a3:0000:0000:8a2e:0370:7334",
         "2001:db8::1",
         "::ffff:192.168.1.1", // IPv4-mapped IPv6
         "gggg::1" // Invalid
-    };
+    }};
 
     for (const auto& addr : ipv6Tests) {
         bool valid = Socket::isValidIPv6(addr);

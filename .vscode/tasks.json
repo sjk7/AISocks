@@ -7,7 +7,7 @@
       "command": "cmake",
       "args": [
         "--build",
-        "build-debug-windows",
+        "build-mac",
         "--parallel",
         "8",
         "--target",
@@ -27,7 +27,7 @@
       "command": "cmake",
       "args": [
         "--build",
-        "build-debug-windows",
+        "build-mac",
         "--parallel",
         "8",
         "--target",
@@ -47,7 +47,7 @@
       "command": "cmake",
       "args": [
         "--build",
-        "build-debug-windows",
+        "build-mac",
         "--parallel",
         "8",
         "--target",
@@ -67,7 +67,7 @@
       "command": "cmake",
       "args": [
         "--build",
-        "build-debug-windows",
+        "build-mac",
         "--parallel",
         "8",
         "--target",
@@ -87,7 +87,7 @@
       "command": "cmake",
       "args": [
         "--build",
-        "build-debug-windows",
+        "build-mac",
         "--parallel",
         "8",
         "--target",
@@ -107,7 +107,7 @@
       "command": "cmake",
       "args": [
         "--build",
-        "build-debug-windows",
+        "build-mac",
         "--parallel",
         "8",
         "--target",
@@ -127,7 +127,7 @@
       "command": "cmake",
       "args": [
         "--build",
-        "build-debug-windows",
+        "build-mac",
         "--parallel",
         "8",
         "--target",
@@ -147,7 +147,7 @@
       "command": "cmake",
       "args": [
         "--build",
-        "build-debug-windows",
+        "build-mac",
         "--parallel",
         "8",
         "--target",
@@ -167,7 +167,7 @@
       "command": "cmake",
       "args": [
         "--build",
-        "build-debug-windows",
+        "build-mac",
         "--parallel",
         "8",
         "--target",
@@ -187,7 +187,7 @@
       "command": "cmake",
       "args": [
         "--build",
-        "build-debug-windows",
+        "build-mac",
         "--parallel",
         "8"
       ],
@@ -205,7 +205,7 @@
       "command": "cmake",
       "args": [
         "--build",
-        "build-debug-windows",
+        "build-mac",
         "--parallel",
         "8",
         "--target",
