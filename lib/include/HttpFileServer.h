@@ -50,7 +50,7 @@ class HttpFileServer : public HttpPollServer {
     };
 
     explicit HttpFileServer(const ServerBind& bind, const Config& config,
-                         Result<TcpSocket>* result = nullptr)
+        Result<TcpSocket>* result = nullptr)
         : HttpPollServer(bind, result) {
         // Set default values
         config_.documentRoot

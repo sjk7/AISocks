@@ -102,15 +102,18 @@ struct HttpClientState {
 // ---------------------------------------------------------------------------
 class HttpPollServer : public ServerBase<HttpClientState> {
     public:
-    explicit HttpPollServer(const ServerBind& bind, Result<TcpSocket>* result = nullptr)
-        : ServerBase<HttpClientState>(bind, AddressFamily::IPv4, result), bind_(bind) {}
+    explicit HttpPollServer(
+        const ServerBind& bind, Result<TcpSocket>* result = nullptr)
+        : ServerBase<HttpClientState>(bind, AddressFamily::IPv4, result)
+        , bind_(bind) {}
 
     // Run the server with startup/shutdown messages
     void run(ClientLimit maxClients = ClientLimit::Default,
         Milliseconds timeout = Milliseconds{-1}) {
         if (!this->isValid()) {
-            printf("ERROR: Server failed to start - port %d is already in use or invalid\n",
-                   bind_.port.value());
+            printf("ERROR: Server failed to start - port %d is already in use "
+                   "or invalid\n",
+                bind_.port.value());
             return; // Server not valid, exit early
         }
 
@@ -130,7 +133,7 @@ class HttpPollServer : public ServerBase<HttpClientState> {
 
     protected:
     ServerBind bind_;
-    
+
     // Static helpers for OS/Build info
     static const char* buildOS() {
 #if defined(__APPLE__)

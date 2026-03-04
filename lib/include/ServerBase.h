@@ -88,8 +88,8 @@ enum class ServerResult {
 //
 //   // With detailed error information:
 //   Result<TcpSocket> serverResult;
-//   MyServer srv(ServerBind{"0.0.0.0", Port{9000}}, AddressFamily::IPv4, &serverResult);
-//   if (!srv.isValid()) {
+//   MyServer srv(ServerBind{"0.0.0.0", Port{9000}}, AddressFamily::IPv4,
+//   &serverResult); if (!srv.isValid()) {
 //       fprintf(stderr, "Server failed: %s\n", serverResult.message().c_str());
 //       return;
 //   }
@@ -105,8 +105,8 @@ template <typename ClientData> class ServerBase {
     // Construct and start listening.  Does not accept until run() is called.
     // Returns invalid server if bind or listen fails - check isValid().
     // The detailed error information is moved into the result parameter.
-    explicit ServerBase(
-        const ServerBind& args, AddressFamily family = AddressFamily::IPv4,
+    explicit ServerBase(const ServerBind& args,
+        AddressFamily family = AddressFamily::IPv4,
         Result<TcpSocket>* result = nullptr)
         : listener_(std::make_unique<TcpSocket>(TcpSocket::createRaw(family))) {
         // Pre-size the sparse fd→client table to the process fd ceiling
@@ -140,13 +140,16 @@ template <typename ClientData> class ServerBase {
             // Reset the listener to make the server invalid
             listener_.reset();
             // Still print the error for backward compatibility
-            fprintf(stderr, "FATAL: SocketFactory::createTcpServer() failed with error "
-                   "code %d: %s\n",
-                   static_cast<int>(createResult.error()), createResult.message().c_str());
-            fprintf(stderr, "FATAL: Cannot start server - port %d is already in use or invalid\n",
-                   args.port.value());
+            fprintf(stderr,
+                "FATAL: SocketFactory::createTcpServer() failed with error "
+                "code %d: %s\n",
+                static_cast<int>(createResult.error()),
+                createResult.message().c_str());
+            fprintf(stderr,
+                "FATAL: Cannot start server - port %d is already in use or "
+                "invalid\n",
+                args.port.value());
             // exit(1); // NO! Bad form!
-            
         }
     }
 
