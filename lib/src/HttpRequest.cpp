@@ -31,8 +31,7 @@ HttpRequest HttpRequest::parse(const std::string& raw) {
     const auto sep = raw.find("\r\n\r\n");
     const std::string headerSection
         = (sep == std::string::npos) ? raw : raw.substr(0, sep);
-    if (sep != std::string::npos)
-        req.body = raw.substr(sep + 4);
+    if (sep != std::string::npos) req.body = raw.substr(sep + 4);
 
     // ------------------------------------------------------------------ //
     // 2. Split header section into lines                                  //
@@ -52,7 +51,7 @@ HttpRequest HttpRequest::parse(const std::string& raw) {
         const auto sp2 = requestLine.find(' ', sp1 + 1);
         if (sp2 == std::string::npos) return req;
 
-        req.method  = requestLine.substr(0, sp1);
+        req.method = requestLine.substr(0, sp1);
         req.version = requestLine.substr(sp2 + 1);
 
         const std::string target = requestLine.substr(sp1 + 1, sp2 - sp1 - 1);
@@ -60,7 +59,7 @@ HttpRequest HttpRequest::parse(const std::string& raw) {
         if (qmark == std::string::npos) {
             req.rawPath = target;
         } else {
-            req.rawPath     = target.substr(0, qmark);
+            req.rawPath = target.substr(0, qmark);
             req.queryString = target.substr(qmark + 1);
         }
         req.path = urlDecode(req.rawPath);
@@ -81,11 +80,13 @@ HttpRequest HttpRequest::parse(const std::string& raw) {
 
             const auto colon = line.find(':');
             if (colon != std::string::npos) {
-                std::string key   = line.substr(0, colon);
+                std::string key = line.substr(0, colon);
                 std::string value = line.substr(colon + 1);
 
-                std::transform(key.begin(), key.end(), key.begin(),
-                    [](unsigned char c) { return static_cast<char>(::tolower(c)); });
+                std::transform(
+                    key.begin(), key.end(), key.begin(), [](unsigned char c) {
+                        return static_cast<char>(::tolower(c));
+                    });
 
                 const auto valStart = value.find_first_not_of(" \t");
                 if (valStart == std::string::npos) {

@@ -98,7 +98,7 @@ Result<SocketType> SocketFactory::bindSocket(
 
     // Bind the socket
     if (!socket.bind(config.address, config.port)) {
-      
+
         return Result<SocketType>::failure(socket.getLastError(),
             "bind() failed - address already in use or invalid",
             SocketFactory::captureLastError(), false);
