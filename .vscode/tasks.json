@@ -258,6 +258,24 @@
       "problemMatcher": [
         "$gcc"
       ]
+    },
+    {
+      "label": "Run Tests (mac)",
+      "type": "shell",
+      "command": "ctest",
+      "args": [
+        "--output-on-failure",
+        "--parallel",
+        "4"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}/build-mac"
+      },
+      "group": {
+        "kind": "test",
+        "isDefault": true
+      },
+      "problemMatcher": []
     }
   ]
 }
