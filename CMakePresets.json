@@ -81,7 +81,8 @@
             "binaryDir": "${sourceDir}/build-relwithdebinfo",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "RelWithDebInfo",
-                "BUILD_EXAMPLES": "ON"
+                "BUILD_EXAMPLES": "ON",
+                "BUILD_TESTS": "ON"
             }
         },
         {
@@ -94,6 +95,18 @@
             "binaryDir": "${sourceDir}/out/build/${presetName}",
             "cacheVariables": {
                 "CMAKE_INSTALL_PREFIX": "${sourceDir}/out/install/${presetName}"
+            }
+        },
+        {
+            "name": "relwithdebinfo-make",
+            "inherits": "base",
+            "displayName": "RelWithDebInfo (Make)",
+            "generator": "Unix Makefiles",
+            "binaryDir": "${sourceDir}/build-relwithdebinfo-make",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+                "BUILD_EXAMPLES": "ON",
+                "BUILD_TESTS": "ON"
             }
         }
     ],
@@ -280,6 +293,12 @@
             "displayName": "Visual Studio (MSVC) - Debug",
             "configurePreset": "msvc",
             "configuration": "Debug"
+        },
+        {
+            "name": "relwithdebinfo-make",
+            "inherits": "base-build",
+            "configurePreset": "relwithdebinfo-make",
+            "displayName": "Build RelWithDebInfo (Make)"
         }
     ],
     "testPresets": [
