@@ -12,7 +12,6 @@ struct ErrorContext;
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
-#include <exception>
 #include <memory>
 #include <string>
 #include <vector>

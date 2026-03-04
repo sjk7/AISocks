@@ -5,7 +5,6 @@
 #define AISOCKS_ERROR_FORMATTER_H
 
 #include "Socket.h"
-#include "SocketImplHelpers.h"
 #include <string>
 
 namespace aiSocks {
@@ -14,15 +13,8 @@ namespace aiSocks {
 // ErrorFormatter - Formats error messages consistently across the library.
 // ---------------------------------------------------------------------------
 
-// Format error message with step and OS description.
-// Format: "step: description [sysCode: systemMessage]"
-inline std::string formatErrorMessage(
-    const std::string& step, const ErrorContext& ctx) {
-    std::string result = step + ": " + formatErrorContext(ctx);
-    return result;
-}
-
-// Format error message from SocketImpl for compatibility
+// Format error message from a Socket's last error.
+// Returns "step: errorMessage" when the socket is invalid, else "".
 inline std::string formatErrorMessage(
     const std::string& step, const Socket& socket) {
     if (!socket.isValid()) {

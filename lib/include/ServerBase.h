@@ -8,7 +8,6 @@
 #include "ServerSignal.h"
 #include "ServerTypes.h"
 #include "TcpSocket.h"
-#include <cstdlib>
 #include "SocketFactory.h"
 #include <algorithm>
 #include <atomic>
