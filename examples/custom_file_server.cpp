@@ -12,7 +12,7 @@
 #include "custom_file_server_strings.h"
 #include "CustomFileServerHtmlHelpers.h"
 #include "FileIO.h"
-#include <iostream>
+#include <cstdio>
 #include <chrono>
 
 using namespace aiSocks;
@@ -572,12 +572,12 @@ class CustomFileServer : public HttpFileServer {
             });
 
         for (const auto& [name, isDir] : entries) {
-            std::string fullPath = PathHelper::joinPath(dirPath, name);
             std::string type = isDir ? "Directory" : getFileExtension(name);
             std::string size = "-";
             std::string modified = "-";
 
             if (!isDir) {
+                std::string fullPath = PathHelper::joinPath(dirPath, name);
                 PathHelper::FileInfo fileInfo
                     = PathHelper::getFileInfo(fullPath);
                 if (fileInfo.exists) {

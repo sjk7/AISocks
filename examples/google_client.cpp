@@ -1,8 +1,8 @@
-// This is an independent project of an individual developer. Dear PVS-Studio, please check it.
+// This is an independent project of an individual developer. Dear PVS-Studio,
+// please check it.
 
-// PVS-Studio Static Code Analyzer for C, C++, C#, and Java: https://pvs-studio.com
-
-
+// PVS-Studio Static Code Analyzer for C, C++, C#, and Java:
+// https://pvs-studio.com
 
 // Example: SimpleClient connecting to Google
 // Demonstrates receiving data until connection closes
@@ -11,7 +11,6 @@
 #include <iostream>
 #include <string>
 #include <cstring>
-#include <cassert>
 
 using namespace aiSocks;
 
@@ -27,7 +26,10 @@ int httpConnect(const ConnectArgs& args, const char* httpRequest) {
     }
 
     client.run([&](TcpSocket& sock) {
-        assert(sock.isBlocking());
+        if (!sock.isBlocking()) {
+            std::cerr << "Expected a blocking socket\n"; //-V1056
+            return;
+        }
         std::cout << "Connected! Socket is valid.\n";
 
         std::cout << "Sending HTTP request...\n";
@@ -55,7 +57,7 @@ int httpConnect(const ConnectArgs& args, const char* httpRequest) {
                     bytesRead);
                 std::cout.write(buffer, toPrint);
                 std::cout.flush();
-            } else if (isFirstChunk && totalBytesRead > 0) {
+            } else if (isFirstChunk) {
                 std::cout << "\n... (response truncated, showing stats) ...\n";
                 isFirstChunk = false;
             }
@@ -94,6 +96,6 @@ int main() {
 
     std::cout << "8765 Example finished with code: " << ret << "\n";
 
-    ret = httpConnect(
+    httpConnect(
         ConnectArgs{"google.com", Port{8765}, Milliseconds{1000}}, httpRequest);
 }
