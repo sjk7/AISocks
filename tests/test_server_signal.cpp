@@ -132,19 +132,14 @@ int main() {
     // Test 6: Signal handler installation (function exists)
     BEGIN_TEST("Signal handler: installSignalHandlers function exists");
     {
-// Just verify we can call it without crashing
-#if defined(_WIN32) || defined(AISOCKS_HAS_SIGNAL_HANDLERS)
+        // Just verify we can call it without crashing
         try {
-            installSignalHandlers();
+            aiSocks::installSignalHandlers();
             REQUIRE(true); // Didn't crash
         } catch (...) {
             // Some platforms might not support this
             REQUIRE(true);
         }
-#else
-        // If not implemented, that's OK for this test
-        REQUIRE(true);
-#endif
     }
 
     // Test 7: Server stops when flag is set (handleSignals=true)

@@ -251,7 +251,7 @@ int main() {
         // Server sends a 256-byte payload in 16-byte chunks to exercise the
         // receiveAll loop.  Client calls receiveAll(256) and checks the result.
         constexpr size_t PAYLOAD = 256;
-        std::array<char, PAYLOAD> expected{};
+        std::array<char, PAYLOAD> expected;
         for (size_t i = 0; i < PAYLOAD; ++i) expected[i] = static_cast<char>(i);
 
         std::atomic<bool> ready{false};
@@ -285,8 +285,7 @@ int main() {
         srvThread.join();
 
         REQUIRE(ok);
-        REQUIRE(std::equal(
-            buf.begin(), buf.end(), expected.begin(), expected.end()));
+        REQUIRE(std::equal(buf.begin(), buf.end(), expected.begin()));
     }
 
     std::this_thread::sleep_for(std::chrono::milliseconds(1));

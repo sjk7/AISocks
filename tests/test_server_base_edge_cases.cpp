@@ -230,7 +230,6 @@ int main() {
         std::this_thread::sleep_for(std::chrono::milliseconds{50});
 
         // Verify client is connected
-        REQUIRE(server.clientCount() >= 0);
         REQUIRE(server.clientCount() <= 1);
 
         // Send a message
@@ -409,7 +408,7 @@ int main() {
 
         std::this_thread::sleep_for(std::chrono::milliseconds{50});
 
-        REQUIRE(server.clientCount() >= 0); // Should be reasonable
+        // clientCount() is unsigned, so it's always >= 0
 
         server.requestStop();
         serverThread.join();

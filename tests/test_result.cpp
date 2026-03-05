@@ -202,10 +202,14 @@ int main() {
     BEGIN_TEST("Self-assignment: copy assignment");
     {
         Result<int> result(777);
+#ifdef __clang__
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wself-assign-overloaded"
+#endif
         result = result; // Self-assign //-V570
+#ifdef __clang__
 #pragma clang diagnostic pop
+#endif
 
         REQUIRE(result.isSuccess());
         REQUIRE(result.value() == 777);
@@ -215,10 +219,19 @@ int main() {
     BEGIN_TEST("Self-assignment: move assignment");
     {
         Result<int> result(888);
+#ifdef __clang__
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wself-move"
+#elif defined(__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wself-move"
+#endif
         result = std::move(result); // Self-move //-V570
+#ifdef __clang__
 #pragma clang diagnostic pop
+#elif defined(__GNUC__)
+#pragma GCC diagnostic pop
+#endif
 
         REQUIRE(result.isSuccess());
         // Value may be in moved-from state, but should not crash

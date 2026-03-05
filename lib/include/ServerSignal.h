@@ -29,6 +29,9 @@ extern std::atomic<bool> g_serverSignalStop;
 // Plain C signal handler — writes g_serverSignalStop, nothing else.
 extern "C" void serverHandleSignal(int) noexcept;
 
+// Install signal handlers for graceful shutdown (cross-platform)
+void installSignalHandlers();
+
 } // namespace aiSocks
 
 #endif // AISOCKS_SERVER_SIGNAL_H

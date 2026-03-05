@@ -4,6 +4,7 @@
 
 #include "ServerSignal.h"
 #include <atomic>
+#include <csignal>
 
 namespace aiSocks {
 
@@ -12,6 +13,18 @@ std::atomic<bool> g_serverSignalStop{false};
 
 extern "C" void serverHandleSignal(int) noexcept {
     g_serverSignalStop.store(true, std::memory_order_relaxed);
+}
+
+void installSignalHandlers() {
+    // Install signal handlers for graceful shutdown
+    // This works on Unix-like systems and Windows
+    std::signal(SIGINT, serverHandleSignal);
+    std::signal(SIGTERM, serverHandleSignal);
+    
+#ifdef SIGBREAK
+    // Windows-specific signal for Ctrl+Break
+    std::signal(SIGBREAK, serverHandleSignal);
+#endif
 }
 
 } // namespace aiSocks
