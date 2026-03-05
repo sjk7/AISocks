@@ -2,7 +2,7 @@
 
 ## Overview
 
-The aiSocks test suite includes **25+ comprehensive tests** covering sockets, servers, HTTP protocols, and utilities. All tests are included when building with `-DBUILD_TESTS=ON`.
+The aiSocks test suite includes **30 comprehensive tests** covering sockets, servers, HTTP protocols, and utilities. All tests are included when building with `-DBUILD_TESTS=ON`.
 
 ## Building with Tests
 
@@ -118,10 +118,12 @@ ctest --output-on-failure
 | Test Name | Description | Time |
 |-----------|-------------|------|
 | `test_server_base` | Poll-driven `ServerBase<T>` framework core functionality | ~0.73s |
+| `test_server_base_edge_cases` | Edge cases: connection limits, keep-alive, timeouts, signal handling (10 comprehensive tests) | ~3.6s |
 | `test_server_base_simple` | Simple HTTP echo server over ServerBase | ~0.55s |
 | `test_server_base_echo_simple` | Echo server with response building | ~0.15s |
 | `test_server_base_minimal` | Minimal server setup and lifecycle | ~0.06s |
 | `test_server_base_no_timeout` | Behavior without timeout constraints | ~0.05s |
+| `test_server_signal` | Signal handling and graceful shutdown | ~0.18s |
 | `test_simple_client` | SimpleClient API for building HTTP requests | ~0.12s |
 | `test_simple_server` | Simple HTTP file server (dynamic file serving) | ~0.21s |
 | `test_advanced_file_server` | Advanced HTTP file server (auth, caching, logging) | ~0.14s |
@@ -132,67 +134,42 @@ ctest --output-on-failure
 |-----------|-------------|------|
 | `test_file_io` | File operations and directory handling | ~0.00s |
 | `test_file_cache` | File caching mechanisms | ~0.00s |
+| `test_path_helper` | Path utilities, normalization, security checks | ~0.01s |
 | `test_error_messages` | Error message generation and formatting | ~0.01s |
+| `test_result` | Result type operations and error handling | ~0.01s |
 | `test_fixes` | Regression and edge-case fixes | ~0.99s |
 
 ## Test Execution Example
 
+### Sequential Execution
 ```
 Test project /path/to/build-release
       Start  1: test_socket_basics
-1/25 Test  #1: test_socket_basics ...............   Passed    0.00 sec
+1/30 Test  #1: test_socket_basics ...............   Passed    0.00 sec
       Start  2: test_ip_utils
-2/25 Test  #2: test_ip_utils ....................   Passed    0.00 sec
-      Start  3: test_blocking
-3/25 Test  #3: test_blocking ....................   Passed    0.04 sec
-      Start  4: test_move_semantics
-4/25 Test  #4: test_move_semantics ..............   Passed    0.00 sec
-      Start  5: test_loopback_tcp
-5/25 Test  #5: test_loopback_tcp ................   Passed    0.08 sec
-      Start  6: test_error_handling
-6/25 Test  #6: test_error_handling ..............   Passed    0.00 sec
-      Start  7: test_construction
-7/25 Test  #7: test_construction ................   Passed    0.09 sec
-      Start  8: test_new_features
-8/25 Test  #8: test_new_features ................   Passed    0.25 sec
-      Start  9: test_error_messages
-9/25 Test  #9: test_error_messages ..............   Passed    0.01 sec
-     Start 10: test_poller
-10/25 Test #10: test_poller ......................   Passed    0.05 sec
-     Start 11: test_tcp_socket
-11/25 Test #11: test_tcp_socket ..................   Passed    0.07 sec
-     Start 12: test_simple_client
-12/25 Test #12: test_simple_client ...............   Passed    0.12 sec
-     Start 13: test_server_base
-13/25 Test #13: test_server_base .................   Passed    0.73 sec
-     Start 14: test_http_request
-14/25 Test #14: test_http_request ................   Passed    0.00 sec
-     Start 15: test_url_codec
-15/25 Test #15: test_url_codec ...................   Passed    0.00 sec
-     Start 16: test_socket_factory
-16/25 Test #16: test_socket_factory ..............   Passed    0.02 sec
-     Start 17: test_server_base_simple
-17/25 Test #17: test_server_base_simple ..........   Passed    0.55 sec
-     Start 18: test_server_base_minimal
-18/25 Test #18: test_server_base_minimal .........   Passed    0.06 sec
-     Start 19: test_server_base_echo_simple
-19/25 Test #19: test_server_base_echo_simple .....   Passed    0.15 sec
-     Start 20: test_server_base_no_timeout
-20/25 Test #20: test_server_base_no_timeout ......   Passed    0.05 sec
-     Start 21: test_fixes
-21/25 Test #21: test_fixes .......................   Passed    0.99 sec
-     Start 22: test_simple_server
-22/25 Test #22: test_simple_server ...............   Passed    0.21 sec
-     Start 23: test_advanced_file_server
-23/25 Test #23: test_advanced_file_server ........   Passed    0.14 sec
-     Start 24: test_file_io
-24/25 Test #24: test_file_io .....................   Passed    0.00 sec
-     Start 25: test_file_cache
-25/25 Test #25: test_file_cache ..................   Passed    0.00 sec
+2/30 Test  #2: test_ip_utils ....................   Passed    0.00 sec
+...
+     Start 30: test_http_poll_server
+30/30 Test #30: test_http_poll_server ............   Passed    4.32 sec
 
-100% tests passed, 0 tests failed out of 25
+100% tests passed, 0 tests failed out of 30
 
-Total Test time (real) =   5.12 sec
+Total Test time (real) =  29.21 sec
+```
+
+### Parallel Execution (8 jobs)
+```
+Test project /path/to/build-release
+      Start 30: test_http_poll_server
+      Start 14: test_server_base_edge_cases
+      Start 22: test_fixes
+...
+     Start 14: test_server_base_edge_cases ......   Passed    3.24 sec
+30/30 Test #30: test_http_poll_server ............   Passed    4.46 sec
+
+100% tests passed, 0 tests failed out of 30
+
+Total Test time (real) =   4.46 sec
 ```
 
 ## Advanced Test Options
@@ -267,12 +244,16 @@ tests/
 ├── test_server_base_echo_simple.cpp
 ├── test_server_base_minimal.cpp
 ├── test_server_base_no_timeout.cpp
+├── test_server_base_edge_cases.cpp
+├── test_server_signal.cpp
 ├── test_simple_client.cpp
 ├── test_simple_server.cpp
 ├── test_advanced_file_server.cpp
 ├── test_file_io.cpp
 ├── test_file_cache.cpp
+├── test_path_helper.cpp
 ├── test_error_messages.cpp
+├── test_result.cpp
 ├── test_fixes.cpp
 ├── test_helpers.h          # Test utility macros (REQUIRE, BEGIN_TEST, etc.)
 └── CMakeLists.txt          # Test build configuration
@@ -309,10 +290,14 @@ ctest --output-on-failure -R "test_my_feature"
 
 ## Test Metrics
 
-- **Total Tests**: 26+ (25 core + 16 HTTP poll server tests)
-- **Total Coverage**: Core sockets, TCP/UDP, IPv4/IPv6, blocking/non-blocking, HTTP/1.x protocol, keep-alive, zero-copy responses, file serving, authentication, and caching
-- **Average Execution Time**: ~5 seconds (full suite)
+- **Total Tests**: 30 (comprehensive test suite)
+- **Test Categories**: 9 categories covering all major components
+- **Total Coverage**: Core sockets, TCP/UDP, IPv4/IPv6, blocking/non-blocking, HTTP/1.x protocol, keep-alive, zero-copy responses, file serving, authentication, caching, path utilities, signal handling, and edge cases
+- **Sequential Execution Time**: ~29 seconds (full suite)
+- **Parallel Execution Time**: ~4.5 seconds (8 jobs) - 6.5x speedup
 - **Pass Rate**: 100% on all supported platforms (Windows, macOS, Linux)
+- **Cross-Platform**: Windows (MSVC), macOS (Clang), Linux (GCC/Clang)
+- **Build Standards**: Strict warnings (`-Wall -Werror`/`/W4 /WX`), no exceptions
 
 ## Continuous Integration
 
