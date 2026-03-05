@@ -11,10 +11,16 @@ CompileFlags:
   Add:
     - "-Ilib/include"
   # Remove Windows-specific Clang flags that confuse clangd
+  # Also remove PCH flags to avoid circular dependency when parsing headers
+  # that are themselves included in the PCH (e.g., TcpSocket.h in test_pch.h)
   Remove:
     - "-Xclang"
     - "--dependent-lib=*"
     - "-gcodeview"
+    - "-include-pch"
+    - "-Winvalid-pch"
+    - "-include"
+    - "**/cmake_pch.hxx*"
 
 # Do not index the C++ standard library headers or pull them into
 # completion/navigation results. This keeps "Go to Definition" fast

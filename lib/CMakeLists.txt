@@ -53,7 +53,8 @@ if(WIN32)
 endif()
 
 # Configure precompiled headers for Clang (Mac/Linux)
-if(NOT MSVC)
+# Temporarily disabled on macOS due to PVS-Studio compatibility issues
+if(NOT MSVC AND NOT APPLE)
     target_precompile_headers(aiSocksLib PRIVATE src/pch.h)
 endif()
 

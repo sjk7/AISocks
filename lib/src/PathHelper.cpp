@@ -1,7 +1,6 @@
-// This is an independent project of an individual developer. Dear PVS-Studio, please check it.
-// PVS-Studio Static Code Analyzer for C, C++, C#, and Java: https://pvs-studio.com
-
-
+// This is an independent project of an individual developer. Dear PVS-Studio,
+// please check it. PVS-Studio Static Code Analyzer for C, C++, C#, and Java:
+// https://pvs-studio.com
 
 #include "PathHelper.h"
 
@@ -109,6 +108,8 @@ bool PathHelper::hasSymlinkComponentWithin(
     if (path.compare(0, root.size(), root) != 0) return true;
 
     std::string current = root;
+    // NOTE: !current.empty() is always true here (root was validated above),
+    // but kept for defensive programming clarity. //-V560
     if (!current.empty() && current.back() == '/') current.pop_back();
 
     const std::string rel = path.substr(root.size());
@@ -117,9 +118,8 @@ bool PathHelper::hasSymlinkComponentWithin(
         while (i < rel.size() && rel[i] == '/') ++i;
         if (i >= rel.size()) break;
         const size_t j = rel.find('/', i);
-        const std::string comp = (j == std::string::npos)
-            ? rel.substr(i)
-            : rel.substr(i, j - i);
+        const std::string comp
+            = (j == std::string::npos) ? rel.substr(i) : rel.substr(i, j - i);
         if (comp.empty()) break;
 
         current += "/";

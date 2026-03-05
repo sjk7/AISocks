@@ -28,8 +28,10 @@ void HttpPollServer::printBuildInfo() {
 }
 
 void HttpPollServer::printStartupBanner() {
-    printf("Built: %s %s  |  OS: %s  |  Build: %s\n", __DATE__, __TIME__,
-        buildOS(), buildKind());
+    // Default implementation prints build info.
+    // Subclasses can override and call HttpPollServer::printStartupBanner()
+    // to include build info alongside custom startup messages.
+    printBuildInfo();
 }
 
 ServerResult HttpPollServer::onError(TcpSocket& sock, HttpClientState& /*s*/) {

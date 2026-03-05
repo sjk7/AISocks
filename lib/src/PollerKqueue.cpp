@@ -1,7 +1,6 @@
-// This is an independent project of an individual developer. Dear PVS-Studio, please check it.
-// PVS-Studio Static Code Analyzer for C, C++, C#, and Java: https://pvs-studio.com
-
-
+// This is an independent project of an individual developer. Dear PVS-Studio,
+// please check it. PVS-Studio Static Code Analyzer for C, C++, C#, and Java:
+// https://pvs-studio.com
 
 // PollerKqueue.cpp  kqueue backend for macOS / BSD.
 // Compiled only when CMAKE detects Apple or FreeBSD.
@@ -162,12 +161,13 @@ std::vector<PollResult> Poller::wait(Milliseconds timeout) {
     }
 
     // keventBuf is pre-sized in ensureCapacity; guard against empty state.
-    if (pImpl_->keventBuf.empty()) pImpl_->keventBuf.resize(1);
-    const int maxEvents = static_cast<int>(pImpl_->keventBuf.size());
+    auto& keventBuf = pImpl_->keventBuf;
+    if (keventBuf.empty()) keventBuf.resize(1);
+    const int maxEvents = static_cast<int>(keventBuf.size());
 
     for (;;) {
         int n = ::kevent(
-            pImpl_->kq, nullptr, 0, pImpl_->keventBuf.data(), maxEvents, tsp);
+            pImpl_->kq, nullptr, 0, keventBuf.data(), maxEvents, tsp);
         if (n < 0) {
             if (errno == EINTR)
                 return {}; // signal received -- let caller check stop flag
@@ -180,7 +180,7 @@ std::vector<PollResult> Poller::wait(Milliseconds timeout) {
         auto& arr = pImpl_->socketArray;
         pImpl_->seenFds.clear();
         for (int i = 0; i < n; ++i) {
-            const struct kevent& ev = pImpl_->keventBuf[static_cast<size_t>(i)];
+            const struct kevent& ev = keventBuf[static_cast<size_t>(i)];
             auto fd = static_cast<size_t>(ev.ident);
             if (fd >= arr.size()) continue;
             uint8_t bits = pImpl_->mergeBits[fd];
@@ -200,16 +200,17 @@ std::vector<PollResult> Poller::wait(Milliseconds timeout) {
             pImpl_->mergeBits[fd] = bits;
         }
 
-        pImpl_->resultBuffer.clear();
-        pImpl_->resultBuffer.reserve(pImpl_->seenFds.size());
+        auto& resultBuffer = pImpl_->resultBuffer;
+        resultBuffer.clear();
+        resultBuffer.reserve(pImpl_->seenFds.size());
         for (auto fd : pImpl_->seenFds) {
             const uint8_t bits = pImpl_->mergeBits[fd];
             pImpl_->mergeBits[fd] = 0; // reset for next call
             if (pImpl_->socketValid[fd] && arr[fd])
-                pImpl_->resultBuffer.push_back(
+                resultBuffer.push_back(
                     {arr[fd], static_cast<PollEvent>(bits)});
         }
-        return pImpl_->resultBuffer;
+        return resultBuffer;
     }
 }
 

@@ -317,21 +317,30 @@ template <typename ClientData> class ServerBase {
             // Restore normal timeout when load drops.
             {
                 constexpr size_t HIGH_LOAD_THRESHOLD = 256;
-                constexpr auto AGGRESSIVE_TIMEOUT = std::chrono::milliseconds{5000};
-                
-                if (!inHighLoadMode_ && clientFds_.size() > HIGH_LOAD_THRESHOLD) {
-                    // Entering high-load mode: save normal timeout and switch to aggressive
+
+                if (!inHighLoadMode_
+                    && clientFds_.size() > HIGH_LOAD_THRESHOLD) {
+                    // Entering high-load mode: save normal timeout and switch
+                    // to aggressive
+                    constexpr auto AGGRESSIVE_TIMEOUT
+                        = std::chrono::milliseconds{5000};
                     normalKeepAliveTimeout_ = keepAliveTimeout_;
                     keepAliveTimeout_ = AGGRESSIVE_TIMEOUT;
                     inHighLoadMode_ = true;
-                    printf("[ServerBase] High load detected (%zu clients), switching to aggressive %lld ms timeout\n",
-                           clientFds_.size(), static_cast<long long>(AGGRESSIVE_TIMEOUT.count()));
-                } else if (inHighLoadMode_ && clientFds_.size() <= HIGH_LOAD_THRESHOLD) {
+                    printf("[ServerBase] High load detected (%zu clients), "
+                           "switching to aggressive %lld ms timeout\n",
+                        clientFds_.size(),
+                        static_cast<long long>(AGGRESSIVE_TIMEOUT.count()));
+                } else if (inHighLoadMode_
+                    && clientFds_.size() <= HIGH_LOAD_THRESHOLD) {
                     // Exiting high-load mode: restore normal timeout
                     keepAliveTimeout_ = normalKeepAliveTimeout_;
                     inHighLoadMode_ = false;
-                    printf("[ServerBase] Load normalized (%zu clients), restoring normal %lld ms timeout\n",
-                           clientFds_.size(), static_cast<long long>(normalKeepAliveTimeout_.count()));
+                    printf("[ServerBase] Load normalized (%zu clients), "
+                           "restoring normal %lld ms timeout\n",
+                        clientFds_.size(),
+                        static_cast<long long>(
+                            normalKeepAliveTimeout_.count()));
                 }
             }
 
@@ -674,7 +683,7 @@ template <typename ClientData> class ServerBase {
         // Fast-path: the soonest-expiring entry in the whole heap hasn't
         // fired yet, so nothing else can have fired either.  Return now.
         if (timeout_heap_.front().expiry > now) {
- 
+
             return;
         }
 
