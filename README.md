@@ -1,5 +1,7 @@
 # aiSocks
 
+> **Note:** This project was created entirely by AI (GitHub Copilot / Claude) under my direct supervision. The code is mine, but not physically typed by me.
+
 Cross-platform C++17 socket library — and a high-performance poll-driven HTTP/1.x server built on top of it.
 
 Zero dependencies beyond a standard C++17 compiler and CMake.
