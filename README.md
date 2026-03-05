@@ -163,13 +163,14 @@ ctest --show-only -C RelWithDebInfo
 ```
 Test project /path/to/build-release
     Start  1: test_socket_basics
-1/22 Test #1: test_socket_basics ...............   Passed    0.02 sec
+1/30 Test #1: test_socket_basics ...............   Passed    0.00 sec
     Start  2: test_ip_utils
-2/22 Test #2: test_ip_utils ....................   Passed    0.03 sec
+2/30 Test #2: test_ip_utils ....................   Passed    0.00 sec
 ...
-100% tests passed, 0 tests failed out of 22
+100% tests passed, 0 tests failed out of 30
 
-Total Test time (real) =   8.74 sec
+Total Test time (real) =   4.46 sec  # Parallel execution (8 jobs)
+# Sequential: ~29 sec | Parallel (8 jobs): ~4.5 sec
 ```
 
 ### Slow Tests
@@ -298,7 +299,24 @@ or `SimpleServer`.
 
 ## Testing
 
-Comprehensive tests are included when building with `-DBUILD_TESTS=ON`. The suite covers **26+ tests**: socket operations (TCP/UDP, IPv4/IPv6, blocking/non-blocking), HTTP/1.x protocol, keep-alive connections, zero-copy responses, file serving, and utilities.
+Comprehensive tests are included when building with `-DBUILD_TESTS=ON`. The suite covers **30 tests** across all major components:
+
+### Test Categories
+- **Socket Basics** (1): Core socket functionality and validation
+- **IP Utilities** (1): IPv4/IPv6 address parsing and validation  
+- **Socket Operations** (6): TCP/UDP, blocking/non-blocking, move semantics
+- **Polling & Event Handling** (3): kqueue/epoll backends, timeout behavior
+- **ServerBase Framework** (8): Connection limits, keep-alive, edge cases, signal handling
+- **HTTP Protocol** (3): Request parsing, response building, URL encoding
+- **File Operations** (4): File I/O, caching, directory operations, path utilities
+- **Error Handling** (3): Result types, error propagation, edge cases
+- **Integration Tests** (3): Simple server, advanced file server, HTTP poll server
+
+### Performance & Reliability
+- **Parallel Execution**: All tests run reliably in parallel (8 jobs: ~4.5s, sequential: ~29s)
+- **Cross-Platform**: Windows (MSVC), macOS (Clang), Linux (GCC/Clang)
+- **Strict Warnings**: Built with `-Wall -Werror` (GCC/Clang) and `/W4 /WX` (MSVC)
+- **No Exceptions**: Project-wide "don't throw" philosophy with error-code based handling
 
 For detailed testing instructions, test descriptions, and running options, see [README_TESTS.md](README_TESTS.md).
 
