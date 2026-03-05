@@ -1,8 +1,8 @@
-// This is an independent project of an individual developer. Dear PVS-Studio, please check it.
+// This is an independent project of an individual developer. Dear PVS-Studio,
+// please check it.
 
-// PVS-Studio Static Code Analyzer for C, C++, C#, and Java: https://pvs-studio.com
-
-
+// PVS-Studio Static Code Analyzer for C, C++, C#, and Java:
+// https://pvs-studio.com
 
 // Tests: SocketFactory API with Result<T> exception-free error handling
 // Verifies that SocketFactory methods return Result<T> with proper error
@@ -27,8 +27,9 @@ int main() {
     {
         auto result = SocketFactory::createTcpSocket();
         REQUIRE(result.isSuccess());
-        REQUIRE(result.value().isValid());
-        REQUIRE(result.value().getAddressFamily() == AddressFamily::IPv4);
+        auto& socket = result.value();
+        REQUIRE(socket.isValid());
+        REQUIRE(socket.getAddressFamily() == AddressFamily::IPv4);
     }
 
     // Test 2: IPv6 socket creation
@@ -36,8 +37,9 @@ int main() {
     {
         auto result = SocketFactory::createTcpSocket(AddressFamily::IPv6);
         REQUIRE(result.isSuccess());
-        REQUIRE(result.value().isValid());
-        REQUIRE(result.value().getAddressFamily() == AddressFamily::IPv6);
+        auto& socket = result.value();
+        REQUIRE(socket.isValid());
+        REQUIRE(socket.getAddressFamily() == AddressFamily::IPv6);
     }
 
     // Test 3: UDP socket creation
@@ -45,8 +47,9 @@ int main() {
     {
         auto result = SocketFactory::createUdpSocket();
         REQUIRE(result.isSuccess());
-        REQUIRE(result.value().isValid());
-        REQUIRE(result.value().getAddressFamily() == AddressFamily::IPv4);
+        auto& socket = result.value();
+        REQUIRE(socket.isValid());
+        REQUIRE(socket.getAddressFamily() == AddressFamily::IPv4);
     }
 
     // Test 4: Server socket creation
@@ -109,7 +112,9 @@ int main() {
         REQUIRE(srvPort.load() != 0);
 
         auto clt_result = SocketFactory::createTcpClient(AddressFamily::IPv4,
-            ConnectArgs{"127.0.0.1", Port{static_cast<uint16_t>(srvPort.load())}, Milliseconds{2000}});
+            ConnectArgs{"127.0.0.1",
+                Port{static_cast<uint16_t>(srvPort.load())},
+                Milliseconds{2000}});
         REQUIRE(clt_result.isSuccess());
         auto& client = clt_result.value();
         REQUIRE(client.isValid());

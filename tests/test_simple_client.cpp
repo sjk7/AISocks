@@ -63,7 +63,7 @@ int main() {
         bool callbackFired = false;
         SimpleClient client(ConnectArgs{"127.0.0.1", Port{srvPort}});
         REQUIRE(client.isConnected());
-        REQUIRE(!callbackFired); // must NOT have fired yet
+        REQUIRE(!callbackFired); //-V547 // must NOT have fired yet
 
         client.run([&](TcpSocket& sock) {
             callbackFired = true;

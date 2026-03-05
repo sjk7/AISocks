@@ -165,7 +165,7 @@ static void test_happy_send_receive() {
         c.close();
 
         srvThread.join();
-        REQUIRE(received == msg);
+        REQUIRE(received == msg); //-V547
     }
 
     std::this_thread::sleep_for(std::chrono::milliseconds(1));
