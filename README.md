@@ -296,6 +296,12 @@ and epoll (Linux) backends live entirely inside `Poller`; adding an
 `io_uring` `Poller` implementation would not require changes to `ServerBase`
 or `SimpleServer`.
 
+## Testing
+
+Comprehensive tests are included when building with `-DBUILD_TESTS=ON`. The suite covers **25+ tests**: socket operations (TCP/UDP, IPv4/IPv6, blocking/non-blocking), HTTP/1.x protocol, keep-alive connections, zero-copy responses, file serving, and utilities.
+
+For detailed testing instructions, test descriptions, and running options, see [README_TESTS.md](README_TESTS.md).
+
 ## Requirements
 
 - CMake 3.15+

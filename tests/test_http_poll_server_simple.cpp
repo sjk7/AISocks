@@ -1,6 +1,8 @@
-// This is an independent project of an individual developer. Dear PVS-Studio, please check it.
+// This is an independent project of an individual developer. Dear PVS-Studio,
+// please check it.
 
-// PVS-Studio Static Code Analyzer for C, C++, C#, and Java: https://pvs-studio.com
+// PVS-Studio Static Code Analyzer for C, C++, C#, and Java:
+// https://pvs-studio.com
 
 // Simple tests for HttpPollServer - basic instantiation and API
 
@@ -12,13 +14,13 @@ using namespace aiSocks;
 
 // Test server with instrumented hooks
 class TestHttpServer : public HttpPollServer {
-public:
+    public:
     int responseBeginCount = 0;
     int responseSentCount = 0;
 
     explicit TestHttpServer(const ServerBind& bind) : HttpPollServer(bind) {}
 
-protected:
+    protected:
     void buildResponse(HttpClientState& state) override {
         state.responseBuf = "HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nOK";
         state.responseView = state.responseBuf;
