@@ -54,7 +54,7 @@ class EdgeCaseServer : public ServerBase<EdgeCaseState> {
     std::atomic<int> totalMessagesReceived{0};
     std::atomic<int> totalMessagesSent{0};
     std::atomic<int> errorCount{0};
-    std::atomic<int> timedOutClientsCount{0};
+    std::atomic<size_t> timedOutClientsCount{0};
     std::atomic<int> disconnectCount{0};
 
     Port getActualPort() const {
