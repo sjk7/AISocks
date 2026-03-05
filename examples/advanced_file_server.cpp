@@ -843,7 +843,7 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    printf("%s", ServerStrings::STARTING);
+    printf(ServerStrings::STARTING, port);
     printf("%s%s\n", ServerStrings::SERVING_FROM, config.documentRoot.c_str());
 
     server.run();

@@ -13,7 +13,7 @@ namespace ServerStrings {
 // Server startup messages
 inline const char* HEADER = "\n=== Custom HTTP File Server Example ===\n";
 inline const char* STARTING
-    = "Custom HTTP File Server starting on http://localhost:8080/\n";
+    = "Custom HTTP File Server starting on http://localhost:%d/\n";
 inline const char* SERVING_FROM = "Serving files from: ";
 inline const char* BUILD_INFO_PREFIX = "Build: ";
 inline const char* MAX_CLIENTS_PREFIX = "Max concurrent clients: ";
