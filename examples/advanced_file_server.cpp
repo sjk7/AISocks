@@ -802,7 +802,7 @@ int main(int argc, char* argv[]) {
         static_cast<size_t>(ClientLimit::Default));
 
     uint16_t port = 8080;
-    std::string root = "./www";
+    std::string root = "www";
 
     if (argc > 1) {
         port = static_cast<uint16_t>(std::atoi(argv[1]));
