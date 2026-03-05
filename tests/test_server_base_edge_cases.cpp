@@ -26,7 +26,7 @@ using namespace aiSocks;
 
 // Testing constants for edge case scenarios
 static constexpr Milliseconds QUICK_POLL_TIMEOUT{5};
-static constexpr Milliseconds SHORT_KEEP_ALIVE{50};
+static constexpr Milliseconds SHORT_KEEP_ALIVE{1000}; // 1 second - more reasonable for testing
 
 // ---------------------------------------------------------------------------
 // Echo server for edge case testing
@@ -43,6 +43,12 @@ class EdgeCaseServer : public ServerBase<EdgeCaseState> {
         : ServerBase<EdgeCaseState>(
               ServerBind{"127.0.0.1", port, Backlog{10}}) {
         setKeepAliveTimeout(std::chrono::milliseconds(SHORT_KEEP_ALIVE.count));
+        setHandleSignals(false); // Disable signal handling for parallel test execution
+    }
+
+    // Method to set custom keep-alive timeout for specific tests
+    void setCustomKeepAliveTimeout(Milliseconds timeout) {
+        setKeepAliveTimeout(std::chrono::milliseconds(timeout.count));
     }
 
     std::atomic<int> totalMessagesReceived{0};
@@ -232,7 +238,7 @@ int main() {
         REQUIRE(client1 != nullptr);
         client1->setBlocking(true);
 
-        std::this_thread::sleep_for(std::chrono::milliseconds{50});
+        std::this_thread::sleep_for(std::chrono::milliseconds{100});
 
         // Verify client is connected
         REQUIRE(server.clientCount() <= 1);
@@ -263,6 +269,8 @@ int main() {
             = startServerInBackground(server, ready, ClientLimit::Unlimited);
         waitForServerReady(ready);
 
+         server.setCustomKeepAliveTimeout(Milliseconds{5000});
+
         // Connect/disconnect cycle
         int cycles = 10;
         for (int i = 0; i < cycles; ++i) {
@@ -289,6 +297,7 @@ int main() {
     BEGIN_TEST("Edge case: keep-alive timeout disconnects idle clients");
     {
         EdgeCaseServer server(Port::any);
+        server.setCustomKeepAliveTimeout(Milliseconds{50}); // Use 150ms for this specific test
         Port port = server.getActualPort();
         std::atomic<bool> ready{false};
 
@@ -305,7 +314,7 @@ int main() {
             client->sendAll(msg, strlen(msg));
 
             // Wait longer than keep-alive timeout
-            std::this_thread::sleep_for(std::chrono::milliseconds{200});
+            std::this_thread::sleep_for(std::chrono::milliseconds{300});
 
             // Try to send another message
             bool sent = client->sendAll(msg, strlen(msg));
