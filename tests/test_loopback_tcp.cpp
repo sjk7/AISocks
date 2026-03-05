@@ -17,6 +17,7 @@
 #include <string>
 #include <atomic>
 #include <algorithm>
+#include <array>
 
 using namespace aiSocks;
 
