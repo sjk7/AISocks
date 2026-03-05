@@ -16,6 +16,7 @@
 #include <vector>
 #include <string>
 #include <atomic>
+#include <algorithm>
 
 using namespace aiSocks;
 
@@ -284,7 +285,8 @@ int main() {
         srvThread.join();
 
         REQUIRE(ok);
-        REQUIRE(buf == expected);
+        REQUIRE(std::equal(
+            buf.begin(), buf.end(), expected.begin(), expected.end()));
     }
 
     std::this_thread::sleep_for(std::chrono::milliseconds(1));
