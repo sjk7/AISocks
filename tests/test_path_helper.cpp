@@ -326,15 +326,9 @@ int main() {
         pathWithNull += "/../../etc/passwd";
 
         // Should handle gracefully (either stop at null or reject)
-        try {
-            bool within
-                = PathHelper::isPathWithin(pathWithNull, "test_path_root");
-            // Should not allow escape
-            REQUIRE(within == false || within == true); // No crash required //-V560
-        } catch (...) {
-            // Exception is acceptable for invalid input
-            REQUIRE(true);
-        }
+        bool within = PathHelper::isPathWithin(pathWithNull, "test_path_root");
+        // Should not allow escape
+        REQUIRE(within == false || within == true); // No crash required
     }
 
     // Test 34: Security - extremely long path
@@ -345,14 +339,9 @@ int main() {
             longPath += "a/";
         }
 
-        try {
-            std::string canonical = PathHelper::getCanonicalPath(longPath);
-            // Should not crash - empty result is acceptable for extremely long paths on Windows
-            REQUIRE(true);
-        } catch (...) {
-            // Exception is acceptable for extreme input
-            REQUIRE(true);
-        }
+        // Should not crash - any result (empty or non-empty) is acceptable for extreme input
+        std::string canonical = PathHelper::getCanonicalPath(longPath);
+        REQUIRE(true); // If we get here, no crash occurred
     }
 
     // Test 35: Edge case - root path
