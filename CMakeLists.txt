@@ -17,9 +17,8 @@ else()
 endif()
 
 # Build options
-# Tests and extra examples are opt-in so a plain `cmake .. && ninja` only
-# builds the library and the primary example (main.cpp).
-option(BUILD_TESTS    "Build test programs"    OFF)
+# Tests are built by default, examples are opt-in
+option(BUILD_TESTS    "Build test programs"    ON)
 option(BUILD_EXAMPLES "Build all example programs" OFF)
 option(ENABLE_ASAN    "Enable AddressSanitizer"    OFF)
 option(ENABLE_MSAN    "Enable MemorySanitizer"     OFF)
