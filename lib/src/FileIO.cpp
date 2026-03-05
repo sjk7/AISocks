@@ -320,9 +320,8 @@ StringBuilder::StringBuilder(size_t initialCapacity) {
 StringBuilder::~StringBuilder() {
     // NOTE: if (buffer_) check is redundant per C11 §7.22.3.3:
     // "If ptr is a null pointer, no action occurs." free(nullptr) is safe.
-    if (buffer_) {
-        free(buffer_);
-    }
+    free(buffer_);
+    buffer_ = nullptr;
 }
 
 StringBuilder::StringBuilder(StringBuilder&& other) noexcept

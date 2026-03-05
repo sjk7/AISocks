@@ -187,7 +187,7 @@ static void test_connect_to_happy() {
         bool sent = c.send(payload.data(), payload.size());
         srvThread.join();
         REQUIRE(sent);
-        REQUIRE(received == payload);
+        REQUIRE(received == payload); //-V547
     }
 }
 

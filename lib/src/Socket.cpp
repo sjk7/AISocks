@@ -75,11 +75,11 @@ Socket::Socket(SocketType type, AddressFamily family, const ServerBind& cfg)
     // Don't throw - let socket remain in invalid state if creation fails
     if (!setErrorIfFailed(pImpl->isValid(), pImpl)) return;
 
-    if (cfg.reuseAddr) setErrorIfFailed(pImpl->setReuseAddress(true), pImpl);
+    if (cfg.reuseAddr) setErrorIfFailed(pImpl->setReuseAddress(true), pImpl); //-V530
 
-    setErrorIfFailed(pImpl->bind(cfg.address, cfg.port), pImpl);
+    setErrorIfFailed(pImpl->bind(cfg.address, cfg.port), pImpl); //-V530
 
-    setErrorIfFailed(pImpl->listen(cfg.backlog), pImpl);
+    setErrorIfFailed(pImpl->listen(cfg.backlog), pImpl); //-V530
 }
 
 Socket::Socket(SocketType type, AddressFamily family, const ConnectArgs& cfg)
@@ -87,7 +87,7 @@ Socket::Socket(SocketType type, AddressFamily family, const ConnectArgs& cfg)
     // Don't throw - let socket remain in invalid state if creation fails
     if (!setErrorIfFailed(pImpl->isValid(), pImpl)) return;
 
-    setErrorIfFailed(
+    setErrorIfFailed( //-V530
         pImpl->connect(cfg.address, cfg.port, cfg.connectTimeout), pImpl);
 }
 

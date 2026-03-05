@@ -40,7 +40,7 @@ int httpConnect(const ConnectArgs& args, const char* httpRequest) {
 
         // Read response data until connection closes (receive returns 0 or -1)
         char buffer[4096];
-        int bytesRead;
+        size_t bytesRead;
         bool isFirstChunk = true;
         int retval = 0;
         std::cout << "Reading response...\n";
@@ -54,7 +54,7 @@ int httpConnect(const ConnectArgs& args, const char* httpRequest) {
             if (totalBytesRead < 2048) {
                 int toPrint = std::min(
                     static_cast<int>(sizeof(buffer) - 1 - totalBytesRead),
-                    bytesRead);
+                    static_cast<int>(bytesRead));
                 std::cout.write(buffer, toPrint);
                 std::cout.flush();
             } else if (isFirstChunk) {

@@ -36,7 +36,7 @@ int main() {
     {
         auto a = TcpSocket::createRaw();
         auto b = TcpSocket::createRaw();
-        b = std::move(a);
+        b = std::move(a); //-V519
         REQUIRE(b.isValid());
         REQUIRE(!a.isValid());
     }
@@ -46,7 +46,7 @@ int main() {
         // b holds a valid socket; after move assignment, b's old socket is gone
         auto a = TcpSocket::createRaw();
         auto b = TcpSocket::createRaw();
-        b = std::move(a);
+        b = std::move(a); //-V519
         // No crash = the displaced socket was released cleanly
         REQUIRE_MSG(
             true, "move assignment released old resource without crash");

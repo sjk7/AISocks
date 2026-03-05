@@ -85,7 +85,7 @@ void runServerNonBlocking() {
             buffer.data() + bufferOffset, currentChunkSize - bufferOffset);
 
         if (bytesSent > 0) {
-            bufferOffset += bytesSent;
+            bufferOffset += bytesSent; //-V101
             sendCount++;
 
             // If we sent the whole chunk, reset for next chunk
@@ -172,7 +172,7 @@ void runClientNonBlocking() {
         int bytesReceived = clientSocket.receive(buffer.data(), buffer.size());
 
         if (bytesReceived > 0) {
-            totalReceived += static_cast<size_t>(bytesReceived);
+            totalReceived += static_cast<size_t>(bytesReceived); //-V201
             recvCount++;
         } else if (bytesReceived == 0) {
             std::cout << "Server closed connection" << std::endl;

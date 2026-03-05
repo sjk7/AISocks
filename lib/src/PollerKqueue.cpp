@@ -207,8 +207,7 @@ std::vector<PollResult> Poller::wait(Milliseconds timeout) {
             const uint8_t bits = pImpl_->mergeBits[fd];
             pImpl_->mergeBits[fd] = 0; // reset for next call
             if (pImpl_->socketValid[fd] && arr[fd])
-                resultBuffer.push_back(
-                    {arr[fd], static_cast<PollEvent>(bits)});
+                resultBuffer.push_back({arr[fd], static_cast<PollEvent>(bits)});
         }
         return resultBuffer;
     }

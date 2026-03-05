@@ -32,5 +32,8 @@
     "buildType": {
       "default": "debug"
     }
-  }
+  },
+
+  // PVS-Studio configuration
+  "PVS-Studio.CompilationDatabase": "${workspaceFolder}/compile_commands.json"
 }

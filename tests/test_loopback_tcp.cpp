@@ -1,7 +1,8 @@
-// This is an independent project of an individual developer. Dear PVS-Studio, please check it.
+// This is an independent project of an individual developer. Dear PVS-Studio,
+// please check it.
 
-// PVS-Studio Static Code Analyzer for C, C++, C#, and Java: https://pvs-studio.com
-
+// PVS-Studio Static Code Analyzer for C, C++, C#, and Java:
+// https://pvs-studio.com
 
 //
 // Tests: End-to-end TCP send/receive over the loopback
@@ -249,9 +250,8 @@ int main() {
         // Server sends a 256-byte payload in 16-byte chunks to exercise the
         // receiveAll loop.  Client calls receiveAll(256) and checks the result.
         constexpr size_t PAYLOAD = 256;
-        std::vector<char> expected(PAYLOAD);
-        for (size_t i = 0; i < PAYLOAD; ++i)
-            expected[i] = static_cast<char>(i);
+        std::array<char, PAYLOAD> expected{};
+        for (size_t i = 0; i < PAYLOAD; ++i) expected[i] = static_cast<char>(i);
 
         std::atomic<bool> ready{false};
         std::thread srvThread([&]() {

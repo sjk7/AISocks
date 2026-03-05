@@ -35,7 +35,9 @@ inline constexpr size_t defaultMaxClients
 
 // Return values for ServerBase virtual functions
 enum class ServerResult {
-    KeepConnection = 1, // Keep the connection alive
+    KeepConnection,
+    OK,
+    Continue = 1, // Keep the connection alive/continue running the server
     Disconnect = 0, // Disconnect this client
     StopServer = -1 // Stop the server gracefully
 };
