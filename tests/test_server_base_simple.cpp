@@ -65,7 +65,7 @@ int main() {
         }).detach();
 
         // Wait for server to be ready
-        while (!ready)
+        while (!ready) //-V776
             std::this_thread::sleep_for(std::chrono::milliseconds{10});
 
         // Connect one client

@@ -56,7 +56,7 @@ class MinimalServer : public ServerBase<MinimalState> {
         return ServerResult::KeepConnection;
     }
 
-    ServerResult onWritable(TcpSocket& sock, MinimalState& s) override {
+    ServerResult onWritable(TcpSocket& sock, MinimalState& s) override { //-V524
         (void)sock; (void)s;
         return ServerResult::KeepConnection;
     }
@@ -90,7 +90,7 @@ int main() {
         });
 
         // Wait for server to be ready AND actually accept a client
-        while (!ready)
+        while (!ready) //-V1044
             std::this_thread::sleep_for(std::chrono::milliseconds{10});
 
         // Connect a client to verify server works

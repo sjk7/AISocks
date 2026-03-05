@@ -1,7 +1,8 @@
-// This is an independent project of an individual developer. Dear PVS-Studio, please check it.
+// This is an independent project of an individual developer. Dear PVS-Studio,
+// please check it.
 
-// PVS-Studio Static Code Analyzer for C, C++, C#, and Java: https://pvs-studio.com
-
+// PVS-Studio Static Code Analyzer for C, C++, C#, and Java:
+// https://pvs-studio.com
 
 //
 // Test: SimpleClient convenience class with SocketFactory API
@@ -137,13 +138,14 @@ int main() {
 
         SimpleClient client(ConnectArgs{"127.0.0.1", Port{srvPort}});
         REQUIRE(client.isConnected());
-        REQUIRE(client.getSocket() != nullptr);
-        REQUIRE(client.getSocket()->isValid());
+        auto* sock = client.getSocket();
+        REQUIRE(sock != nullptr); //-V807
+        REQUIRE(sock->isValid());
 
         const char* msg = "direct socket";
-        client.getSocket()->sendAll(msg, strlen(msg));
+        sock->sendAll(msg, strlen(msg));
         char buf[256]{};
-        int n = client.getSocket()->receive(buf, sizeof(buf) - 1);
+        int n = sock->receive(buf, sizeof(buf) - 1);
         REQUIRE(n > 0);
         REQUIRE(std::string(buf, n) == msg);
 

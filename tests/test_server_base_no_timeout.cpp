@@ -98,7 +98,7 @@ int main() {
         });
 
         // Wait for server to be ready AND actually accept a client
-        while (!ready)
+        while (!ready) //-V1044 //-V776
             std::this_thread::sleep_for(std::chrono::milliseconds{10});
 
         std::cout << "Server started successfully\n";
