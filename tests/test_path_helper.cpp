@@ -315,7 +315,7 @@ int main() {
             "test_path_root/%2e%2e/test_path_outside", "test_path_root");
         // Should detect this as outside (after URL decode, if implemented)
         // At minimum, should not crash
-        REQUIRE(!within || within); // Just verify no crash
+        REQUIRE(!within || within); // Just verify no crash //-V560
     }
 
     // Test 33: Security - null bytes in path

@@ -186,7 +186,7 @@ int main() {
 
         server.setHandleSignals(false);
         server.setHandleSignals(true);
-        
+
         REQUIRE(true); // Method exists and can be called
     }
 

@@ -1,4 +1,4 @@
-// This is an independent project of an individual developer. Dear PVS-Studio,
+// This is an independent project of an individual developer. Dear PVS-Studio, //-V002
 // please check it.
 
 // PVS-Studio Static Code Analyzer for C, C++, C#, and Java:
@@ -184,7 +184,7 @@ int main() {
         Result<int> result(777);
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wself-assign-overloaded"
-        result = result; // Self-assign
+        result = result; // Self-assign //-V570
 #pragma clang diagnostic pop
 
         REQUIRE(result.isSuccess());
@@ -197,7 +197,7 @@ int main() {
         Result<int> result(888);
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wself-move"
-        result = std::move(result); // Self-move
+        result = std::move(result); // Self-move //-V570
 #pragma clang diagnostic pop
 
         REQUIRE(result.isSuccess());
