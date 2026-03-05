@@ -1,7 +1,8 @@
-// This is an independent project of an individual developer. Dear PVS-Studio, please check it.
+// This is an independent project of an individual developer. Dear PVS-Studio,
+// please check it.
 
-// PVS-Studio Static Code Analyzer for C, C++, C#, and Java: https://pvs-studio.com
-
+// PVS-Studio Static Code Analyzer for C, C++, C#, and Java:
+// https://pvs-studio.com
 
 //
 // Tests for features added in the second pass:
@@ -25,7 +26,6 @@
 #include <thread>
 #include <vector>
 #include <optional>
-
 
 using namespace aiSocks;
 
@@ -204,7 +204,8 @@ static void test_udp() {
         REQUIRE(std::string(buf, static_cast<size_t>(recvd)) == "hello udp");
         REQUIRE(from.port.value() != 0);
         REQUIRE(from.address == "127.0.0.1");
-        std::cout << "  sender seen as: " << from.address << ":" << from.port.value() << "\n";
+        std::cout << "  sender seen as: " << from.address << ":"
+                  << from.port.value() << "\n";
     }
 
     BEGIN_TEST("UDP sendTo/receiveFrom: multiple datagrams in sequence");
@@ -268,7 +269,8 @@ static void test_udp_connected() {
         REQUIRE(
             std::string(buf, static_cast<size_t>(recvd)) == "connected-udp");
         REQUIRE(from.address == "127.0.0.1");
-        std::cout << "  datagram arrived from: " << from.address << ":" << from.port.value() << "\n";
+        std::cout << "  datagram arrived from: " << from.address << ":"
+                  << from.port.value() << "\n";
     }
 }
 
@@ -569,9 +571,8 @@ static void test_span_overloads() {
         REQUIRE(recvd == static_cast<int>(payload.size()));
 
         std::string echoed(recvd, '\0');
-        for (int i = 0; i < recvd; ++i)
-            echoed[static_cast<size_t>(i)]
-                = static_cast<char>(recvBuf[static_cast<size_t>(i)]);
+        for (size_t i = 0; i < static_cast<size_t>(recvd); ++i)
+            echoed[i] = static_cast<char>(recvBuf[i]);
         REQUIRE(echoed == payload);
 
         t.join();
@@ -603,9 +604,8 @@ static void test_span_overloads() {
         REQUIRE(recvd == static_cast<int>(msg.size()));
 
         std::string got(recvd, '\0');
-        for (int i = 0; i < recvd; ++i)
-            got[static_cast<size_t>(i)]
-                = static_cast<char>(rxBuf[static_cast<size_t>(i)]);
+        for (size_t i = 0; i < static_cast<size_t>(recvd); ++i)
+            got[i] = static_cast<char>(rxBuf[i]);
         REQUIRE(got == msg);
     }
 }

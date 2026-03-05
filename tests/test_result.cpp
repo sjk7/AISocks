@@ -1,5 +1,5 @@
-// This is an independent project of an individual developer. Dear PVS-Studio, //-V002
-// please check it.
+// This is an independent project of an individual developer. Dear PVS-Studio,
+// //-V002 please check it.
 
 // PVS-Studio Static Code Analyzer for C, C++, C#, and Java:
 // https://pvs-studio.com
@@ -20,7 +20,7 @@
 using namespace aiSocks;
 
 // Test helper: non-trivial type with move/copy tracking
-struct TrackedObject {
+struct TrackedObject { //-V690 //-V690
     int value;
     bool* moveFlag;
     bool* copyFlag;
@@ -51,8 +51,28 @@ struct TrackedObject {
         if (destructorFlag) *destructorFlag = true;
     }
 
-    TrackedObject& operator=(const TrackedObject&) = default;
-    TrackedObject& operator=(TrackedObject&&) noexcept = default;
+    TrackedObject& operator=(const TrackedObject& other) {
+        if (this != &other) {
+            value = other.value;
+            moveFlag = other.moveFlag;
+            copyFlag = other.copyFlag;
+            destructorFlag = other.destructorFlag;
+            if (copyFlag) *copyFlag = true;
+        }
+        return *this;
+    }
+
+    TrackedObject& operator=(TrackedObject&& other) noexcept {
+        if (this != &other) {
+            value = other.value;
+            moveFlag = other.moveFlag;
+            copyFlag = other.copyFlag;
+            destructorFlag = other.destructorFlag;
+            if (moveFlag) *moveFlag = true;
+            other.value = -1; // Mark as moved-from
+        }
+        return *this;
+    }
 };
 
 int main() {
@@ -81,7 +101,7 @@ int main() {
     BEGIN_TEST("Error: message() constructs error message lazily");
     {
         Result<int> result(SocketError::Timeout, "Operation timed out", 0);
-        std::string msg = result.message();
+        std::string msg = result.message(); //-V820
         REQUIRE(!msg.empty());
         REQUIRE(msg.find("timed out") != std::string::npos
             || msg.find("Timeout") != std::string::npos);
@@ -118,7 +138,7 @@ int main() {
         Result<TrackedObject> result1(
             TrackedObject(789, &moved, nullptr, &destructed));
         REQUIRE(result1.isSuccess());
-
+ //-V820
         Result<TrackedObject> result2(std::move(result1));
         REQUIRE(result2.isSuccess());
         REQUIRE(result2.value().value == 789);
@@ -129,7 +149,7 @@ int main() {
     {
         Result<int> result1(SocketError::BindFailed, "Bind failed", 13);
         Result<int> result2(std::move(result1));
-
+ //-V820
         REQUIRE(result2.isError());
         REQUIRE(result2.error() == SocketError::BindFailed);
     }
@@ -140,7 +160,7 @@ int main() {
         Result<int> result1(100);
         Result<int> result2(200);
 
-        result2 = result1;
+        result2 = result1; //-V820
         REQUIRE(result2.isSuccess());
         REQUIRE(result2.value() == 100);
     }
@@ -243,7 +263,7 @@ int main() {
         // Message should not be built yet (lazy)
         // First access builds it
         std::string msg1 = result.message();
-        REQUIRE(!msg1.empty());
+        REQUIRE(!msg1.empty()); //-V807
 
         // Second access reuses cached message
         std::string msg2 = result.message();
@@ -292,7 +312,7 @@ int main() {
         REQUIRE(sock.isValid());
 
         // This test just verifies Result can hold socket types and propagate
-        // through APIs Testing actual network errors would be unreliable across
+        // through APIs Testing actual network errors would be unreliable across //-V820
         // platforms
         REQUIRE(true);
     }
@@ -303,7 +323,7 @@ int main() {
         bool destructed = false;
         {
             Result<TrackedObject> result(
-                TrackedObject(1, nullptr, nullptr, &destructed));
+                TrackedObject(1, nullptr, nullptr, &destructed)); //-V820
             REQUIRE(result.isSuccess());
         } // Result destructor should call TrackedObject destructor
 

@@ -114,22 +114,19 @@ class StringBuilder {
 
         if (needed < 0) return false;
 
-        if (static_cast<size_t>(static_cast<unsigned int>(needed))
-            < sizeof(smallBuf)) {
-            append(smallBuf,
-                static_cast<size_t>(static_cast<unsigned int>(needed)));
+        if (needed < static_cast<int>(sizeof(smallBuf))) {
+            append(smallBuf, static_cast<size_t>(needed));
             return true;
         }
 
-        size_t requiredSize
-            = static_cast<size_t>(static_cast<unsigned int>(needed)) + 1;
+        size_t requiredSize = static_cast<size_t>(needed) + 1;
         reserve(size_ + requiredSize);
 
         if (!buffer_) return false;
 
         int result = snprintf(buffer_ + size_, requiredSize, format, args...);
         if (result > 0) {
-            size_ += static_cast<size_t>(static_cast<unsigned int>(result));
+            size_ += static_cast<size_t>(result);
             return true;
         }
 

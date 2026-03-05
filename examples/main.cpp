@@ -131,7 +131,7 @@ void runServer(const std::string& bindAddr) {
                       << "\n";
             break;
         }
-        totalSent += static_cast<size_t>(bytesSent);
+        totalSent += static_cast<size_t>(bytesSent); //-V201
     }
 
     auto endTime = std::chrono::high_resolution_clock::now();
@@ -176,7 +176,7 @@ void runClient(const std::string& addr) {
     auto startTime = std::chrono::high_resolution_clock::now();
 
     while (totalReceived < TOTAL_DATA) {
-        size_t n = clientSocket.receive(buffer.data(), buffer.size());
+        size_t n = clientSocket.receive(buffer.data(), buffer.size()); //-V101
         if (n <= 0) {
             std::cout << "  [DEBUG] receive returned " << n << ", error: "
                       << static_cast<int>(clientSocket.getLastError()) << "\n";

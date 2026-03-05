@@ -1,8 +1,8 @@
-// This is an independent project of an individual developer. Dear PVS-Studio, please check it.
+// This is an independent project of an individual developer. Dear PVS-Studio,
+// please check it.
 
-// PVS-Studio Static Code Analyzer for C, C++, C#, and Java: https://pvs-studio.com
-
-
+// PVS-Studio Static Code Analyzer for C, C++, C#, and Java:
+// https://pvs-studio.com
 
 // Measures raw receive throughput from an HTTP/1.1 server.
 // One connection, HTTP pipelining: keeps the send pipe full and drains
@@ -15,6 +15,7 @@
 #include "TcpSocket.h"
 #include <cassert>
 #include <chrono>
+#include <cinttypes>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
@@ -75,9 +76,9 @@ int main(int argc, char* argv[]) {
         // Send side: push as much of the current request as the kernel takes.
         int sent = sock.send(request + sendOffset, reqLen - sendOffset);
         if (sent > 0) {
-            sendOffset += static_cast<size_t>(sent);
+            sendOffset += sent; // Safe: sent is positive
             if (sendOffset >= reqLen) sendOffset = 0;
-        } else {
+        } else if (sent < 0) {
             auto err = sock.getLastError();
             if (err != SocketError::WouldBlock && err != SocketError::Timeout) {
                 printf("[error] send failed\n");
@@ -88,7 +89,7 @@ int main(int argc, char* argv[]) {
         // Receive side: drain everything available right now.
         int n = sock.receive(buf, sizeof(buf));
         if (n > 0) {
-            totalBytes += static_cast<uint64_t>(n);
+            totalBytes += n; // Safe: n is positive
         } else if (n == 0) {
             printf("[error] server closed connection\n");
             break;
@@ -99,7 +100,7 @@ int main(int argc, char* argv[]) {
     double elapsed
         = std::chrono::duration<double>(Clock::now() - startTime).count();
 
-    printf("Bytes recv: %llu\n", (unsigned long long)totalBytes);
+    printf("Bytes recv: %" PRIu64 "\n", totalBytes);
     printf("Elapsed   : %.2fs\n", elapsed);
     printf("Throughput: ");
     printRate(elapsed, totalBytes);

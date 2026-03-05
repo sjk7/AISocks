@@ -144,14 +144,13 @@ class TcpSocket : public Socket {
                                           ? std::numeric_limits<int>::max()
                                           : static_cast<int>(sent))
                                 : n;
-            sent += static_cast<size_t>(static_cast<unsigned int>(n));
-            if (static_cast<size_t>(static_cast<unsigned int>(n)) < toSend)
-                break; // buffer full
+            sent += static_cast<size_t>(n);
+            if (static_cast<size_t>(n) < toSend) break; // buffer full
         }
         if (sent > static_cast<size_t>(std::numeric_limits<int>::max())) {
             return std::numeric_limits<int>::max();
         }
-        return static_cast<int>(static_cast<unsigned int>(sent));
+        return static_cast<int>(sent);
     }
 
     // sendAll with a per-chunk progress callback.

@@ -110,7 +110,7 @@ ctest --output-on-failure
 | Test Name | Description | Time |
 |-----------|-------------|------|
 | `test_http_request` | HTTP request parsing, method/path/header extraction | ~0.00s |
-| `test_http_poll_server` | HTTP/1.x framing, keep-alive, connection management, hooks (15 comprehensive tests) | ~0.50s |
+| `test_http_poll_server` | HTTP/1.x framing, keep-alive, connection management, hooks (16 comprehensive tests) | ~0.50s |
 | `test_url_codec` | URL encoding/decoding | ~0.00s |
 
 ### Server Framework Tests
@@ -309,7 +309,7 @@ ctest --output-on-failure -R "test_my_feature"
 
 ## Test Metrics
 
-- **Total Tests**: 25+
+- **Total Tests**: 26+ (25 core + 16 HTTP poll server tests)
 - **Total Coverage**: Core sockets, TCP/UDP, IPv4/IPv6, blocking/non-blocking, HTTP/1.x protocol, keep-alive, zero-copy responses, file serving, authentication, and caching
 - **Average Execution Time**: ~5 seconds (full suite)
 - **Pass Rate**: 100% on all supported platforms (Windows, macOS, Linux)

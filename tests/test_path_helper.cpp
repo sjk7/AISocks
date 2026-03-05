@@ -90,7 +90,7 @@ int main() {
     {
         std::string path = "";
         std::string normalized = PathHelper::normalizePath(path);
-        REQUIRE(normalized == "");
+        REQUIRE(normalized == ""); //-V815
     }
 
     // Test 5: getCanonicalPath - resolves single dot
@@ -187,7 +187,7 @@ int main() {
     BEGIN_TEST("getFilename: handles trailing slash");
     {
         std::string filename = PathHelper::getFilename("path/to/dir/");
-        REQUIRE(filename == "");
+        REQUIRE(filename == ""); //-V815
     }
 
     // Test 17: getFilename - Windows path
@@ -216,14 +216,14 @@ int main() {
     BEGIN_TEST("getExtension: returns empty for no extension");
     {
         std::string ext = PathHelper::getExtension("README");
-        REQUIRE(ext == "");
+        REQUIRE(ext == ""); //-V815
     }
 
     // Test 21: getExtension - hidden file (Unix)
     BEGIN_TEST("getExtension: handles hidden file");
     {
         std::string ext = PathHelper::getExtension(".gitignore");
-        REQUIRE(ext == "" || ext == ".gitignore");
+        REQUIRE(ext == "" || ext == ".gitignore"); //-V815
     }
 
     // Test 22: joinPath - two components
@@ -330,7 +330,7 @@ int main() {
             bool within
                 = PathHelper::isPathWithin(pathWithNull, "test_path_root");
             // Should not allow escape
-            REQUIRE(within == false || within == true); // No crash required
+            REQUIRE(within == false || within == true); // No crash required //-V560
         } catch (...) {
             // Exception is acceptable for invalid input
             REQUIRE(true);

@@ -12,6 +12,7 @@ set(TEST_SOURCES
     test_tcp_socket
     test_simple_client
     test_server_base
+    test_server_base_edge_cases
     test_http_request
     test_url_codec
     test_socket_factory

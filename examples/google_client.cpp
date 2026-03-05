@@ -46,7 +46,7 @@ int httpConnect(const ConnectArgs& args, const char* httpRequest) {
         std::cout << "Reading response...\n";
         std::cout << "-----------------------------------------\n\n";
 
-        while ((retval = (bytesRead = sock.receive(buffer, sizeof(buffer) - 1)))
+        while ((retval = (bytesRead = sock.receive(buffer, sizeof(buffer) - 1))) //-V101 //-V103
             > 0) {
             buffer[bytesRead] = '\0';
 
@@ -54,7 +54,7 @@ int httpConnect(const ConnectArgs& args, const char* httpRequest) {
             if (totalBytesRead < 2048) {
                 int toPrint = std::min(
                     static_cast<int>(sizeof(buffer) - 1 - totalBytesRead),
-                    static_cast<int>(bytesRead));
+                    static_cast<int>(bytesRead)); //-V202
                 std::cout.write(buffer, toPrint);
                 std::cout.flush();
             } else if (isFirstChunk) {

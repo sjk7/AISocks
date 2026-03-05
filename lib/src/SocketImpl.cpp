@@ -1,6 +1,6 @@
-// This is an independent project of an individual developer. Dear PVS-Studio, please check it.
-// PVS-Studio Static Code Analyzer for C, C++, C#, and Java: https://pvs-studio.com
-
+// This is an independent project of an individual developer. Dear PVS-Studio,
+// please check it. PVS-Studio Static Code Analyzer for C, C++, C#, and Java:
+// https://pvs-studio.com
 
 #ifdef _WIN32
 #include "pch.h"
@@ -1184,8 +1184,7 @@ Endpoint SocketImpl::endpointFromSockaddr(const sockaddr_storage& addr) {
     Endpoint ep;
     if (addr.ss_family == AF_INET6) {
         ep.family = AddressFamily::IPv6;
-        const auto* a6
-            = static_cast<const sockaddr_in6*>(static_cast<const void*>(&addr));
+        const auto* a6 = reinterpret_cast<const sockaddr_in6*>(&addr);
         ep.port = Port{ntohs(a6->sin6_port)};
         char buf[INET6_ADDRSTRLEN];
         inet_ntop(
@@ -1193,8 +1192,7 @@ Endpoint SocketImpl::endpointFromSockaddr(const sockaddr_storage& addr) {
         ep.address = buf;
     } else {
         ep.family = AddressFamily::IPv4;
-        const auto* a4
-            = static_cast<const sockaddr_in*>(static_cast<const void*>(&addr));
+        const auto* a4 = reinterpret_cast<const sockaddr_in*>(&addr);
         ep.port = Port{ntohs(a4->sin_port)};
         char buf[INET_ADDRSTRLEN];
         inet_ntop(

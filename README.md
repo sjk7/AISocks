@@ -298,7 +298,7 @@ or `SimpleServer`.
 
 ## Testing
 
-Comprehensive tests are included when building with `-DBUILD_TESTS=ON`. The suite covers **25+ tests**: socket operations (TCP/UDP, IPv4/IPv6, blocking/non-blocking), HTTP/1.x protocol, keep-alive connections, zero-copy responses, file serving, and utilities.
+Comprehensive tests are included when building with `-DBUILD_TESTS=ON`. The suite covers **26+ tests**: socket operations (TCP/UDP, IPv4/IPv6, blocking/non-blocking), HTTP/1.x protocol, keep-alive connections, zero-copy responses, file serving, and utilities.
 
 For detailed testing instructions, test descriptions, and running options, see [README_TESTS.md](README_TESTS.md).
 
