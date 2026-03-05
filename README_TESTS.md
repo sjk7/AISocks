@@ -308,3 +308,8 @@ Tests are designed to run in CI environments:
 - ✅ Deterministic (no flaky tests, no race conditions)
 - ✅ Parallel-safe (tests use unique ports via port 0 OS allocation)
 - ✅ Timeout-safe (all tests include appropriate timeouts)
+
+## See Also
+
+- [README.md](README.md) - Main project documentation
+- [README_EXAMPLES.md](README_EXAMPLES.md) - Examples and usage patterns

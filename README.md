@@ -320,6 +320,8 @@ Comprehensive tests are included when building with `-DBUILD_TESTS=ON`. The suit
 
 For detailed testing instructions, test descriptions, and running options, see [README_TESTS.md](README_TESTS.md).
 
+For examples and usage patterns, see [README_EXAMPLES.md](README_EXAMPLES.md).
+
 ## Requirements
 
 - CMake 3.15+
