@@ -22,7 +22,8 @@
             "displayName": "Debug",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Debug",
-                "BUILD_EXAMPLES": "ON"
+                "BUILD_EXAMPLES": "ON",
+                "BUILD_TESTS": "ON"
             }
         },
         {
@@ -285,6 +286,24 @@
             "displayName": "Build test_socket_factory",
             "targets": [
                 "test_socket_factory"
+            ]
+        },
+        {
+            "name": "test-http-poll-server",
+            "inherits": "base-build",
+            "configurePreset": "debug",
+            "displayName": "Build test_http_poll_server",
+            "targets": [
+                "test_http_poll_server"
+            ]
+        },
+        {
+            "name": "advanced-file-server",
+            "inherits": "base-build",
+            "configurePreset": "debug",
+            "displayName": "Build advanced_file_server",
+            "targets": [
+                "advanced_file_server"
             ]
         },
         {

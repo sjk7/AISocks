@@ -1,39 +1,21 @@
 {
-  // Open any navigation target (Go-to-Definition, etc.) in a preview tab
-  // so it can be dismissed with a single Escape rather than closing a full editor.
-  "workbench.editor.enablePreviewFromCodeNavigation": true,
-
-  // Mark system/SDK headers read-only so VS Code signals they should not be edited.
-  // This also suppresses the "save?" prompt if you accidentally type in one.
-  "files.readonlyInclude": {
-    "/Applications/Xcode.app/**": true,
-    "/usr/include/**": true,
-    "/usr/local/include/**": true,
-    "/Library/Developer/**": true
+  "cmake.buildDirectory": "/Users/stevekerr/Documents/code/AISocks/build",
+  "cmake.generator": "Ninja",
+  "cmake.configureOnOpen": true,
+  "cmake.buildBeforeRun": true,
+  "cmake.defaultBuildType": "Debug",
+  "cmake.showAdvanced": true,
+  "cmake.useCMakePresets": "always",
+  "cmake.statusbar.advanced": {
+    "target": "visible",
+    "buildType": "visible", 
+    "kit": "visible",
+    "launchTarget": "visible"
   },
-
-  // clangd settings
-  "clangd.inlayHints.enable": false,
-  "clangd.arguments": [
-    "--header-insertion=never",
-    "--completion-style=detailed"
+  "cmake.configureArgs": [
+    "-DBUILD_EXAMPLES=ON",
+    "-DBUILD_TESTS=ON"
   ],
-
-  // CMake Tools configuration
-  "cmake.buildDirectory": "${workspaceFolder}/build-debug-mac",
-  "cmake.configureOnOpen": false,
-  "cmake.debugConfig": {
-    "MIMode": "lldb"
-  },
-  "cmake.launchTarget": {
-    "name": "advanced_file_server"
-  },
-  "cmake.defaultVariants": {
-    "buildType": {
-      "default": "debug"
-    }
-  },
-
-  // PVS-Studio configuration
-  "PVS-Studio.CompilationDatabase": "${workspaceFolder}/compile_commands.json"
+  "cmake.autoRestartBuild": true,
+  "cmake.enableTraceLogging": true
 }

@@ -2,153 +2,30 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "🐛 Debug advanced_file_server",
+      "name": "Debug test_http_poll_server",
       "type": "lldb",
       "request": "launch",
-      "program": "${workspaceFolder}/build-debug-mac/advanced_file_server",
+      "program": "/Users/stevekerr/Documents/code/AISocks/build/tests/test_http_poll_server",
       "args": [],
-      "cwd": "${workspaceFolder}",
-      "preLaunchTask": "build advanced_file_server (debug)",
-      "stopOnEntry": false,
-      "console": "integratedTerminal"
+      "cwd": "/Users/stevekerr/Documents/code/AISocks",
+      "console": "integratedTerminal",
+      "sourceMap": {
+        "/Users/stevekerr/Documents/code/AISocks": "/Users/stevekerr/Documents/code/AISocks"
+      },
+      "preLaunchTask": "Build test_http_poll_server"
     },
     {
-      "name": "🚀 Run advanced_file_server (RelWithDebInfo)",
+      "name": "Debug advanced_file_server",
       "type": "lldb",
       "request": "launch",
-      "program": "${workspaceFolder}/build-mac-rel/advanced_file_server",
+      "program": "/Users/stevekerr/Documents/code/AISocks/build/advanced_file_server",
       "args": [],
-      "cwd": "${workspaceFolder}",
-      "preLaunchTask": "build advanced_file_server (relwithdebinfo)",
-      "console": "integratedTerminal"
-    },
-    {
-      "name": "Debug test_socket_basics",
-      "type": "lldb",
-      "request": "launch",
-      "program": "${workspaceFolder}/build-debug-windows/tests/test_socket_basics.exe",
-      "args": [],
-      "cwd": "${workspaceFolder}",
-      "preLaunchTask": "build test_socket_basics"
-    },
-    {
-      "name": "Debug test_blocking",
-      "type": "lldb",
-      "request": "launch",
-      "program": "${workspaceFolder}/build-debug-windows/tests/test_blocking.exe",
-      "args": [],
-      "cwd": "${workspaceFolder}",
-      "preLaunchTask": "build test_blocking"
-    },
-    {
-      "name": "Debug test_loopback_tcp",
-      "type": "lldb",
-      "request": "launch",
-      "program": "${workspaceFolder}/build-debug-windows/tests/test_loopback_tcp.exe",
-      "args": [],
-      "cwd": "${workspaceFolder}",
-      "preLaunchTask": "build test_loopback_tcp"
-    },
-    {
-      "name": "Debug test_construction",
-      "type": "lldb",
-      "request": "launch",
-      "program": "${workspaceFolder}/build-debug-windows/tests/test_construction.exe",
-      "args": [],
-      "cwd": "${workspaceFolder}",
-      "preLaunchTask": "build test_construction"
-    },
-    {
-      "name": "Debug test_new_features",
-      "type": "lldb",
-      "request": "launch",
-      "program": "${workspaceFolder}/build-debug-windows/tests/test_new_features.exe",
-      "args": [],
-      "cwd": "${workspaceFolder}",
-      "preLaunchTask": "build test_new_features"
-    },
-    {
-      "name": "Debug test_error_messages",
-      "type": "lldb",
-      "request": "launch",
-      "program": "${workspaceFolder}/build-debug-windows/tests/test_error_messages.exe",
-      "args": [],
-      "cwd": "${workspaceFolder}",
-      "preLaunchTask": "build test_error_messages"
-    },
-    {
-      "name": "Debug test_poller",
-      "type": "lldb",
-      "request": "launch",
-      "program": "${workspaceFolder}/build-debug-windows/tests/test_poller.exe",
-      "args": [],
-      "cwd": "${workspaceFolder}",
-      "preLaunchTask": "build test_poller"
-    },
-    {
-      "name": "Debug test_tcp_socket (SEGFAULT)",
-      "type": "lldb",
-      "request": "launch",
-      "program": "${workspaceFolder}/build-debug-windows/tests/test_tcp_socket.exe",
-      "args": [],
-      "cwd": "${workspaceFolder}",
-      "preLaunchTask": "build test_tcp_socket"
-    },
-    {
-      "name": "Debug test_socket_factory",
-      "type": "lldb",
-      "request": "launch",
-      "program": "${workspaceFolder}/build-debug-windows/tests/test_socket_factory.exe",
-      "args": [],
-      "cwd": "${workspaceFolder}",
-      "preLaunchTask": "build test_socket_factory"
-    },
-    {
-      "name": "Run All Tests (CTest)",
-      "type": "lldb",
-      "request": "launch",
-      "program": "C:/Program Files/CMake/bin/ctest.exe",
-      "args": [
-        "--test-dir",
-        "build-debug-windows",
-        "--output-on-failure",
-        "--verbose"
-      ],
-      "cwd": "${workspaceFolder}",
-      "preLaunchTask": "Build All"
-    },
-    {
-      "name": "Attach to Process",
-      "type": "lldb",
-      "request": "attach",
-      "pid": "${command:pickProcess}"
-    },
-    {
-      "name": "Debug test_server_base_minimal (HANGING)",
-      "type": "lldb",
-      "request": "launch",
-      "program": "${workspaceFolder}/build-debug-windows/tests/test_server_base_minimal.exe",
-      "args": [],
-      "cwd": "${workspaceFolder}",
-      "preLaunchTask": "build test_server_base_minimal"
-    },
-    {
-      "name": "Debug advanced_file_server (debug)",
-      "type": "lldb",
-      "request": "launch",
-      "program": "${workspaceFolder}/build-debug-mac/advanced_file_server",
-      "args": [],
-      "cwd": "${workspaceFolder}",
-      "preLaunchTask": "build advanced_file_server (debug)"
-    },
-    {
-      "name": "Debug advanced_file_server (relwithdebinfo)",
-      "type": "lldb",
-      "request": "launch",
-      "program": "${workspaceFolder}/build-mac-rel/advanced_file_server",
-      "args": [],
-      "cwd": "${workspaceFolder}",
-      "preLaunchTask": "build advanced_file_server (relwithdebinfo)"
+      "cwd": "/Users/stevekerr/Documents/code/AISocks",
+      "console": "integratedTerminal",
+      "sourceMap": {
+        "/Users/stevekerr/Documents/code/AISocks": "/Users/stevekerr/Documents/code/AISocks"
+      },
+      "preLaunchTask": "Build advanced_file_server"
     }
   ]
 }

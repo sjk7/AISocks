@@ -35,11 +35,13 @@ inline constexpr size_t defaultMaxClients
 
 // Return values for ServerBase virtual functions
 enum class ServerResult {
-    KeepConnection,
-    OK,
-    Continue = 1, // Keep the connection alive/continue running the server
+
+    StopServer = -1 ,// Stop the server gracefully
     Disconnect = 0, // Disconnect this client
-    StopServer = -1 // Stop the server gracefully
+    KeepConnection = 1,
+    OK = 1,
+    Continue = 1, // Keep the connection alive/continue running the server
+
 };
 
 // ---------------------------------------------------------------------------
@@ -182,9 +184,10 @@ template <typename ClientData> class ServerBase {
     //             but continue serving existing clients until all disconnect.
     // timeout:    passed to Poller::wait(); -1 = block until an event.
     //
-    // Returns when there are no remaining connected clients (and accepting is
+    // Returns when there are no remaining connected clients (AND accepting is
     // stopped, either because maxClients was reached or you stopped
-    // externally).
+    // externally). Or via the thread-safe stop_ flag or if anything returns ServerResult::StopServer 
+    // from one of the, or if CTRL+C is detected.
     void run(ClientLimit maxClients = ClientLimit::Default,
         Milliseconds timeout = Milliseconds{-1}) {
         if (!isValid()) return; // Server not valid, exit early
@@ -245,10 +248,17 @@ template <typename ClientData> class ServerBase {
         bool accepting = true;
         size_t accepted = 0;
 
-        while (!stop_.load(std::memory_order_relaxed)
-            && !(handleSignals_
-                && g_serverSignalStop.load(std::memory_order_relaxed))
-            && (accepting || !clientFds_.empty())) {
+        while (true) {
+            // Check if server should stop
+            bool shouldStop = stop_.load(std::memory_order_relaxed);
+            bool signalReceived = handleSignals_
+                && g_serverSignalStop.load(std::memory_order_relaxed);
+            bool hasClientsOrAccepting = accepting || !clientFds_.empty();
+
+            if (shouldStop || signalReceived || !hasClientsOrAccepting) {
+                break;
+            }
+
             auto ready = poller.wait(timeout);
             if (stop_.load(std::memory_order_relaxed)
                 || (handleSignals_
@@ -292,6 +302,9 @@ template <typename ClientData> class ServerBase {
                 }
 
                 if (!keep) {
+                    printf("[DEBUG] ServerBase disconnecting client fd=%llu\n",
+                        (unsigned long long)cfd);
+                    fflush(stdout);
                     onDisconnect(ce->data);
                     ce->socket->shutdown(ShutdownHow::Both);
                     (void)poller.remove(*ce->socket);
@@ -383,10 +396,25 @@ template <typename ClientData> class ServerBase {
             }
         }
 
-        printf(
-            "DEBUG: Event loop exited - stop=%d, accepting=%d, clients=%zu\n",
-            stop_.load(std::memory_order_relaxed), accepting,
-            clientFds_.size());
+        // Enhanced exit reason logging
+        bool shouldStop = stop_.load(std::memory_order_relaxed);
+        bool signalReceived = handleSignals_ && g_serverSignalStop.load(std::memory_order_relaxed);
+        bool hasClientsOrAccepting = accepting || !clientFds_.empty();
+        
+        printf("=== Server exited gracefully ===\n");
+        printf("Exit reason: ");
+        if (shouldStop) {
+            printf("STOP flag was set (requestStop() called)\n");
+        } else if (signalReceived) {
+            printf("SIGINT/SIGTERM signal received (Ctrl+C)\n");
+        } else if (!hasClientsOrAccepting) {
+            printf("No clients AND not accepting (maxClients limit reached)\n");
+        } else {
+            printf("Unknown reason\n");
+        }
+        printf("Final state: stop=%d, signal=%d, accepting=%d, clients=%zu\n",
+            shouldStop, signalReceived, accepting, clientFds_.size());
+        printf("===============================\n");
 
         // Flush any accumulated keep-alive timeout count before exiting.
         if (timeoutLogCount_ > 0) {
@@ -565,7 +593,7 @@ template <typename ClientData> class ServerBase {
         fprintf(stderr,
             "[ServerBase] warning: poller.add failed for accepted fd %zu"
             " (peer %s) — connection dropped\n",
-            static_cast<size_t>(fd), peerAddr.c_str());
+            fd, peerAddr.c_str());
     }
 
     // Called when poller.wait() returns with no ready events, i.e. a genuine

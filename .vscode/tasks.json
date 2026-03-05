@@ -2,280 +2,44 @@
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "build test_socket_basics",
+      "label": "Build test_http_poll_server",
       "type": "shell",
       "command": "cmake",
       "args": [
         "--build",
-        "build-mac",
-        "--parallel",
-        "8",
+        "build",
         "--target",
-        "test_socket_basics"
+        "test_http_poll_server",
+        "--config",
+        "Debug"
       ],
       "group": {
-        "kind": "build",
-        "isDefault": false
+        "kind": "build"
       },
-      "problemMatcher": [
-        "$gcc"
-      ]
+      "presentation": {
+        "echo": true,
+        "reveal": "always"
+      }
     },
     {
-      "label": "build test_blocking",
+      "label": "Build advanced_file_server",
       "type": "shell",
       "command": "cmake",
       "args": [
         "--build",
-        "build-mac",
-        "--parallel",
-        "8",
+        "build",
         "--target",
-        "test_blocking"
+        "advanced_file_server",
+        "--config",
+        "Debug"
       ],
       "group": {
-        "kind": "build",
-        "isDefault": false
+        "kind": "build"
       },
-      "problemMatcher": [
-        "$gcc"
-      ]
-    },
-    {
-      "label": "build test_loopback_tcp",
-      "type": "shell",
-      "command": "cmake",
-      "args": [
-        "--build",
-        "build-mac",
-        "--parallel",
-        "8",
-        "--target",
-        "test_loopback_tcp"
-      ],
-      "group": {
-        "kind": "build",
-        "isDefault": false
-      },
-      "problemMatcher": [
-        "$gcc"
-      ]
-    },
-    {
-      "label": "build test_construction",
-      "type": "shell",
-      "command": "cmake",
-      "args": [
-        "--build",
-        "build-mac",
-        "--parallel",
-        "8",
-        "--target",
-        "test_construction"
-      ],
-      "group": {
-        "kind": "build",
-        "isDefault": false
-      },
-      "problemMatcher": [
-        "$gcc"
-      ]
-    },
-    {
-      "label": "build test_new_features",
-      "type": "shell",
-      "command": "cmake",
-      "args": [
-        "--build",
-        "build-mac",
-        "--parallel",
-        "8",
-        "--target",
-        "test_new_features"
-      ],
-      "group": {
-        "kind": "build",
-        "isDefault": false
-      },
-      "problemMatcher": [
-        "$gcc"
-      ]
-    },
-    {
-      "label": "build test_error_messages",
-      "type": "shell",
-      "command": "cmake",
-      "args": [
-        "--build",
-        "build-mac",
-        "--parallel",
-        "8",
-        "--target",
-        "test_error_messages"
-      ],
-      "group": {
-        "kind": "build",
-        "isDefault": false
-      },
-      "problemMatcher": [
-        "$gcc"
-      ]
-    },
-    {
-      "label": "build test_poller",
-      "type": "shell",
-      "command": "cmake",
-      "args": [
-        "--build",
-        "build-mac",
-        "--parallel",
-        "8",
-        "--target",
-        "test_poller"
-      ],
-      "group": {
-        "kind": "build",
-        "isDefault": false
-      },
-      "problemMatcher": [
-        "$gcc"
-      ]
-    },
-    {
-      "label": "build test_tcp_socket",
-      "type": "shell",
-      "command": "cmake",
-      "args": [
-        "--build",
-        "build-mac",
-        "--parallel",
-        "8",
-        "--target",
-        "test_tcp_socket"
-      ],
-      "group": {
-        "kind": "build",
-        "isDefault": false
-      },
-      "problemMatcher": [
-        "$gcc"
-      ]
-    },
-    {
-      "label": "build test_socket_factory",
-      "type": "shell",
-      "command": "cmake",
-      "args": [
-        "--build",
-        "build-mac",
-        "--parallel",
-        "8",
-        "--target",
-        "test_socket_factory"
-      ],
-      "group": {
-        "kind": "build",
-        "isDefault": false
-      },
-      "problemMatcher": [
-        "$gcc"
-      ]
-    },
-    {
-      "label": "Build All",
-      "type": "shell",
-      "command": "cmake",
-      "args": [
-        "--build",
-        "build-mac",
-        "--parallel",
-        "8"
-      ],
-      "group": {
-        "kind": "build",
-        "isDefault": true
-      },
-      "problemMatcher": [
-        "$gcc"
-      ]
-    },
-    {
-      "label": "build test_server_base_minimal",
-      "type": "shell",
-      "command": "cmake",
-      "args": [
-        "--build",
-        "build-mac",
-        "--parallel",
-        "8",
-        "--target",
-        "test_server_base_minimal"
-      ],
-      "group": {
-        "kind": "build",
-        "isDefault": false
-      },
-      "problemMatcher": [
-        "$gcc"
-      ]
-    },
-    {
-      "label": "build advanced_file_server (debug)",
-      "type": "shell",
-      "command": "cmake",
-      "args": [
-        "--build",
-        "build-debug-mac",
-        "--parallel",
-        "8",
-        "--target",
-        "advanced_file_server"
-      ],
-      "group": {
-        "kind": "build",
-        "isDefault": false
-      },
-      "problemMatcher": [
-        "$gcc"
-      ]
-    },
-    {
-      "label": "build advanced_file_server (relwithdebinfo)",
-      "type": "shell",
-      "command": "cmake",
-      "args": [
-        "--build",
-        "build-mac-rel",
-        "--parallel",
-        "8",
-        "--target",
-        "advanced_file_server"
-      ],
-      "group": {
-        "kind": "build",
-        "isDefault": false
-      },
-      "problemMatcher": [
-        "$gcc"
-      ]
-    },
-    {
-      "label": "Run Tests (mac)",
-      "type": "shell",
-      "command": "ctest",
-      "args": [
-        "--output-on-failure",
-        "--parallel",
-        "4"
-      ],
-      "options": {
-        "cwd": "${workspaceFolder}/build-mac"
-      },
-      "group": {
-        "kind": "test",
-        "isDefault": true
-      },
-      "problemMatcher": []
+      "presentation": {
+        "echo": true,
+        "reveal": "always"
+      }
     }
   ]
 }

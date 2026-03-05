@@ -17,7 +17,13 @@ void HttpPollServer::run(ClientLimit maxClients, Milliseconds timeout) {
         return;
     }
 
+    printf("[DEBUG] HttpPollServer::run() - Starting server\n");
+    fflush(stdout);
+
     ServerBase<HttpClientState>::run(maxClients, timeout);
+    
+    printf("[DEBUG] HttpPollServer::run() - Server completed\n");
+    fflush(stdout);
 
     printf("\nServer stopped gracefully.\n");
 }
@@ -118,12 +124,16 @@ ServerResult HttpPollServer::onReadable(TcpSocket& sock, HttpClientState& s) {
             auto now = std::chrono::steady_clock::now();
             auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(
                 now - s.startTime);
-            if (elapsed.count() > 5) {
+            // Only check timeout if we've received some data or if it's been too long
+            if (elapsed.count() > 5 && !s.request.empty()) {
+                printf("[DEBUG] Header timeout - disconnecting\n");
+                fflush(stdout);
                 return ServerResult::Disconnect;
             }
         }
 
         int n = sock.receive(buf, sizeof(buf));
+        
         if (n > 0) {
             touchClient(sock);
             s.request.append(buf, static_cast<size_t>(n));
@@ -144,11 +154,15 @@ ServerResult HttpPollServer::onReadable(TcpSocket& sock, HttpClientState& s) {
                 return onWritable(sock, s);
             }
         } else if (n == 0) {
+            printf("[DEBUG] Client disconnected - n=0, closing connection\n");
+            fflush(stdout);
             return ServerResult::Disconnect;
         } else {
             const auto err = sock.getLastError();
             if (err == SocketError::WouldBlock || err == SocketError::Timeout)
                 break;
+            printf("[DEBUG] Socket error - disconnecting\n");
+            fflush(stdout);
             return ServerResult::Disconnect;
         }
     }
@@ -165,6 +179,7 @@ ServerResult HttpPollServer::onWritable(TcpSocket& sock, HttpClientState& s) {
 
     int sent = sock.sendChunked(
         s.responseView.data() + s.sent, s.responseView.size() - s.sent);
+    
     if (sent > 0) {
         touchClient(sock);
         s.sent += static_cast<size_t>(sent);
@@ -178,6 +193,10 @@ ServerResult HttpPollServer::onWritable(TcpSocket& sock, HttpClientState& s) {
     if (s.sent >= s.responseView.size()) {
         onResponseSent(s);
         bool shouldClose = s.closeAfterSend;
+        if (shouldClose) {
+            printf("[DEBUG] Response sent, closing connection\n");
+            fflush(stdout);
+        }
         s.request.clear();
         s.responseView = {};
         s.responseBuf.clear();

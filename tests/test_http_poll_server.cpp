@@ -19,6 +19,7 @@
 
 using namespace aiSocks;
 using namespace std::chrono_literals;
+using namespace std::chrono;
 
 // Test server with instrumented hooks
 class TestHttpServer : public HttpPollServer {
@@ -68,49 +69,150 @@ class TestHttpServer : public HttpPollServer {
 
 // Test helper: send raw HTTP request and read response
 static std::string sendHttpRequest(Port port, const std::string& request) {
+    printf("[DEBUG] sendHttpRequest: Starting - port=%d\n", static_cast<int>(port.value()));
+    fflush(stdout);
+    
     auto clientResult = SocketFactory::createTcpClient(
         AddressFamily::IPv4, ConnectArgs{"127.0.0.1", port});
 
+    printf("[DEBUG] sendHttpRequest: Client creation result=%s\n", 
+           clientResult.isSuccess() ? "SUCCESS" : "FAILED");
+    fflush(stdout);
+
     if (!clientResult.isSuccess()) {
+        printf("[DEBUG] sendHttpRequest: Returning empty string due to client creation failure\n");
+        fflush(stdout);
         return "";
     }
 
     auto& client = clientResult.value();
     client.setReceiveTimeout(Milliseconds{1000});
+    printf("[DEBUG] sendHttpRequest: Set receive timeout to 1000ms\n");
+    fflush(stdout);
 
     // Send request
+    printf("[DEBUG] sendHttpRequest: Sending request of size %zu bytes\n", request.size());
+    fflush(stdout);
     if (!client.sendAll(request.data(), request.size())) {
+        printf("[DEBUG] sendHttpRequest: sendAll failed, returning empty string\n");
+        fflush(stdout);
         return "";
     }
+    printf("[DEBUG] sendHttpRequest: Request sent successfully\n");
+    fflush(stdout);
 
     // Receive response
+    printf("[DEBUG] sendHttpRequest: Starting to receive response\n");
+    fflush(stdout);
     std::string response;
     char buf[4096];
     int n;
+    int receiveCount = 0;
     while ((n = client.receive(buf, sizeof(buf))) > 0) {
+        receiveCount++;
+        printf("[DEBUG] sendHttpRequest: Received chunk %d, size=%d bytes\n", receiveCount, n);
+        fflush(stdout);
         response.append(buf, n);
 
         // Check if we have complete response (simple heuristic)
         if (response.find("\r\n\r\n") != std::string::npos) {
+            printf("[DEBUG] sendHttpRequest: Found end of headers\n");
+            fflush(stdout);
             // Check Content-Length if present
             size_t clPos = response.find("Content-Length:");
             if (clPos != std::string::npos) {
                 int contentLength = std::atoi(response.c_str() + clPos + 15);
                 size_t bodyStart = response.find("\r\n\r\n") + 4;
+                printf("[DEBUG] sendHttpRequest: Content-Length=%d, bodyStart=%zu, currentSize=%zu\n", 
+                       contentLength, bodyStart, response.size());
+                fflush(stdout);
                 if (response.size() >= bodyStart + contentLength) {
+                    printf("[DEBUG] sendHttpRequest: Complete response received, breaking\n");
+                    fflush(stdout);
                     break;
                 }
             } else {
+                printf("[DEBUG] sendHttpRequest: No Content-Length, breaking\n");
+                fflush(stdout);
                 break;
             }
         }
     }
+    printf("[DEBUG] sendHttpRequest: Receive loop ended, final response size=%zu\n", response.size());
+    fflush(stdout);
+    
+    // Explicitly close the client socket to ensure server detects disconnection
+    client.close();
+    printf("[DEBUG] sendHttpRequest: Client socket closed\n");
+    fflush(stdout);
 
     return response;
 }
 
+// Helper function to receive complete HTTP response with timeout protection
+std::string receiveCompleteResponse(TcpSocket& client, Milliseconds timeout = Milliseconds{1000}) {
+    std::string response;
+    char buf[1024];
+    size_t bodyStart = 0;
+    size_t contentLength = 0;
+    bool headersReceived = false;
+    
+    auto startTime = std::chrono::steady_clock::now();
+    auto timeoutDuration = milliseconds(timeout.count);
+    
+    while (true) {
+        // Check timeout
+        auto elapsed = std::chrono::steady_clock::now() - startTime;
+        if (elapsed > timeoutDuration) {
+            printf("[DEBUG] receiveCompleteResponse: Timeout after %lldms\n", static_cast<long long>(timeout.count));
+            fflush(stdout);
+            break;
+        }
+        
+        int n = client.receive(buf, sizeof(buf));
+        if (n > 0) {
+            response.append(buf, static_cast<size_t>(n));
+            
+            if (!headersReceived) {
+                size_t headerEnd = response.find("\r\n\r\n");
+                if (headerEnd != std::string::npos) {
+                    headersReceived = true;
+                    bodyStart = headerEnd + 4;
+                    
+                    size_t clPos = response.find("Content-Length: ");
+                    if (clPos != std::string::npos) {
+                        contentLength = std::stoul(
+                            response.substr(clPos + 16, response.find("\r\n", clPos) - (clPos + 16)));
+                    }
+                }
+            }
+            
+            if (headersReceived && contentLength > 0 && (response.size() - bodyStart) >= contentLength) {
+                // Complete response received
+                break;
+            } else if (headersReceived && contentLength == 0 && response.find("\r\n\r\n") != std::string::npos) {
+                // No Content-Length, assume complete after headers
+                break;
+            }
+        } else if (n == 0) {
+            // Connection closed
+            break;
+        } else {
+            const auto err = client.getLastError();
+            if (err == SocketError::WouldBlock || err == SocketError::Timeout) {
+                std::this_thread::sleep_for(10ms); // Small delay before retry
+                continue;
+            }
+            break; // Error
+        }
+    }
+    
+    return response;
+}
+
 int main() {
-    std::cout << "=== HttpPollServer Tests ===\n";
+    printf("=== HttpPollServer Tests ===\n");
+    fflush(stdout);
 
     // Test 1: Server can be instantiated
     BEGIN_TEST("Basic: HttpPollServer can be created");
@@ -141,24 +243,45 @@ int main() {
     // Test 3: Dynamic response mode
     BEGIN_TEST("Response mode: dynamic response mode works");
     {
-        std::cout << "DEBUG: Starting Test 3 Dynamic Response\n";
+        printf("[DEBUG] Starting Test 3 Dynamic Response\n");
+        fflush(stdout);
         TestHttpServer server(ServerBind{"127.0.0.1", Port{0}});
+        printf("[DEBUG] Test 3 - Server created, isValid=%s\n", server.isValid() ? "true" : "false");
+        fflush(stdout);
         REQUIRE(server.isValid());
 
+        printf("[DEBUG] Test 3 - Starting server thread\n");
+        fflush(stdout);
         std::thread serverThread(
-            [&server]() { server.run(ClientLimit{1}, Milliseconds{100}); });
+            [&server]() { 
+                printf("[DEBUG] Test 3 - Server thread: starting run()\n");
+                fflush(stdout);
+                server.run(ClientLimit{1}, Milliseconds{100}); 
+                printf("[DEBUG] Test 3 - Server thread: run() completed\n");
+                fflush(stdout);
+            });
 
+        printf("[DEBUG] Test 3 - Waiting 50ms for server to start\n");
+        fflush(stdout);
         std::this_thread::sleep_for(50ms);
 
-        std::cout << "DEBUG: Test 3 - Client sending request\n";
+        printf("[DEBUG] Test 3 - Client sending request\n");
+        fflush(stdout);
         std::string response = sendHttpRequest(server.getActualPort(),
             "GET / HTTP/1.1\r\nHost: localhost\r\n\r\n");
-        std::cout << "DEBUG: Test 3 - Client received response, length: "
-                  << response.length() << "\n";
+        printf("[DEBUG] Test 3 - Client received response, length: %zu\n", response.size());
+        fflush(stdout);
 
-        std::cout << "DEBUG: Test 3 - Joining server thread\n";
+        printf("[DEBUG] Test 3 - Stopping server\n");
+        fflush(stdout);
+        g_serverSignalStop.store(true);
+        
+        printf("[DEBUG] Test 3 - Joining server thread\n");
+        fflush(stdout);
         serverThread.join();
-        std::cout << "DEBUG: Test 3 - Server thread joined\n";
+        g_serverSignalStop.store(false); // Reset for next test
+        printf("[DEBUG] Test 3 - Server thread joined\n");
+        fflush(stdout);
 
         REQUIRE(!response.empty());
         REQUIRE(response.find("Dynamic") != std::string::npos);
@@ -213,24 +336,45 @@ int main() {
     // Test 6: HTTP/1.0 default close behavior
     BEGIN_TEST("HTTP/1.0: connection closes after response by default");
     {
-        std::cout << "DEBUG: Starting Test 6 HTTP/1.0\n";
+        printf("[DEBUG] Starting Test 6 HTTP/1.0\n");
+        fflush(stdout);
         TestHttpServer server(ServerBind{"127.0.0.1", Port{0}});
+        printf("[DEBUG] Test 6 - Server created, isValid=%s\n", server.isValid() ? "true" : "false");
+        fflush(stdout);
         REQUIRE(server.isValid());
 
+        printf("[DEBUG] Test 6 - Starting server thread\n");
+        fflush(stdout);
         std::thread serverThread(
-            [&server]() { server.run(ClientLimit{1}, Milliseconds{100}); });
+            [&server]() { 
+                printf("[DEBUG] Test 6 - Server thread: starting run()\n");
+                fflush(stdout);
+                server.run(ClientLimit{1}, Milliseconds{100}); 
+                printf("[DEBUG] Test 6 - Server thread: run() completed\n");
+                fflush(stdout);
+            });
 
+        printf("[DEBUG] Test 6 - Waiting 50ms for server to start\n");
+        fflush(stdout);
         std::this_thread::sleep_for(50ms);
 
-        std::cout << "DEBUG: Test 6 - Client sending HTTP/1.0 request\n";
+        printf("[DEBUG] Test 6 - Client sending HTTP/1.0 request\n");
+        fflush(stdout);
         std::string response = sendHttpRequest(server.getActualPort(),
             "GET / HTTP/1.0\r\nHost: localhost\r\n\r\n");
-        std::cout << "DEBUG: Test 6 - Client received response, length: "
-                  << response.length() << "\n";
+        printf("[DEBUG] Test 6 - Client received response, length: %zu\n", response.length());
+        fflush(stdout);
 
-        std::cout << "DEBUG: Test 6 - Joining server thread\n";
+        printf("[DEBUG] Test 6 - Stopping server\n");
+        fflush(stdout);
+        g_serverSignalStop.store(true);
+        
+        printf("[DEBUG] Test 6 - Joining server thread\n");
+        fflush(stdout);
         serverThread.join();
-        std::cout << "DEBUG: Test 6 - Server thread joined\n";
+        g_serverSignalStop.store(false); // Reset for next test
+        printf("[DEBUG] Test 6 - Server thread joined\n");
+        fflush(stdout);
 
         REQUIRE(!response.empty());
         REQUIRE(response.find("200 OK") != std::string::npos);
@@ -258,14 +402,18 @@ int main() {
         std::string req1 = "GET / HTTP/1.1\r\nHost: localhost\r\n\r\n";
         client.sendAll(req1.data(), req1.size());
 
-        char buf[500];
-        int n = client.receive(buf, sizeof(buf));
-        REQUIRE(n > 0);
+        std::string response1 = receiveCompleteResponse(client);
+        REQUIRE(!response1.empty());
+        REQUIRE(response1.find("200") != std::string::npos);
 
         // Connection should still be open - send second request
         std::string req2 = "GET / HTTP/1.1\r\nHost: localhost\r\n\r\n";
         bool sent = client.sendAll(req2.data(), req2.size());
         REQUIRE(sent == true); // Connection was kept alive
+
+        std::string response2 = receiveCompleteResponse(client);
+        REQUIRE(!response2.empty());
+        REQUIRE(response2.find("200") != std::string::npos);
 
         g_serverSignalStop.store(true);
         serverThread.join();
@@ -275,25 +423,45 @@ int main() {
     // Test 8: Connection: close header forces close
     BEGIN_TEST("Connection: close header closes after response");
     {
-        std::cout << "DEBUG: Starting Test 8 Connection Close\n";
+        printf("[DEBUG] Starting Test 8 Connection Close\n");
+        fflush(stdout);
         TestHttpServer server(ServerBind{"127.0.0.1", Port{0}});
+        printf("[DEBUG] Test 8 - Server created, isValid=%s\n", server.isValid() ? "true" : "false");
+        fflush(stdout);
         REQUIRE(server.isValid());
 
+        printf("[DEBUG] Test 8 - Starting server thread\n");
+        fflush(stdout);
         std::thread serverThread(
-            [&server]() { server.run(ClientLimit{1}, Milliseconds{100}); });
+            [&server]() { 
+                printf("[DEBUG] Test 8 - Server thread: starting run()\n");
+                fflush(stdout);
+                server.run(ClientLimit{1}, Milliseconds{100}); 
+                printf("[DEBUG] Test 8 - Server thread: run() completed\n");
+                fflush(stdout);
+            });
 
+        printf("[DEBUG] Test 8 - Waiting 50ms for server to start\n");
+        fflush(stdout);
         std::this_thread::sleep_for(50ms);
 
-        std::cout
-            << "DEBUG: Test 8 - Client sending Connection: close request\n";
+        printf("[DEBUG] Test 8 - Client sending Connection: close request\n");
+        fflush(stdout);
         std::string response = sendHttpRequest(server.getActualPort(),
             "GET / HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n");
-        std::cout << "DEBUG: Test 8 - Client received response, length: "
-                  << response.length() << "\n";
+        printf("[DEBUG] Test 8 - Client received response, length: %zu\n", response.length());
+        fflush(stdout);
 
-        std::cout << "DEBUG: Test 8 - Joining server thread\n";
+        printf("[DEBUG] Test 8 - Stopping server\n");
+        fflush(stdout);
+        g_serverSignalStop.store(true);
+        
+        printf("[DEBUG] Test 8 - Joining server thread\n");
+        fflush(stdout);
         serverThread.join();
-        std::cout << "DEBUG: Test 8 - Server thread joined\n";
+        g_serverSignalStop.store(false); // Reset for next test
+        printf("[DEBUG] Test 8 - Server thread joined\n");
+        fflush(stdout);
 
         REQUIRE(!response.empty());
     }
@@ -305,7 +473,7 @@ int main() {
         REQUIRE(server.isValid());
 
         std::thread serverThread(
-            [&server]() { server.run(ClientLimit{1}, Milliseconds{100}); });
+            [&server]() { server.run(ClientLimit{10}, Milliseconds{100}); });
 
         std::this_thread::sleep_for(50ms);
 
@@ -320,9 +488,8 @@ int main() {
         for (int i = 0; i < 3; ++i) {
             std::string req = "GET / HTTP/1.1\r\nHost: localhost\r\n\r\n";
             if (client.sendAll(req.data(), req.size())) {
-                char buf[500];
-                int n = client.receive(buf, sizeof(buf));
-                if (n > 0) {
+                std::string response = receiveCompleteResponse(client);
+                if (!response.empty() && response.find("200") != std::string::npos) {
                     successfulRequests++;
                 }
             }
@@ -364,20 +531,18 @@ int main() {
         std::cout << "DEBUG: Sent part2\n";
 
         // Should get complete response
-        char buf[500];
         std::cout << "DEBUG: Client receiving response...\n";
-        int n = client.receive(buf, sizeof(buf));
-        std::cout << "DEBUG: Client received " << n << " bytes\n";
+        std::string response = receiveCompleteResponse(client);
+        std::cout << "DEBUG: Client received " << response.size() << " bytes\n";
 
-        // The server is run with ClientLimit{1}. It will stop accepting new
-        // connections, but we must ensure it has processed the full request
-        // and sent the response before the loop exits gracefully.
-        std::cout << "DEBUG: Joining server thread...\n";
+        std::cout << "DEBUG: Test 10 - Stopping server...\n";
+        g_serverSignalStop.store(true);
+        std::cout << "DEBUG: Test 10 - Joining server thread...\n";
         serverThread.join();
-        std::cout << "DEBUG: Server thread joined\n";
+        g_serverSignalStop.store(false); // Reset for next test
+        std::cout << "DEBUG: Test 10 - Server thread joined\n";
 
-        REQUIRE(n > 0);
-        std::string response(buf, n);
+        REQUIRE(!response.empty());
         REQUIRE(response.find("200 OK") != std::string::npos);
     }
 
@@ -410,8 +575,11 @@ int main() {
             std::this_thread::sleep_for(200ms);
         }
 
+        std::cout << "DEBUG: Test 11 - Stopping server...\n";
+        g_serverSignalStop.store(true);
         std::cout << "DEBUG: Test 11 - Joining server thread...\n";
         serverThread.join();
+        g_serverSignalStop.store(false); // Reset for next test
         std::cout << "DEBUG: Test 11 - Server thread joined\n";
 
         REQUIRE(true); // Server should handle gracefully, no crash
@@ -462,7 +630,12 @@ int main() {
             if (response.size() > 10200) break; // Got header + body
         }
 
+        printf("[DEBUG] Test 12 - Stopping server\n");
+        fflush(stdout);
+        g_serverSignalStop.store(true);
+        
         serverThread.join();
+        g_serverSignalStop.store(false); // Reset for next test
 
         REQUIRE(response.size() >= 10000);
         REQUIRE(response.find("200 OK") != std::string::npos);
@@ -482,7 +655,12 @@ int main() {
         sendHttpRequest(server.getActualPort(),
             "GET / HTTP/1.1\r\nHost: localhost\r\n\r\n");
 
+        printf("[DEBUG] Test 13 - Stopping server\n");
+        fflush(stdout);
+        g_serverSignalStop.store(true);
+        
         serverThread.join();
+        g_serverSignalStop.store(false); // Reset for next test
 
         REQUIRE(server.responseBeginCount == 1);
         REQUIRE(server.responseSentCount == 1);
@@ -521,11 +699,15 @@ int main() {
 
         // Give server a moment to finish any processing before signaling stop
         std::this_thread::sleep_for(100ms);
+        REQUIRE(successCount.load() == 5); // They shuuld all complete.
+        
+        printf("[DEBUG] Test 14 - Stopping server\n");
+        fflush(stdout);
         g_serverSignalStop.store(true);
         serverThread.join();
         g_serverSignalStop.store(false);
-
-        REQUIRE(successCount.load() >= 4); // At least 4 of 5 should succeed
+        printf("[DEBUG] Test 14 - Server thread joined\n");
+        fflush(stdout);
     }
 
     // Test 15: Request scan position tracking (incremental parsing)
@@ -552,11 +734,12 @@ int main() {
         std::string req = "GET / HTTP/1.1\r\nHost: localhost\r\n\r\n";
         client.sendAll(req.data(), req.size());
 
-        char buf[500];
-        int n = client.receive(buf, sizeof(buf));
-        REQUIRE(n > 0);
-
+        std::string response = receiveCompleteResponse(client);
+        REQUIRE(client.isBlocking());
+        REQUIRE(!response.empty());
+        g_serverSignalStop.store(true);
         serverThread.join();
+        g_serverSignalStop.store(false);
     }
 
     return test_summary();
