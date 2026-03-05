@@ -165,8 +165,9 @@ int main() {
 
         // Each client sends a small message
         for (auto& client : clients) {
+            client->setBlocking(true);
             const char* msg = "test";
-            client->send(msg, strlen(msg));
+            client->sendAll(msg, strlen(msg));
         }
 
         std::this_thread::sleep_for(std::chrono::milliseconds{100});
@@ -197,6 +198,9 @@ int main() {
         for (size_t i = 0; i < maxClients; ++i) {
             auto client = connectClient(port, Milliseconds{100});
             if (client) {
+                client->setBlocking(true);
+                const char* msg = "test";
+                client->sendAll(msg, strlen(msg));
                 clients.push_back(std::move(client));
             }
         }
@@ -226,6 +230,7 @@ int main() {
         // Connect one client
         auto client1 = connectClient(port, Milliseconds{100});
         REQUIRE(client1 != nullptr);
+        client1->setBlocking(true);
 
         std::this_thread::sleep_for(std::chrono::milliseconds{50});
 
@@ -234,12 +239,12 @@ int main() {
 
         // Send a message
         const char* msg = "hello";
-        client1->send(msg, strlen(msg));
+        client1->sendAll(msg, strlen(msg));
 
         // Give the single-threaded event loop multiple cycles to process the
         // message The server runs with 5ms timeout, so multiple sleeps ensure
         // processing
-        std::this_thread::sleep_for(std::chrono::milliseconds{200});
+        std::this_thread::sleep_for(std::chrono::milliseconds{300});
 
         server.requestStop();
         serverThread.join();
@@ -258,12 +263,14 @@ int main() {
             = startServerInBackground(server, ready, ClientLimit::Unlimited);
         waitForServerReady(ready);
 
+        // Connect/disconnect cycle
         int cycles = 10;
         for (int i = 0; i < cycles; ++i) {
             auto client = connectClient(port, Milliseconds{100});
             if (client) {
+                client->setBlocking(true);
                 const char* msg = "data";
-                client->send(msg, strlen(msg));
+                client->sendAll(msg, strlen(msg));
                 std::this_thread::sleep_for(std::chrono::milliseconds{10});
             }
             // Client disconnects when it goes out of scope
@@ -292,15 +299,16 @@ int main() {
         // Connect a client
         auto client = connectClient(port, Milliseconds{100});
         if (client) {
+            client->setBlocking(true);
             // Send initial message
             const char* msg = "test";
-            client->send(msg, strlen(msg));
+            client->sendAll(msg, strlen(msg));
 
             // Wait longer than keep-alive timeout
             std::this_thread::sleep_for(std::chrono::milliseconds{200});
 
             // Try to send another message
-            bool sent = client->send(msg, strlen(msg));
+            bool sent = client->sendAll(msg, strlen(msg));
             // Connection may or may not still work depending on timing
             std::cout << "DEBUG: After timeout, send "
                       << (sent ? "succeeded" : "failed") << "\n";
@@ -331,20 +339,24 @@ int main() {
         const int numClients = 5;
         const int messageSize = 5000;
 
-        // Connect clients and send large messages
+        // Connect clients and send large messages immediately
         for (int i = 0; i < numClients; ++i) {
             auto client = connectClient(port, Milliseconds{100});
             if (client) {
+                client->setBlocking(true);
                 client->setReceiveTimeout(Milliseconds{500});
-                clients.push_back(std::move(client));
-
-                // Send a large message
+                
+                // Send large message immediately after connecting
                 std::string largeMsg(messageSize, 'X');
-                clients.back()->send(largeMsg.data(), largeMsg.size());
+                bool sent = client->sendAll(largeMsg.data(), largeMsg.size());
+                std::cout << "DEBUG: Client " << i << " sent " << messageSize 
+                          << " bytes: " << sent << std::endl;
+                
+                clients.push_back(std::move(client));
             }
         }
 
-        std::this_thread::sleep_for(std::chrono::milliseconds{200});
+        std::this_thread::sleep_for(std::chrono::milliseconds{500});
 
         server.requestStop();
         serverThread.join();
@@ -471,8 +483,9 @@ int main() {
         // Connect and send data quickly
         auto client = connectClient(port, Milliseconds{200});
         if (client) {
+            client->setBlocking(true);
             const char* msg = "quick";
-            client->send(msg, strlen(msg));
+            client->sendAll(msg, strlen(msg));
 
             char buf[100];
             int n = client->receive(buf, sizeof(buf));
