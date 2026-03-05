@@ -1,13 +1,12 @@
-// This is an independent project of an individual developer. Dear PVS-Studio, please check it.
-// PVS-Studio Static Code Analyzer for C, C++, C#, and Java: https://pvs-studio.com
-
+// This is an independent project of an individual developer. Dear PVS-Studio,
+// please check it. PVS-Studio Static Code Analyzer for C, C++, C#, and Java:
+// https://pvs-studio.com
 
 #ifdef _WIN32
 #include "pch.h"
 #endif
 #include "Socket.h"
 #include "SocketImpl.h"
-#include "SocketHelpers.h"
 #include <cassert>
 #include <string>
 
@@ -75,7 +74,8 @@ Socket::Socket(SocketType type, AddressFamily family, const ServerBind& cfg)
     // Don't throw - let socket remain in invalid state if creation fails
     if (!setErrorIfFailed(pImpl->isValid(), pImpl)) return;
 
-    if (cfg.reuseAddr) setErrorIfFailed(pImpl->setReuseAddress(true), pImpl); //-V530
+    if (cfg.reuseAddr)
+        setErrorIfFailed(pImpl->setReuseAddress(true), pImpl); //-V530
 
     setErrorIfFailed(pImpl->bind(cfg.address, cfg.port), pImpl); //-V530
 

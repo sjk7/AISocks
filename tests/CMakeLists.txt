@@ -24,6 +24,10 @@ set(TEST_SOURCES
     test_advanced_file_server
     test_file_io
     test_file_cache
+    test_path_helper
+    test_result
+    test_server_signal
+    test_http_poll_server
 )
 
 # Slow tests (disabled by default, enable with -DALLOW_SLOW_TESTS=ON)

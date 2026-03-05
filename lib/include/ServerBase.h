@@ -413,6 +413,13 @@ template <typename ClientData> class ServerBase {
     TcpSocket& getSocket() { return *listener_; }
     const TcpSocket& getSocket() const { return *listener_; }
 
+    // Get the actual port the server is listening on (useful when binding to
+    // Port{0})
+    Port getActualPort() const {
+        auto endpoint = getSocket().getLocalEndpoint();
+        return endpoint.isSuccess() ? endpoint.value().port : Port::any;
+    }
+
     // Current number of connected clients.
     size_t clientCount() const { return clientFds_.size(); }
 

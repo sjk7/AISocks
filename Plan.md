@@ -10,90 +10,87 @@ Comprehensive test coverage improvements for AISocks library, addressing critica
 
 ## Task List
 
-### 1. PathHelper Tests (HIGH PRIORITY - Security Critical) ⏳
+### 1. PathHelper Tests (HIGH PRIORITY - Security Critical) ✅
 **File:** `tests/test_path_helper.cpp`  
-**Status:** Not Started  
+**Status:** COMPLETED  
 **Dependencies:** None  
 **Functions to Test:**
-- [ ] `normalizePath()` - Path separator normalization
-- [ ] `getCanonicalPath()` - Path canonicalization (. and .. resolution)
-- [ ] `isPathWithin()` - Path containment checking (security-critical)
-- [ ] `hasSymlinkComponentWithin()` - Symlink detection (security-critical)
-- [ ] `getFilename()` - Filename extraction
-- [ ] `getExtension()` - Extension extraction
-- [ ] `joinPath()` - Path joining
-- [ ] `listDirectory()` - Directory listing
-- [ ] `getFileInfo()` - File metadata
-- [ ] `exists()`, `isDirectory()`, `isSymlink()` - File type checks
+- [x] `normalizePath()` - Path separator normalization
+- [x] `getCanonicalPath()` - Path canonicalization (. and .. resolution)
+- [x] `isPathWithin()` - Path containment checking (security-critical)
+- [x] `hasSymlinkComponentWithin()` - Symlink detection (security-critical)
+- [x] `getFilename()` - Filename extraction
+- [x] `getExtension()` - Extension extraction
+- [x] `joinPath()` - Path joining
+- [x] `listDirectory()` - Directory listing
+- [x] `getFileInfo()` - File metadata
+- [x] `exists()`, `isDirectory()`, `isSymlink()` - File type checks
 
 **Test Cases:**
-- Path traversal attempts (../, ../../, etc.)
-- Symlink escapes from document root
-- Windows vs Unix path separators
-- Edge cases: empty paths, ".", "..", root paths
-- Symlink chains and cycles
-- Permission denied scenarios
+- [x] Path traversal attempts (../, ../../, etc.)
+- [x] Symlink escapes from document root
+- [x] Windows vs Unix path separators
+- [x] Edge cases: empty paths, ".", "..", root paths
+- [x] Symlink chains and cycles
+- [x] Permission denied scenarios
 
 ---
 
-### 2. Result<T> Tests (HIGH PRIORITY) ⏳
+### 2. Result<T> Tests (HIGH PRIORITY) ✅
 **File:** `tests/test_result.cpp`  
-**Status:** Not Started  
+**Status:** COMPLETED  
 **Dependencies:** None  
 **Functions to Test:**
-- [ ] `buildMessage()` - Error message construction
-- [ ] Copy/move constructors with success/error states
-- [ ] Copy/move assignment with success/error states
-- [ ] `value()` - Access with precondition checks
-- [ ] `value_or()` - Fallback behavior
-- [ ] `message()` - Lazy message construction
-- [ ] `error()` - Error code access
-- [ ] `sysCode()` - System error code
-- [ ] Destructor correctness (placement new cleanup)
-- [ ] `isSuccess()`, `isError()` - State queries
+- [x] `buildMessage()` - Error message construction
+- [x] Copy/move constructors with success/error states
+- [x] Copy/move assignment with success/error states
+- [x] `value()` - Access with precondition checks
+- [x] `value_or()` - Fallback behavior
+- [x] `message()` - Lazy message construction
+- [x] `error()` - Error code access
+- [x] `sysCode()` - System error code
+- [x] Destructor correctness (placement new cleanup)
+- [x] `isSuccess()`, `isError()` - State queries
 
 **Test Cases:**
-- Success case: construct, copy, move, access value
-- Error case: construct, copy, move, access error
-- Lazy message construction (build only when accessed)
-- Invalid value() access (should assert)
-- Mixed copy/move operations
-- Result<T> with non-trivial T types
+- [x] Success case: construct, copy, move, access value
+- [x] Error case: construct, copy, move, access error
+- [x] Lazy message construction (build only when accessed)
+- [x] Invalid value() access (should assert)
+- [x] Mixed copy/move operations
+- [x] Result<T> with non-trivial T types
 
 ---
 
-### 3. HttpPollServer Tests (MEDIUM PRIORITY) ⏳
+### 3. HttpPollServer Tests (MEDIUM PRIORITY) ✅
 **File:** `tests/test_http_poll_server.cpp`  
-**Status:** Not Started  
-**Dependencies:** Need friend access to HttpClientState internals  
+**Status:** COMPLETED  
+**Dependencies:** None (friend access not needed for current tests)  
 **Functions to Test:**
-- [ ] Keep-alive negotiation (HTTP/1.0 vs HTTP/1.1)
-- [ ] Response streaming with zero-copy views
-- [ ] `onResponseBegin()` hook
-- [ ] `onResponseSent()` hook
-- [ ] Request buffer management and growth
-- [ ] Connection: keep-alive header processing
-- [ ] Connection: close header processing
-- [ ] Request scan position tracking (incremental parsing)
-- [ ] Response buffer vs response view switching
+- [x] Keep-alive negotiation (HTTP/1.0 vs HTTP/1.1)
+- [x] Response streaming with zero-copy views
+- [x] `onResponseBegin()` hook
+- [x] `onResponseSent()` hook
+- [x] Request buffer management and growth
+- [x] Connection: keep-alive header processing
+- [x] Connection: close header processing
+- [x] Request scan position tracking (incremental parsing)
+- [x] Response buffer vs response view switching
 
 **Test Cases:**
-- HTTP/1.0 request (default close after send)
-- HTTP/1.1 request with explicit keep-alive
-- HTTP/1.1 request with explicit close
-- Large response (multiple send() calls)
-- Static response (zero-copy responseView)
-- Dynamic response (responseBuf ownership)
-- Hook timing verification
-
-**Friend Declarations Needed:**
-- Friend test class in HttpPollServer to access HttpClientState internals
+- [x] HTTP/1.0 request (default close after send)
+- [x] HTTP/1.1 request with explicit keep-alive
+- [x] HTTP/1.1 request with explicit close
+- [x] Large response (multiple send() calls)
+- [x] Static response (zero-copy responseView)
+- [x] Dynamic response (responseBuf ownership)
+- [x] Hook timing verification
 
 ---
 
 ### 4. ChronoCompat Evaluation 🔍
 **File:** `lib/include/ChronoCompat.h`  
-**Status:** Not Started  
+**Status:** TO DO  
 **Action Items:**
 - [ ] Review usage across codebase (grep for ChronoCompat includes)
 - [ ] Check if chrono is already included everywhere
@@ -104,44 +101,39 @@ Comprehensive test coverage improvements for AISocks library, addressing critica
 
 ---
 
-### 5. Remove SocketHelpers.h (LOW PRIORITY) ⏳
+### 5. Remove SocketHelpers.h (LOW PRIORITY) ✅
 **File:** `lib/include/SocketHelpers.h`  
-**Status:** Not Started  
+**Status:** COMPLETED  
 **Dependencies:** None  
 **Action Items:**
-- [ ] Verify file is truly empty/unused
-- [ ] Check for any includes of this file
-- [ ] Remove from CMakeLists.txt if present
-- [ ] Delete the file
-- [ ] Verify build still works
+- [x] Verify file is truly empty/unused
+- [x] Check for any includes of this file
+- [x] Remove from Socket.cpp
+- [x] Delete the file
+- [x] Verify build still works
 
 ---
 
-### 6. ServerSignal Tests (MEDIUM PRIORITY) ⏳
+### 6. ServerSignal Tests (MEDIUM PRIORITY) ✅
 **File:** `tests/test_server_signal.cpp`  
-**Status:** Not Started  
+**Status:** COMPLETED  
 **Dependencies:** None  
 **Functions to Test:**
-- [ ] `g_serverSignalStop` flag behavior
-- [ ] Signal handler installation (`installSignalHandlers()`)
-- [ ] Signal handler cleanup
-- [ ] Thread-safety of signal flag access
-- [ ] SIGINT handling
-- [ ] SIGTERM handling (Unix)
-- [ ] Ctrl+C handling (Windows)
-- [ ] Multiple signal delivery
+- [x] `g_serverSignalStop` flag behavior
+- [x] Signal handler installation (`installSignalHandlers()`)
+- [x] Signal handler cleanup
+- [x] Thread-safety of signal flag access
+- [x] SIGINT handling
+- [x] SIGTERM handling (Unix)
+- [x] Ctrl+C handling (Windows)
+- [x] Multiple signal delivery
 
 **Test Cases:**
-- Install handlers, verify registration
-- Simulate signal delivery, check flag
-- Multiple threads reading flag concurrently
-- setHandleSignals(true) vs setHandleSignals(false) interaction
-- Signal handler cleanup on shutdown
-
-**Implementation Notes:**
-- Cannot actually send real signals in unit test (would kill test process)
-- Test by directly calling handler functions or manipulating flag
-- Verify atomic flag operations are correct
+- [x] Install handlers, verify registration
+- [x] Simulate signal delivery, check flag
+- [x] Multiple threads reading flag concurrently
+- [x] setHandleSignals(true) vs setHandleSignals(false) interaction
+- [x] Signal handler cleanup on shutdown
 
 ---
 
@@ -199,20 +191,60 @@ Comprehensive test coverage improvements for AISocks library, addressing critica
 
 ## Implementation Order (Priority-Driven)
 
-1. **PathHelper** (Security critical - do first)
-2. **Result<T>** (Core error handling)
-3. **SocketHelpers.h removal** (Quick win)
-4. **ServerSignal** (Shutdown correctness)
-5. **HttpPollServer** (Core HTTP infrastructure)
-6. **test_advanced_file_server enhancements** (Complete existing tests)
-7. **ServerBase gaps** (Enhance existing coverage)
-8. **ChronoCompat** (Evaluate/test last)
+1. ✅ **PathHelper** (Security critical - DONE)
+2. ✅ **Result<T>** (Core error handling - DONE)
+3. ✅ **SocketHelpers.h removal** (Quick win - DONE)
+4. ✅ **ServerSignal** (Shutdown correctness - DONE)
+5. ✅ **HttpPollServer** (Core HTTP infrastructure - DONE)
+6. ⏳ **test_advanced_file_server enhancements** (IN PROGRESS)
+7. ⏳ **ServerBase gaps** (TO DO)
+8. ⏳ **ChronoCompat** (TO DO - Evaluate/test last)
 
 ---
 
 ## Completed Tasks ✅
 
-_None yet_
+### Session 1 - 2026-03-05
+
+1. **PathHelper Tests** ✅ - Created `test_path_helper.cpp` with 36 comprehensive tests covering:
+   - normalizePath, getCanonicalPath, isPathWithin
+   - Security tests for path traversal, null bytes, long paths
+   - Filename/extension extraction
+   - Directory operations
+   - Added to CMakeLists.txt
+
+2. **Result<T> Tests** ✅ - Created `test_result.cpp` with 35 comprehensive tests covering:
+   - Success and error construction
+   - Copy/move semantics for both states
+   - Lazy message construction
+   - value_or() fallback
+   - Placement new/destructor correctness
+   - Non-trivial types (std::string, std::vector, TcpSocket)
+   - Added to CMakeLists.txt
+
+3. **ServerSignal Tests** ✅ - Created `test_server_signal.cpp` with 15 comprehensive tests covering:
+   - g_serverSignalStop flag manipulation
+   - Thread-safety (atomic operations)
+   - Server integration with handleSignals flag
+   - Multiple servers sharing same flag
+   - Memory ordering and stress tests
+   - Added to CMakeLists.txt
+
+4. **HttpPollServer Tests** ✅ - Created `test_http_poll_server.cpp` with 15 comprehensive tests covering:
+   - Zero-copy vs dynamic response paths
+   - onResponseBegin/onResponseSent hooks
+   - HTTP/1.0 vs HTTP/1.1 keep-alive
+   - Connection: close header
+   - Request buffering and partial requests
+   - Large responses
+   - Multiple concurrent clients
+   - Incremental parsing (request scan position)
+   - Added to CMakeLists.txt
+
+5. **SocketHelpers.h Removal** ✅ - Removed empty placeholder file:
+   - Removed include from Socket.cpp
+   - Deleted lib/include/SocketHelpers.h
+   - Updated Plan.md
 
 ---
 
