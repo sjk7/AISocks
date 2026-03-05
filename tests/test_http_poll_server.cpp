@@ -153,7 +153,8 @@ int main() {
         std::cout << "DEBUG: Test 3 - Client sending request\n";
         std::string response = sendHttpRequest(server.getActualPort(),
             "GET / HTTP/1.1\r\nHost: localhost\r\n\r\n");
-        std::cout << "DEBUG: Test 3 - Client received response, length: " << response.length() << "\n";
+        std::cout << "DEBUG: Test 3 - Client received response, length: "
+                  << response.length() << "\n";
 
         std::cout << "DEBUG: Test 3 - Joining server thread\n";
         serverThread.join();
@@ -224,7 +225,8 @@ int main() {
         std::cout << "DEBUG: Test 6 - Client sending HTTP/1.0 request\n";
         std::string response = sendHttpRequest(server.getActualPort(),
             "GET / HTTP/1.0\r\nHost: localhost\r\n\r\n");
-        std::cout << "DEBUG: Test 6 - Client received response, length: " << response.length() << "\n";
+        std::cout << "DEBUG: Test 6 - Client received response, length: "
+                  << response.length() << "\n";
 
         std::cout << "DEBUG: Test 6 - Joining server thread\n";
         serverThread.join();
@@ -282,10 +284,12 @@ int main() {
 
         std::this_thread::sleep_for(50ms);
 
-        std::cout << "DEBUG: Test 8 - Client sending Connection: close request\n";
+        std::cout
+            << "DEBUG: Test 8 - Client sending Connection: close request\n";
         std::string response = sendHttpRequest(server.getActualPort(),
             "GET / HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n");
-        std::cout << "DEBUG: Test 8 - Client received response, length: " << response.length() << "\n";
+        std::cout << "DEBUG: Test 8 - Client received response, length: "
+                  << response.length() << "\n";
 
         std::cout << "DEBUG: Test 8 - Joining server thread\n";
         serverThread.join();
