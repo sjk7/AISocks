@@ -1,15 +1,15 @@
 #include "lib/include/Result.h"
 #include "lib/include/SocketTypes.h"
-#include <iostream>
+#include <cstdio>
 #include <stdexcept>
 
 int main() {
-    std::cout << "=== Result Class Size Analysis ===" << std::endl;
-    std::cout << "sizeof(ErrorInfo): " << sizeof(aiSocks::ErrorInfo) << " bytes" << std::endl;
-    std::cout << "sizeof(Result<int>): " << sizeof(aiSocks::Result<int>) << " bytes" << std::endl;
-    std::cout << "sizeof(Result<Endpoint>): " << sizeof(aiSocks::Result<aiSocks::Endpoint>) << " bytes" << std::endl;
-    std::cout << "sizeof(Result<void>): " << sizeof(aiSocks::Result<void>) << " bytes" << std::endl;
-    std::cout << "sizeof(Endpoint): " << sizeof(aiSocks::Endpoint) << " bytes" << std::endl;
-    std::cout << "sizeof(std::string): " << sizeof(std::string) << " bytes" << std::endl;
+    printf("=== Result Class Size Analysis ===\n");
+    printf("sizeof(ErrorInfo): %zu bytes\n", sizeof(aiSocks::ErrorInfo));
+    printf("sizeof(Result<int>): %zu bytes\n", sizeof(aiSocks::Result<int>));
+    printf("sizeof(Result<Endpoint>): %zu bytes\n", sizeof(aiSocks::Result<aiSocks::Endpoint>));
+    printf("sizeof(Result<void>): %zu bytes\n", sizeof(aiSocks::Result<void>));
+    printf("sizeof(Endpoint): %zu bytes\n", sizeof(aiSocks::Endpoint));
+    printf("sizeof(std::string): %zu bytes\n", sizeof(std::string));
     return 0;
 }

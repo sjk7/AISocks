@@ -1,0 +1,40 @@
+FROM ubuntu:22.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install toolchain — unversioned names resolve to clang-14 on Ubuntu 22.04.
+# --no-install-recommends keeps the layer small and fast.
+RUN apt-get update && apt-get install -y --no-install-recommends --fix-missing \
+    clang-14 \
+    lldb-14 \
+    libc++-14-dev \
+    libc++abi-14-dev \
+    cmake \
+    ninja-build \
+    ca-certificates \
+    && ln -sf /usr/bin/clang-14    /usr/local/bin/clang \
+    && ln -sf /usr/bin/clang++-14  /usr/local/bin/clang++ \
+    && find /usr/bin -name 'lldb-server-14*' | head -1 \
+       | xargs -I{} ln -sf {} /usr/local/bin/lldb-server \
+    && rm -rf /var/lib/apt/lists/*
+
+# Force Clang + libc++ so MSan can instrument the standard library
+# (libstdc++ is not MSan-instrumented and produces false positives)
+ENV CC=clang
+ENV CXX=clang++
+# Don't abort on first MSan report — libc's stdout buffers are a known false positive
+ENV MSAN_OPTIONS=halt_on_error=0
+
+WORKDIR /workspace
+
+# Copy source (respects .dockerignore so local build dirs are excluded)
+COPY . .
+
+# Configure and build with MemorySanitizer — artifacts baked into the image
+RUN cmake --preset msan-debug \
+      -DCMAKE_CXX_FLAGS="-stdlib=libc++" \
+      -DCMAKE_EXE_LINKER_FLAGS="-stdlib=libc++ -lc++abi" \
+ && cmake --build build-msan
+
+# lldb-server is the entry point for remote debugging
+EXPOSE 1234

@@ -11,7 +11,6 @@
 #define AISOCKS_PCH_H
 
 // Standard library headers used across multiple translation units
-// Note: Avoid <chrono> to prevent conflicts with aiSocks::Milliseconds
 #include <algorithm>
 #include <atomic>
 #include <cassert>

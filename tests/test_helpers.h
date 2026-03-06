@@ -1,10 +1,11 @@
-// This is an independent project of an individual developer. Dear PVS-Studio, please check it.
+// This is an independent project of an individual developer. Dear PVS-Studio,
+// please check it.
 
-// PVS-Studio Static Code Analyzer for C, C++, C#, and Java: https://pvs-studio.com
-
+// PVS-Studio Static Code Analyzer for C, C++, C#, and Java:
+// https://pvs-studio.com
 
 #pragma once
-#include <iostream>
+#include <cstdio>
 #include <string>
 #include <cstdint>
 #include <stdexcept>
@@ -27,11 +28,10 @@ static int g_passed = 0;
 #define REQUIRE(expr)                                                          \
     do {                                                                       \
         if (!(expr)) {                                                         \
-            std::cerr << "  FAIL [" << __FILE__ << ":" << __LINE__ << "] "     \
-                      << #expr << "\n";                                        \
+            fprintf(stderr, "  FAIL [%s:%d] %s\n", __FILE__, __LINE__, #expr); \
             ++g_failed;                                                        \
         } else {                                                               \
-            std::cout << "  pass: " << #expr << "\n";                          \
+            printf("  pass: %s\n", #expr);                                     \
             ++g_passed;                                                        \
         }                                                                      \
     } while (0)
@@ -39,23 +39,22 @@ static int g_passed = 0;
 #define REQUIRE_MSG(expr, msg)                                                 \
     do {                                                                       \
         if (!(expr)) {                                                         \
-            std::cerr << "  FAIL [" << __FILE__ << ":" << __LINE__ << "] "     \
-                      << msg << "\n";                                          \
+            fprintf(stderr, "  FAIL [%s:%d] %s\n", __FILE__, __LINE__,        \
+                    std::string(msg).c_str());                                 \
             ++g_failed;                                                        \
         } else {                                                               \
-            std::cout << "  pass: " << msg << "\n";                            \
+            printf("  pass: %s\n", std::string(msg).c_str());                 \
             ++g_passed;                                                        \
         }                                                                      \
     } while (0)
 
 #define BEGIN_TEST(name)                                                       \
     do {                                                                       \
-        std::cout << "\n--- " << name << " ---\n";                             \
+        printf("\n--- %s ---\n", name);                                        \
     } while (0)
 
 inline int test_summary() {
-    std::cout << "\n==============================\n";
-    std::cout << "Results: " << g_passed << " passed, " << g_failed
-              << " failed\n";
+    printf("\n==============================\n");
+    printf("Results: %d passed, %d failed\n", g_passed, g_failed);
     return (g_failed > 0) ? 1 : 0;
 }

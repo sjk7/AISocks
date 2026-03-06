@@ -6,14 +6,13 @@
 
 #include "FileCache.h"
 #include "test_helpers.h"
-#include <iostream>
 #include <string>
 #include <vector>
 
 using namespace aiSocks;
 
 int main() {
-    std::cout << "=== FileCache Tests ===\n";
+    printf("=== FileCache Tests ===\n");
 
     // Test 1: Basic cache operations
     BEGIN_TEST("FileCache: put and get");
@@ -203,6 +202,6 @@ int main() {
         REQUIRE(cache.get("C:\\Windows\\file.txt", 300) != nullptr);
     }
 
-    std::cout << "\n=== All FileCache tests passed ===\n";
+    printf("\n=== All FileCache tests passed ===\n");
     return 0;
 }

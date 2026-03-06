@@ -8,7 +8,7 @@
 // Demonstrates receiving data until connection closes
 
 #include "SimpleClient.h"
-#include <iostream>
+#include <cstdio>
 #include <string>
 #include <cstring>
 
@@ -21,20 +21,20 @@ int httpConnect(const ConnectArgs& args, const char* httpRequest) {
 
     SimpleClient client(args);
     if (!client.isConnected()) {
-        std::cerr << "\n*** CONNECTION FAILED ***\n";
+        fprintf(stderr, "\n*** CONNECTION FAILED ***\n");
         return 1;
     }
 
     client.run([&](TcpSocket& sock) {
         if (!sock.isBlocking()) {
-            std::cerr << "Expected a blocking socket\n"; //-V1056
+            fprintf(stderr, "Expected a blocking socket\n"); //-V1056
             return;
         }
-        std::cout << "Connected! Socket is valid.\n";
+        printf("Connected! Socket is valid.\n");
 
-        std::cout << "Sending HTTP request...\n";
+        printf("Sending HTTP request...\n");
         if (!sock.sendAll(httpRequest, strlen(httpRequest))) {
-            std::cerr << "Failed to send request\n";
+            fprintf(stderr, "Failed to send request\n");
             return;
         }
 
@@ -43,8 +43,8 @@ int httpConnect(const ConnectArgs& args, const char* httpRequest) {
         size_t bytesRead;
         bool isFirstChunk = true;
         int retval = 0;
-        std::cout << "Reading response...\n";
-        std::cout << "-----------------------------------------\n\n";
+        printf("Reading response...\n");
+        printf("-----------------------------------------\n\n");
 
         while ((retval = (bytesRead = sock.receive(buffer, sizeof(buffer) - 1))) //-V101 //-V103
             > 0) {
@@ -55,10 +55,10 @@ int httpConnect(const ConnectArgs& args, const char* httpRequest) {
                 int toPrint = std::min(
                     static_cast<int>(sizeof(buffer) - 1 - totalBytesRead),
                     static_cast<int>(bytesRead)); //-V202
-                std::cout.write(buffer, toPrint);
-                std::cout.flush();
+                fwrite(buffer, 1, static_cast<size_t>(toPrint), stdout);
+                fflush(stdout);
             } else if (isFirstChunk) {
-                std::cout << "\n... (response truncated, showing stats) ...\n";
+                printf("\n... (response truncated, showing stats) ...\n");
                 isFirstChunk = false;
             }
 
@@ -66,23 +66,23 @@ int httpConnect(const ConnectArgs& args, const char* httpRequest) {
         }
 
         if (totalBytesRead == 0 && retval < 0) {
-            std::cout
-                << "\nConnection closed by server, after sending zero bytes\n";
-            std::cout << "Last error: " << static_cast<int>(sock.getLastError())
-                      << " - " << sock.getErrorMessage() << "\n";
+            printf("\nConnection closed by server, after sending zero bytes\n");
+            printf("Last error: %d - %s\n",
+                   static_cast<int>(sock.getLastError()),
+                   sock.getErrorMessage().c_str());
         }
 
-        std::cout << "\n-----------------------------------------\n";
+        printf("\n-----------------------------------------\n");
     });
 
-    std::cout << "\nConnection complete!\n";
-    std::cout << "Total bytes received: " << totalBytesRead << "\n";
+    printf("\nConnection complete!\n");
+    printf("Total bytes received: %zu\n", totalBytesRead);
     return 0;
 }
 
 int main() {
-    std::cout << "=== SimpleClient Google Connect Example ===\n";
-    std::cout << "Connecting to google.com:8765 with 1s timeout...\n\n";
+    printf("=== SimpleClient Google Connect Example ===\n");
+    printf("Connecting to google.com:8765 with 1s timeout...\n\n");
 
     // HTTP GET request
     const char* httpRequest = "GET / HTTP/1.1\r\n"
@@ -94,7 +94,7 @@ int main() {
     auto ret = httpConnect(
         ConnectArgs{"google.com", Port{80}, Milliseconds{1000}}, httpRequest);
 
-    std::cout << "8765 Example finished with code: " << ret << "\n";
+    printf("8765 Example finished with code: %d\n", ret);
 
     httpConnect(
         ConnectArgs{"google.com", Port{8765}, Milliseconds{1000}}, httpRequest);

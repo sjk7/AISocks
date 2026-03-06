@@ -292,7 +292,7 @@ static void test_move_semantics() {
 }
 
 int main() {
-    std::cout << "=== SocketFactory Construction Tests ===\n";
+    printf("=== SocketFactory Construction Tests ===\n");
 
     test_basic_constructor();
     test_server_bind_happy();
@@ -301,6 +301,6 @@ int main() {
     test_connect_to_failures();
     test_move_semantics();
 
-    std::cout << "All construction tests passed!\n";
+    printf("All construction tests passed!\n");
     return 0;
 }

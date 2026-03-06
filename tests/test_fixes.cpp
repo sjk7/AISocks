@@ -456,7 +456,7 @@ static void test_request_complete_incremental() {
 // main
 // ---------------------------------------------------------------------------
 int main() {
-    std::cout << "=== test_fixes ===\n";
+    printf("=== test_fixes ===\n");
     test_client_limit_source_of_truth();
     test_signal_opt_out();
     test_on_error_returns_server_result();

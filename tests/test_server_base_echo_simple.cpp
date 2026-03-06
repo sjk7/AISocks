@@ -62,7 +62,7 @@ class SimpleEchoServer : public ServerBase<SimpleEchoState> {
 };
 
 int main() {
-    std::cout << "=== Simple Echo ServerBase Test ===\n";
+    printf("=== Simple Echo ServerBase Test ===\n");
 
     BEGIN_TEST("Simple echo server with ClientLimit");
     {
@@ -89,7 +89,7 @@ int main() {
             ConnectArgs{"127.0.0.1", port, Milliseconds{1000}});
 
         if (result.isSuccess()) {
-            std::cout << "Client connected successfully\n";
+            printf("Client connected successfully\n");
             auto client
                 = std::make_unique<TcpSocket>(std::move(result.value()));
 
@@ -100,7 +100,7 @@ int main() {
             const char* msg = "Hello Echo!";
             bool sent = client->send(msg, strlen(msg));
             if (sent) {
-                std::cout << "Data sent successfully\n";
+                printf("Data sent successfully\n");
 
                 // Wait for echo with timeout
                 auto start = std::chrono::steady_clock::now();
@@ -118,7 +118,7 @@ int main() {
 
                     // Check timeout
                     if (std::chrono::steady_clock::now() - start > timeout) {
-                        std::cout << "Receive timeout\n";
+                        printf("Receive timeout\n");
                         break;
                     }
 
@@ -127,22 +127,20 @@ int main() {
                 }
 
                 if (received > 0) {
-                    std::cout << "Received echo: " << std::string(buf, received)
-                              << "\n";
+                    printf("Received echo: %.*s\n", received, buf);
                 }
             }
 
-            std::cout << "Server client count: " << server.clientCount()
-                      << "\n";
+            printf("Server client count: %zu\n", server.clientCount());
         }
 
         // Stop server
         server.requestStop();
         std::this_thread::sleep_for(std::chrono::milliseconds{100});
 
-        std::cout << "Simple echo test completed\n";
+        printf("Simple echo test completed\n");
     }
 
-    std::cout << "All tests passed!\n";
+    printf("All tests passed!\n");
     return 0;
 }

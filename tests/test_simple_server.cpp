@@ -245,7 +245,7 @@ static void test_accept_clients() {
 }
 
 int main() {
-    std::cout << "=== SimpleServer Tests ===\n\n";
+    printf("=== SimpleServer Tests ===\n\n");
 
     test_validity();
     test_poll_clients_echo();

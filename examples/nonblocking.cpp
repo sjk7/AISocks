@@ -5,13 +5,13 @@
 // https://pvs-studio.com
 
 #include "TcpSocket.h"
-#include <iostream>
+#include <cstdio>
 #include <thread>
 #include <chrono>
 #include <string>
 #include <cstring>
 #include <vector>
-#include <iomanip>
+#include <cstring>
 
 using namespace aiSocks;
 
@@ -20,49 +20,48 @@ constexpr size_t CHUNK_SIZE = 64 * 1024; // 64 KB chunks
 constexpr size_t TOTAL_DATA = 100 * 1024 * 1024; // 100 MB total
 
 void runServerNonBlocking() {
-    std::cout << "Starting non-blocking server on port 8080..." << std::endl;
+    printf("Starting non-blocking server on port 8080...\n");
 
     auto serverSocket = TcpSocket::createRaw();
 
     if (!serverSocket.isValid()) {
-        std::cerr << "Failed to create server socket: "
-                  << serverSocket.getErrorMessage() << std::endl;
+        fprintf(stderr, "Failed to create server socket: %s\n",
+                serverSocket.getErrorMessage().c_str());
         return;
     }
 
     (void)serverSocket.setReuseAddress(true);
 
     if (!serverSocket.bind("0.0.0.0", Port{8080})) {
-        std::cerr << "Failed to bind: " << serverSocket.getErrorMessage()
-                  << std::endl;
+        fprintf(stderr, "Failed to bind: %s\n",
+                serverSocket.getErrorMessage().c_str());
         return;
     }
 
     if (!serverSocket.listen(5)) {
-        std::cerr << "Failed to listen: " << serverSocket.getErrorMessage()
-                  << std::endl;
+        fprintf(stderr, "Failed to listen: %s\n",
+                serverSocket.getErrorMessage().c_str());
         return;
     }
 
-    std::cout << "Server listening on port 8080..." << std::endl;
+    printf("Server listening on port 8080...\n");
 
     // Accept connection (blocking accept is fine)
     auto clientSocket = serverSocket.accept();
     if (!clientSocket) {
-        std::cerr << "Failed to accept connection: "
-                  << serverSocket.getErrorMessage() << std::endl;
+        fprintf(stderr, "Failed to accept connection: %s\n",
+                serverSocket.getErrorMessage().c_str());
         return;
     }
 
     // Set client socket to non-blocking mode
     if (!clientSocket->setBlocking(false)) {
-        std::cerr << "Failed to set non-blocking mode: "
-                  << clientSocket->getErrorMessage() << std::endl;
+        fprintf(stderr, "Failed to set non-blocking mode: %s\n",
+                clientSocket->getErrorMessage().c_str());
         return;
     }
 
-    std::cout << "Client connected! Starting non-blocking data transfer..."
-              << std::endl;
+    printf("Client connected! Starting non-blocking data transfer...\n");
 
     // Prepare data buffer
     std::vector<char> buffer(CHUNK_SIZE, 'A');
@@ -99,8 +98,8 @@ void runServerNonBlocking() {
                 wouldBlockCount++;
                 std::this_thread::sleep_for(std::chrono::microseconds(100));
             } else {
-                std::cerr << "Failed to send data: "
-                          << clientSocket->getErrorMessage() << std::endl;
+                fprintf(stderr, "Failed to send data: %s\n",
+                        clientSocket->getErrorMessage().c_str());
                 break;
             }
         }
@@ -115,14 +114,12 @@ void runServerNonBlocking() {
     double speedMBps = megabytes / seconds;
     double speedMbps = speedMBps * 8;
 
-    std::cout << std::fixed << std::setprecision(2);
-    std::cout << "\nServer Statistics (Non-blocking):" << std::endl;
-    std::cout << "  Total sent: " << megabytes << " MB" << std::endl;
-    std::cout << "  Time: " << seconds << " seconds" << std::endl;
-    std::cout << "  Speed: " << speedMBps << " MB/s (" << speedMbps << " Mbps)"
-              << std::endl;
-    std::cout << "  Send calls: " << sendCount << std::endl;
-    std::cout << "  Would-block events: " << wouldBlockCount << std::endl;
+    printf("\nServer Statistics (Non-blocking):\n");
+    printf("  Total sent: %.2f MB\n", megabytes);
+    printf("  Time: %.2f seconds\n", seconds);
+    printf("  Speed: %.2f MB/s (%.2f Mbps)\n", speedMBps, speedMbps);
+    printf("  Send calls: %zu\n", sendCount);
+    printf("  Would-block events: %zu\n", wouldBlockCount);
 
     clientSocket->close();
     serverSocket.close();
@@ -132,32 +129,31 @@ void runClientNonBlocking() {
     // Give server time to start
     std::this_thread::sleep_for(std::chrono::milliseconds(500));
 
-    std::cout << "Connecting to server..." << std::endl;
+    printf("Connecting to server...\n");
 
     auto clientSocket = TcpSocket::createRaw();
 
     if (!clientSocket.isValid()) {
-        std::cerr << "Failed to create client socket: "
-                  << clientSocket.getErrorMessage() << std::endl;
+        fprintf(stderr, "Failed to create client socket: %s\n",
+                clientSocket.getErrorMessage().c_str());
         return;
     }
 
     // Connect (blocking connect is fine)
     if (!clientSocket.connect("127.0.0.1", Port{8080})) {
-        std::cerr << "Failed to connect: " << clientSocket.getErrorMessage()
-                  << std::endl;
+        fprintf(stderr, "Failed to connect: %s\n",
+                clientSocket.getErrorMessage().c_str());
         return;
     }
 
     // Set socket to non-blocking mode
     if (!clientSocket.setBlocking(false)) {
-        std::cerr << "Failed to set non-blocking mode: "
-                  << clientSocket.getErrorMessage() << std::endl;
+        fprintf(stderr, "Failed to set non-blocking mode: %s\n",
+                clientSocket.getErrorMessage().c_str());
         return;
     }
 
-    std::cout << "Connected to server! Starting non-blocking data transfer..."
-              << std::endl;
+    printf("Connected to server! Starting non-blocking data transfer...\n");
 
     // Prepare receive buffer
     std::vector<char> buffer(CHUNK_SIZE);
@@ -175,7 +171,7 @@ void runClientNonBlocking() {
             totalReceived += static_cast<size_t>(bytesReceived); //-V201
             recvCount++;
         } else if (bytesReceived == 0) {
-            std::cout << "Server closed connection" << std::endl;
+            printf("Server closed connection\n");
             break;
         } else {
             // Check if it would block
@@ -183,8 +179,8 @@ void runClientNonBlocking() {
                 wouldBlockCount++;
                 std::this_thread::sleep_for(std::chrono::microseconds(100));
             } else {
-                std::cerr << "Failed to receive data: "
-                          << clientSocket.getErrorMessage() << std::endl;
+                fprintf(stderr, "Failed to receive data: %s\n",
+                        clientSocket.getErrorMessage().c_str());
                 break;
             }
         }
@@ -199,25 +195,21 @@ void runClientNonBlocking() {
     double speedMBps = megabytes / seconds;
     double speedMbps = speedMBps * 8;
 
-    std::cout << std::fixed << std::setprecision(2);
-    std::cout << "\nClient Statistics (Non-blocking):" << std::endl;
-    std::cout << "  Total received: " << megabytes << " MB" << std::endl;
-    std::cout << "  Time: " << seconds << " seconds" << std::endl;
-    std::cout << "  Speed: " << speedMBps << " MB/s (" << speedMbps << " Mbps)"
-              << std::endl;
-    std::cout << "  Receive calls: " << recvCount << std::endl;
-    std::cout << "  Would-block events: " << wouldBlockCount << std::endl;
+    printf("\nClient Statistics (Non-blocking):\n");
+    printf("  Total received: %.2f MB\n", megabytes);
+    printf("  Time: %.2f seconds\n", seconds);
+    printf("  Speed: %.2f MB/s (%.2f Mbps)\n", speedMBps, speedMbps);
+    printf("  Receive calls: %zu\n", recvCount);
+    printf("  Would-block events: %zu\n", wouldBlockCount);
 
     clientSocket.close();
 }
 
 int main() {
-    std::cout << "=== aiSocks Library - Non-Blocking I/O Speed Test ==="
-              << std::endl;
-    std::cout << "Transfer size: " << (TOTAL_DATA / (1024 * 1024)) << " MB"
-              << std::endl;
-    std::cout << "Chunk size: " << (CHUNK_SIZE / 1024) << " KB" << std::endl;
-    std::cout << std::endl;
+    printf("=== aiSocks Library - Non-Blocking I/O Speed Test ===\n");
+    printf("Transfer size: %zu MB\n", TOTAL_DATA / (1024 * 1024));
+    printf("Chunk size: %zu KB\n", CHUNK_SIZE / 1024);
+    printf("\n");
 
     // Run server in a separate thread
     std::thread serverThread(runServerNonBlocking);
@@ -228,8 +220,8 @@ int main() {
     // Wait for server to finish
     serverThread.join();
 
-    std::cout << std::endl;
-    std::cout << "Non-blocking transfer test completed!" << std::endl;
+    printf("\n");
+    printf("Non-blocking transfer test completed!\n");
 
     return 0;
 }

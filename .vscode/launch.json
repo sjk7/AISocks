@@ -27,5 +27,36 @@
       },
       "preLaunchTask": "Build advanced_file_server"
     }
+    ,
+    {
+      "name": "Docker arm64 MSan: test_http_poll_server",
+      "type": "lldb",
+      "request": "custom",
+      "targetCreateCommands": [
+        "target create \"${workspaceFolder}/build-msan/tests/test_http_poll_server\"",
+        "settings set target.source-map \"/workspace\" \"${workspaceFolder}\"",
+        "breakpoint set --name main"
+      ],
+      "processCreateCommands": [
+        "gdb-remote localhost:1234"
+      ],
+      "preLaunchTask": "Docker: Start lldb-server for test_http_poll_server",
+      "postDebugTask": "Docker: Kill debug container"
+    },
+    {
+      "name": "Docker arm64 MSan: advanced_file_server",
+      "type": "lldb",
+      "request": "custom",
+      "targetCreateCommands": [
+        "target create \"${workspaceFolder}/build-msan/advanced_file_server\"",
+        "settings set target.source-map \"/workspace\" \"${workspaceFolder}\"",
+        "breakpoint set --name main"
+      ],
+      "processCreateCommands": [
+        "gdb-remote localhost:1234"
+      ],
+      "preLaunchTask": "Docker: Start lldb-server for advanced_file_server",
+      "postDebugTask": "Docker: Kill debug container"
+    }
   ]
 }

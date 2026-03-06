@@ -28,7 +28,6 @@
 
 #include "UrlCodec.h"
 #include "test_helpers.h"
-#include <iostream>
 #include <string>
 
 using namespace aiSocks;
@@ -254,7 +253,7 @@ static void test_all_bytes_encode_decode() {
 
 // -- main -------------------------------------------------------------------
 int main() {
-    std::cout << "=== url_codec tests ===\n";
+    printf("=== url_codec tests ===\n");
 
     test_empty();
     test_unreserved_chars();

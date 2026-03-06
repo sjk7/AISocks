@@ -11,7 +11,6 @@
 #include "FileIO.h"
 #include "PathHelper.h"
 #include "FileCache.h"
-#include <iostream>
 #include <string>
 #include <cassert>
 #include <vector>
@@ -42,46 +41,46 @@ class SecurityTestFramework {
 public:
     static void assert_true(bool condition, const std::string& message) {
         if (!condition) {
-            std::cerr << "❌ SECURITY FAIL: " << message << std::endl;
+            fprintf(stderr, "\u274C SECURITY FAIL: %s\n", message.c_str());
             failedTests++;
         } else {
-            std::cout << "✅ SECURE: " << message << std::endl;
+            printf("\u2705 SECURE: %s\n", message.c_str());
             passedTests++;
         }
     }
     
     static void assert_contains(const std::string& haystack, const std::string& needle, const std::string& message) {
         if (haystack.find(needle) == std::string::npos) {
-            std::cerr << "❌ SECURITY FAIL: " << message << std::endl;
-            std::cerr << "   Expected to contain: '" << needle << "'" << std::endl;
+            fprintf(stderr, "\u274C SECURITY FAIL: %s\n", message.c_str());
+            fprintf(stderr, "   Expected to contain: '%s'\n", needle.c_str());
             failedTests++;
         } else {
-            std::cout << "✅ SECURE: " << message << std::endl;
+            printf("\u2705 SECURE: %s\n", message.c_str());
             passedTests++;
         }
     }
     
     static void assert_not_contains(const std::string& haystack, const std::string& needle, const std::string& message) {
         if (haystack.find(needle) != std::string::npos) {
-            std::cerr << "❌ SECURITY FAIL: " << message << std::endl;
-            std::cerr << "   Should NOT contain: '" << needle << "'" << std::endl;
+            fprintf(stderr, "\u274C SECURITY FAIL: %s\n", message.c_str());
+            fprintf(stderr, "   Should NOT contain: '%s'\n", needle.c_str());
             failedTests++;
         } else {
-            std::cout << "✅ SECURE: " << message << std::endl;
+            printf("\u2705 SECURE: %s\n", message.c_str());
             passedTests++;
         }
     }
     
     static void printSummary() {
-        std::cout << "\n=== SECURITY TEST SUMMARY ===" << std::endl;
-        std::cout << "Passed: " << passedTests << std::endl;
-        std::cout << "Failed: " << failedTests << std::endl;
-        std::cout << "Total:  " << (passedTests + failedTests) << std::endl;
+        printf("\n=== SECURITY TEST SUMMARY ===\n");
+        printf("Passed: %d\n", passedTests);
+        printf("Failed: %d\n", failedTests);
+        printf("Total:  %d\n", (passedTests + failedTests));
         
         if (failedTests == 0) {
-            std::cout << "🔒 ALL SECURITY TESTS PASSED - SYSTEM IS SECURE!" << std::endl;
+            printf("\U0001F512 ALL SECURITY TESTS PASSED - SYSTEM IS SECURE!\n");
         } else {
-            std::cout << "🚨 SECURITY VULNERABILITIES DETECTED!" << std::endl;
+            printf("\U0001F6A8 SECURITY VULNERABILITIES DETECTED!\n");
         }
     }
     
@@ -189,7 +188,7 @@ void cleanupTestEnvironment() {
 
 /// TEST 1: Path Traversal Attacks
 void testPathTraversalAttacks() {
-    std::cout << "\n=== TEST 1: PATH TRAVERSAL ATTACKS ===" << std::endl;
+    printf("\n=== TEST 1: PATH TRAVERSAL ATTACKS ===\n");
     
     HttpFileServer::Config config;
     config.documentRoot = "test_secure/public";
@@ -285,7 +284,7 @@ void testPathTraversalAttacks() {
 
 /// TEST 2: XSS (Cross-Site Scripting) Attacks
 void testXSSAttacks() {
-    std::cout << "\n=== TEST 2: XSS ATTACKS ===" << std::endl;
+    printf("\n=== TEST 2: XSS ATTACKS ===\n");
     
     HttpFileServer::Config config;
     config.documentRoot = "test_secure/public";
@@ -325,7 +324,7 @@ void testXSSAttacks() {
 
 /// TEST 3: Security Headers
 void testSecurityHeaders() {
-    std::cout << "\n=== TEST 3: SECURITY HEADERS ===" << std::endl;
+    printf("\n=== TEST 3: SECURITY HEADERS ===\n");
     
     HttpFileServer::Config config;
     config.documentRoot = "test_secure/public";
@@ -351,7 +350,7 @@ void testSecurityHeaders() {
 
 /// TEST 4: Information Leakage
 void testInformationLeakage() {
-    std::cout << "\n=== TEST 4: INFORMATION LEAKAGE ===" << std::endl;
+    printf("\n=== TEST 4: INFORMATION LEAKAGE ===\n");
     
     HttpFileServer::Config config;
     config.documentRoot = "test_secure/public";
@@ -390,7 +389,7 @@ void testInformationLeakage() {
 
 /// TEST 5: Cache DoS Protection
 void testCacheDoSProtection() {
-    std::cout << "\n=== TEST 5: CACHE DOS PROTECTION ===" << std::endl;
+    printf("\n=== TEST 5: CACHE DOS PROTECTION ===\n");
     
     // Test FileCache limits
     {
@@ -448,7 +447,7 @@ void testCacheDoSProtection() {
 
 /// TEST 6: URL Decoding Issues
 void testURLDecodingIssues() {
-    std::cout << "\n=== TEST 6: URL DECODING ISSUES ===" << std::endl;
+    printf("\n=== TEST 6: URL DECODING ISSUES ===\n");
     
     HttpFileServer::Config config;
     config.documentRoot = "test_secure/public";
@@ -480,7 +479,7 @@ void testURLDecodingIssues() {
 
 /// TEST 7: Method Validation
 void testMethodValidation() {
-    std::cout << "\n=== TEST 7: HTTP METHOD VALIDATION ===" << std::endl;
+    printf("\n=== TEST 7: HTTP METHOD VALIDATION ===\n");
     
     HttpFileServer::Config config;
     config.documentRoot = "test_secure/public";
@@ -508,7 +507,7 @@ void testMethodValidation() {
 
 /// TEST 8: File Type Restrictions
 void testFileTypeRestrictions() {
-    std::cout << "\n=== TEST 8: FILE TYPE RESTRICTIONS ===" << std::endl;
+    printf("\n=== TEST 8: FILE TYPE RESTRICTIONS ===\n");
     
     HttpFileServer::Config config;
     config.documentRoot = "test_secure/public";
@@ -531,9 +530,9 @@ void testFileTypeRestrictions() {
 
 /// Main test runner
 int main() {
-    std::cout << "🔒 HttpFileServer Security Test Suite" << std::endl;
-    std::cout << "======================================" << std::endl;
-    std::cout << "Testing protection against malicious client attacks\n" << std::endl;
+    printf("\U0001F512 HttpFileServer Security Test Suite\n");
+    printf("======================================\n");
+    printf("Testing protection against malicious client attacks\n\n");
     
     try {
         setupTestEnvironment();
@@ -554,7 +553,7 @@ int main() {
         return SecurityTestFramework::failedTests > 0 ? 1 : 0;
         
     } catch (const std::exception& e) {
-        std::cerr << "💥 Security test suite failed with exception: " << e.what() << std::endl;
+        fprintf(stderr, "\U0001F4A5 Security test suite failed with exception: %s\n", e.what());
         cleanupTestEnvironment();
         return 1;
     }

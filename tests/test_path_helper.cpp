@@ -10,7 +10,6 @@
 
 #include "PathHelper.h"
 #include "test_helpers.h"
-#include <iostream>
 #include <string>
 #include <vector>
 
@@ -57,7 +56,7 @@ static void cleanupTestDirs() {
 }
 
 int main() {
-    std::cout << "=== PathHelper Tests ===\n";
+    printf("=== PathHelper Tests ===\n");
 
     setupTestDirs();
 

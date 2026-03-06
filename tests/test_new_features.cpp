@@ -20,8 +20,6 @@
 #include <chrono>
 #include <cstdio>
 #include <cstring>
-#include <iomanip>
-#include <iostream>
 #include <string>
 #include <thread>
 #include <vector>
@@ -59,7 +57,7 @@ static void test_endpoints() {
         if (!ep) return;
         const auto& e = ep.value();
         REQUIRE(e.port.value() != 0);
-        std::cout << "  assigned ephemeral port: " << e.port.value() << "\n";
+        printf("  assigned ephemeral port: %u\n", e.port.value());
     }
 
     BEGIN_TEST("getPeerEndpoint: populated after TCP connect");
@@ -204,8 +202,7 @@ static void test_udp() {
         REQUIRE(std::string(buf, static_cast<size_t>(recvd)) == "hello udp");
         REQUIRE(from.port.value() != 0);
         REQUIRE(from.address == "127.0.0.1");
-        std::cout << "  sender seen as: " << from.address << ":"
-                  << from.port.value() << "\n";
+        printf("  sender seen as: %s:%u\n", from.address.c_str(), from.port.value());
     }
 
     BEGIN_TEST("UDP sendTo/receiveFrom: multiple datagrams in sequence");
@@ -269,8 +266,7 @@ static void test_udp_connected() {
         REQUIRE(
             std::string(buf, static_cast<size_t>(recvd)) == "connected-udp");
         REQUIRE(from.address == "127.0.0.1");
-        std::cout << "  datagram arrived from: " << from.address << ":"
-                  << from.port.value() << "\n";
+        printf("  datagram arrived from: %s:%u\n", from.address.c_str(), from.port.value());
     }
 }
 
@@ -447,16 +443,12 @@ static void test_bulk_throughput() {
         double mbSend = static_cast<double>(TOTAL) / (1024.0 * 1024.0);
         double mbps = mbSend / (ms / 1000.0); // throughput = sent / sender time
 
-        std::cout << std::fixed << std::setprecision(1);
-        std::cout << "  datagrams: " << COUNT << "  size: " << DGRAM
-                  << " B  sent: " << mbSend << " MB  received: " << mbRecv
-                  << " MB  dropped: " << dropped << "\n";
-        std::cout << "  sender time: " << ms << " ms  send throughput: " << mbps
-                  << " MB/s\n";
+        printf("  datagrams: %d  size: %zu B  sent: %.1f MB  received: %.1f MB  dropped: %zu\n",
+               COUNT, DGRAM, mbSend, mbRecv, dropped);
+        printf("  sender time: %.1f ms  send throughput: %.1f MB/s\n", ms, mbps);
 
         if (dropped > 0)
-            std::cout << "  NOTE: " << dropped
-                      << " datagrams dropped (kernel buffer overflow)\n";
+            printf("  NOTE: %zu datagrams dropped (kernel buffer overflow)\n", dropped);
         REQUIRE(recvTotal.load() > 0);
     }
 
@@ -517,12 +509,9 @@ static void test_bulk_throughput() {
         double mbps
             = (static_cast<double>(TOTAL) / (1024.0 * 1024.0)) / (ms / 1000.0);
 
-        std::cout << std::fixed << std::setprecision(1);
-        std::cout << "  total: " << (TOTAL / (1024 * 1024))
-                  << " MB  sent: " << sent
-                  << " B  received: " << recvTotal.load() << " B\n";
-        std::cout << "  time: " << ms << " ms  throughput: " << mbps
-                  << " MB/s\n";
+        printf("  total: %zu MB  sent: %zu B  received: %zu B\n",
+               TOTAL / (1024 * 1024), sent, recvTotal.load());
+        printf("  time: %.1f ms  throughput: %.1f MB/s\n", ms, mbps);
 
         REQUIRE(recvTotal.load() == TOTAL);
     }

@@ -21,6 +21,5 @@
 #include <string> // 17 / 25 tests
 #include <cstring> // 12 / 25 tests
 #include <atomic> // 11 / 25 tests
-#include <iostream> //  7 / 25 tests
 #include <vector> //  5 / 25 tests
 #include <cassert> //  2 / 25 tests

@@ -5,13 +5,13 @@
 // https://pvs-studio.com
 
 #include "TcpSocket.h"
-#include <iostream>
+#include <cstdio>
 #include <thread>
 #include <chrono>
 #include <string>
 #include <cstring>
 #include <vector>
-#include <iomanip>
+#include <cstring>
 #include <sstream>
 
 using namespace aiSocks;
@@ -91,33 +91,34 @@ int getAddressPriority(const std::string& address) {
 }
 
 void runServer(const std::string& bindAddr) {
-    std::cout << "Starting server on " << bindAddr << ":" << TEST_PORT
-              << "...\n";
+    printf("Starting server on %s:%u...\n", bindAddr.c_str(), TEST_PORT);
 
     auto serverSocket = TcpSocket::createRaw();
     (void)serverSocket.setReuseAddress(true);
 
     if (!serverSocket.bind(bindAddr, Port{TEST_PORT})) {
-        std::cerr << "Failed to bind to " << bindAddr << ":" << TEST_PORT
-                  << ": " << serverSocket.getErrorMessage() << "\n";
+        fprintf(stderr, "Failed to bind to %s:%u: %s\n",
+                bindAddr.c_str(), TEST_PORT,
+                serverSocket.getErrorMessage().c_str());
         return;
     }
     if (!serverSocket.listen(5)) {
-        std::cerr << "Failed to listen on " << bindAddr << ":" << TEST_PORT
-                  << ": " << serverSocket.getErrorMessage() << "\n";
+        fprintf(stderr, "Failed to listen on %s:%u: %s\n",
+                bindAddr.c_str(), TEST_PORT,
+                serverSocket.getErrorMessage().c_str());
         return;
     }
 
-    std::cout << "Server listening...\n";
+    printf("Server listening...\n");
 
     auto clientSocket = serverSocket.accept();
     if (!clientSocket) {
-        std::cerr << "Failed to accept: " << serverSocket.getErrorMessage()
-                  << "\n";
+        fprintf(stderr, "Failed to accept: %s\n",
+                serverSocket.getErrorMessage().c_str());
         return;
     }
 
-    std::cout << "Client connected! Sending...\n";
+    printf("Client connected! Sending...\n");
 
     std::vector<char> buffer(CHUNK_SIZE, 'A');
     size_t totalSent = 0;
@@ -127,8 +128,8 @@ void runServer(const std::string& bindAddr) {
         size_t toSend = std::min(CHUNK_SIZE, TOTAL_DATA - totalSent);
         int bytesSent = clientSocket->send(buffer.data(), toSend);
         if (bytesSent <= 0) {
-            std::cerr << "Send failed: " << clientSocket->getErrorMessage()
-                      << "\n";
+            fprintf(stderr, "Send failed: %s\n",
+                    clientSocket->getErrorMessage().c_str());
             break;
         }
         totalSent += static_cast<size_t>(bytesSent); //-V201
@@ -141,10 +142,8 @@ void runServer(const std::string& bindAddr) {
         / 1000.0;
     double mb = static_cast<double>(totalSent) / (1024.0 * 1024.0);
 
-    std::cout << std::fixed << std::setprecision(2);
-    std::cout << "  [server] sent " << mb << " MB in " << seconds
-              << "s = " << (mb / seconds) << " MB/s (" << (mb * 8 / seconds)
-              << " Mbps)\n";
+    printf("  [server] sent %.2f MB in %.2fs = %.2f MB/s (%.2f Mbps)\n",
+           mb, seconds, mb / seconds, mb * 8 / seconds);
 
     // Store server speed
     currentResult.serverMBps = mb / seconds;
@@ -155,21 +154,22 @@ void runServer(const std::string& bindAddr) {
 
 void runClient(const std::string& addr) {
     std::this_thread::sleep_for(std::chrono::milliseconds(200));
-    std::cout << "Connecting to " << addr << ":" << TEST_PORT << "...\n";
-    std::cout.flush();
+    printf("Connecting to %s:%u...\n", addr.c_str(), TEST_PORT);
+    fflush(stdout);
 
     auto clientSocket = TcpSocket::createRaw();
-    std::cout << "  [DEBUG] Attempting connect with 5s timeout...\n";
-    std::cout.flush();
+    printf("  [DEBUG] Attempting connect with 5s timeout...\n");
+    fflush(stdout);
     if (!clientSocket.connect(addr, Port{TEST_PORT}, Milliseconds{5000})) {
-        std::cerr << "Connect failed to " << addr << ":" << TEST_PORT << ": "
-                  << clientSocket.getErrorMessage() << "\n";
+        fprintf(stderr, "Connect failed to %s:%u: %s\n",
+                addr.c_str(), TEST_PORT,
+                clientSocket.getErrorMessage().c_str());
         return;
     }
-    std::cout << "  [DEBUG] Connect succeeded\n";
-    std::cout.flush();
+    printf("  [DEBUG] Connect succeeded\n");
+    fflush(stdout);
 
-    std::cout << "Connected! Receiving...\n";
+    printf("Connected! Receiving...\n");
 
     std::vector<char> buffer(CHUNK_SIZE);
     size_t totalReceived = 0;
@@ -178,16 +178,16 @@ void runClient(const std::string& addr) {
     while (totalReceived < TOTAL_DATA) {
         size_t n = clientSocket.receive(buffer.data(), buffer.size()); //-V101
         if (n <= 0) {
-            std::cout << "  [DEBUG] receive returned " << n << ", error: "
-                      << static_cast<int>(clientSocket.getLastError()) << "\n";
-            std::cout.flush();
+            printf("  [DEBUG] receive returned %zu, error: %d\n",
+                   n, static_cast<int>(clientSocket.getLastError()));
+            fflush(stdout);
             break;
         }
         totalReceived += static_cast<size_t>(n); //-V201
         if (totalReceived % (10 * 1024 * 1024) == 0) {
-            std::cout << "  [DEBUG] received "
-                      << (totalReceived / (1024 * 1024)) << " MB so far\n";
-            std::cout.flush();
+            printf("  [DEBUG] received %zu MB so far\n",
+                   totalReceived / (1024 * 1024));
+            fflush(stdout);
         }
     }
 
@@ -198,10 +198,8 @@ void runClient(const std::string& addr) {
         / 1000.0;
     double mb = static_cast<double>(totalReceived) / (1024.0 * 1024.0);
 
-    std::cout << std::fixed << std::setprecision(2);
-    std::cout << "  [client] received " << mb << " MB in " << seconds
-              << "s = " << (mb / seconds) << " MB/s (" << (mb * 8 / seconds)
-              << " Mbps)\n";
+    printf("  [client] received %.2f MB in %.2fs = %.2f MB/s (%.2f Mbps)\n",
+           mb, seconds, mb / seconds, mb * 8 / seconds);
 
     // Store client speed
     currentResult.clientMBps = mb / seconds;
@@ -211,8 +209,8 @@ void runClient(const std::string& addr) {
 }
 
 void runTest(const std::string& label, const std::string& addr) {
-    std::cout << "\n--- " << label << " (" << addr << ") ---\n";
-    std::cout.flush();
+    printf("\n--- %s (%s) ---\n", label.c_str(), addr.c_str());
+    fflush(stdout);
 
     // Initialize current result
     currentResult = {label, 0.0, 0.0, false};
@@ -220,22 +218,22 @@ void runTest(const std::string& label, const std::string& addr) {
     std::thread serverThread(runServer, addr);
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
     runClient(addr);
-    std::cout << "  [DEBUG] Waiting for server thread to finish...\n";
-    std::cout.flush();
+    printf("  [DEBUG] Waiting for server thread to finish...\n");
+    fflush(stdout);
     if (serverThread.joinable()) {
         serverThread.join();
-        std::cout << "  [DEBUG] Server thread finished\n";
+        printf("  [DEBUG] Server thread finished\n");
     }
 
     // Store the result
     results.push_back(currentResult);
-    std::cout.flush();
+    fflush(stdout);
 }
 
 int main() {
-    std::cout << "=== aiSocks Transfer Speed Test ===\n";
-    std::cout << "Transfer: " << (TOTAL_DATA / (1024 * 1024)) << " MB  "
-              << "Chunk: " << (CHUNK_SIZE / 1024) << " KB\n";
+    printf("=== aiSocks Transfer Speed Test ===\n");
+    printf("Transfer: %zu MB  Chunk: %zu KB\n",
+           TOTAL_DATA / (1024 * 1024), CHUNK_SIZE / 1024);
 
     // Always run loopback
     runTest("Loopback", "127.0.0.1");
@@ -267,29 +265,24 @@ int main() {
             addressType = "Non-LAN";
         }
 
-        std::cout << "\nFound " << addressType << " interface: (" << bestAddress
-                  << ")\n";
+        printf("\nFound %s interface: (%s)\n", addressType.c_str(), bestAddress.c_str());
         runTest("Non-loopback", bestAddress);
     } else {
-        std::cout
-            << "\nNo suitable non-loopback IPv4 interface found; skipping.\n";
+        printf("\nNo suitable non-loopback IPv4 interface found; skipping.\n");
     }
 
     // Print summary in GB/s
-    std::cout << "\n=== Transfer Speed Summary ===\n";
-    std::cout << std::fixed << std::setprecision(3);
+    printf("\n=== Transfer Speed Summary ===\n");
     for (const auto& result : results) {
         if (result.success) {
-            std::cout << result.label << ":\n";
-            std::cout << "  Server: " << (result.serverMBps / 1024.0)
-                      << " GB/s\n";
-            std::cout << "  Client: " << (result.clientMBps / 1024.0)
-                      << " GB/s\n";
+            printf("%s:\n", result.label.c_str());
+            printf("  Server: %.3f GB/s\n", result.serverMBps / 1024.0);
+            printf("  Client: %.3f GB/s\n", result.clientMBps / 1024.0);
         } else {
-            std::cout << result.label << ": Failed\n";
+            printf("%s: Failed\n", result.label.c_str());
         }
     }
 
-    std::cout << "\nDone.\n";
+    printf("\nDone.\n");
     return 0;
 }

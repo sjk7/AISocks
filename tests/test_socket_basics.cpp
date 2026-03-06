@@ -13,7 +13,7 @@
 using namespace aiSocks;
 
 int main() {
-    std::cout << "=== Socket Construction Tests ===\n";
+    printf("=== Socket Construction Tests ===\n");
 
     BEGIN_TEST("TCP/IPv4 socket is valid after construction");
     {

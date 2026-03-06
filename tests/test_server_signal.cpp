@@ -10,7 +10,6 @@
 #include "ServerSignal.h"
 #include "ServerBase.h"
 #include "test_helpers.h"
-#include <iostream>
 #include <thread>
 #include <atomic>
 #include <chrono>
@@ -38,7 +37,7 @@ class SignalTestServer : public ServerBase<int> {
 };
 
 int main() {
-    std::cout << "=== ServerSignal Tests ===\n";
+    printf("=== ServerSignal Tests ===\n");
 
     // Test 1: Initial state of g_serverSignalStop
     BEGIN_TEST("Initial state: g_serverSignalStop is false");

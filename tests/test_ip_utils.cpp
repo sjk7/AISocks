@@ -14,7 +14,7 @@
 using namespace aiSocks;
 
 int main() {
-    std::cout << "=== IP Utility Tests ===\n";
+    printf("=== IP Utility Tests ===\n");
 
     // ---- isValidIPv4 ----
     BEGIN_TEST("isValidIPv4 - valid addresses");

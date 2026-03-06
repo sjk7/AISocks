@@ -636,7 +636,7 @@ static void test_many_idle_clients_all_timeout() {
 // Entry point
 // ---------------------------------------------------------------------------
 int main() {
-    std::cout << "=== Timeout Heap Provability Tests ===\n";
+    printf("=== Timeout Heap Provability Tests ===\n");
 
     test_timeout_fires_when_idle();
     test_touch_resets_expiry();

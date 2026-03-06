@@ -122,11 +122,8 @@ static void waitForCondition(const std::string& description,
     while (std::chrono::steady_clock::now() - startTime < maxWait) {
         if (condition()) {
             auto waitTime = std::chrono::steady_clock::now() - startTime;
-            std::cout << "DEBUG: " << description << " - waited "
-                      << std::chrono::duration_cast<std::chrono::milliseconds>(
-                             waitTime)
-                             .count()
-                      << "ms\n";
+            printf("DEBUG: %s - waited %lldms\n", description.c_str(),
+                (long long)std::chrono::duration_cast<std::chrono::milliseconds>(waitTime).count());
             return;
         }
         std::this_thread::sleep_for(interval);
@@ -134,17 +131,16 @@ static void waitForCondition(const std::string& description,
     // Don't fail on timeout - just report it. Let the test check the actual
     // condition.
     auto waitTime = std::chrono::steady_clock::now() - startTime;
-    std::cout << "DEBUG: " << description << " - timeout after "
-              << std::chrono::duration_cast<std::chrono::milliseconds>(waitTime)
-                     .count()
-              << "ms (condition not met)\n";
+    printf("DEBUG: %s - timeout after %lldms (condition not met)\n",
+        description.c_str(),
+        (long long)std::chrono::duration_cast<std::chrono::milliseconds>(waitTime).count());
 }
 
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 int main() {
-    std::cout << "=== ServerBase Tests ===\n";
+    printf("=== ServerBase Tests ===\n");
 
     // Test 1: requestStop() from another thread
     BEGIN_TEST("ServerBase::requestStop() from another thread");
@@ -196,8 +192,7 @@ int main() {
         });
 
         // Debug: Check actual client count
-        std::cout << "DEBUG: Test 2 - Expected " << maxClients << ", actual "
-                  << server.clientCount() << std::endl;
+        printf("DEBUG: Test 2 - Expected %d, actual %zu\n", maxClients, server.clientCount());
 
         // Should have accepted the maximum number of clients
         REQUIRE(server.clientCount() == static_cast<size_t>(maxClients));
@@ -270,8 +265,7 @@ int main() {
             std::chrono::milliseconds{200});
 
         // Debug: Check actual client count
-        std::cout << "DEBUG: Test 4 - Expected 0 or 1, actual "
-                  << server.clientCount() << std::endl;
+        printf("DEBUG: Test 4 - Expected 0 or 1, actual %zu\n", server.clientCount());
 
         // Server should have 0 or 1 clients (may not immediately detect
         // disconnection) disconnection) disconnection)
@@ -285,7 +279,7 @@ int main() {
     BEGIN_TEST(
         "ServerBase: ClientLimit::Unlimited accepts unlimited connections");
     {
-        std::cout << "DEBUG: Starting unlimited test\n";
+        printf("DEBUG: Starting unlimited test\n");
         EchoServer server(Port::any);
         Port port = server.getActualPort();
         std::atomic<bool> ready{false};
@@ -293,28 +287,28 @@ int main() {
             = startServerInBackground(server, ready, ClientLimit::Unlimited);
         waitForServerReady(ready);
 
-        std::cout << "DEBUG: About to connect clients\n";
+        printf("DEBUG: About to connect clients\n");
         // Connect many clients
         std::vector<std::unique_ptr<TcpSocket>> clients;
         const int manyClients = 5; // Reduced to prevent hanging
 
         for (int i = 0; i < manyClients; ++i) {
-            std::cout << "DEBUG: Connecting client " << i << "\n";
+            printf("DEBUG: Connecting client %d\n", i);
             auto result = SocketFactory::createTcpClient(AddressFamily::IPv4,
                 ConnectArgs{"127.0.0.1", Port{port},
                     Milliseconds{200}}); // Reduced timeout
             if (result.isSuccess()) {
                 clients.emplace_back(
                     std::make_unique<TcpSocket>(std::move(result.value())));
-                std::cout << "DEBUG: Client " << i << " connected\n";
+                printf("DEBUG: Client %d connected\n", i);
             } else {
-                std::cout << "DEBUG: Client " << i << " failed\n";
+                printf("DEBUG: Client %d failed\n", i);
                 // Connection failed - stop trying
                 break;
             }
         }
 
-        std::cout << "DEBUG: Connected " << clients.size() << " clients\n";
+        printf("DEBUG: Connected %zu clients\n", clients.size());
 
         // Wait for server to accept all connections
         waitForCondition("server to accept all connections", [&]() {
@@ -324,17 +318,17 @@ int main() {
         // Should have accepted all clients
         REQUIRE(server.clientCount() == static_cast<size_t>(manyClients));
 
-        std::cout << "DEBUG: About to disconnect clients\n";
+        printf("DEBUG: About to disconnect clients\n");
         // Disconnect all clients
         clients.clear();
 
-        std::cout << "DEBUG: About to call requestStop\n";
+        printf("DEBUG: About to call requestStop\n");
         server.requestStop();
-        std::cout << "DEBUG: Called requestStop\n";
+        printf("DEBUG: Called requestStop\n");
 
         // CRITICAL: Wait for server thread to finish before destructor
         serverThread.join();
-        std::cout << "DEBUG: Unlimited test completed\n";
+        printf("DEBUG: Unlimited test completed\n");
     }
 
     // Test 6: ClientLimit::Default works correctly
@@ -367,9 +361,7 @@ int main() {
 
         // Should have accepted up to the test limit (not necessarily the
         // default limit)
-        std::cout << "DEBUG: Test 6 - Connected " << clients.size()
-                  << " clients, server has " << server.clientCount()
-                  << std::endl;
+        printf("DEBUG: Test 6 - Connected %zu clients, server has %zu\n", clients.size(), server.clientCount());
         REQUIRE(server.clientCount() <= static_cast<size_t>(maxTestClients));
         REQUIRE(
             server.clientCount() <= static_cast<size_t>(ClientLimit::Default));
@@ -414,6 +406,6 @@ int main() {
         serverThread2.join();
     }
 
-    std::cout << "All ServerBase tests passed!\n";
+    printf("All ServerBase tests passed!\n");
     return 0;
 }

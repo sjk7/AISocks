@@ -13,7 +13,6 @@
 #include "FileIO.h"
 #include "PathHelper.h"
 #include "test_string_literals.h"
-#include <iostream>
 #include <string>
 #include <thread>
 #include <chrono>

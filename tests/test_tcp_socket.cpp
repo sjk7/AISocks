@@ -633,7 +633,7 @@ static void test_happy_lifecycle() {
 }
 
 int main() {
-    std::cout << "=== TcpSocket: Happy and Sad Path Tests ===\n\n";
+    printf("=== TcpSocket: Happy and Sad Path Tests ===\n\n");
 
     using clock = std::chrono::steady_clock;
     auto time = [&](const char* name, auto fn) {
@@ -642,7 +642,7 @@ int main() {
         auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
             clock::now() - t0)
                       .count();
-        std::cout << "  [timing] " << name << ": " << ms << " ms\n";
+        printf("  [timing] %s: %lld ms\n", name, (long long)ms);
     };
 
     time("test_happy_construction", test_happy_construction);

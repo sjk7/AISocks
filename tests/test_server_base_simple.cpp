@@ -46,7 +46,7 @@ class SimpleServer : public ServerBase<SimpleState> {
 };
 
 int main() {
-    std::cout << "=== Simple ServerBase Test ===\n";
+    printf("=== Simple ServerBase Test ===\n");
 
     BEGIN_TEST("Basic server with ClientLimit");
     {
@@ -73,15 +73,14 @@ int main() {
             ConnectArgs{"127.0.0.1", Port{port}, Milliseconds{1000}});
 
         if (result.isSuccess()) {
-            std::cout << "Client connected successfully\n";
+            printf("Client connected successfully\n");
             auto client
                 = std::make_unique<TcpSocket>(std::move(result.value()));
 
             // Give server time to process
             std::this_thread::sleep_for(std::chrono::milliseconds{200});
 
-            std::cout << "Server client count: " << server.clientCount()
-                      << "\n";
+            printf("Server client count: %zu\n", server.clientCount());
 
             // Disconnect client
             client.reset();
@@ -89,11 +88,9 @@ int main() {
             // Give server time to process disconnection
             std::this_thread::sleep_for(std::chrono::milliseconds{200});
 
-            std::cout << "Server client count after disconnect: "
-                      << server.clientCount() << "\n";
+            printf("Server client count after disconnect: %zu\n", server.clientCount());
         } else {
-            std::cout << "Client connection failed: " << result.message()
-                      << "\n";
+            printf("Client connection failed: %s\n", result.message().c_str());
         }
 
         // Stop server
@@ -101,6 +98,6 @@ int main() {
         std::this_thread::sleep_for(std::chrono::milliseconds{100});
     }
 
-    std::cout << "Simple test completed\n";
+    printf("Simple test completed\n");
     return 0;
 }

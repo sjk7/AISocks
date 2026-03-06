@@ -298,7 +298,7 @@ static void test_poller_async_connect() {
 // main
 // ---------------------------------------------------------------------------
 int main() {
-    std::cout << "=== Poller + new-feature tests ===\n";
+    printf("=== Poller + new-feature tests ===\n");
 
     test_poller_construct();
     test_poller_add_remove();

@@ -132,7 +132,7 @@ static void test_dns_error_message() {
         auto result = SocketFactory::createTcpClient(AddressFamily::IPv4,
             ConnectArgs{BAD_HOST, Port{BASE + 10}, Milliseconds{100}});
         std::string message = result.message();
-        std::cout << "  message(): " << message << "\n";
+        printf("  message(): %s\n", message.c_str());
         REQUIRE(!message.empty());
         // Result<T> messages for DNS are simpler, just verify OS bracket
         REQUIRE_MSG(hasOsBracket(message),
@@ -142,7 +142,7 @@ static void test_dns_error_message() {
         auto s = TcpSocket::createRaw();
         (void)s.connect(BAD_HOST, Port{BASE + 10});
         std::string msg = s.getErrorMessage();
-        std::cout << "  getErrorMessage(): " << msg << "\n";
+        printf("  getErrorMessage(): %s\n", msg.c_str());
         REQUIRE_MSG(msg.find(BAD_HOST) != std::string::npos,
             "getErrorMessage() contains the failing hostname (non-throwing "
             "path)");
@@ -240,7 +240,7 @@ static void test_invalid_socket_message_content() {
         s.close();
         s.send("x", 1);
         std::string msg = s.getErrorMessage();
-        std::cout << "  send on closed: " << msg << "\n";
+        printf("  send on closed: %s\n", msg.c_str());
         REQUIRE(!msg.empty());
         // The InvalidSocket path doesn't involve a syscall so errno may be 0;
         // the description must still be present between brackets.
@@ -337,8 +337,7 @@ static void test_post_shutdown_errors() {
         // Error must have been recorded.
         REQUIRE(c.getLastError() != SocketError::None);
         REQUIRE(!c.getErrorMessage().empty());
-        std::cout << "  send-after-shutdown error: " << c.getErrorMessage()
-                  << "\n";
+        printf("  send-after-shutdown error: %s\n", c.getErrorMessage().c_str());
 
         t.join();
     }
@@ -368,7 +367,7 @@ static void test_no_stale_error_on_fresh_socket() {
 
 // -----------------------------------------------------------------------
 int main() {
-    std::cout << "=== Error Message Content Tests ===\n";
+    printf("=== Error Message Content Tests ===\n");
     test_connect_exception_message();
     test_bind_exception_message();
     test_dns_error_message();

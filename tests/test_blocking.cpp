@@ -16,7 +16,7 @@
 using namespace aiSocks;
 
 int main() {
-    std::cout << "=== Blocking State Tests ===\n";
+    printf("=== Blocking State Tests ===\n");
 
     BEGIN_TEST("New socket is blocking by default");
     {

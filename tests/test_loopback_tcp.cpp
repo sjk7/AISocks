@@ -54,7 +54,7 @@ static void recv_all(TcpSocket& s, std::string& out) {
 }
 
 int main() {
-    std::cout << "=== TCP Loopback Communication Tests ===\n";
+    printf("=== TCP Loopback Communication Tests ===\n");
 
     BEGIN_TEST("Client can connect to a listening server");
     {

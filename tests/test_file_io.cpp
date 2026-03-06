@@ -6,7 +6,6 @@
 
 #include "FileIO.h"
 #include "test_helpers.h"
-#include <iostream>
 #include <string>
 
 #ifdef _WIN32
@@ -20,7 +19,7 @@
 using namespace aiSocks;
 
 int main() {
-    std::cout << "=== FileIO Tests ===\n";
+    printf("=== FileIO Tests ===\n");
 
     // Test 1: File creation and writing
     BEGIN_TEST("File: create and write");
@@ -221,6 +220,6 @@ int main() {
     remove("test_move2.txt");
     remove("test_lock.txt");
 
-    std::cout << "\n=== All FileIO tests passed ===\n";
+    printf("\n=== All FileIO tests passed ===\n");
     return 0;
 }

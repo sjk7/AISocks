@@ -50,7 +50,15 @@ if(ENABLE_MSAN AND NOT MSVC)
     if(APPLE)
         message(FATAL_ERROR "MemorySanitizer is not supported on macOS (including Apple Silicon). Use Linux for MSan.")
     endif()
-    add_compile_options(-fsanitize=memory -fno-omit-frame-pointer)
+    # Suppress false positives from uninstrumented libc++ (installed from apt,
+    # not built with MSan). Without this, std::string etc. report
+    # use-of-uninitialized-value because libc++ internals aren't tracked.
+    set(MSAN_IGNORELIST "${CMAKE_SOURCE_DIR}/msan_ignorelist.txt")
+    add_compile_options(
+        -fsanitize=memory
+        -fno-omit-frame-pointer
+        -fsanitize-ignorelist=${MSAN_IGNORELIST}
+    )
     add_link_options(-fsanitize=memory)
     message(STATUS "MemorySanitizer enabled - use RelWithDebInfo for -O2 -g (recommended)")
 elseif(ENABLE_MSAN AND MSVC)

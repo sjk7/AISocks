@@ -50,7 +50,7 @@ static std::pair<std::thread, Port> startEchoServer(int clients = 1) {
 }
 
 int main() {
-    std::cout << "=== SimpleClient Tests ===\n";
+    printf("=== SimpleClient Tests ===\n");
 
     // -------------------------------------------------------------------------
     // Test 1: Two-step form — construction does not fire any callback
@@ -347,6 +347,6 @@ int main() {
         srv.join(); // server-side accept returns when client closes
     }
 
-    std::cout << "All SimpleClient tests passed!\n";
+    printf("All SimpleClient tests passed!\n");
     return test_summary();
 }

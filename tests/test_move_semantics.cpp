@@ -14,7 +14,7 @@
 using namespace aiSocks;
 
 int main() {
-    std::cout << "=== Move Semantics Tests ===\n";
+    printf("=== Move Semantics Tests ===\n");
 
     BEGIN_TEST("Move constructor transfers validity");
     {

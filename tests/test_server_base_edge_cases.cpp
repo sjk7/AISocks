@@ -142,7 +142,7 @@ static std::unique_ptr<TcpSocket> connectClient(
 // Tests
 // ---------------------------------------------------------------------------
 int main() {
-    std::cout << "=== ServerBase Edge Cases Tests ===\n";
+    printf("=== ServerBase Edge Cases Tests ===\n");
 
     // Test 1: Server under load with many connections
     BEGIN_TEST("Edge case: server handles high connection load");
@@ -166,8 +166,7 @@ int main() {
             }
         }
 
-        std::cout << "DEBUG: Connected " << clients.size() << " of "
-                  << numClients << " clients\n";
+        printf("DEBUG: Connected %zu of %d clients\n", clients.size(), numClients);
 
         // Each client sends a small message
         for (auto& client : clients) {
@@ -213,8 +212,7 @@ int main() {
 
         // Verify we're at capacity
         std::this_thread::sleep_for(std::chrono::milliseconds{50});
-        std::cout << "DEBUG: Client count = " << server.clientCount()
-                  << " (expected " << maxClients << ")\n";
+        printf("DEBUG: Client count = %zu (expected %zu)\n", server.clientCount(), maxClients);
 
         REQUIRE(server.clientCount() <= maxClients);
 
@@ -289,7 +287,7 @@ int main() {
         server.requestStop();
         serverThread.join();
 
-        std::cout << "DEBUG: Completed " << cycles << " cycles\n";
+        printf("DEBUG: Completed %d cycles\n", cycles);
         REQUIRE(server.totalMessagesReceived.load() >= cycles - 2);
     }
 
@@ -319,8 +317,7 @@ int main() {
             // Try to send another message
             bool sent = client->sendAll(msg, strlen(msg));
             // Connection may or may not still work depending on timing
-            std::cout << "DEBUG: After timeout, send "
-                      << (sent ? "succeeded" : "failed") << "\n";
+            printf("DEBUG: After timeout, send %s\n", (sent ? "succeeded" : "failed"));
         }
 
         std::this_thread::sleep_for(std::chrono::milliseconds{100});
@@ -328,8 +325,7 @@ int main() {
         server.requestStop();
         serverThread.join();
 
-        std::cout << "DEBUG: Timed-out clients detected: "
-                  << server.timedOutClientsCount.load() << "\n";
+        printf("DEBUG: Timed-out clients detected: %zu\n", server.timedOutClientsCount.load());
     }
 
     // Test 6: Large message handling under load
@@ -358,8 +354,7 @@ int main() {
                 // Send large message immediately after connecting
                 std::string largeMsg(messageSize, 'X');
                 bool sent = client->sendAll(largeMsg.data(), largeMsg.size());
-                std::cout << "DEBUG: Client " << i << " sent " << messageSize 
-                          << " bytes: " << sent << std::endl;
+                printf("DEBUG: Client %d sent %d bytes: %s\n", i, messageSize, (sent ? "true" : "false"));
                 
                 clients.push_back(std::move(client));
             }
@@ -370,8 +365,7 @@ int main() {
         server.requestStop();
         serverThread.join();
 
-        std::cout << "DEBUG: Received " << server.totalMessagesReceived.load()
-                  << " messages\n";
+        printf("DEBUG: Received %d messages\n", server.totalMessagesReceived.load());
         REQUIRE(server.totalMessagesReceived.load() >= numClients - 1);
     }
 
@@ -467,8 +461,7 @@ int main() {
         // - Connection might be accepted but immediately closed
         // - Connection might succeed if one client disconnected
 
-        std::cout << "DEBUG: Extra client "
-                  << (extraClient ? "connected" : "rejected") << "\n";
+        printf("DEBUG: Extra client %s\n", (extraClient ? "connected" : "rejected"));
 
         server.requestStop();
         serverThread.join();
@@ -503,7 +496,7 @@ int main() {
                 auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
                     elapsed)
                               .count();
-                std::cout << "DEBUG: Round-trip took " << ms << "ms\n";
+                printf("DEBUG: Round-trip took %lldms\n", (long long)ms);
                 REQUIRE(ms < 1000); // Should be quick
             }
         }

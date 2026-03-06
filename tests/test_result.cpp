@@ -13,7 +13,6 @@
 #include "TcpSocket.h"
 #include "SocketFactory.h"
 #include "test_helpers.h"
-#include <iostream>
 #include <string>
 #include <vector>
 
@@ -76,7 +75,7 @@ struct TrackedObject { //-V690 //-V690
 };
 
 int main() {
-    std::cout << "=== Result<T> Tests ===\n";
+    printf("=== Result<T> Tests ===\n");
 
     // Test 1: Success case - construct with value
     BEGIN_TEST("Success: construct Result with value");

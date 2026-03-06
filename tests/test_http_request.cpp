@@ -49,7 +49,6 @@
 #include "HttpRequest.h"
 #include "test_helpers.h"
 
-#include <iostream>
 #include <string>
 
 using namespace aiSocks;

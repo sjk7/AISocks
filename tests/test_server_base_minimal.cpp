@@ -24,20 +24,16 @@ static void waitForCondition(const std::string& description,
     while (std::chrono::steady_clock::now() - startTime < maxWait) {
         if (condition()) {
             auto waitTime = std::chrono::steady_clock::now() - startTime;
-            std::cout << "DEBUG: " << description << " - waited "
-                      << std::chrono::duration_cast<std::chrono::milliseconds>(
-                             waitTime)
-                             .count()
-                      << "ms\n";
+            printf("DEBUG: %s - waited %lldms\n", description.c_str(),
+                (long long)std::chrono::duration_cast<std::chrono::milliseconds>(waitTime).count());
             return;
         }
         std::this_thread::sleep_for(interval);
     }
     auto waitTime = std::chrono::steady_clock::now() - startTime;
-    std::cout << "DEBUG: " << description << " - timeout after "
-              << std::chrono::duration_cast<std::chrono::milliseconds>(waitTime)
-                     .count()
-              << "ms (condition not met)\n";
+    printf("DEBUG: %s - timeout after %lldms (condition not met)\n",
+        description.c_str(),
+        (long long)std::chrono::duration_cast<std::chrono::milliseconds>(waitTime).count());
 }
 
 struct MinimalState {
@@ -69,7 +65,7 @@ class MinimalServer : public ServerBase<MinimalState> {
 };
 
 int main() {
-    std::cout << "=== Minimal ServerBase Test ===\n";
+    printf("=== Minimal ServerBase Test ===\n");
 
     BEGIN_TEST("Minimal server with ClientLimit");
     {
@@ -103,7 +99,7 @@ int main() {
         waitForCondition("server to accept client",
             [&]() { return server.clientCount() == 1; });
 
-        std::cout << "Stopping server...\n";
+        printf("Stopping server...\n");
 
         // Stop server AFTER it has actually started and accepted a client
         server.requestStop();
@@ -116,12 +112,12 @@ int main() {
             },
             std::chrono::milliseconds{100});
 
-        std::cout << "Server stopped successfully\n";
+        printf("Server stopped successfully\n");
 
         // CRITICAL: Wait for server thread to finish before destructor
         serverThread.join();
     }
 
-    std::cout << "Minimal test completed\n";
+    printf("Minimal test completed\n");
     return 0;
 }

@@ -14,7 +14,7 @@
 using namespace aiSocks;
 
 int main() {
-    std::cout << "=== Error Handling Tests ===\n";
+    printf("=== Error Handling Tests ===\n");
 
     BEGIN_TEST("bind() on invalid socket returns error");
     {
@@ -182,6 +182,6 @@ int main() {
         }
     }
 
-    std::cout << "All error handling tests passed!\n";
+    printf("All error handling tests passed!\n");
     return 0;
 }

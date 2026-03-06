@@ -8,7 +8,6 @@
 
 #include "HttpPollServer.h"
 #include "test_helpers.h"
-#include <iostream>
 
 using namespace aiSocks;
 
@@ -38,7 +37,7 @@ class TestHttpServer : public HttpPollServer {
 };
 
 int main() {
-    std::cout << "=== HttpPollServer Tests ===\n";
+    printf("=== HttpPollServer Tests ===\n");
 
     // Test 1: Server can be instantiated
     BEGIN_TEST("Basic: HttpPollServer can be created");

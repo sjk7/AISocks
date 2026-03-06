@@ -1,0 +1,22 @@
+# Local build directories — these get rebuilt inside the image
+build/
+build-msan/
+build-asan/
+build-ubsan/
+build-mac-rel/
+build-mingw/
+build_mac_rel/
+
+# IDE / editor
+.vscode/
+.idea/
+
+# Git
+.git/
+
+# macOS
+.DS_Store
+
+# Test/scratch files
+*.pid
+compile_commands*.json

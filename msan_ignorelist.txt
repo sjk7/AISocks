@@ -1,0 +1,6 @@
+# Suppress false positives from uninstrumented libc++ internals.
+# libc++ (from apt) is not MSan-instrumented, so memory written inside
+# std::string/vector/etc constructors appears uninitialized to MSan.
+# Match all libc++ functions by their mangled std::__1 namespace prefix.
+fun:_ZNKSt3__1*
+fun:_ZNSt3__1*

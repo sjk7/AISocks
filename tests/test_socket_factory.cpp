@@ -20,7 +20,7 @@
 using namespace aiSocks;
 
 int main() {
-    std::cout << "=== SocketFactory API Tests ===\n";
+    printf("=== SocketFactory API Tests ===\n");
 
     // Test 1: Basic socket creation
     BEGIN_TEST("SocketFactory::createTcpSocket succeeds");
@@ -163,6 +163,6 @@ int main() {
         REQUIRE(second_result.error() != SocketError::None);
     }
 
-    std::cout << "All SocketFactory tests passed!\n";
+    printf("All SocketFactory tests passed!\n");
     return 0;
 }
