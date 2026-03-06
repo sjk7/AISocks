@@ -17,9 +17,9 @@
             }
         },
         {
-            "name": "debug",
+            "name": "build_mac_arm",
             "inherits": "base",
-            "displayName": "Debug",
+            "displayName": "Mac arm64 Debug",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Debug",
                 "BUILD_EXAMPLES": "ON",
@@ -113,10 +113,10 @@
             "jobs": 8
         },
         {
-            "name": "debug",
+            "name": "build_mac_arm",
             "inherits": "base-build",
-            "configurePreset": "debug",
-            "displayName": "Build Debug"
+            "configurePreset": "build_mac_arm",
+            "displayName": "Build Mac arm64 Debug"
         },
         {
             "name": "msan-debug",
@@ -151,7 +151,7 @@
         {
             "name": "test-socket-basics",
             "inherits": "base-build",
-            "configurePreset": "debug",
+            "configurePreset": "build_mac_arm",
             "displayName": "Build test_socket_basics",
             "targets": [
                 "test_socket_basics"
@@ -160,7 +160,7 @@
         {
             "name": "test-blocking",
             "inherits": "base-build",
-            "configurePreset": "debug",
+            "configurePreset": "build_mac_arm",
             "displayName": "Build test_blocking",
             "targets": [
                 "test_blocking"
@@ -169,7 +169,7 @@
         {
             "name": "test-loopback-tcp",
             "inherits": "base-build",
-            "configurePreset": "debug",
+            "configurePreset": "build_mac_arm",
             "displayName": "Build test_loopback_tcp",
             "targets": [
                 "test_loopback_tcp"
@@ -178,7 +178,7 @@
         {
             "name": "test-construction",
             "inherits": "base-build",
-            "configurePreset": "debug",
+            "configurePreset": "build_mac_arm",
             "displayName": "Build test_construction",
             "targets": [
                 "test_construction"
@@ -187,7 +187,7 @@
         {
             "name": "test-new-features",
             "inherits": "base-build",
-            "configurePreset": "debug",
+            "configurePreset": "build_mac_arm",
             "displayName": "Build test_new_features",
             "targets": [
                 "test_new_features"
@@ -196,7 +196,7 @@
         {
             "name": "test-error-messages",
             "inherits": "base-build",
-            "configurePreset": "debug",
+            "configurePreset": "build_mac_arm",
             "displayName": "Build test_error_messages",
             "targets": [
                 "test_error_messages"
@@ -205,7 +205,7 @@
         {
             "name": "test-poller",
             "inherits": "base-build",
-            "configurePreset": "debug",
+            "configurePreset": "build_mac_arm",
             "displayName": "Build test_poller",
             "targets": [
                 "test_poller"
@@ -215,7 +215,7 @@
         {
             "name": "test-socket-factory",
             "inherits": "base-build",
-            "configurePreset": "debug",
+            "configurePreset": "build_mac_arm",
             "displayName": "Build test_socket_factory",
             "targets": [
                 "test_socket_factory"
@@ -224,7 +224,7 @@
         {
             "name": "test-http-poll-server",
             "inherits": "base-build",
-            "configurePreset": "debug",
+            "configurePreset": "build_mac_arm",
             "displayName": "Build test_http_poll_server",
             "targets": [
                 "test_http_poll_server"
@@ -233,7 +233,7 @@
         {
             "name": "advanced-file-server",
             "inherits": "base-build",
-            "configurePreset": "debug",
+            "configurePreset": "build_mac_arm",
             "displayName": "Build advanced_file_server",
             "targets": [
                 "advanced_file_server"
@@ -248,9 +248,9 @@
     ],
     "testPresets": [
         {
-            "name": "debug",
-            "configurePreset": "debug",
-            "displayName": "Run Tests (Debug)"
+            "name": "build_mac_arm",
+            "configurePreset": "build_mac_arm",
+            "displayName": "Run Tests (Mac arm64 Debug)"
         },
         {
             "name": "mingw-debug",
