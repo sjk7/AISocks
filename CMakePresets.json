@@ -19,7 +19,7 @@
         {
             "name": "build_mac_arm",
             "inherits": "base",
-            "displayName": "Mac arm64 Debug",
+            "displayName": "build_mac_arm",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Debug",
                 "BUILD_EXAMPLES": "ON",
@@ -116,7 +116,7 @@
             "name": "build_mac_arm",
             "inherits": "base-build",
             "configurePreset": "build_mac_arm",
-            "displayName": "Build Mac arm64 Debug"
+            "displayName": "build_mac_arm"
         },
         {
             "name": "msan-debug",
@@ -250,7 +250,7 @@
         {
             "name": "build_mac_arm",
             "configurePreset": "build_mac_arm",
-            "displayName": "Run Tests (Mac arm64 Debug)"
+            "displayName": "build_mac_arm"
         },
         {
             "name": "mingw-debug",
