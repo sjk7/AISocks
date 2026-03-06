@@ -1,4 +1,20 @@
 cmake_minimum_required(VERSION 3.15)
+
+# Prefer Ninja when available. The CMakePresets.json base preset requests Ninja;
+# this check fires early so the user gets a clear message instead of a cryptic
+# "could not find make program" error, with an obvious fallback command.
+if(CMAKE_GENERATOR STREQUAL "Ninja")
+    find_program(NINJA_EXE ninja)
+    if(NOT NINJA_EXE)
+        message(FATAL_ERROR
+            "Ninja generator requested but 'ninja' was not found in PATH.\n"
+            "  Install Ninja:  brew install ninja   # macOS\n"
+            "                  sudo apt install ninja-build  # Linux\n"
+            "  Or fall back:   cmake -G 'Unix Makefiles' <source-dir>")
+    endif()
+    message(STATUS "Ninja found: ${NINJA_EXE}")
+endif()
+
 project(aiSocks VERSION 1.0.0 LANGUAGES CXX)
 
 # Set C++ standard
