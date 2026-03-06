@@ -79,7 +79,7 @@ using namespace std::chrono_literals;
 // ---------------------------------------------------------------------------
 static constexpr Milliseconds KEEP_ALIVE{1000}; // 1 s
 static constexpr Milliseconds POLL_TICK{20};
-static constexpr auto GRACE = 600ms; // generous for slow machines
+static constexpr Milliseconds GRACE{600}; // generous for slow machines
 
 // ---------------------------------------------------------------------------
 // TimedServer -- minimal ServerBase<> subclass used by all tests.
@@ -99,8 +99,7 @@ class TimedServer : public ServerBase<int> {
     std::atomic<int> disconnectCount{0};
     std::atomic<int> timeoutClosedCount{0};
 
-    explicit TimedServer(
-        Port port, Milliseconds keepAlive = KEEP_ALIVE)
+    explicit TimedServer(Port port, Milliseconds keepAlive = KEEP_ALIVE)
         : ServerBase<int>(ServerBind{"127.0.0.1", port, Backlog{16}}) {
         setKeepAliveTimeout(keepAlive);
     }
@@ -157,8 +156,8 @@ static TcpSocket connectClient(Port port) {
 }
 
 // Sleep for the given duration (portable shorthand).
-static void sleepFor(std::chrono::milliseconds ms) {
-    std::this_thread::sleep_for(ms);
+static void sleepFor(Milliseconds ms) {
+    std::this_thread::sleep_for(std::chrono::milliseconds{ms.count});
 }
 
 // Spin-wait until predicate() returns true or the deadline passes.
@@ -264,7 +263,7 @@ static void test_touch_resets_expiry() {
 
     // At t ~= 500ms from connect, send data to trigger
     // touchClient(), refreshing the expiry to (now + KEEP_ALIVE).
-    static constexpr auto touchAt = 500ms;
+    static constexpr Milliseconds touchAt{500};
     sleepFor(touchAt);
     const char ping[] = "ping";
     int sent = client.send(ping, sizeof(ping) - 1);
@@ -567,8 +566,7 @@ static void test_getKeepAliveTimeout_roundtrip() {
             "setKeepAliveTimeout(250ms) round-trips correctly");
 
         s.setKeepAliveTimeout(Milliseconds{65'000});
-        REQUIRE_MSG(
-            s.getKeepAliveTimeout() == Milliseconds{65'000},
+        REQUIRE_MSG(s.getKeepAliveTimeout() == Milliseconds{65'000},
             "setKeepAliveTimeout(65000ms) round-trips correctly");
 
         s.setKeepAliveTimeout(Milliseconds{0});

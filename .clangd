@@ -2,10 +2,12 @@
 # clangd configuration for AISocks (cross-platform: Windows, macOS, Linux)
 # --------------------------------------------------------------------------
 
-# Use the compile_commands.json from the project root.
-# CMake automatically copies it there from the build directory.
+# Always use the native build directory for clangd.
+# "build" is the binaryDir for the "debug" CMake preset on all platforms.
+# The cross-compilation builds (build-mingw, build-msan) must never drive
+# clangd -- they produce foreign-compiler commands that cause false errors.
 CompileFlags:
-  CompilationDatabase: .
+  CompilationDatabase: build
   # Fallback include path so clangd resolves <Socket.h> even before
   # compile_commands.json is regenerated after a clean.
   Add:

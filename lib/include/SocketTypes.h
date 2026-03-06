@@ -50,6 +50,22 @@ struct Milliseconds {
     }
 };
 
+constexpr Milliseconds operator+(Milliseconds a, Milliseconds b) noexcept {
+    return Milliseconds{a.count + b.count};
+}
+constexpr Milliseconds operator-(Milliseconds a, Milliseconds b) noexcept {
+    return Milliseconds{a.count - b.count};
+}
+constexpr Milliseconds operator*(Milliseconds a, int64_t b) noexcept {
+    return Milliseconds{a.count * b};
+}
+constexpr Milliseconds operator*(int64_t a, Milliseconds b) noexcept {
+    return Milliseconds{a * b.count};
+}
+constexpr Milliseconds operator/(Milliseconds a, int64_t b) noexcept {
+    return Milliseconds{a.count / b};
+}
+
 // Default timeout applied to all optional timeout parameters.
 inline constexpr Milliseconds defaultTimeout{30000}; // 30 seconds
 inline constexpr Milliseconds defaultConnectTimeout{10000}; // 10 seconds

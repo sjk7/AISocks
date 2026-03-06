@@ -36,7 +36,7 @@ inline constexpr size_t defaultMaxClients
 // Return values for ServerBase virtual functions
 enum class ServerResult {
 
-    StopServer = -1 ,// Stop the server gracefully
+    StopServer = -1, // Stop the server gracefully
     Disconnect = 0, // Disconnect this client
     KeepConnection = 1,
     OK = 1,
@@ -186,8 +186,8 @@ template <typename ClientData> class ServerBase {
     //
     // Returns when there are no remaining connected clients (AND accepting is
     // stopped, either because maxClients was reached or you stopped
-    // externally). Or via the thread-safe stop_ flag or if anything returns ServerResult::StopServer 
-    // from one of the, or if CTRL+C is detected.
+    // externally). Or via the thread-safe stop_ flag or if anything returns
+    // ServerResult::StopServer from one of the, or if CTRL+C is detected.
     void run(ClientLimit maxClients = ClientLimit::Default,
         Milliseconds timeout = Milliseconds{-1}) {
         if (!isValid()) return; // Server not valid, exit early
@@ -398,9 +398,10 @@ template <typename ClientData> class ServerBase {
 
         // Enhanced exit reason logging
         bool shouldStop = stop_.load(std::memory_order_relaxed);
-        bool signalReceived = handleSignals_ && g_serverSignalStop.load(std::memory_order_relaxed);
+        bool signalReceived = handleSignals_
+            && g_serverSignalStop.load(std::memory_order_relaxed);
         bool hasClientsOrAccepting = accepting || !clientFds_.empty();
-        
+
         printf("=== Server exited gracefully ===\n");
         printf("Exit reason: ");
         if (shouldStop) {
