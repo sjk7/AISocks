@@ -1,5 +1,5 @@
 {
-  "cmake.buildDirectory": "/Users/stevekerr/Documents/code/AISocks/build",
+  "cmake.buildDirectory": "/Users/stevekerr/Documents/code/AISocks/build_Mac_arm",
   "cmake.generator": "Ninja",
   "cmake.configureOnOpen": true,
   "cmake.buildBeforeRun": true,

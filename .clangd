@@ -7,7 +7,7 @@
 # The cross-compilation builds (build-mingw, build-msan) must never drive
 # clangd -- they produce foreign-compiler commands that cause false errors.
 CompileFlags:
-  CompilationDatabase: build
+  CompilationDatabase: build_Mac_arm
   # Fallback include path so clangd resolves <Socket.h> even before
   # compile_commands.json is regenerated after a clean.
   Add:

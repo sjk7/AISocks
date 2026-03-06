@@ -7,7 +7,7 @@
       "command": "cmake",
       "args": [
         "--build",
-        "build",
+        "build_Mac_arm",
         "--target",
         "test_http_poll_server",
         "--config",
@@ -27,7 +27,7 @@
       "command": "cmake",
       "args": [
         "--build",
-        "build",
+        "build_Mac_arm",
         "--target",
         "advanced_file_server",
         "--config",

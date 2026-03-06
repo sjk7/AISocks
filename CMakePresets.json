@@ -10,7 +10,7 @@
             "name": "base",
             "hidden": true,
             "generator": "Ninja",
-            "binaryDir": "${sourceDir}/build",
+            "binaryDir": "${sourceDir}/build_Mac_arm",
             "toolset": {
                 "value": "host",
                 "strategy": "external"
@@ -87,30 +87,6 @@
             }
         },
         {
-            "name": "msvc",
-            "displayName": "Visual Studio (MSVC) - x64",
-            "description": "Using Visual Studio 17 2022 generator with x64 architecture",
-            "generator": "Visual Studio 17 2022",
-            "toolset": "host=x64",
-            "architecture": "x64",
-            "binaryDir": "${sourceDir}/out/build/${presetName}",
-            "cacheVariables": {
-                "CMAKE_INSTALL_PREFIX": "${sourceDir}/out/install/${presetName}"
-            }
-        },
-        {
-            "name": "relwithdebinfo-make",
-            "inherits": "base",
-            "displayName": "RelWithDebInfo (Make)",
-            "generator": "Unix Makefiles",
-            "binaryDir": "${sourceDir}/build-relwithdebinfo-make",
-            "cacheVariables": {
-                "CMAKE_BUILD_TYPE": "RelWithDebInfo",
-                "BUILD_EXAMPLES": "ON",
-                "BUILD_TESTS": "ON"
-            }
-        },
-        {
             "name": "mingw-debug",
             "displayName": "MinGW-w64 Debug (Wine)",
             "description": "Cross-compile for Windows x86-64 with MinGW-w64; run tests under Wine",
@@ -143,28 +119,10 @@
             "displayName": "Build Debug"
         },
         {
-            "name": "http-server-debug",
-            "inherits": "base-build",
-            "configurePreset": "debug",
-            "displayName": "Build http_server (Debug)",
-            "targets": [
-                "http_server"
-            ]
-        },
-        {
             "name": "msan-debug",
             "inherits": "base-build",
             "configurePreset": "msan-debug",
             "displayName": "Build MemorySanitizer Debug"
-        },
-        {
-            "name": "http-server-msan",
-            "inherits": "base-build",
-            "configurePreset": "msan-debug",
-            "displayName": "Build http_server (MemorySanitizer)",
-            "targets": [
-                "http_server"
-            ]
         },
         {
             "name": "asan-debug",
@@ -173,28 +131,10 @@
             "displayName": "Build AddressSanitizer Debug"
         },
         {
-            "name": "http-server-asan",
-            "inherits": "base-build",
-            "configurePreset": "asan-debug",
-            "displayName": "Build http_server (AddressSanitizer)",
-            "targets": [
-                "http_server"
-            ]
-        },
-        {
             "name": "ubsan-release",
             "inherits": "base-build",
             "configurePreset": "ubsan-release",
             "displayName": "Build UBSan RelWithDebInfo"
-        },
-        {
-            "name": "http-server-ubsan",
-            "inherits": "base-build",
-            "configurePreset": "ubsan-release",
-            "displayName": "Build http_server (UBSan RelWithDebInfo)",
-            "targets": [
-                "http_server"
-            ]
         },
         {
             "name": "mac-release",
@@ -203,28 +143,10 @@
             "displayName": "Build macOS Release -O3"
         },
         {
-            "name": "http-server-mac-rel",
-            "inherits": "base-build",
-            "configurePreset": "mac-release",
-            "displayName": "Build http_server (macOS Release -O3)",
-            "targets": [
-                "http_server"
-            ]
-        },
-        {
             "name": "relwithdebinfo",
             "inherits": "base-build",
             "configurePreset": "relwithdebinfo",
             "displayName": "Build RelWithDebInfo"
-        },
-        {
-            "name": "http-server-relwithdebinfo",
-            "inherits": "base-build",
-            "configurePreset": "relwithdebinfo",
-            "displayName": "Build http_server (RelWithDebInfo)",
-            "targets": [
-                "http_server"
-            ]
         },
         {
             "name": "test-socket-basics",
@@ -289,15 +211,7 @@
                 "test_poller"
             ]
         },
-        {
-            "name": "test-tcp-socket",
-            "inherits": "base-build",
-            "configurePreset": "debug",
-            "displayName": "Build test_tcp_socket (SEGFAULT)",
-            "targets": [
-                "test_tcp_socket"
-            ]
-        },
+
         {
             "name": "test-socket-factory",
             "inherits": "base-build",
@@ -324,19 +238,6 @@
             "targets": [
                 "advanced_file_server"
             ]
-        },
-        {
-            "name": "msvc-debug",
-            "inherits": "base-build",
-            "displayName": "Visual Studio (MSVC) - Debug",
-            "configurePreset": "msvc",
-            "configuration": "Debug"
-        },
-        {
-            "name": "relwithdebinfo-make",
-            "inherits": "base-build",
-            "configurePreset": "relwithdebinfo-make",
-            "displayName": "Build RelWithDebInfo (Make)"
         },
         {
             "name": "mingw-debug",
