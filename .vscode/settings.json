@@ -1,5 +1,5 @@
 {
-  "cmake.buildDirectory": "/Users/stevekerr/Documents/code/AISocks/build_Mac_arm",
+  "cmake.buildDirectory": "${workspaceFolder}/build_Mac_arm",
   "cmake.generator": "Ninja",
   "cmake.configureOnOpen": true,
   "cmake.buildBeforeRun": true,
@@ -8,9 +8,11 @@
   "cmake.useCMakePresets": "always",
   "cmake.statusbar.advanced": {
     "target": "visible",
-    "buildType": "visible", 
+    "buildType": "visible",
     "kit": "visible",
-    "launchTarget": "visible"
+    "launchTarget": "visible",
+    "debug": "visible",
+    "run": "visible"
   },
   "cmake.configureArgs": [
     "-DBUILD_EXAMPLES=ON",
