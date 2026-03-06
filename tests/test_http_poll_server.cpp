@@ -66,6 +66,54 @@ class TestHttpServer : public HttpPollServer {
     }
 };
 
+// Receive an HTTP response from an already-connected socket,
+// stopping as soon as Content-Length bytes of body have arrived
+// (or after headers if no Content-Length is present).
+static std::string rxHttpResponse(TcpSocket& client) {
+    std::string response;
+    char buf[4096];
+    int n;
+    int receiveCount = 0;
+    while ((n = client.receive(buf, sizeof(buf))) > 0) {
+        receiveCount++;
+        printf("[DEBUG] rxHttpResponse: Received chunk %d, size=%d bytes\n",
+            receiveCount, n);
+        fflush(stdout);
+        response.append(buf, n);
+
+        if (response.find("\r\n\r\n") != std::string::npos) {
+            printf("[DEBUG] rxHttpResponse: Found end of headers\n");
+            fflush(stdout);
+            size_t clPos = response.find("Content-Length:");
+            if (clPos != std::string::npos) {
+                int contentLength = std::atoi(response.c_str() + clPos + 15);
+                size_t bodyStart = response.find("\r\n\r\n") + 4;
+                printf("[DEBUG] rxHttpResponse: Content-Length=%d, "
+                       "bodyStart=%zu, currentSize=%zu\n",
+                    contentLength, bodyStart, response.size());
+                fflush(stdout);
+                if (response.size()
+                    >= bodyStart + static_cast<size_t>(contentLength)) {
+                    printf(
+                        "[DEBUG] rxHttpResponse: Complete response received, "
+                        "breaking\n");
+                    fflush(stdout);
+                    break;
+                }
+            } else {
+                printf("[DEBUG] rxHttpResponse: No Content-Length, breaking\n");
+                fflush(stdout);
+                break;
+            }
+        }
+    }
+    printf(
+        "[DEBUG] rxHttpResponse: Receive loop ended, final response size=%zu\n",
+        response.size());
+    fflush(stdout);
+    return response;
+}
+
 // Test helper: send raw HTTP request and read response
 static std::string sendHttpRequest(Port port, const std::string& request) {
     printf("[DEBUG] sendHttpRequest: Starting - port=%d\n",
@@ -104,51 +152,9 @@ static std::string sendHttpRequest(Port port, const std::string& request) {
     printf("[DEBUG] sendHttpRequest: Request sent successfully\n");
     fflush(stdout);
 
-    // Receive response
     printf("[DEBUG] sendHttpRequest: Starting to receive response\n");
     fflush(stdout);
-    std::string response;
-    char buf[4096];
-    int n;
-    int receiveCount = 0;
-    while ((n = client.receive(buf, sizeof(buf))) > 0) {
-        receiveCount++;
-        printf("[DEBUG] sendHttpRequest: Received chunk %d, size=%d bytes\n",
-            receiveCount, n);
-        fflush(stdout);
-        response.append(buf, n);
-
-        // Check if we have complete response (simple heuristic)
-        if (response.find("\r\n\r\n") != std::string::npos) {
-            printf("[DEBUG] sendHttpRequest: Found end of headers\n");
-            fflush(stdout);
-            // Check Content-Length if present
-            size_t clPos = response.find("Content-Length:");
-            if (clPos != std::string::npos) {
-                int contentLength = std::atoi(response.c_str() + clPos + 15);
-                size_t bodyStart = response.find("\r\n\r\n") + 4;
-                printf("[DEBUG] sendHttpRequest: Content-Length=%d, "
-                       "bodyStart=%zu, currentSize=%zu\n",
-                    contentLength, bodyStart, response.size());
-                fflush(stdout);
-                if (response.size() >= bodyStart + contentLength) {
-                    printf("[DEBUG] sendHttpRequest: Complete response "
-                           "received, breaking\n");
-                    fflush(stdout);
-                    break;
-                }
-            } else {
-                printf(
-                    "[DEBUG] sendHttpRequest: No Content-Length, breaking\n");
-                fflush(stdout);
-                break;
-            }
-        }
-    }
-    printf("[DEBUG] sendHttpRequest: Receive loop ended, final response "
-           "size=%zu\n",
-        response.size());
-    fflush(stdout);
+    std::string response = rxHttpResponse(client);
 
     // Explicitly close the client socket to ensure server detects disconnection
     client.close();
@@ -280,8 +286,8 @@ int main() {
 
         printf("[DEBUG] Test 3 - Client sending request\n");
         fflush(stdout);
-        std::string response = sendHttpRequest(server.serverPort(),
-            "GET / HTTP/1.1\r\nHost: localhost\r\n\r\n");
+        std::string response = sendHttpRequest(
+            server.serverPort(), "GET / HTTP/1.1\r\nHost: localhost\r\n\r\n");
         printf("[DEBUG] Test 3 - Client received response, length: %zu\n",
             response.size());
         fflush(stdout);
@@ -313,8 +319,8 @@ int main() {
 
         std::this_thread::sleep_for(50ms);
 
-        sendHttpRequest(server.serverPort(),
-            "GET / HTTP/1.1\r\nHost: localhost\r\n\r\n");
+        sendHttpRequest(
+            server.serverPort(), "GET / HTTP/1.1\r\nHost: localhost\r\n\r\n");
 
         std::this_thread::sleep_for(100ms);
         g_serverSignalStop.store(true);
@@ -336,8 +342,8 @@ int main() {
 
         std::this_thread::sleep_for(50ms);
 
-        sendHttpRequest(server.serverPort(),
-            "GET / HTTP/1.1\r\nHost: localhost\r\n\r\n");
+        sendHttpRequest(
+            server.serverPort(), "GET / HTTP/1.1\r\nHost: localhost\r\n\r\n");
 
         std::this_thread::sleep_for(100ms);
         g_serverSignalStop.store(true);
@@ -374,8 +380,8 @@ int main() {
 
         printf("[DEBUG] Test 6 - Client sending HTTP/1.0 request\n");
         fflush(stdout);
-        std::string response = sendHttpRequest(server.serverPort(),
-            "GET / HTTP/1.0\r\nHost: localhost\r\n\r\n");
+        std::string response = sendHttpRequest(
+            server.serverPort(), "GET / HTTP/1.0\r\nHost: localhost\r\n\r\n");
         printf("[DEBUG] Test 6 - Client received response, length: %zu\n",
             response.length());
         fflush(stdout);
@@ -406,8 +412,8 @@ int main() {
 
         std::this_thread::sleep_for(50ms);
 
-        auto clientResult = SocketFactory::createTcpClient(AddressFamily::IPv4,
-            ConnectArgs{"127.0.0.1", server.serverPort()});
+        auto clientResult = SocketFactory::createTcpClient(
+            AddressFamily::IPv4, ConnectArgs{"127.0.0.1", server.serverPort()});
         REQUIRE(clientResult.isSuccess());
 
         auto& client = clientResult.value();
@@ -493,8 +499,8 @@ int main() {
 
         std::this_thread::sleep_for(50ms);
 
-        auto clientResult = SocketFactory::createTcpClient(AddressFamily::IPv4,
-            ConnectArgs{"127.0.0.1", server.serverPort()});
+        auto clientResult = SocketFactory::createTcpClient(
+            AddressFamily::IPv4, ConnectArgs{"127.0.0.1", server.serverPort()});
         REQUIRE(clientResult.isSuccess());
 
         auto& client = clientResult.value();
@@ -530,8 +536,8 @@ int main() {
 
         std::this_thread::sleep_for(50ms);
 
-        auto clientResult = SocketFactory::createTcpClient(AddressFamily::IPv4,
-            ConnectArgs{"127.0.0.1", server.serverPort()});
+        auto clientResult = SocketFactory::createTcpClient(
+            AddressFamily::IPv4, ConnectArgs{"127.0.0.1", server.serverPort()});
         REQUIRE(clientResult.isSuccess());
 
         auto& client = clientResult.value();
@@ -574,8 +580,8 @@ int main() {
 
         std::this_thread::sleep_for(50ms);
 
-        auto clientResult = SocketFactory::createTcpClient(AddressFamily::IPv4,
-            ConnectArgs{"127.0.0.1", server.serverPort()});
+        auto clientResult = SocketFactory::createTcpClient(
+            AddressFamily::IPv4, ConnectArgs{"127.0.0.1", server.serverPort()});
 
         if (clientResult.isSuccess()) {
             printf("DEBUG: Test 11 - Connected dummy client\n");
@@ -627,20 +633,22 @@ int main() {
 
         std::this_thread::sleep_for(50ms);
 
-        auto clientResult = SocketFactory::createTcpClient(AddressFamily::IPv4,
-            ConnectArgs{"127.0.0.1", server.serverPort()});
+        auto clientResult = SocketFactory::createTcpClient(
+            AddressFamily::IPv4, ConnectArgs{"127.0.0.1", server.serverPort()});
         REQUIRE(clientResult.isSuccess());
 
         auto& client = clientResult.value();
+
         client.setReceiveTimeout(Milliseconds{2000});
 
         std::string req = "GET / HTTP/1.1\r\nHost: localhost\r\n\r\n";
+        assert(client.isBlocking());
         client.sendAll(req.data(), req.size());
 
         // Receive all data
         std::string response;
         char buf[1024];
-        int n;
+        int n{0};
         while ((n = client.receive(buf, sizeof(buf))) > 0) {
             response.append(buf, n);
             if (response.size() > 10200) break; // Got header + body
@@ -668,8 +676,8 @@ int main() {
 
         std::this_thread::sleep_for(50ms);
 
-        sendHttpRequest(server.serverPort(),
-            "GET / HTTP/1.1\r\nHost: localhost\r\n\r\n");
+        sendHttpRequest(
+            server.serverPort(), "GET / HTTP/1.1\r\nHost: localhost\r\n\r\n");
 
         printf("[DEBUG] Test 13 - Stopping server\n");
         fflush(stdout);
@@ -739,8 +747,8 @@ int main() {
 
         std::this_thread::sleep_for(50ms);
 
-        auto clientResult = SocketFactory::createTcpClient(AddressFamily::IPv4,
-            ConnectArgs{"127.0.0.1", server.serverPort()});
+        auto clientResult = SocketFactory::createTcpClient(
+            AddressFamily::IPv4, ConnectArgs{"127.0.0.1", server.serverPort()});
         REQUIRE(clientResult.isSuccess());
 
         auto& client = clientResult.value();
