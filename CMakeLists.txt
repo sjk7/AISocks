@@ -4,7 +4,10 @@ cmake_minimum_required(VERSION 3.15)
 # this check fires early so the user gets a clear message instead of a cryptic
 # "could not find make program" error, with an obvious fallback command.
 if(CMAKE_GENERATOR STREQUAL "Ninja")
-    find_program(NINJA_EXE ninja)
+    # Also check alongside the cmake binary itself — the cmake.org official
+    # installer bundles ninja next to cmake, even if it's not in PATH.
+    get_filename_component(_cmake_dir "${CMAKE_COMMAND}" DIRECTORY)
+    find_program(NINJA_EXE ninja HINTS "${_cmake_dir}")
     if(NOT NINJA_EXE)
         message(FATAL_ERROR
             "Ninja generator requested but 'ninja' was not found in PATH.\n"
