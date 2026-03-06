@@ -59,7 +59,7 @@ class EdgeCaseServer : public ServerBase<EdgeCaseState> {
     std::atomic<size_t> timedOutClientsCount{0};
     std::atomic<int> disconnectCount{0};
 
-    Port getActualPort() const {
+    Port serverPort() const {
         auto endpoint = getSocket().getLocalEndpoint();
         return endpoint.isSuccess() ? endpoint.value().port : Port::any;
     }
@@ -150,7 +150,7 @@ int main() {
     BEGIN_TEST("Edge case: server handles high connection load");
     {
         EdgeCaseServer server(Port::any);
-        Port port = server.getActualPort();
+        Port port = server.serverPort();
         std::atomic<bool> ready{false};
 
         auto serverThread
@@ -192,7 +192,7 @@ int main() {
     BEGIN_TEST("Edge case: server at exactly maximum client capacity");
     {
         EdgeCaseServer server(Port::any);
-        Port port = server.getActualPort();
+        Port port = server.serverPort();
         std::atomic<bool> ready{false};
 
         const size_t maxClients = 5;
@@ -228,7 +228,7 @@ int main() {
     BEGIN_TEST("Edge case: server with minimal client limit (1)");
     {
         EdgeCaseServer server(Port::any);
-        Port port = server.getActualPort();
+        Port port = server.serverPort();
         std::atomic<bool> ready{false};
 
         auto serverThread
@@ -264,7 +264,7 @@ int main() {
     BEGIN_TEST("Edge case: rapid connect/disconnect/reconnect cycling");
     {
         EdgeCaseServer server(Port::any);
-        Port port = server.getActualPort();
+        Port port = server.serverPort();
         std::atomic<bool> ready{false};
 
         auto serverThread
@@ -301,7 +301,7 @@ int main() {
         EdgeCaseServer server(Port::any);
         server.setCustomKeepAliveTimeout(
             Milliseconds{50}); // Use 150ms for this specific test
-        Port port = server.getActualPort();
+        Port port = server.serverPort();
         std::atomic<bool> ready{false};
 
         auto serverThread
@@ -340,7 +340,7 @@ int main() {
         "Edge case: large messages from multiple clients simultaneously");
     {
         EdgeCaseServer server(Port::any);
-        Port port = server.getActualPort();
+        Port port = server.serverPort();
         std::atomic<bool> ready{false};
 
         auto serverThread
@@ -382,7 +382,7 @@ int main() {
     BEGIN_TEST("Edge case: graceful shutdown with multiple active connections");
     {
         EdgeCaseServer server(Port::any);
-        Port port = server.getActualPort();
+        Port port = server.serverPort();
         std::atomic<bool> ready{false};
 
         auto serverThread
@@ -414,7 +414,7 @@ int main() {
     BEGIN_TEST("Edge case: client limit sanity (zero or unlimited)");
     {
         EdgeCaseServer server(Port::any);
-        Port port = server.getActualPort();
+        Port port = server.serverPort();
         std::atomic<bool> ready{false};
 
         auto serverThread
@@ -442,7 +442,7 @@ int main() {
     BEGIN_TEST("Edge case: new connection attempts when at client limit");
     {
         EdgeCaseServer server(Port::any);
-        Port port = server.getActualPort();
+        Port port = server.serverPort();
         std::atomic<bool> ready{false};
 
         const size_t maxClients = 3;
@@ -483,7 +483,7 @@ int main() {
     BEGIN_TEST("Edge case: server responds within reasonable time");
     {
         EdgeCaseServer server(Port::any);
-        Port port = server.getActualPort();
+        Port port = server.serverPort();
         std::atomic<bool> ready{false};
 
         auto start = std::chrono::steady_clock::now();

@@ -280,7 +280,7 @@ int main() {
 
         printf("[DEBUG] Test 3 - Client sending request\n");
         fflush(stdout);
-        std::string response = sendHttpRequest(server.getActualPort(),
+        std::string response = sendHttpRequest(server.serverPort(),
             "GET / HTTP/1.1\r\nHost: localhost\r\n\r\n");
         printf("[DEBUG] Test 3 - Client received response, length: %zu\n",
             response.size());
@@ -313,7 +313,7 @@ int main() {
 
         std::this_thread::sleep_for(50ms);
 
-        sendHttpRequest(server.getActualPort(),
+        sendHttpRequest(server.serverPort(),
             "GET / HTTP/1.1\r\nHost: localhost\r\n\r\n");
 
         std::this_thread::sleep_for(100ms);
@@ -336,7 +336,7 @@ int main() {
 
         std::this_thread::sleep_for(50ms);
 
-        sendHttpRequest(server.getActualPort(),
+        sendHttpRequest(server.serverPort(),
             "GET / HTTP/1.1\r\nHost: localhost\r\n\r\n");
 
         std::this_thread::sleep_for(100ms);
@@ -374,7 +374,7 @@ int main() {
 
         printf("[DEBUG] Test 6 - Client sending HTTP/1.0 request\n");
         fflush(stdout);
-        std::string response = sendHttpRequest(server.getActualPort(),
+        std::string response = sendHttpRequest(server.serverPort(),
             "GET / HTTP/1.0\r\nHost: localhost\r\n\r\n");
         printf("[DEBUG] Test 6 - Client received response, length: %zu\n",
             response.length());
@@ -407,7 +407,7 @@ int main() {
         std::this_thread::sleep_for(50ms);
 
         auto clientResult = SocketFactory::createTcpClient(AddressFamily::IPv4,
-            ConnectArgs{"127.0.0.1", server.getActualPort()});
+            ConnectArgs{"127.0.0.1", server.serverPort()});
         REQUIRE(clientResult.isSuccess());
 
         auto& client = clientResult.value();
@@ -462,7 +462,7 @@ int main() {
 
         printf("[DEBUG] Test 8 - Client sending Connection: close request\n");
         fflush(stdout);
-        std::string response = sendHttpRequest(server.getActualPort(),
+        std::string response = sendHttpRequest(server.serverPort(),
             "GET / HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n");
         printf("[DEBUG] Test 8 - Client received response, length: %zu\n",
             response.length());
@@ -494,7 +494,7 @@ int main() {
         std::this_thread::sleep_for(50ms);
 
         auto clientResult = SocketFactory::createTcpClient(AddressFamily::IPv4,
-            ConnectArgs{"127.0.0.1", server.getActualPort()});
+            ConnectArgs{"127.0.0.1", server.serverPort()});
         REQUIRE(clientResult.isSuccess());
 
         auto& client = clientResult.value();
@@ -531,7 +531,7 @@ int main() {
         std::this_thread::sleep_for(50ms);
 
         auto clientResult = SocketFactory::createTcpClient(AddressFamily::IPv4,
-            ConnectArgs{"127.0.0.1", server.getActualPort()});
+            ConnectArgs{"127.0.0.1", server.serverPort()});
         REQUIRE(clientResult.isSuccess());
 
         auto& client = clientResult.value();
@@ -575,7 +575,7 @@ int main() {
         std::this_thread::sleep_for(50ms);
 
         auto clientResult = SocketFactory::createTcpClient(AddressFamily::IPv4,
-            ConnectArgs{"127.0.0.1", server.getActualPort()});
+            ConnectArgs{"127.0.0.1", server.serverPort()});
 
         if (clientResult.isSuccess()) {
             printf("DEBUG: Test 11 - Connected dummy client\n");
@@ -628,7 +628,7 @@ int main() {
         std::this_thread::sleep_for(50ms);
 
         auto clientResult = SocketFactory::createTcpClient(AddressFamily::IPv4,
-            ConnectArgs{"127.0.0.1", server.getActualPort()});
+            ConnectArgs{"127.0.0.1", server.serverPort()});
         REQUIRE(clientResult.isSuccess());
 
         auto& client = clientResult.value();
@@ -668,7 +668,7 @@ int main() {
 
         std::this_thread::sleep_for(50ms);
 
-        sendHttpRequest(server.getActualPort(),
+        sendHttpRequest(server.serverPort(),
             "GET / HTTP/1.1\r\nHost: localhost\r\n\r\n");
 
         printf("[DEBUG] Test 13 - Stopping server\n");
@@ -700,7 +700,7 @@ int main() {
 
         for (int i = 0; i < 5; ++i) {
             clients.emplace_back([&server, &successCount]() {
-                std::string response = sendHttpRequest(server.getActualPort(),
+                std::string response = sendHttpRequest(server.serverPort(),
                     "GET / HTTP/1.1\r\nHost: localhost\r\n\r\n");
                 if (!response.empty()
                     && response.find("200") != std::string::npos) {
@@ -740,7 +740,7 @@ int main() {
         std::this_thread::sleep_for(50ms);
 
         auto clientResult = SocketFactory::createTcpClient(AddressFamily::IPv4,
-            ConnectArgs{"127.0.0.1", server.getActualPort()});
+            ConnectArgs{"127.0.0.1", server.serverPort()});
         REQUIRE(clientResult.isSuccess());
 
         auto& client = clientResult.value();

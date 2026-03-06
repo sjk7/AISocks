@@ -54,11 +54,11 @@ int main() {
         REQUIRE(server.responseSentCount == 0);
     }
 
-    // Test 3: getActualPort works
-    BEGIN_TEST("API: getActualPort returns bound port");
+    // Test 3: serverPort works
+    BEGIN_TEST("API: serverPort returns bound port");
     {
         TestHttpServer server(ServerBind{"127.0.0.1", Port{0}});
-        Port port = server.getActualPort();
+        Port port = server.serverPort();
         REQUIRE(port.value() > 0); // Should have bound to a dynamic port
     }
 

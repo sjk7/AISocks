@@ -442,11 +442,16 @@ template <typename ClientData> class ServerBase {
     TcpSocket& getSocket() { return *listener_; }
     const TcpSocket& getSocket() const { return *listener_; }
 
-    // Get the actual port the server is listening on (useful when binding to
-    // Port{0})
-    Port getActualPort() const {
-        auto endpoint = getSocket().getLocalEndpoint();
-        return endpoint.isSuccess() ? endpoint.value().port : Port::any;
+    // The local endpoint (address + port) the server is bound to.
+    // Returns an error Result if the socket is invalid.
+    Result<Endpoint> serverEndpoint() const {
+        return getSocket().getLocalEndpoint();
+    }
+
+    // The port the server is listening on (useful when binding to Port{0}).
+    Port serverPort() const {
+        auto ep = getSocket().getLocalEndpoint();
+        return ep.isSuccess() ? ep.value().port : Port::any;
     }
 
     // Current number of connected clients.

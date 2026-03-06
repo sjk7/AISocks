@@ -44,7 +44,7 @@ class EchoServer : public ServerBase<EchoState> {
     std::atomic<int> disconnectCalls{0};
 
     // Get the actual port the server is listening on
-    Port getActualPort() const {
+    Port serverPort() const {
         auto endpoint = getSocket().getLocalEndpoint();
         return endpoint.isSuccess() ? endpoint.value().port : Port::any;
     }
@@ -173,7 +173,7 @@ int main() {
     BEGIN_TEST("ServerBase: exits when maxClients limit is reached");
     {
         EchoServer server(Port::any);
-        Port port = server.getActualPort();
+        Port port = server.serverPort();
         std::atomic<bool> ready{false};
         const int maxClients = 3;
         auto serverThread = startServerInBackground(
@@ -229,7 +229,7 @@ int main() {
     BEGIN_TEST("ServerBase: handles client connections gracefully");
     {
         EchoServer server(Port::any);
-        Port port = server.getActualPort();
+        Port port = server.serverPort();
         std::atomic<bool> ready{false};
         auto serverThread = startServerInBackground(server, ready);
         waitForServerReady(ready);
@@ -288,7 +288,7 @@ int main() {
     {
         printf("DEBUG: Starting unlimited test\n");
         EchoServer server(Port::any);
-        Port port = server.getActualPort();
+        Port port = server.serverPort();
         std::atomic<bool> ready{false};
         auto serverThread
             = startServerInBackground(server, ready, ClientLimit::Unlimited);
@@ -342,7 +342,7 @@ int main() {
     BEGIN_TEST("ServerBase: ClientLimit::Default respects limit");
     {
         EchoServer server(Port::any);
-        Port port = server.getActualPort();
+        Port port = server.serverPort();
         std::atomic<bool> ready{false};
         auto serverThread
             = startServerInBackground(server, ready, ClientLimit::Default);
@@ -382,7 +382,7 @@ int main() {
     BEGIN_TEST("ServerBase: can be stopped and restarted");
     {
         EchoServer server1(Port::any);
-        Port port = server1.getActualPort();
+        Port port = server1.serverPort();
         std::atomic<bool> ready1{false};
         auto serverThread1 = startServerInBackground(server1, ready1);
         waitForServerReady(ready1);
@@ -405,7 +405,7 @@ int main() {
         waitForServerReady(ready2);
 
         // Should be able to connect again to server2
-        Port port2 = server2.getActualPort();
+        Port port2 = server2.serverPort();
         auto result2 = SocketFactory::createTcpClient(AddressFamily::IPv4,
             ConnectArgs{"127.0.0.1", Port{port2}, Milliseconds{200}});
         REQUIRE(result2.isSuccess());

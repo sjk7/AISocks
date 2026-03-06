@@ -105,7 +105,7 @@ class TimedServer : public ServerBase<int> {
     }
 
     // Query the actual OS port (useful when the server bound to Port::any).
-    Port actualPort() const {
+    Port serverPort() const {
         auto ep = getSocket().getLocalEndpoint();
         return ep.isSuccess() ? ep.value().port : Port::any;
     }
@@ -187,7 +187,7 @@ static void test_timeout_fires_when_idle() {
     // other process can steal the port between allocation and use.
     TimedServer server(Port::any);
     REQUIRE(server.isValid());
-    const Port port = server.actualPort();
+    const Port port = server.serverPort();
     REQUIRE(port != Port::any);
 
     std::atomic<bool> serverReady{false};
@@ -246,7 +246,7 @@ static void test_touch_resets_expiry() {
     // Bind to port 0; query actual port after the server is already listening.
     TimedServer server(Port::any);
     REQUIRE(server.isValid());
-    Port port = server.actualPort();
+    Port port = server.serverPort();
     REQUIRE(port != Port::any);
 
     std::atomic<bool> serverReady{false};
@@ -310,7 +310,7 @@ static void test_multiple_touches_no_spurious_close() {
     TimedServer server(Port::any);
     REQUIRE(server.isValid());
     // Query port after the bind -- the OS has already reserved it; no TOCTOU.
-    Port port = server.actualPort();
+    Port port = server.serverPort();
     REQUIRE(port != Port::any);
 
     std::atomic<bool> serverReady{false};
@@ -371,7 +371,7 @@ static void test_zero_timeout_disables_sweep() {
     TimedServer server(
         Port::any, std::chrono::seconds{0}); // port 0 = OS assigns
     REQUIRE(server.isValid());
-    Port port = server.actualPort();
+    Port port = server.serverPort();
     REQUIRE(port != Port::any);
 
     std::atomic<bool> serverReady{false};
@@ -424,7 +424,7 @@ static void test_only_idle_client_closed() {
     // already holds the socket -- no TOCTOU window.
     TimedServer server(Port::any);
     REQUIRE(server.isValid());
-    Port port = server.actualPort();
+    Port port = server.serverPort();
     REQUIRE(port != Port::any);
 
     std::atomic<bool> serverReady{false};
@@ -500,7 +500,7 @@ static void test_subsecond_timeout_precision() {
 
     TimedServer server(Port::any, SHORT_KA);
     REQUIRE(server.isValid());
-    Port port = server.actualPort();
+    Port port = server.serverPort();
     REQUIRE(port != Port::any);
 
     std::atomic<bool> serverReady{false};
@@ -591,7 +591,7 @@ static void test_many_idle_clients_all_timeout() {
 
     TimedServer server(Port::any);
     REQUIRE(server.isValid());
-    Port port = server.actualPort();
+    Port port = server.serverPort();
     REQUIRE(port != Port::any);
 
     std::atomic<bool> serverReady{false};
