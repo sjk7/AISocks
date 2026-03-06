@@ -1,7 +1,8 @@
-// This is an independent project of an individual developer. Dear PVS-Studio, please check it.
+// This is an independent project of an individual developer. Dear PVS-Studio,
+// please check it.
 
-// PVS-Studio Static Code Analyzer for C, C++, C#, and Java: https://pvs-studio.com
-
+// PVS-Studio Static Code Analyzer for C, C++, C#, and Java:
+// https://pvs-studio.com
 
 // Simple test to isolate the segfault issue
 
@@ -36,7 +37,8 @@ class SimpleServer : public ServerBase<SimpleState> {
     }
 
     ServerResult onWritable(TcpSocket& sock, SimpleState& s) override {
-        (void)sock; (void)s;
+        (void)sock;
+        (void)s;
         return ServerResult::KeepConnection;
     }
 
@@ -88,7 +90,8 @@ int main() {
             // Give server time to process disconnection
             std::this_thread::sleep_for(std::chrono::milliseconds{200});
 
-            printf("Server client count after disconnect: %zu\n", server.clientCount());
+            printf("Server client count after disconnect: %zu\n",
+                server.clientCount());
         } else {
             printf("Client connection failed: %s\n", result.message().c_str());
         }

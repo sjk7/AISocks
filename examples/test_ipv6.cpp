@@ -1,7 +1,8 @@
-// This is an independent project of an individual developer. Dear PVS-Studio, please check it.
+// This is an independent project of an individual developer. Dear PVS-Studio,
+// please check it.
 
-// PVS-Studio Static Code Analyzer for C, C++, C#, and Java: https://pvs-studio.com
-
+// PVS-Studio Static Code Analyzer for C, C++, C#, and Java:
+// https://pvs-studio.com
 
 #include "TcpSocket.h"
 #include <cstdio>
@@ -31,14 +32,14 @@ void testIPv4() {
 
     if (!serverSocket.bind("127.0.0.1", Port{8001})) {
         fprintf(stderr, "   Failed to bind IPv4: %s\n",
-                serverSocket.getErrorMessage().c_str());
+            serverSocket.getErrorMessage().c_str());
         return;
     }
     printf("   Bound to 127.0.0.1:8001\n");
 
     if (!serverSocket.listen(1)) {
         fprintf(stderr, "   Failed to listen: %s\n",
-                serverSocket.getErrorMessage().c_str());
+            serverSocket.getErrorMessage().c_str());
         return;
     }
     printf("   Listening for connections\n");
@@ -94,7 +95,7 @@ void testIPv6() {
 
     if (!serverSocket.bind("::1", Port{8002})) {
         fprintf(stderr, "   Failed to bind IPv6: %s\n",
-                serverSocket.getErrorMessage().c_str());
+            serverSocket.getErrorMessage().c_str());
         fprintf(stderr, "   IPv6 may not be available on this system\n");
         return;
     }
@@ -102,7 +103,7 @@ void testIPv6() {
 
     if (!serverSocket.listen(1)) {
         fprintf(stderr, "   Failed to listen: %s\n",
-                serverSocket.getErrorMessage().c_str());
+            serverSocket.getErrorMessage().c_str());
         return;
     }
     printf("   Listening for connections\n");

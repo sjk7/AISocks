@@ -1,7 +1,8 @@
-// This is an independent project of an individual developer. Dear PVS-Studio, please check it.
+// This is an independent project of an individual developer. Dear PVS-Studio,
+// please check it.
 
-// PVS-Studio Static Code Analyzer for C, C++, C#, and Java: https://pvs-studio.com
-
+// PVS-Studio Static Code Analyzer for C, C++, C#, and Java:
+// https://pvs-studio.com
 
 //
 // Tests for HttpRequest::parse()
@@ -56,30 +57,27 @@ using namespace aiSocks;
 // -- helpers ----------------------------------------------------------------
 
 // Build a minimal well-formed GET request.
-[[maybe_unused]] static std::string makeGet(const std::string& target,
-                           const std::string& version = "HTTP/1.1") {
+[[maybe_unused]] static std::string makeGet(
+    const std::string& target, const std::string& version = "HTTP/1.1") {
     return "GET " + target + " " + version + "\r\n\r\n";
 }
 
 // Build a request with headers (each entry = "Key: Value").
 [[maybe_unused]] static std::string makeRequest(const std::string& method,
-                               const std::string& target,
-                               const std::string& version,
-                               const std::string& headers,
-                               const std::string& body = {}) {
+    const std::string& target, const std::string& version,
+    const std::string& headers, const std::string& body = {}) {
     std::string r = method + " " + target + " " + version + "\r\n";
     r += headers;
-    if (!headers.empty() && (headers.size() < 2 ||
-        headers.substr(headers.size() - 2) != "\r\n"))
+    if (!headers.empty()
+        && (headers.size() < 2 || headers.substr(headers.size() - 2) != "\r\n"))
         r += "\r\n";
     r += "\r\n";
     r += body;
     return r;
 }
 
-static void CHECK_FIELD(const std::string& label,
-                        const std::string& got,
-                        const std::string& expected) {
+static void CHECK_FIELD(const std::string& label, const std::string& got,
+    const std::string& expected) {
     REQUIRE_MSG(got == expected,
         label + ": expected \"" + expected + "\"  got \"" + got + "\"");
 }
@@ -92,8 +90,8 @@ static void test_basic_get() {
     auto req = HttpRequest::parse("GET /index.html HTTP/1.1\r\n\r\n");
     REQUIRE(req.valid);
     REQUIRE(static_cast<bool>(req));
-    CHECK_FIELD("method",  req.method,  "GET");
-    CHECK_FIELD("path",    req.path,    "/index.html");
+    CHECK_FIELD("method", req.method, "GET");
+    CHECK_FIELD("path", req.path, "/index.html");
     CHECK_FIELD("rawPath", req.rawPath, "/index.html");
     CHECK_FIELD("version", req.version, "HTTP/1.1");
     REQUIRE(req.queryString.empty());
@@ -104,8 +102,8 @@ static void test_basic_get() {
 // 2. Common HTTP methods
 static void test_methods() {
     BEGIN_TEST("HTTP methods");
-    for (const char* m : {"POST", "PUT", "DELETE", "PATCH",
-                          "HEAD", "OPTIONS", "TRACE"}) {
+    for (const char* m :
+        {"POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS", "TRACE"}) {
         auto req = HttpRequest::parse(std::string(m) + " / HTTP/1.1\r\n\r\n");
         REQUIRE_MSG(req.valid, std::string("valid for method ") + m);
         REQUIRE_MSG(req.method == m, std::string("method field == ") + m);
@@ -139,14 +137,14 @@ static void test_path_decoding() {
         auto req = HttpRequest::parse("GET /hello%20world HTTP/1.1\r\n\r\n");
         REQUIRE(req.valid);
         CHECK_FIELD("rawPath", req.rawPath, "/hello%20world");
-        CHECK_FIELD("path",    req.path,    "/hello world");
+        CHECK_FIELD("path", req.path, "/hello world");
     }
     {
         // %41 = 'A'
         auto req = HttpRequest::parse("GET /fo%6F HTTP/1.1\r\n\r\n");
         REQUIRE(req.valid);
         CHECK_FIELD("rawPath %6F", req.rawPath, "/fo%6F");
-        CHECK_FIELD("path %6F",    req.path,    "/foo");
+        CHECK_FIELD("path %6F", req.path, "/foo");
     }
     {
         // Case-insensitive hex in path
@@ -162,7 +160,7 @@ static void test_path_encoded_slash() {
     auto req = HttpRequest::parse("GET /foo%2Fbar HTTP/1.1\r\n\r\n");
     REQUIRE(req.valid);
     CHECK_FIELD("rawPath", req.rawPath, "/foo%2Fbar");
-    CHECK_FIELD("path",    req.path,    "/foo/bar");
+    CHECK_FIELD("path", req.path, "/foo/bar");
 }
 
 // 6. Query split at first '?' only
@@ -171,14 +169,14 @@ static void test_query_split() {
     {
         auto req = HttpRequest::parse("GET /path?a=1 HTTP/1.1\r\n\r\n");
         REQUIRE(req.valid);
-        CHECK_FIELD("rawPath",     req.rawPath,     "/path");
+        CHECK_FIELD("rawPath", req.rawPath, "/path");
         CHECK_FIELD("queryString", req.queryString, "a=1");
     }
     {
         // Second '?' belongs to the query value
         auto req = HttpRequest::parse("GET /path?a=1?b=2 HTTP/1.1\r\n\r\n");
         REQUIRE(req.valid);
-        CHECK_FIELD("rawPath 2q",     req.rawPath,     "/path");
+        CHECK_FIELD("rawPath 2q", req.rawPath, "/path");
         CHECK_FIELD("queryString 2q", req.queryString, "a=1?b=2");
         REQUIRE(req.queryParams.count("a") == 1);
         CHECK_FIELD("param a value", req.queryParams.at("a"), "1?b=2");
@@ -188,10 +186,11 @@ static void test_query_split() {
 // 7. Multiple distinct query parameters
 static void test_query_params_multiple() {
     BEGIN_TEST("multiple query params");
-    auto req = HttpRequest::parse("GET /search?q=hello&page=2&sort=asc HTTP/1.1\r\n\r\n");
+    auto req = HttpRequest::parse(
+        "GET /search?q=hello&page=2&sort=asc HTTP/1.1\r\n\r\n");
     REQUIRE(req.valid);
     REQUIRE(req.queryParams.size() == 3);
-    CHECK_FIELD("q",    req.queryParams.at("q"),    "hello");
+    CHECK_FIELD("q", req.queryParams.at("q"), "hello");
     CHECK_FIELD("page", req.queryParams.at("page"), "2");
     CHECK_FIELD("sort", req.queryParams.at("sort"), "asc");
 }
@@ -242,76 +241,71 @@ static void test_query_param_encoded_key() {
 // 13. Header key case-folding (RFC 7230 S.3.2)
 static void test_header_case_folding() {
     BEGIN_TEST("header key case-folding");
-    std::string raw =
-        "GET / HTTP/1.1\r\n"
-        "Content-Type: text/html\r\n"
-        "X-My-Header: value\r\n"
-        "ACCEPT: application/json\r\n"
-        "\r\n";
+    std::string raw = "GET / HTTP/1.1\r\n"
+                      "Content-Type: text/html\r\n"
+                      "X-My-Header: value\r\n"
+                      "ACCEPT: application/json\r\n"
+                      "\r\n";
     auto req = HttpRequest::parse(raw);
     REQUIRE(req.valid);
     REQUIRE(req.headers.count("content-type") == 1);
-    REQUIRE(req.headers.count("x-my-header")  == 1);
-    REQUIRE(req.headers.count("accept")        == 1);
+    REQUIRE(req.headers.count("x-my-header") == 1);
+    REQUIRE(req.headers.count("accept") == 1);
     // Original-case keys should NOT exist
     REQUIRE(req.headers.count("Content-Type") == 0);
-    REQUIRE(req.headers.count("ACCEPT")        == 0);
+    REQUIRE(req.headers.count("ACCEPT") == 0);
     CHECK_FIELD("content-type", req.headers.at("content-type"), "text/html");
 }
 
 // 14. Header OWS trimming (RFC 7230 S.3.2.6)
 static void test_header_ows() {
     BEGIN_TEST("header OWS trimming");
-    std::string raw =
-        "GET / HTTP/1.1\r\n"
-        "Content-Type:   text/html   \r\n"
-        "X-A:value_no_space\r\n"
-        "X-B:  leading only\r\n"
-        "\r\n";
+    std::string raw = "GET / HTTP/1.1\r\n"
+                      "Content-Type:   text/html   \r\n"
+                      "X-A:value_no_space\r\n"
+                      "X-B:  leading only\r\n"
+                      "\r\n";
     auto req = HttpRequest::parse(raw);
     REQUIRE(req.valid);
-    CHECK_FIELD("OWS both sides",  req.headers.at("content-type"), "text/html");
-    CHECK_FIELD("no spaces",       req.headers.at("x-a"), "value_no_space");
-    CHECK_FIELD("leading only",    req.headers.at("x-b"), "leading only");
+    CHECK_FIELD("OWS both sides", req.headers.at("content-type"), "text/html");
+    CHECK_FIELD("no spaces", req.headers.at("x-a"), "value_no_space");
+    CHECK_FIELD("leading only", req.headers.at("x-b"), "leading only");
 }
 
 // 15. Header value with colon -- only first colon splits key/value
 static void test_header_colon_in_value() {
     BEGIN_TEST("colon in header value");
-    std::string raw =
-        "GET / HTTP/1.1\r\n"
-        "Authorization: Basic dXNlcjpwYXNz\r\n"
-        "Date: Mon, 01 Jan 2024 00:00:00 GMT\r\n"
-        "\r\n";
+    std::string raw = "GET / HTTP/1.1\r\n"
+                      "Authorization: Basic dXNlcjpwYXNz\r\n"
+                      "Date: Mon, 01 Jan 2024 00:00:00 GMT\r\n"
+                      "\r\n";
     auto req = HttpRequest::parse(raw);
     REQUIRE(req.valid);
-    CHECK_FIELD("Authorization", req.headers.at("authorization"),
-                "Basic dXNlcjpwYXNz");
+    CHECK_FIELD(
+        "Authorization", req.headers.at("authorization"), "Basic dXNlcjpwYXNz");
     CHECK_FIELD("Date with colon", req.headers.at("date"),
-                "Mon, 01 Jan 2024 00:00:00 GMT");
+        "Mon, 01 Jan 2024 00:00:00 GMT");
 }
 
 // 16. Header with empty value
 static void test_header_empty_value() {
     BEGIN_TEST("header with empty value");
-    std::string raw =
-        "GET / HTTP/1.1\r\n"
-        "X-Empty:\r\n"
-        "X-Spaces:   \r\n"
-        "\r\n";
+    std::string raw = "GET / HTTP/1.1\r\n"
+                      "X-Empty:\r\n"
+                      "X-Spaces:   \r\n"
+                      "\r\n";
     auto req = HttpRequest::parse(raw);
     REQUIRE(req.valid);
-    CHECK_FIELD("x-empty",  req.headers.at("x-empty"),  "");
+    CHECK_FIELD("x-empty", req.headers.at("x-empty"), "");
     CHECK_FIELD("x-spaces", req.headers.at("x-spaces"), "");
 }
 
 // 17. Header with tab OWS (RFC 7230 allows HTAB as OWS)
 static void test_header_tab_ows() {
     BEGIN_TEST("header tab OWS");
-    std::string raw =
-        "GET / HTTP/1.1\r\n"
-        "Content-Type:\ttext/plain\t\r\n"
-        "\r\n";
+    std::string raw = "GET / HTTP/1.1\r\n"
+                      "Content-Type:\ttext/plain\t\r\n"
+                      "\r\n";
     auto req = HttpRequest::parse(raw);
     REQUIRE(req.valid);
     CHECK_FIELD("tab OWS", req.headers.at("content-type"), "text/plain");
@@ -320,16 +314,15 @@ static void test_header_tab_ows() {
 // 18. header() accessor is case-insensitive
 static void test_header_accessor_case() {
     BEGIN_TEST("header() accessor case-insensitivity");
-    std::string raw =
-        "GET / HTTP/1.1\r\n"
-        "Content-Length: 42\r\n"
-        "\r\n";
+    std::string raw = "GET / HTTP/1.1\r\n"
+                      "Content-Length: 42\r\n"
+                      "\r\n";
     auto req = HttpRequest::parse(raw);
     REQUIRE(req.valid);
-    REQUIRE(req.header("content-length")  != nullptr);
-    REQUIRE(req.header("Content-Length")  != nullptr);
-    REQUIRE(req.header("CONTENT-LENGTH")  != nullptr);
-    REQUIRE(req.header("Content-length")  != nullptr);
+    REQUIRE(req.header("content-length") != nullptr);
+    REQUIRE(req.header("Content-Length") != nullptr);
+    REQUIRE(req.header("CONTENT-LENGTH") != nullptr);
+    REQUIRE(req.header("Content-length") != nullptr);
     CHECK_FIELD("via accessor", *req.header("Content-Length"), "42"); //-V522
     REQUIRE(req.header("x-not-present") == nullptr);
 }
@@ -339,18 +332,18 @@ static void test_header_or_fallback() {
     BEGIN_TEST("headerOr() fallback");
     auto req = HttpRequest::parse("GET / HTTP/1.1\r\n\r\n");
     REQUIRE(req.valid);
-    CHECK_FIELD("absent fallback", req.headerOr("x-missing", "default"), "default");
-    CHECK_FIELD("absent empty",    req.headerOr("x-missing"),            "");
+    CHECK_FIELD(
+        "absent fallback", req.headerOr("x-missing", "default"), "default");
+    CHECK_FIELD("absent empty", req.headerOr("x-missing"), "");
 }
 
 // 20. Body separated by \r\n\r\n
 static void test_body_separation() {
     BEGIN_TEST("body separation");
-    std::string raw =
-        "POST /submit HTTP/1.1\r\n"
-        "Content-Type: application/x-www-form-urlencoded\r\n"
-        "\r\n"
-        "name=Alice&age=30";
+    std::string raw = "POST /submit HTTP/1.1\r\n"
+                      "Content-Type: application/x-www-form-urlencoded\r\n"
+                      "\r\n"
+                      "name=Alice&age=30";
     auto req = HttpRequest::parse(raw);
     REQUIRE(req.valid);
     CHECK_FIELD("body", req.body, "name=Alice&age=30");
@@ -359,7 +352,8 @@ static void test_body_separation() {
 // 21. No body -> body is empty
 static void test_no_body() {
     BEGIN_TEST("no body");
-    auto req = HttpRequest::parse("GET / HTTP/1.1\r\nHost: example.com\r\n\r\n");
+    auto req
+        = HttpRequest::parse("GET / HTTP/1.1\r\nHost: example.com\r\n\r\n");
     REQUIRE(req.valid);
     REQUIRE(req.body.empty());
 }
@@ -368,20 +362,22 @@ static void test_no_body() {
 static void test_post_with_body() {
     BEGIN_TEST("POST with body");
     std::string body = "{\"key\":\"value\"}";
-    std::string raw =
-        "POST /api/data HTTP/1.1\r\n"
-        "Host: api.example.com\r\n"
-        "Content-Type: application/json\r\n"
-        "Content-Length: " + std::to_string(body.size()) + "\r\n"
-        "\r\n" + body;
+    std::string raw = "POST /api/data HTTP/1.1\r\n"
+                      "Host: api.example.com\r\n"
+                      "Content-Type: application/json\r\n"
+                      "Content-Length: "
+        + std::to_string(body.size())
+        + "\r\n"
+          "\r\n"
+        + body;
     auto req = HttpRequest::parse(raw);
     REQUIRE(req.valid);
     CHECK_FIELD("POST method", req.method, "POST");
-    CHECK_FIELD("POST path",   req.path,   "/api/data");
-    CHECK_FIELD("POST body",   req.body,   body);
+    CHECK_FIELD("POST path", req.path, "/api/data");
+    CHECK_FIELD("POST body", req.body, body);
     CHECK_FIELD("Content-Length header",
-                *req.header("content-length"), //-V522
-                std::to_string(body.size()));
+        *req.header("content-length"), //-V522
+        std::to_string(body.size()));
 }
 
 // 23. Request with no headers (bare request line)
@@ -396,12 +392,12 @@ static void test_no_headers() {
 // 24. Absolute-form target (proxy / CONNECT)
 static void test_absolute_form() {
     BEGIN_TEST("absolute-form target");
-    auto req = HttpRequest::parse(
-        "GET http://example.com/page?id=1 HTTP/1.1\r\nHost: example.com\r\n\r\n");
+    auto req = HttpRequest::parse("GET http://example.com/page?id=1 "
+                                  "HTTP/1.1\r\nHost: example.com\r\n\r\n");
     REQUIRE(req.valid);
-    CHECK_FIELD("rawPath abs",     req.rawPath,     "http://example.com/page");
+    CHECK_FIELD("rawPath abs", req.rawPath, "http://example.com/page");
     CHECK_FIELD("queryString abs", req.queryString, "id=1");
-    CHECK_FIELD("method abs",      req.method,      "GET");
+    CHECK_FIELD("method abs", req.method, "GET");
 }
 
 // 25. Asterisk-form target (OPTIONS *)
@@ -409,9 +405,9 @@ static void test_asterisk_form() {
     BEGIN_TEST("asterisk-form target");
     auto req = HttpRequest::parse("OPTIONS * HTTP/1.1\r\n\r\n");
     REQUIRE(req.valid);
-    CHECK_FIELD("method *",  req.method,  "OPTIONS");
+    CHECK_FIELD("method *", req.method, "OPTIONS");
     CHECK_FIELD("rawPath *", req.rawPath, "*");
-    CHECK_FIELD("path *",    req.path,    "*");
+    CHECK_FIELD("path *", req.path, "*");
 }
 
 // 26. Malformed: missing HTTP version
@@ -439,7 +435,7 @@ static void test_malformed_empty() {
 // 29. operator bool
 static void test_operator_bool() {
     BEGIN_TEST("operator bool");
-    REQUIRE( static_cast<bool>(HttpRequest::parse("GET / HTTP/1.1\r\n\r\n")));
+    REQUIRE(static_cast<bool>(HttpRequest::parse("GET / HTTP/1.1\r\n\r\n")));
     REQUIRE(!static_cast<bool>(HttpRequest::parse("")));
     REQUIRE(!static_cast<bool>(HttpRequest::parse("OOPS\r\n\r\n")));
 }
@@ -448,7 +444,8 @@ static void test_operator_bool() {
 static void test_duplicate_query_key() {
     BEGIN_TEST("duplicate query param key");
     // RFC 3986 does not define which value wins; common behaviour is last-wins.
-    auto req = HttpRequest::parse("GET /?color=red&color=blue HTTP/1.1\r\n\r\n");
+    auto req
+        = HttpRequest::parse("GET /?color=red&color=blue HTTP/1.1\r\n\r\n");
     REQUIRE(req.valid);
     REQUIRE(req.queryParams.count("color") == 1);
     CHECK_FIELD("duplicate key last-wins", req.queryParams.at("color"), "blue");
@@ -478,9 +475,10 @@ static void test_deep_encoded_path() {
     auto req = HttpRequest::parse(
         "GET /api/v1/users/John%20Doe/profile?lang=en HTTP/1.1\r\n\r\n");
     REQUIRE(req.valid);
-    CHECK_FIELD("rawPath deep", req.rawPath, "/api/v1/users/John%20Doe/profile");
-    CHECK_FIELD("path deep",    req.path,    "/api/v1/users/John Doe/profile");
-    CHECK_FIELD("lang param",   req.queryParams.at("lang"), "en");
+    CHECK_FIELD(
+        "rawPath deep", req.rawPath, "/api/v1/users/John%20Doe/profile");
+    CHECK_FIELD("path deep", req.path, "/api/v1/users/John Doe/profile");
+    CHECK_FIELD("lang param", req.queryParams.at("lang"), "en");
 }
 
 // 34. '#' fragment -- clients MUST NOT send fragments; if present, it ends up
@@ -500,10 +498,11 @@ static void test_fragment_not_sent() {
 static void test_long_header_value() {
     BEGIN_TEST("long header value");
     std::string longVal(4096, 'x');
-    std::string raw =
-        "GET / HTTP/1.1\r\n"
-        "X-Long: " + longVal + "\r\n"
-        "\r\n";
+    std::string raw = "GET / HTTP/1.1\r\n"
+                      "X-Long: "
+        + longVal
+        + "\r\n"
+          "\r\n";
     auto req = HttpRequest::parse(raw);
     REQUIRE(req.valid);
     CHECK_FIELD("long value", req.headers.at("x-long"), longVal);
@@ -519,32 +518,33 @@ static void test_many_headers() {
     auto req = HttpRequest::parse(raw);
     REQUIRE(req.valid);
     REQUIRE_MSG(req.headers.size() == 50, "50 headers parsed");
-    CHECK_FIELD("header 0",  req.headers.at("x-h0"),  "v0");
+    CHECK_FIELD("header 0", req.headers.at("x-h0"), "v0");
     CHECK_FIELD("header 49", req.headers.at("x-h49"), "v49");
 }
 
 // 37. Typical browser-like request (integration)
 static void test_typical_browser_request() {
     BEGIN_TEST("typical browser request");
-    std::string raw =
-        "GET /search?q=c%2B%2B+templates&safe=off HTTP/1.1\r\n"
-        "Host: www.example.com\r\n"
-        "User-Agent: Mozilla/5.0\r\n"
-        "Accept: text/html,application/xhtml+xml\r\n"
-        "Accept-Language: en-US,en;q=0.9\r\n"
-        "Accept-Encoding: gzip, deflate, br\r\n"
-        "Connection: keep-alive\r\n"
-        "\r\n";
+    std::string raw = "GET /search?q=c%2B%2B+templates&safe=off HTTP/1.1\r\n"
+                      "Host: www.example.com\r\n"
+                      "User-Agent: Mozilla/5.0\r\n"
+                      "Accept: text/html,application/xhtml+xml\r\n"
+                      "Accept-Language: en-US,en;q=0.9\r\n"
+                      "Accept-Encoding: gzip, deflate, br\r\n"
+                      "Connection: keep-alive\r\n"
+                      "\r\n";
     auto req = HttpRequest::parse(raw);
     REQUIRE(req.valid);
-    CHECK_FIELD("browser method",  req.method,  "GET");
-    CHECK_FIELD("browser path",    req.path,    "/search");
+    CHECK_FIELD("browser method", req.method, "GET");
+    CHECK_FIELD("browser path", req.path, "/search");
     CHECK_FIELD("browser version", req.version, "HTTP/1.1");
-    CHECK_FIELD("q param", req.queryParams.at("q"),    "c++ templates");
+    CHECK_FIELD("q param", req.queryParams.at("q"), "c++ templates");
     CHECK_FIELD("safe param", req.queryParams.at("safe"), "off");
-    CHECK_FIELD("host header",       req.headers.at("host"),     "www.example.com");
-    CHECK_FIELD("user-agent header", *req.header("User-Agent"),  "Mozilla/5.0"); //-V522
-    CHECK_FIELD("connection header", req.headers.at("connection"), "keep-alive");
+    CHECK_FIELD("host header", req.headers.at("host"), "www.example.com");
+    CHECK_FIELD(
+        "user-agent header", *req.header("User-Agent"), "Mozilla/5.0"); //-V522
+    CHECK_FIELD(
+        "connection header", req.headers.at("connection"), "keep-alive");
     REQUIRE(req.body.empty());
 }
 

@@ -137,7 +137,7 @@ int main() {
         Result<TrackedObject> result1(
             TrackedObject(789, &moved, nullptr, &destructed));
         REQUIRE(result1.isSuccess());
- //-V820
+        //-V820
         Result<TrackedObject> result2(std::move(result1));
         REQUIRE(result2.isSuccess());
         REQUIRE(result2.value().value == 789);
@@ -148,7 +148,7 @@ int main() {
     {
         Result<int> result1(SocketError::BindFailed, "Bind failed", 13);
         Result<int> result2(std::move(result1));
- //-V820
+        //-V820
         REQUIRE(result2.isError());
         REQUIRE(result2.error() == SocketError::BindFailed);
     }
@@ -324,8 +324,8 @@ int main() {
         REQUIRE(sock.isValid());
 
         // This test just verifies Result can hold socket types and propagate
-        // through APIs Testing actual network errors would be unreliable across //-V820
-        // platforms
+        // through APIs Testing actual network errors would be unreliable across
+        // //-V820 platforms
         REQUIRE(true);
     }
 

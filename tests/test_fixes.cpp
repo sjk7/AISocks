@@ -1,8 +1,8 @@
-// This is an independent project of an individual developer. Dear PVS-Studio, please check it.
+// This is an independent project of an individual developer. Dear PVS-Studio,
+// please check it.
 
-// PVS-Studio Static Code Analyzer for C, C++, C#, and Java: https://pvs-studio.com
-
-
+// PVS-Studio Static Code Analyzer for C, C++, C#, and Java:
+// https://pvs-studio.com
 
 // Tests for the five fixes applied to ServerBase / HttpPollServer:
 //
@@ -58,14 +58,14 @@ class BaseServer : public ServerBase<TS> {
     public:
     explicit BaseServer(Port port)
         : ServerBase<TS>(ServerBind{"127.0.0.1", port, Backlog{5}}) {
-        setKeepAliveTimeout(std::chrono::milliseconds{0});
+        setKeepAliveTimeout(Milliseconds{0});
     }
 
     std::atomic<int> idleCalls{0};
     std::atomic<int> readableCalls{0};
     std::atomic<int> errorCalls{0};
     ServerResult errorReturn{ServerResult::Disconnect};
-    bool partialReadMode{false};  // For onIdle test: read only small chunks
+    bool partialReadMode{false}; // For onIdle test: read only small chunks
 
     protected:
     ServerResult onReadable(TcpSocket& sock, TS& s) override {
@@ -124,12 +124,18 @@ static void test_client_limit_source_of_truth() {
 
     // Including ServerTypes.h in isolation compiles (proven by compilation).
     // Verify values using static_assert to avoid constant expression warnings.
-    static_assert(static_cast<size_t>(ClientLimit::Unlimited) == 0, "ClientLimit::Unlimited");
-    static_assert(static_cast<size_t>(ClientLimit::Default) == 1000, "ClientLimit::Default");
-    static_assert(static_cast<size_t>(ClientLimit::Low) == 100, "ClientLimit::Low");
-    static_assert(static_cast<size_t>(ClientLimit::Medium) == 500, "ClientLimit::Medium");
-    static_assert(static_cast<size_t>(ClientLimit::High) == 2000, "ClientLimit::High");
-    static_assert(static_cast<size_t>(ClientLimit::Maximum) == 10000, "ClientLimit::Maximum");
+    static_assert(static_cast<size_t>(ClientLimit::Unlimited) == 0,
+        "ClientLimit::Unlimited");
+    static_assert(static_cast<size_t>(ClientLimit::Default) == 1000,
+        "ClientLimit::Default");
+    static_assert(
+        static_cast<size_t>(ClientLimit::Low) == 100, "ClientLimit::Low");
+    static_assert(
+        static_cast<size_t>(ClientLimit::Medium) == 500, "ClientLimit::Medium");
+    static_assert(
+        static_cast<size_t>(ClientLimit::High) == 2000, "ClientLimit::High");
+    static_assert(static_cast<size_t>(ClientLimit::Maximum) == 10000,
+        "ClientLimit::Maximum");
 
     // The ClientLimit seen via ServerBase.h and HttpPollServer.h must be the
     // same type (they both include ServerTypes.h, there is only one
@@ -311,7 +317,8 @@ static void test_on_idle_only_on_timeout() {
     // are present. We measure total onIdle calls over the entire test duration.
     {
         BaseServer server(Port::any);
-        server.partialReadMode = true;  // Read only small chunks to keep socket readable
+        server.partialReadMode
+            = true; // Read only small chunks to keep socket readable
 
         Port srvPort104 = Port::any;
         {
@@ -344,13 +351,13 @@ static void test_on_idle_only_on_timeout() {
         for (int i = 0; i < 100; ++i) {
             client->send(chunk, sizeof(chunk));
         }
-        
+
         // Give server time to process the data
         std::this_thread::sleep_for(std::chrono::milliseconds{150});
 
         int idleAfterData = server.idleCalls.load();
         int readableAfterData = server.readableCalls.load();
-        
+
         int idleDelta = idleAfterData - idleBeforeData;
         int readableDelta = readableAfterData - readableBeforeData;
 
@@ -361,7 +368,8 @@ static void test_on_idle_only_on_timeout() {
         // Behavior verification: If onIdle were called on every poll wake,
         // it would be called as often as onReadable. Since it should only
         // fire on timeouts (when no events are ready), it should be called
-        // much less frequently. We verify idleDelta is at most 50% of readableDelta.
+        // much less frequently. We verify idleDelta is at most 50% of
+        // readableDelta.
         REQUIRE_MSG(readableDelta > 0, "onReadable should have fired");
         REQUIRE_MSG(idleDelta <= readableDelta / 2,
             "onIdle calls (" + std::to_string(idleDelta)

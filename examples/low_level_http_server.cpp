@@ -149,7 +149,7 @@ class HttpServer : public HttpPollServer {
               "Bad Request: this server only accepts HTTP requests.\n";
 
         rebuildResponses(); // warm the cache before the first request
-        setKeepAliveTimeout(std::chrono::milliseconds{5000});
+        setKeepAliveTimeout(Milliseconds{5000});
 
         const int port = static_cast<int>(bind.port.value());
         const bool isWildcard = (bind.address == "0.0.0.0"

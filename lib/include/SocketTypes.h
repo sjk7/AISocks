@@ -13,8 +13,9 @@
 
 namespace aiSocks {
 
-// Lightweight milliseconds type to avoid including <chrono> in Socket.h.
-// Provides implicit conversion from integers and std::chrono::duration types.
+// Lightweight milliseconds type used throughout the API.
+// Explicit construction from int64_t; implicit conversion from
+// std::chrono::duration types.
 struct Milliseconds {
     int64_t count;
 

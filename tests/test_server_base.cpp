@@ -1,8 +1,8 @@
-// This is an independent project of an individual developer. Dear PVS-Studio, please check it.
+// This is an independent project of an individual developer. Dear PVS-Studio,
+// please check it.
 
-// PVS-Studio Static Code Analyzer for C, C++, C#, and Java: https://pvs-studio.com
-
-
+// PVS-Studio Static Code Analyzer for C, C++, C#, and Java:
+// https://pvs-studio.com
 
 // Tests for ServerBase<T> with ClientLimit enum:
 //   1. requestStop() from another thread causes run() to return cleanly.
@@ -37,7 +37,7 @@ class EchoServer : public ServerBase<EchoState> {
     public:
     explicit EchoServer(Port port)
         : ServerBase<EchoState>(ServerBind{"127.0.0.1", port, Backlog{5}}) {
-        setKeepAliveTimeout(std::chrono::milliseconds{0});
+        setKeepAliveTimeout(Milliseconds{0});
     }
 
     std::atomic<int> idleCalls{0};
@@ -123,7 +123,10 @@ static void waitForCondition(const std::string& description,
         if (condition()) {
             auto waitTime = std::chrono::steady_clock::now() - startTime;
             printf("DEBUG: %s - waited %lldms\n", description.c_str(),
-                (long long)std::chrono::duration_cast<std::chrono::milliseconds>(waitTime).count());
+                (long long)
+                    std::chrono::duration_cast<std::chrono::milliseconds>(
+                        waitTime)
+                        .count());
             return;
         }
         std::this_thread::sleep_for(interval);
@@ -133,7 +136,9 @@ static void waitForCondition(const std::string& description,
     auto waitTime = std::chrono::steady_clock::now() - startTime;
     printf("DEBUG: %s - timeout after %lldms (condition not met)\n",
         description.c_str(),
-        (long long)std::chrono::duration_cast<std::chrono::milliseconds>(waitTime).count());
+        (long long)std::chrono::duration_cast<std::chrono::milliseconds>(
+            waitTime)
+            .count());
 }
 
 // ---------------------------------------------------------------------------
@@ -192,7 +197,8 @@ int main() {
         });
 
         // Debug: Check actual client count
-        printf("DEBUG: Test 2 - Expected %d, actual %zu\n", maxClients, server.clientCount());
+        printf("DEBUG: Test 2 - Expected %d, actual %zu\n", maxClients,
+            server.clientCount());
 
         // Should have accepted the maximum number of clients
         REQUIRE(server.clientCount() == static_cast<size_t>(maxClients));
@@ -265,7 +271,8 @@ int main() {
             std::chrono::milliseconds{200});
 
         // Debug: Check actual client count
-        printf("DEBUG: Test 4 - Expected 0 or 1, actual %zu\n", server.clientCount());
+        printf("DEBUG: Test 4 - Expected 0 or 1, actual %zu\n",
+            server.clientCount());
 
         // Server should have 0 or 1 clients (may not immediately detect
         // disconnection) disconnection) disconnection)
@@ -361,7 +368,8 @@ int main() {
 
         // Should have accepted up to the test limit (not necessarily the
         // default limit)
-        printf("DEBUG: Test 6 - Connected %zu clients, server has %zu\n", clients.size(), server.clientCount());
+        printf("DEBUG: Test 6 - Connected %zu clients, server has %zu\n",
+            clients.size(), server.clientCount());
         REQUIRE(server.clientCount() <= static_cast<size_t>(maxTestClients));
         REQUIRE(
             server.clientCount() <= static_cast<size_t>(ClientLimit::Default));
@@ -386,7 +394,7 @@ int main() {
 
         server1.requestStop();
         serverThread1.join();
-        
+
         // Small delay to allow port to be released
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
 

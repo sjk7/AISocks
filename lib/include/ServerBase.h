@@ -501,21 +501,22 @@ template <typename ClientData> class ServerBase {
 
     // Keep-alive idle timeout. Connections that have been idle longer than
     // this will be closed gracefully. Set to 0 to disable. Default: 65000ms.
-    // Accepts milliseconds so callers can specify sub-second timeouts without
-    // the silent truncation-to-zero that chrono::seconds would cause.
-    void setKeepAliveTimeout(std::chrono::milliseconds timeout) {
+    // Uses the Milliseconds type so callers can specify sub-second timeouts
+    // without the silent truncation-to-zero that chrono::seconds would cause.
+    void setKeepAliveTimeout(Milliseconds timeout) {
+        std::chrono::milliseconds ms{timeout.count};
         if (inHighLoadMode_) {
             // In high-load mode: save the new timeout for later restoration,
             // but keep the aggressive timeout active to handle current load
-            normalKeepAliveTimeout_ = timeout;
+            normalKeepAliveTimeout_ = ms;
         } else {
             // Normal mode: apply immediately and keep backup in sync
-            keepAliveTimeout_ = timeout;
-            normalKeepAliveTimeout_ = timeout;
+            keepAliveTimeout_ = ms;
+            normalKeepAliveTimeout_ = ms;
         }
     }
-    std::chrono::milliseconds getKeepAliveTimeout() const {
-        return keepAliveTimeout_;
+    Milliseconds getKeepAliveTimeout() const {
+        return Milliseconds{keepAliveTimeout_.count()};
     }
 
     // Request a graceful shutdown. Safe to call from any thread.

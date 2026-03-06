@@ -1,7 +1,8 @@
-// This is an independent project of an individual developer. Dear PVS-Studio, please check it.
+// This is an independent project of an individual developer. Dear PVS-Studio,
+// please check it.
 
-// PVS-Studio Static Code Analyzer for C, C++, C#, and Java: https://pvs-studio.com
-
+// PVS-Studio Static Code Analyzer for C, C++, C#, and Java:
+// https://pvs-studio.com
 
 //
 // Tests: error message completeness, correctness, and
@@ -159,7 +160,7 @@ static void test_invalid_socket_code() {
     {
         auto s = TcpSocket::createRaw();
         s.close();
-        const auto ret =s.send("x", 1);
+        const auto ret = s.send("x", 1);
         REQUIRE(ret == -1);
         REQUIRE(s.getLastError() == SocketError::InvalidSocket);
     }
@@ -337,7 +338,8 @@ static void test_post_shutdown_errors() {
         // Error must have been recorded.
         REQUIRE(c.getLastError() != SocketError::None);
         REQUIRE(!c.getErrorMessage().empty());
-        printf("  send-after-shutdown error: %s\n", c.getErrorMessage().c_str());
+        printf(
+            "  send-after-shutdown error: %s\n", c.getErrorMessage().c_str());
 
         t.join();
     }

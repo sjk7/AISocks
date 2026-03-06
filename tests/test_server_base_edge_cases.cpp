@@ -26,7 +26,8 @@ using namespace aiSocks;
 
 // Testing constants for edge case scenarios
 static constexpr Milliseconds QUICK_POLL_TIMEOUT{5};
-static constexpr Milliseconds SHORT_KEEP_ALIVE{1000}; // 1 second - more reasonable for testing
+static constexpr Milliseconds SHORT_KEEP_ALIVE{
+    1000}; // 1 second - more reasonable for testing
 
 // ---------------------------------------------------------------------------
 // Echo server for edge case testing
@@ -42,13 +43,14 @@ class EdgeCaseServer : public ServerBase<EdgeCaseState> {
     explicit EdgeCaseServer(Port port)
         : ServerBase<EdgeCaseState>(
               ServerBind{"127.0.0.1", port, Backlog{10}}) {
-        setKeepAliveTimeout(std::chrono::milliseconds(SHORT_KEEP_ALIVE.count));
-        setHandleSignals(false); // Disable signal handling for parallel test execution
+        setKeepAliveTimeout(SHORT_KEEP_ALIVE);
+        setHandleSignals(
+            false); // Disable signal handling for parallel test execution
     }
 
     // Method to set custom keep-alive timeout for specific tests
     void setCustomKeepAliveTimeout(Milliseconds timeout) {
-        setKeepAliveTimeout(std::chrono::milliseconds(timeout.count));
+        setKeepAliveTimeout(timeout);
     }
 
     std::atomic<int> totalMessagesReceived{0};
@@ -166,7 +168,8 @@ int main() {
             }
         }
 
-        printf("DEBUG: Connected %zu of %d clients\n", clients.size(), numClients);
+        printf(
+            "DEBUG: Connected %zu of %d clients\n", clients.size(), numClients);
 
         // Each client sends a small message
         for (auto& client : clients) {
@@ -212,7 +215,8 @@ int main() {
 
         // Verify we're at capacity
         std::this_thread::sleep_for(std::chrono::milliseconds{50});
-        printf("DEBUG: Client count = %zu (expected %zu)\n", server.clientCount(), maxClients);
+        printf("DEBUG: Client count = %zu (expected %zu)\n",
+            server.clientCount(), maxClients);
 
         REQUIRE(server.clientCount() <= maxClients);
 
@@ -267,7 +271,7 @@ int main() {
             = startServerInBackground(server, ready, ClientLimit::Unlimited);
         waitForServerReady(ready);
 
-         server.setCustomKeepAliveTimeout(Milliseconds{5000});
+        server.setCustomKeepAliveTimeout(Milliseconds{5000});
 
         // Connect/disconnect cycle
         int cycles = 10;
@@ -295,7 +299,8 @@ int main() {
     BEGIN_TEST("Edge case: keep-alive timeout disconnects idle clients");
     {
         EdgeCaseServer server(Port::any);
-        server.setCustomKeepAliveTimeout(Milliseconds{50}); // Use 150ms for this specific test
+        server.setCustomKeepAliveTimeout(
+            Milliseconds{50}); // Use 150ms for this specific test
         Port port = server.getActualPort();
         std::atomic<bool> ready{false};
 
@@ -317,7 +322,8 @@ int main() {
             // Try to send another message
             bool sent = client->sendAll(msg, strlen(msg));
             // Connection may or may not still work depending on timing
-            printf("DEBUG: After timeout, send %s\n", (sent ? "succeeded" : "failed"));
+            printf("DEBUG: After timeout, send %s\n",
+                (sent ? "succeeded" : "failed"));
         }
 
         std::this_thread::sleep_for(std::chrono::milliseconds{100});
@@ -325,7 +331,8 @@ int main() {
         server.requestStop();
         serverThread.join();
 
-        printf("DEBUG: Timed-out clients detected: %zu\n", server.timedOutClientsCount.load());
+        printf("DEBUG: Timed-out clients detected: %zu\n",
+            server.timedOutClientsCount.load());
     }
 
     // Test 6: Large message handling under load
@@ -350,12 +357,13 @@ int main() {
             if (client) {
                 client->setBlocking(true);
                 client->setReceiveTimeout(Milliseconds{500});
-                
+
                 // Send large message immediately after connecting
                 std::string largeMsg(messageSize, 'X');
                 bool sent = client->sendAll(largeMsg.data(), largeMsg.size());
-                printf("DEBUG: Client %d sent %d bytes: %s\n", i, messageSize, (sent ? "true" : "false"));
-                
+                printf("DEBUG: Client %d sent %d bytes: %s\n", i, messageSize,
+                    (sent ? "true" : "false"));
+
                 clients.push_back(std::move(client));
             }
         }
@@ -365,7 +373,8 @@ int main() {
         server.requestStop();
         serverThread.join();
 
-        printf("DEBUG: Received %d messages\n", server.totalMessagesReceived.load());
+        printf("DEBUG: Received %d messages\n",
+            server.totalMessagesReceived.load());
         REQUIRE(server.totalMessagesReceived.load() >= numClients - 1);
     }
 
@@ -461,7 +470,8 @@ int main() {
         // - Connection might be accepted but immediately closed
         // - Connection might succeed if one client disconnected
 
-        printf("DEBUG: Extra client %s\n", (extraClient ? "connected" : "rejected"));
+        printf("DEBUG: Extra client %s\n",
+            (extraClient ? "connected" : "rejected"));
 
         server.requestStop();
         serverThread.join();

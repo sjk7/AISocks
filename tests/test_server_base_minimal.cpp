@@ -1,7 +1,8 @@
-// This is an independent project of an individual developer. Dear PVS-Studio, please check it.
+// This is an independent project of an individual developer. Dear PVS-Studio,
+// please check it.
 
-// PVS-Studio Static Code Analyzer for C, C++, C#, and Java: https://pvs-studio.com
-
+// PVS-Studio Static Code Analyzer for C, C++, C#, and Java:
+// https://pvs-studio.com
 
 // Minimal test to isolate segfault in ServerBase
 
@@ -25,7 +26,10 @@ static void waitForCondition(const std::string& description,
         if (condition()) {
             auto waitTime = std::chrono::steady_clock::now() - startTime;
             printf("DEBUG: %s - waited %lldms\n", description.c_str(),
-                (long long)std::chrono::duration_cast<std::chrono::milliseconds>(waitTime).count());
+                (long long)
+                    std::chrono::duration_cast<std::chrono::milliseconds>(
+                        waitTime)
+                        .count());
             return;
         }
         std::this_thread::sleep_for(interval);
@@ -33,7 +37,9 @@ static void waitForCondition(const std::string& description,
     auto waitTime = std::chrono::steady_clock::now() - startTime;
     printf("DEBUG: %s - timeout after %lldms (condition not met)\n",
         description.c_str(),
-        (long long)std::chrono::duration_cast<std::chrono::milliseconds>(waitTime).count());
+        (long long)std::chrono::duration_cast<std::chrono::milliseconds>(
+            waitTime)
+            .count());
 }
 
 struct MinimalState {
@@ -48,12 +54,14 @@ class MinimalServer : public ServerBase<MinimalState> {
 
     protected:
     ServerResult onReadable(TcpSocket& sock, MinimalState& s) override {
-        (void)sock; (void)s;
+        (void)sock;
+        (void)s;
         return ServerResult::KeepConnection;
     }
 
     ServerResult onWritable(TcpSocket& sock, MinimalState& s) override { //-V524
-        (void)sock; (void)s;
+        (void)sock;
+        (void)s;
         return ServerResult::KeepConnection;
     }
 

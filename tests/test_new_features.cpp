@@ -202,7 +202,8 @@ static void test_udp() {
         REQUIRE(std::string(buf, static_cast<size_t>(recvd)) == "hello udp");
         REQUIRE(from.port.value() != 0);
         REQUIRE(from.address == "127.0.0.1");
-        printf("  sender seen as: %s:%u\n", from.address.c_str(), from.port.value());
+        printf("  sender seen as: %s:%u\n", from.address.c_str(),
+            from.port.value());
     }
 
     BEGIN_TEST("UDP sendTo/receiveFrom: multiple datagrams in sequence");
@@ -266,7 +267,8 @@ static void test_udp_connected() {
         REQUIRE(
             std::string(buf, static_cast<size_t>(recvd)) == "connected-udp");
         REQUIRE(from.address == "127.0.0.1");
-        printf("  datagram arrived from: %s:%u\n", from.address.c_str(), from.port.value());
+        printf("  datagram arrived from: %s:%u\n", from.address.c_str(),
+            from.port.value());
     }
 }
 
@@ -443,12 +445,15 @@ static void test_bulk_throughput() {
         double mbSend = static_cast<double>(TOTAL) / (1024.0 * 1024.0);
         double mbps = mbSend / (ms / 1000.0); // throughput = sent / sender time
 
-        printf("  datagrams: %d  size: %zu B  sent: %.1f MB  received: %.1f MB  dropped: %zu\n",
-               COUNT, DGRAM, mbSend, mbRecv, dropped);
-        printf("  sender time: %.1f ms  send throughput: %.1f MB/s\n", ms, mbps);
+        printf("  datagrams: %d  size: %zu B  sent: %.1f MB  received: %.1f MB "
+               " dropped: %zu\n",
+            COUNT, DGRAM, mbSend, mbRecv, dropped);
+        printf(
+            "  sender time: %.1f ms  send throughput: %.1f MB/s\n", ms, mbps);
 
         if (dropped > 0)
-            printf("  NOTE: %zu datagrams dropped (kernel buffer overflow)\n", dropped);
+            printf("  NOTE: %zu datagrams dropped (kernel buffer overflow)\n",
+                dropped);
         REQUIRE(recvTotal.load() > 0);
     }
 
@@ -510,7 +515,7 @@ static void test_bulk_throughput() {
             = (static_cast<double>(TOTAL) / (1024.0 * 1024.0)) / (ms / 1000.0);
 
         printf("  total: %zu MB  sent: %zu B  received: %zu B\n",
-               TOTAL / (1024 * 1024), sent, recvTotal.load());
+            TOTAL / (1024 * 1024), sent, recvTotal.load());
         printf("  time: %.1f ms  throughput: %.1f MB/s\n", ms, mbps);
 
         REQUIRE(recvTotal.load() == TOTAL);

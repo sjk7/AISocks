@@ -338,7 +338,8 @@ int main() {
             longPath += "a/";
         }
 
-        // Should not crash - any result (empty or non-empty) is acceptable for extreme input
+        // Should not crash - any result (empty or non-empty) is acceptable for
+        // extreme input
         std::string canonical = PathHelper::getCanonicalPath(longPath);
         REQUIRE(true); // If we get here, no crash occurred
     }

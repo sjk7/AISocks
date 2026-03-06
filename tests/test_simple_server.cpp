@@ -86,7 +86,7 @@ static void test_poll_clients_echo() {
     Port port = serverPort(server);
     REQUIRE(port != Port::any);
     server.setHandleSignals(false);
-    server.setKeepAliveTimeout(std::chrono::milliseconds{0});
+    server.setKeepAliveTimeout(Milliseconds{0});
 
     std::thread serverThread([&] {
         serverReady.store(true);
@@ -145,7 +145,7 @@ static void test_poll_clients_disconnect_on_false() {
     Port port = serverPort(server);
     REQUIRE(port != Port::any);
     server.setHandleSignals(false);
-    server.setKeepAliveTimeout(std::chrono::milliseconds{0});
+    server.setKeepAliveTimeout(Milliseconds{0});
 
     std::thread serverThread([&] {
         serverReady.store(true);

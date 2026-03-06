@@ -1,8 +1,8 @@
-// This is an independent project of an individual developer. Dear PVS-Studio, please check it.
+// This is an independent project of an individual developer. Dear PVS-Studio,
+// please check it.
 
-// PVS-Studio Static Code Analyzer for C, C++, C#, and Java: https://pvs-studio.com
-
-
+// PVS-Studio Static Code Analyzer for C, C++, C#, and Java:
+// https://pvs-studio.com
 
 // ---------------------------------------------------------------------------
 // Provability tests for ServerBase's lazy-deletion min-heap keep-alive sweep.
@@ -77,7 +77,7 @@ using namespace std::chrono_literals;
 // GRACE        -- extra margin added to expected deadlines in test assertions.
 //               Covers OS scheduler jitter and CI slowness.
 // ---------------------------------------------------------------------------
-static constexpr std::chrono::milliseconds KEEP_ALIVE{1000}; // 1 s
+static constexpr Milliseconds KEEP_ALIVE{1000}; // 1 s
 static constexpr Milliseconds POLL_TICK{20};
 static constexpr auto GRACE = 600ms; // generous for slow machines
 
@@ -100,7 +100,7 @@ class TimedServer : public ServerBase<int> {
     std::atomic<int> timeoutClosedCount{0};
 
     explicit TimedServer(
-        Port port, std::chrono::milliseconds keepAlive = KEEP_ALIVE)
+        Port port, Milliseconds keepAlive = KEEP_ALIVE)
         : ServerBase<int>(ServerBind{"127.0.0.1", port, Backlog{16}}) {
         setKeepAliveTimeout(keepAlive);
     }
@@ -543,15 +543,15 @@ static void test_getKeepAliveTimeout_roundtrip() {
 
     // Constructor-supplied values must survive to the getter unchanged.
     {
-        TimedServer s(Port::any, std::chrono::milliseconds{300});
+        TimedServer s(Port::any, Milliseconds{300});
         REQUIRE(s.isValid());
-        REQUIRE_MSG(s.getKeepAliveTimeout() == std::chrono::milliseconds{300},
+        REQUIRE_MSG(s.getKeepAliveTimeout() == Milliseconds{300},
             "constructor-set 300ms round-trips via getter");
     }
     {
-        TimedServer s(Port::any, std::chrono::milliseconds{0});
+        TimedServer s(Port::any, Milliseconds{0});
         REQUIRE(s.isValid());
-        REQUIRE_MSG(s.getKeepAliveTimeout() == std::chrono::milliseconds{0},
+        REQUIRE_MSG(s.getKeepAliveTimeout() == Milliseconds{0},
             "constructor-set 0ms (disabled) round-trips via getter");
     }
 
@@ -562,17 +562,17 @@ static void test_getKeepAliveTimeout_roundtrip() {
         REQUIRE_MSG(s.getKeepAliveTimeout() == KEEP_ALIVE,
             "default KEEP_ALIVE (1000ms) returned correctly");
 
-        s.setKeepAliveTimeout(std::chrono::milliseconds{250});
-        REQUIRE_MSG(s.getKeepAliveTimeout() == std::chrono::milliseconds{250},
+        s.setKeepAliveTimeout(Milliseconds{250});
+        REQUIRE_MSG(s.getKeepAliveTimeout() == Milliseconds{250},
             "setKeepAliveTimeout(250ms) round-trips correctly");
 
-        s.setKeepAliveTimeout(std::chrono::milliseconds{65'000});
+        s.setKeepAliveTimeout(Milliseconds{65'000});
         REQUIRE_MSG(
-            s.getKeepAliveTimeout() == std::chrono::milliseconds{65'000},
+            s.getKeepAliveTimeout() == Milliseconds{65'000},
             "setKeepAliveTimeout(65000ms) round-trips correctly");
 
-        s.setKeepAliveTimeout(std::chrono::milliseconds{0});
-        REQUIRE_MSG(s.getKeepAliveTimeout() == std::chrono::milliseconds{0},
+        s.setKeepAliveTimeout(Milliseconds{0});
+        REQUIRE_MSG(s.getKeepAliveTimeout() == Milliseconds{0},
             "setKeepAliveTimeout(0ms) (disable) round-trips correctly");
     }
 }

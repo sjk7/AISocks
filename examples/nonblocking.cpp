@@ -26,7 +26,7 @@ void runServerNonBlocking() {
 
     if (!serverSocket.isValid()) {
         fprintf(stderr, "Failed to create server socket: %s\n",
-                serverSocket.getErrorMessage().c_str());
+            serverSocket.getErrorMessage().c_str());
         return;
     }
 
@@ -34,13 +34,13 @@ void runServerNonBlocking() {
 
     if (!serverSocket.bind("0.0.0.0", Port{8080})) {
         fprintf(stderr, "Failed to bind: %s\n",
-                serverSocket.getErrorMessage().c_str());
+            serverSocket.getErrorMessage().c_str());
         return;
     }
 
     if (!serverSocket.listen(5)) {
         fprintf(stderr, "Failed to listen: %s\n",
-                serverSocket.getErrorMessage().c_str());
+            serverSocket.getErrorMessage().c_str());
         return;
     }
 
@@ -50,14 +50,14 @@ void runServerNonBlocking() {
     auto clientSocket = serverSocket.accept();
     if (!clientSocket) {
         fprintf(stderr, "Failed to accept connection: %s\n",
-                serverSocket.getErrorMessage().c_str());
+            serverSocket.getErrorMessage().c_str());
         return;
     }
 
     // Set client socket to non-blocking mode
     if (!clientSocket->setBlocking(false)) {
         fprintf(stderr, "Failed to set non-blocking mode: %s\n",
-                clientSocket->getErrorMessage().c_str());
+            clientSocket->getErrorMessage().c_str());
         return;
     }
 
@@ -99,7 +99,7 @@ void runServerNonBlocking() {
                 std::this_thread::sleep_for(std::chrono::microseconds(100));
             } else {
                 fprintf(stderr, "Failed to send data: %s\n",
-                        clientSocket->getErrorMessage().c_str());
+                    clientSocket->getErrorMessage().c_str());
                 break;
             }
         }
@@ -135,21 +135,21 @@ void runClientNonBlocking() {
 
     if (!clientSocket.isValid()) {
         fprintf(stderr, "Failed to create client socket: %s\n",
-                clientSocket.getErrorMessage().c_str());
+            clientSocket.getErrorMessage().c_str());
         return;
     }
 
     // Connect (blocking connect is fine)
     if (!clientSocket.connect("127.0.0.1", Port{8080})) {
         fprintf(stderr, "Failed to connect: %s\n",
-                clientSocket.getErrorMessage().c_str());
+            clientSocket.getErrorMessage().c_str());
         return;
     }
 
     // Set socket to non-blocking mode
     if (!clientSocket.setBlocking(false)) {
         fprintf(stderr, "Failed to set non-blocking mode: %s\n",
-                clientSocket.getErrorMessage().c_str());
+            clientSocket.getErrorMessage().c_str());
         return;
     }
 
@@ -180,7 +180,7 @@ void runClientNonBlocking() {
                 std::this_thread::sleep_for(std::chrono::microseconds(100));
             } else {
                 fprintf(stderr, "Failed to receive data: %s\n",
-                        clientSocket.getErrorMessage().c_str());
+                    clientSocket.getErrorMessage().c_str());
                 break;
             }
         }

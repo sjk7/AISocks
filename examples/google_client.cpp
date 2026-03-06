@@ -46,7 +46,8 @@ int httpConnect(const ConnectArgs& args, const char* httpRequest) {
         printf("Reading response...\n");
         printf("-----------------------------------------\n\n");
 
-        while ((retval = (bytesRead = sock.receive(buffer, sizeof(buffer) - 1))) //-V101 //-V103
+        while ((retval = (bytesRead
+                    = sock.receive(buffer, sizeof(buffer) - 1))) //-V101 //-V103
             > 0) {
             buffer[bytesRead] = '\0';
 
@@ -68,8 +69,8 @@ int httpConnect(const ConnectArgs& args, const char* httpRequest) {
         if (totalBytesRead == 0 && retval < 0) {
             printf("\nConnection closed by server, after sending zero bytes\n");
             printf("Last error: %d - %s\n",
-                   static_cast<int>(sock.getLastError()),
-                   sock.getErrorMessage().c_str());
+                static_cast<int>(sock.getLastError()),
+                sock.getErrorMessage().c_str());
         }
 
         printf("\n-----------------------------------------\n");
