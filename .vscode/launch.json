@@ -5,12 +5,12 @@
       "name": "Debug test_http_poll_server",
       "type": "lldb",
       "request": "launch",
-      "program": "/Users/stevekerr/Documents/code/AISocks/build_Mac_arm/tests/test_http_poll_server",
+      "program": "${workspaceFolder}/build_Mac_arm/tests/test_http_poll_server",
       "args": [],
-      "cwd": "/Users/stevekerr/Documents/code/AISocks",
+      "cwd": "${workspaceFolder}",
       "console": "integratedTerminal",
       "sourceMap": {
-        "/Users/stevekerr/Documents/code/AISocks": "/Users/stevekerr/Documents/code/AISocks"
+        "${workspaceFolder}": "${workspaceFolder}"
       },
       "preLaunchTask": "Build test_http_poll_server"
     },
@@ -18,12 +18,12 @@
       "name": "Debug advanced_file_server",
       "type": "lldb",
       "request": "launch",
-      "program": "/Users/stevekerr/Documents/code/AISocks/build_Mac_arm/advanced_file_server",
+      "program": "${workspaceFolder}/build_Mac_arm/advanced_file_server",
       "args": [],
-      "cwd": "/Users/stevekerr/Documents/code/AISocks",
+      "cwd": "${workspaceFolder}",
       "console": "integratedTerminal",
       "sourceMap": {
-        "/Users/stevekerr/Documents/code/AISocks": "/Users/stevekerr/Documents/code/AISocks"
+        "${workspaceFolder}": "${workspaceFolder}"
       },
       "preLaunchTask": "Build advanced_file_server"
     }
