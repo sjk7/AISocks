@@ -404,6 +404,8 @@ FodyWeavers.xsd
 !.vscode/launch.json
 !.vscode/extensions.json
 !.vscode/*.code-snippets
+!.vscode/cmake-kits.json
+!.vscode/cmake-variants.json
 
 # Local History for Visual Studio Code
 .history/
