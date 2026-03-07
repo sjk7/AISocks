@@ -39,7 +39,12 @@ std::string buildErrorMessage(
             // gai_strerror is available on all platforms (POSIX + Windows)
             const char* gaiMsg = gai_strerror(sysCode);
             if (gaiMsg) {
+#ifdef _WIN32
+                strncpy_s(sysErrBuf, sizeof(sysErrBuf), gaiMsg, sizeof(sysErrBuf) - 1);
+#else
                 strncpy(sysErrBuf, gaiMsg, sizeof(sysErrBuf) - 1);
+                sysErrBuf[sizeof(sysErrBuf) - 1] = '\0';
+#endif
             }
         } else {
 #ifdef _WIN32
@@ -51,6 +56,7 @@ std::string buildErrorMessage(
             const char* errnoMsg = strerror(sysCode);
             if (errnoMsg) {
                 strncpy(sysErrBuf, errnoMsg, sizeof(sysErrBuf) - 1);
+                sysErrBuf[sizeof(sysErrBuf) - 1] = '\0';
             }
 #endif
         }
