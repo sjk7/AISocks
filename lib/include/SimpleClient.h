@@ -1,101 +1,68 @@
-// This is an independent project of an individual developer. Dear PVS-Studio, please check it.
-
-// PVS-Studio Static Code Analyzer for C, C++, C#, and Java: https://pvs-studio.com
-
-
+// This is a personal academic project. Dear PVS-Studio, please check it.
+// PVS-Studio Static Code Analyzer for C, C++, C#, and Java:
+// https://pvs-studio.com
 #ifndef AISOCKS_SIMPLE_CLIENT_H
 #define AISOCKS_SIMPLE_CLIENT_H
 
 #include "TcpSocket.h"
-#include "SocketFactory.h"
-#include "SocketTypes.h" // ConnectArgs, Port, Milliseconds — direct include
-// for discoverability; also pulled in transitively
-// via TcpSocket.h.
+#include <functional>
 #include <memory>
+#include <stdexcept>
 #include <string>
 
 namespace aiSocks {
 
 // ---------------------------------------------------------------------------
-// SimpleClient  convenience wrapper for TCP client connections.
+// SimpleClient  one-liner convenience wrapper for TCP client connections.
 //
-// Two usage patterns, in order of preference:
+// Connects to a remote server and invokes a callback with the connected socket.
+// Useful for quick prototyping and simple request-response patterns.
 //
-//  1. Static factory (most testable — no SimpleClient object needed):
+// Usage:
+//   try {
+//       SimpleClient client(ConnectArgs{"example.com", 80}, [](TcpSocket& sock) {
+//           sock.sendAll("GET / HTTP/1.0\r\n\r\n", ...);
+//           char buf[4096];
+//           int n = sock.receive(buf, sizeof(buf));
+//           std::cout.write(buf, n);
+//       });
+//   } catch (const SocketException& e) {
+//       std::cerr << "Connection failed: " << e.what() << "\n";
+//   }
 //
-//       auto r = SimpleClient::connect(ConnectArgs{"example.com", Port{80}});
-//       if (r.isSuccess()) {
-//           TcpSocket sock = std::move(r.value());
-//           sock.sendAll(...);
-//       }
-//
-//  2. Two-step (construct then run — clean separation, async-friendly):
-//
-//       SimpleClient client(ConnectArgs{"example.com", Port{80}});
-//       if (client.isConnected())
-//           client.run([](TcpSocket& sock) { sock.sendAll(...); });
-//
-// On connection failure the object is left in a disconnected state;
-// check isConnected() before calling run() or getSocket() (which returns
-// nullptr).
+// Throws SocketException if connection fails (consistent with TcpSocket).
+// The callback is invoked synchronously in the constructor immediately after
+// a successful connection.
 // ---------------------------------------------------------------------------
 class SimpleClient {
     public:
-    // ── Primary constructor: connect only ────────────────────────────────────
-    //
-    // Establishes the TCP connection and sets the receive timeout to
-    // connectTimeout.  No callback fires; the object is fully constructed
-    // before any user code runs.
-    explicit SimpleClient(
-        const ConnectArgs& args, AddressFamily family = AddressFamily::IPv4) {
-        auto result = SocketFactory::createTcpClient(family, args);
-        if (result.isSuccess()) {
-            socket_ = std::make_unique<TcpSocket>(std::move(result.value()));
-            (void)socket_->setReceiveTimeout(args.connectTimeout);
-        }
-    }
-
-    // ── Named run step ───────────────────────────────────────────────────────
-    //
-    // Invokes callback(socket) if the connection is live.  Returns true if
-    // the callback was called, false if not connected.  Any exception thrown
-    // by the callback propagates from a fully-constructed object — the socket
-    // is always cleaned up correctly by the destructor.
-    //
+    // Connect using ConnectArgs and invoke callback with the connected socket.
     // Callback signature: void(TcpSocket&)
-    template <typename Callback> bool run(Callback&& callback) {
-        if (!socket_) return false;
-        std::forward<Callback>(callback)(*socket_);
-        return true;
+    // 
+    // Throws SocketException if connection fails (lets it propagate from TcpSocket).
+    template <typename Callback>
+    SimpleClient(const ConnectArgs& args, Callback&& onConnected,
+        AddressFamily family = AddressFamily::IPv4) {
+        auto sock = std::make_unique<TcpSocket>(family, args);
+        // Set receive timeout to prevent indefinite blocking
+        // Use the connection timeout as the receive timeout
+        sock->setReceiveTimeout(args.connectTimeout);
+        socket_ = std::move(sock);
+        onConnected(*socket_);
     }
 
-    // ── Static factory ───────────────────────────────────────────────────────
-    //
-    // Returns the socket directly.  No SimpleClient object is created, making
-    // this the easiest form to unit-test in isolation.
-    //
-    //   auto r = SimpleClient::connect(args);
-    //   if (r.isSuccess()) { TcpSocket s = std::move(r.value()); ... }
-    static Result<TcpSocket> connect(
-        const ConnectArgs& args, AddressFamily family = AddressFamily::IPv4) {
-        return SocketFactory::createTcpClient(family, args);
-    }
-
-    // ── Observers ────────────────────────────────────────────────────────────
+    // Check if the connection was established (always true if constructor succeeded).
     bool isConnected() const noexcept { return socket_ != nullptr; }
 
-    // Returns a human-readable description of the last socket error, or an
-    // empty string if not connected / no error recorded.
-    std::string getLastError() const {
-        if (!socket_) return {};
-        return socket_->getErrorMessage();
+    // Access the underlying socket for manual operations.
+    TcpSocket& getSocket() {
+        if (!socket_) throw std::runtime_error("SimpleClient: socket not initialized");
+        return *socket_;
     }
 
-    // Direct socket access for callers that want to perform I/O without run().
-    // Returns nullptr if not connected — always check before dereferencing.
-    [[nodiscard]] TcpSocket* getSocket() noexcept { return socket_.get(); }
-    [[nodiscard]] const TcpSocket* getSocket() const noexcept {
-        return socket_.get();
+    const TcpSocket& getSocket() const {
+        if (!socket_) throw std::runtime_error("SimpleClient: socket not initialized");
+        return *socket_;
     }
 
     private:
