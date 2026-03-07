@@ -38,7 +38,12 @@ class SimpleClient {
     explicit SimpleClient(
         const ConnectArgs& args, AddressFamily family = AddressFamily::IPv4)
         : socket_(std::make_unique<TcpSocket>(family, args)) {
-        if (socket_->isValid()) socket_->setReceiveTimeout(args.connectTimeout);
+        if (socket_->getLastError() != SocketError::None) {
+            socket_
+                .reset(); // connect failed — null out so isConnected()==false
+        } else {
+            socket_->setReceiveTimeout(args.connectTimeout);
+        }
     }
 
     // Invokes cb and returns true if connected; returns false and skips cb
