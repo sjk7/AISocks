@@ -19,7 +19,8 @@ namespace aiSocks {
 // ---------------------------------------------------------------------------
 
 const std::string_view* HttpResponse::header(std::string_view name) const {
-    // Lowercase the lookup key without allocating when it fits in a small buffer
+    // Lowercase the lookup key without allocating when it fits in a small
+    // buffer
     char smallBuf[128];
     std::string heapBuf;
     const char* keyData = nullptr;
@@ -76,8 +77,7 @@ bool HttpResponseParser::tryParseHeaders_() {
     // Freeze header section
     headerBuf_ = inBuf_.substr(0, sepPos);
     // Any bytes after \r\n\r\n belong to the body
-    if (sepPos + 4 < inBuf_.size())
-        bodyBuf_ = inBuf_.substr(sepPos + 4);
+    if (sepPos + 4 < inBuf_.size()) bodyBuf_ = inBuf_.substr(sepPos + 4);
     inBuf_.clear();
     inBuf_.shrink_to_fit();
 
@@ -85,11 +85,15 @@ bool HttpResponseParser::tryParseHeaders_() {
 
     // Parse status line: HTTP-version SP status-code SP reason-phrase CRLF
     const size_t firstCRLF = hdr.find("\r\n");
-    const std::string_view statusLine
-        = (firstCRLF == std::string_view::npos) ? hdr : hdr.substr(0, firstCRLF);
+    const std::string_view statusLine = (firstCRLF == std::string_view::npos)
+        ? hdr
+        : hdr.substr(0, firstCRLF);
 
     const size_t sp1 = statusLine.find(' ');
-    if (sp1 == std::string_view::npos) { markError_(); return false; }
+    if (sp1 == std::string_view::npos) {
+        markError_();
+        return false;
+    }
 
     const size_t sp2 = statusLine.find(' ', sp1 + 1);
     // reason-phrase may be absent (HTTP/1.1 allows it)
@@ -100,18 +104,24 @@ bool HttpResponseParser::tryParseHeaders_() {
     // Parse status code
     int code = 0;
     for (char c : codeStr) {
-        if (c < '0' || c > '9') { markError_(); return false; }
+        if (c < '0' || c > '9') {
+            markError_();
+            return false;
+        }
         code = code * 10 + (c - '0');
     }
-    if (code < 100 || code > 599) { markError_(); return false; }
+    if (code < 100 || code > 599) {
+        markError_();
+        return false;
+    }
 
     response_.statusCode = code;
-    response_.version_   = hdr.substr(0, sp1);   // view into frozen headerBuf_
+    response_.version_ = hdr.substr(0, sp1); // view into frozen headerBuf_
     response_.statusText_ = (sp2 == std::string_view::npos)
         ? std::string_view{}
-        : hdr.substr(sp2 + 1, firstCRLF != std::string_view::npos
-                                   ? firstCRLF - (sp2 + 1)
-                                   : std::string_view::npos);
+        : hdr.substr(sp2 + 1,
+              firstCRLF != std::string_view::npos ? firstCRLF - (sp2 + 1)
+                                                  : std::string_view::npos);
 
     // Parse header fields
     if (firstCRLF != std::string_view::npos) {
@@ -137,8 +147,7 @@ bool HttpResponseParser::tryParseHeaders_() {
                         ::tolower(static_cast<unsigned char>(rawKey[i])));
 
                 // trim leading/trailing whitespace from value (view only)
-                const size_t valStart
-                    = rawVal.find_first_not_of(" \t");
+                const size_t valStart = rawVal.find_first_not_of(" \t");
                 if (valStart != std::string_view::npos) {
                     rawVal = rawVal.substr(valStart);
                     const size_t valEnd = rawVal.find_last_not_of(" \t\r");
@@ -166,10 +175,9 @@ bool HttpResponseParser::tryParseHeaders_() {
         std::string_view tev = *te;
         // Find last comma-separated token
         const size_t lastComma = tev.rfind(',');
-        std::string_view lastToken
-            = (lastComma == std::string_view::npos)
-                ? tev
-                : tev.substr(lastComma + 1);
+        std::string_view lastToken = (lastComma == std::string_view::npos)
+            ? tev
+            : tev.substr(lastComma + 1);
         // trim
         const size_t ts = lastToken.find_first_not_of(" \t");
         if (ts != std::string_view::npos) lastToken = lastToken.substr(ts);
@@ -252,30 +260,37 @@ HttpResponseParser::State HttpResponseParser::processChunked_() {
 
         // Strip any chunk-extensions (after ';')
         const size_t extPos = sizeLine.find(';');
-        const std::string_view hexStr
-            = (extPos == std::string_view::npos)
-                ? sizeLine
-                : sizeLine.substr(0, extPos);
+        const std::string_view hexStr = (extPos == std::string_view::npos)
+            ? sizeLine
+            : sizeLine.substr(0, extPos);
 
-        if (hexStr.empty()) { markError_(); return state_; }
+        if (hexStr.empty()) {
+            markError_();
+            return state_;
+        }
 
         // Parse hex
         size_t chunkSize = 0;
         for (char c : hexStr) {
             unsigned char uc = static_cast<unsigned char>(c);
             int digit = 0;
-            if (uc >= '0' && uc <= '9')      digit = uc - '0';
-            else if (uc >= 'a' && uc <= 'f') digit = uc - 'a' + 10;
-            else if (uc >= 'A' && uc <= 'F') digit = uc - 'A' + 10;
-            else { markError_(); return state_; }
+            if (uc >= '0' && uc <= '9')
+                digit = uc - '0';
+            else if (uc >= 'a' && uc <= 'f')
+                digit = uc - 'a' + 10;
+            else if (uc >= 'A' && uc <= 'F')
+                digit = uc - 'A' + 10;
+            else {
+                markError_();
+                return state_;
+            }
             chunkSize = chunkSize * 16 + static_cast<size_t>(digit);
         }
 
         if (chunkSize == 0) {
             // Terminal chunk — skip "0\r\n" + optional trailers + "\r\n"
             // Find the final "\r\n" that closes the trailer section
-            const size_t trailerEnd
-                = bodyBuf_.find("\r\n", crlfPos + 2);
+            const size_t trailerEnd = bodyBuf_.find("\r\n", crlfPos + 2);
             if (trailerEnd == std::string::npos) break; // need more data
             // Terminal chunk consumed — body complete
             response_.body_ = std::string_view(decodedBody_);
@@ -285,7 +300,7 @@ HttpResponseParser::State HttpResponseParser::processChunked_() {
 
         // Need: crlfPos + 2 + chunkSize + 2 (trailing \r\n)
         const size_t dataStart = crlfPos + 2;
-        const size_t dataEnd   = dataStart + chunkSize;
+        const size_t dataEnd = dataStart + chunkSize;
         const size_t nextChunk = dataEnd + 2; // skip trailing \r\n
 
         if (nextChunk > bodyBuf_.size()) break; // need more data
@@ -316,8 +331,7 @@ HttpResponseParser::State HttpResponseParser::advanceAfterHeaders_() {
         return state_;
     }
 
-    if (bodyMode_ == BodyMode::Chunked)
-        return processChunked_();
+    if (bodyMode_ == BodyMode::Chunked) return processChunked_();
 
     return processBody_();
 }
@@ -331,19 +345,18 @@ void HttpResponseParser::reset() {
     headerBuf_.clear();
     bodyBuf_.clear();
     decodedBody_.clear();
-    state_         = State::Incomplete;
+    state_ = State::Incomplete;
     headersParsed_ = false;
     headerScanPos_ = 0;
-    bodyMode_      = BodyMode::Unknown;
+    bodyMode_ = BodyMode::Unknown;
     contentLength_ = -1;
-    chunkScanPos_  = 0;
-    response_      = HttpResponse{};
+    chunkScanPos_ = 0;
+    response_ = HttpResponse{};
 }
 
-HttpResponseParser::State HttpResponseParser::feed(const char* data,
-    size_t len) {
-    if (state_ == State::Complete || state_ == State::Error)
-        return state_;
+HttpResponseParser::State HttpResponseParser::feed(
+    const char* data, size_t len) {
+    if (state_ == State::Complete || state_ == State::Error) return state_;
 
     if (data == nullptr || len == 0) return state_;
 
@@ -360,8 +373,7 @@ HttpResponseParser::State HttpResponseParser::feed(const char* data,
     // Headers already parsed — accumulate further body bytes
     bodyBuf_.append(data, len);
 
-    if (bodyMode_ == BodyMode::Chunked)
-        return processChunked_();
+    if (bodyMode_ == BodyMode::Chunked) return processChunked_();
     return processBody_();
 }
 

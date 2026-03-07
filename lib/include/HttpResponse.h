@@ -15,11 +15,13 @@
 //   while (bytes_available) {
 //       auto state = parser.feed(buf, n);
 //       if (state == HttpResponseParser::State::Complete) break;
-//       if (state == HttpResponseParser::State::Error)    { /* bad response */ break; }
+//       if (state == HttpResponseParser::State::Error)    { /* bad response */
+//       break; }
 //   }
 //   const HttpResponse& resp = parser.response();
 //   if (resp) {
-//       // resp.statusCode, resp.version(), resp.body(), resp.header("content-type"), ...
+//       // resp.statusCode, resp.version(), resp.body(),
+//       resp.header("content-type"), ...
 //   }
 //
 // After a keep-alive exchange call parser.reset() before feeding the next
@@ -73,8 +75,8 @@ class HttpResponse {
     /// Direct access to the parsed header map.
     /// Keys are lowercased; values are string_views into the parser's frozen
     /// header buffer.
-    const std::unordered_map<std::string, std::string_view>& headers()
-        const noexcept {
+    const std::unordered_map<std::string, std::string_view>&
+    headers() const noexcept {
         return headers_;
     }
 
@@ -97,10 +99,11 @@ class HttpResponse {
 class HttpResponseParser {
     public:
     enum class State {
-        Incomplete,     ///< More data needed
-        HeadersComplete, ///< Status line + all headers parsed; body may be incomplete
-        Complete,       ///< Full response (headers + body) received
-        Error           ///< Parse error; call reset() before reuse
+        Incomplete, ///< More data needed
+        HeadersComplete, ///< Status line + all headers parsed; body may be
+                         ///< incomplete
+        Complete, ///< Full response (headers + body) received
+        Error ///< Parse error; call reset() before reuse
     };
 
     HttpResponseParser() = default;
@@ -131,7 +134,7 @@ class HttpResponseParser {
         return state_ == State::HeadersComplete || state_ == State::Complete;
     }
     bool isComplete() const noexcept { return state_ == State::Complete; }
-    bool isError()    const noexcept { return state_ == State::Error; }
+    bool isError() const noexcept { return state_ == State::Error; }
 
     // ---- result ---------------------------------------------------------
 
@@ -153,8 +156,8 @@ class HttpResponseParser {
     bool tryParseHeaders_();
     State processBody_();
     State processChunked_();
-    void  markComplete_();
-    void  markError_();
+    void markComplete_();
+    void markError_();
     State advanceAfterHeaders_();
 
     // ---- buffers --------------------------------------------------------
@@ -169,13 +172,13 @@ class HttpResponseParser {
     std::string decodedBody_;
 
     // ---- parser state ---------------------------------------------------
-    State     state_{State::Incomplete};
-    bool      headersParsed_{false};
-    size_t    headerScanPos_{0};  // incremental \r\n\r\n scan in inBuf_
+    State state_{State::Incomplete};
+    bool headersParsed_{false};
+    size_t headerScanPos_{0}; // incremental \r\n\r\n scan in inBuf_
 
-    BodyMode  bodyMode_{BodyMode::Unknown};
-    int64_t   contentLength_{-1};  // -1 = not present
-    size_t    chunkScanPos_{0};    // scan frontier for chunk parsing in bodyBuf_
+    BodyMode bodyMode_{BodyMode::Unknown};
+    int64_t contentLength_{-1}; // -1 = not present
+    size_t chunkScanPos_{0}; // scan frontier for chunk parsing in bodyBuf_
 
     HttpResponse response_;
 };
