@@ -18,6 +18,7 @@ add_library(aiSocksLib STATIC
     src/HttpPollServer.cpp
     src/HttpFileServer.cpp
     src/HttpRequest.cpp
+    src/HttpResponse.cpp
     src/UrlCodec.cpp
 )
 
