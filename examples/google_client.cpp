@@ -46,7 +46,7 @@ int httpConnect(const ConnectArgs& args, const char* httpRequest) {
         printf("Reading response...\n");
         printf("-----------------------------------------\n\n");
 
-        while ((retval = (bytesRead
+        while ((retval = static_cast<int>(bytesRead
                     = sock.receive(buffer, sizeof(buffer) - 1))) //-V101 //-V103
             > 0) {
             buffer[bytesRead] = '\0';
