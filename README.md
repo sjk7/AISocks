@@ -8,15 +8,18 @@ Zero dependencies beyond a standard C++17 compiler and CMake.
 
 ## Performance
 
-Benchmarked on macOS (Apple Silicon), Release build, `wrk -t12 -c5000 -d30s`:
+Benchmarked on Linux (remote LAN), Release build, `wrk -t12 -c15000 -d30s --latency` with Basic Auth:
 
-| Metric | aiSocks | nginx | Δ |
+| Metric | aiSocks (port 8080) | nginx (port 8082) | Δ |
 |---|---|---|---|
-| Requests/sec | **77,243** | 21,385 | ✅ +261% |
-| Transfer/sec | **35.95 MB** | 9.95 MB | ✅ +261% |
-| Total requests (30 s) | **2,325,324** | 643,274 | ✅ +261% |
-| Avg latency | **25.39 ms** | 41.40 ms | ✅ −39% |
-| Read errors | **0** | 154,282 | ✅ |
+| Requests/sec | **14,385** | 1,924 | ✅ +648% |
+| Transfer/sec | **89.61 MB/s** | 1.57 MB/s | ✅ +5,609% |
+| Total requests (30 s) | **432,923** | 57,874 | ✅ +648% |
+| Avg latency | **70.23 ms** | 484.83 ms | ✅ −86% |
+| p99 latency | **95.61 ms** | 667.33 ms | ✅ −86% |
+| Read errors | **0** | 1,632 | ✅ |
+| Write errors | 56 | **0** | — |
+| Timeouts | **0** | 56 | ✅ |
 
 ## Features
 
