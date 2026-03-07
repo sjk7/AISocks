@@ -36,6 +36,7 @@ std::string buildErrorMessage(
         // Platform-specific error string
         char sysErrBuf[256] = {0};
 #ifdef _WIN32
+        (void)isDns; // unused on Windows; used in the POSIX branch below
         FormatMessageA(
             FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, nullptr,
             sysCode, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), sysErrBuf,
