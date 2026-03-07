@@ -24,8 +24,7 @@ int httpConnect(const ConnectArgs& args, const char* httpRequest) {
         fprintf(stderr, "\n*** CONNECTION FAILED ***\n");
         return 1;
     }
-
-    client.run([&](TcpSocket& sock) {
+    client.execute([&](TcpSocket& sock) {
         if (!sock.isBlocking()) {
             fprintf(stderr, "Expected a blocking socket\n"); //-V1056
             return;
@@ -38,7 +37,8 @@ int httpConnect(const ConnectArgs& args, const char* httpRequest) {
             return;
         }
 
-        // Read response data until connection closes (receive returns 0 or -1)
+        // Read response data until connection closes (receive returns 0 or
+        // -1)
         char buffer[4096];
         size_t bytesRead;
         bool isFirstChunk = true;
@@ -67,7 +67,8 @@ int httpConnect(const ConnectArgs& args, const char* httpRequest) {
         }
 
         if (totalBytesRead == 0 && retval < 0) {
-            printf("\nConnection closed by server, after sending zero bytes\n");
+            printf("\nConnection closed by server, after sending zero "
+                   "bytes\n");
             printf("Last error: %d - %s\n",
                 static_cast<int>(sock.getLastError()),
                 sock.getErrorMessage().c_str());

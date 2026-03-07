@@ -65,7 +65,7 @@ int main() {
         REQUIRE(client.isConnected());
         REQUIRE(!callbackFired); //-V547 // must NOT have fired yet
 
-        client.run([&](TcpSocket& sock) {
+        client.execute([&](TcpSocket& sock) {
             callbackFired = true;
             const char* msg = "Hello echo";
             sock.sendAll(msg, strlen(msg));
@@ -88,7 +88,7 @@ int main() {
             ConnectArgs{"127.0.0.1", Port{1}, Milliseconds{100}});
         REQUIRE(!client.isConnected());
         bool called = false;
-        bool ran = client.run([&](TcpSocket&) { called = true; });
+        bool ran = client.execute([&](TcpSocket&) { called = true; });
         REQUIRE(!ran);
         REQUIRE(!called);
     }
@@ -186,7 +186,7 @@ int main() {
             SimpleClient client(ConnectArgs{"127.0.0.1", Port{srvPort}});
             REQUIRE(client.isConnected());
             try {
-                client.run(
+                client.execute(
                     [](TcpSocket&) { throw std::runtime_error("oops"); });
             } catch (const std::runtime_error&) {
                 threw = true;
@@ -212,7 +212,7 @@ int main() {
             REQUIRE(client.isConnected());
 
             bool callbackRan = false;
-            client.run([&](TcpSocket& sock) {
+            client.execute([&](TcpSocket& sock) {
                 callbackRan = true;
                 sock.sendAll(msg.data(), msg.size());
                 char buf[256]{};
@@ -236,14 +236,14 @@ int main() {
         {
             SimpleClient good(ConnectArgs{"127.0.0.1", Port{srvPort}});
             REQUIRE(good.isConnected());
-            bool ret = good.run([](TcpSocket&) {});
+            bool ret = good.execute([](TcpSocket&) {});
             REQUIRE(ret); // true — callback was invoked
         } // closes socket → server's receive() returns, server thread exits
         srv.join();
 
         SimpleClient bad(ConnectArgs{"127.0.0.1", Port{1}, Milliseconds{50}});
         REQUIRE(!bad.isConnected());
-        bool ret2 = bad.run([](TcpSocket&) {});
+        bool ret2 = bad.execute([](TcpSocket&) {});
         REQUIRE(!ret2); // false — not connected, callback skipped
     }
 
@@ -278,7 +278,7 @@ int main() {
         REQUIRE(client.isConnected());
 
         int calls = 0;
-        client.run([&](TcpSocket& sock) {
+        client.execute([&](TcpSocket& sock) {
             ++calls;
             sock.sendAll("first", 5);
             char buf[64]{};
@@ -286,7 +286,7 @@ int main() {
             REQUIRE(n == 5);
             REQUIRE(std::string(buf, n) == "first");
         });
-        client.run([&](TcpSocket& sock) {
+        client.execute([&](TcpSocket& sock) {
             ++calls;
             sock.sendAll("second", 6);
             char buf[64]{};

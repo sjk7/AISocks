@@ -22,7 +22,7 @@ int main() {
         return 1;
     }
 
-    client.run([](TcpSocket& sock) {
+    client.execute([](TcpSocket& sock) {
         const char* request = "GET /get?param=hello HTTP/1.0\r\n"
                               "Host: httpbin.org\r\n"
                               "Connection: close\r\n"

@@ -21,7 +21,7 @@ int main() {
         return 1;
     }
 
-    client.run([](TcpSocket& sock) {
+    client.execute([](TcpSocket& sock) {
         std::cout << "Connected to echo server!\n";
 
         // Test messages to send
