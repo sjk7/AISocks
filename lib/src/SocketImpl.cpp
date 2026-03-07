@@ -10,7 +10,6 @@
 #include "Result.h"
 #include <chrono>
 #include <cstring>
-#include <mutex>
 #ifndef _WIN32
 #include <signal.h>
 #endif
@@ -27,31 +26,37 @@ namespace aiSocks {
 
 // Platform-specific initialization
 #ifdef _WIN32
-static std::once_flag sWsaInitFlag;
-static bool sWsaInitOk = false;
-
 bool SocketImpl::platformInit() {
-    std::call_once(sWsaInitFlag, []() {
+    // Meyers Singleton: initialized exactly once, thread-safe since C++11.
+    static const bool sWsaInitOk = []() -> bool {
         WSADATA wsaData;
-        sWsaInitOk = (WSAStartup(MAKEWORD(2, 2), &wsaData) == 0);
-    });
+        if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) return false;
+        // Raise the system timer resolution to 1 ms so Sleep() and
+        // deadline-based waits have fine-grained accuracy.
+        timeBeginPeriod(1);
+        return true;
+    }();
     return sWsaInitOk;
 }
 
 void SocketImpl::platformCleanup() {
-    if (sWsaInitOk) {
-        WSACleanup();
-    }
+    // WSACleanup is called at process exit; timeEndPeriod mirrors
+    // timeBeginPeriod to restore the default resolution.
+    timeEndPeriod(1);
+    WSACleanup();
 }
 #else
-static std::once_flag sPlatformInitFlag;
-
 bool SocketImpl::platformInit() {
     // Suppress SIGPIPE process-wide.  Belt-and-suspenders with SO_NOSIGPIPE
     // (macOS, set per-socket) and MSG_NOSIGNAL (Linux, set per-call): this
     // catches any remaining path that bypasses those per-socket/per-call
     // guards.
-    std::call_once(sPlatformInitFlag, []() { ::signal(SIGPIPE, SIG_IGN); });
+    // Meyers Singleton: initialized exactly once, thread-safe since C++11.
+    static const bool sInit = []() -> bool {
+        ::signal(SIGPIPE, SIG_IGN);
+        return true;
+    }();
+    (void)sInit;
     return true;
 }
 
