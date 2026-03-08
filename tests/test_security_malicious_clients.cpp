@@ -431,7 +431,7 @@ void testCacheDoSProtection() {
 
         // Fill cache with small files
         for (int i = 0; i < 10; i++) {
-            std::vector<char> content(100, 'A' + i);
+            std::vector<char> content(100, static_cast<char>('A' + i));
             cache.put("file" + std::to_string(i) + ".txt", content, 12345 + i);
         }
 

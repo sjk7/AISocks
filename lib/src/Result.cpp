@@ -30,7 +30,8 @@ std::string buildErrorMessage(
     int msg_len = snprintf(stack_buffer, SMALL_BUFFER_SIZE, "%s", description);
 
     if (sysCode != 0) {
-        msg_len += snprintf(stack_buffer + msg_len, SMALL_BUFFER_SIZE - static_cast<size_t>(msg_len),
+        msg_len += snprintf(stack_buffer + msg_len,
+            SMALL_BUFFER_SIZE - static_cast<size_t>(msg_len),
             " [%d: ", sysCode);
 
         // Platform-specific error string
@@ -40,7 +41,8 @@ std::string buildErrorMessage(
             const char* gaiMsg = gai_strerror(sysCode);
             if (gaiMsg) {
 #ifdef _WIN32
-                strncpy_s(sysErrBuf, sizeof(sysErrBuf), gaiMsg, sizeof(sysErrBuf) - 1);
+                strncpy_s(sysErrBuf, sizeof(sysErrBuf), gaiMsg,
+                    sizeof(sysErrBuf) - 1);
 #else
                 strncpy(sysErrBuf, gaiMsg, sizeof(sysErrBuf) - 1);
                 sysErrBuf[sizeof(sysErrBuf) - 1] = '\0';
@@ -68,8 +70,8 @@ std::string buildErrorMessage(
             --end;
         }
 
-        msg_len += snprintf(stack_buffer + msg_len, SMALL_BUFFER_SIZE - static_cast<size_t>(msg_len),
-            "%s]", sysErrBuf);
+        msg_len += snprintf(stack_buffer + msg_len,
+            SMALL_BUFFER_SIZE - static_cast<size_t>(msg_len), "%s]", sysErrBuf);
     }
 
     // Return the message — fits in the stack buffer for almost all real errors.
