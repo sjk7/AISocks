@@ -44,8 +44,10 @@ struct CallIntervalTracker {
         ++call_count_;
 
         // Print at most once per 60 s after the first output; before that,
-        // print after first_output_seconds_ so the operator gets quick feedback on startup.
-        const double print_interval = first_output_done_ ? 60.0 : first_output_seconds_;
+        // print after first_output_seconds_ so the operator gets quick feedback
+        // on startup.
+        const double print_interval
+            = first_output_done_ ? 60.0 : first_output_seconds_;
         if (Sec(now - last_print_).count() >= print_interval) {
             if (!intervals_.empty()) {
                 double sum = 0;

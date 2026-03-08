@@ -92,7 +92,8 @@ static void test_tracker_independent_instances() {
 }
 
 static void test_tracker_first_output_after_delay() {
-    BEGIN_TEST("CallIntervalTracker: fires throttled print after threshold delay");
+    BEGIN_TEST(
+        "CallIntervalTracker: fires throttled print after threshold delay");
     // Use a 50 ms threshold so we only need a short sleep instead of 600 ms.
     CallIntervalTracker t{0.05};
     std::this_thread::sleep_for(std::chrono::milliseconds(60));
