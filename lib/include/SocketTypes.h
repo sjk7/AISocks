@@ -8,25 +8,18 @@
 #define AISOCKS_SOCKET_TYPES_H
 
 #include <cstdint>
-#include <chrono>
 #include <string>
 
 namespace aiSocks {
 
 // Lightweight milliseconds type used throughout the API.
-// Explicit construction from int64_t; implicit conversion from
-// std::chrono::duration types.
+// Construct with an integer: Milliseconds{5000}.
+// For std::chrono conversions include lib/src/ChronoCompat.h.
 struct Milliseconds {
     int64_t count;
 
     constexpr Milliseconds() noexcept : count(0) {}
     constexpr explicit Milliseconds(int64_t ms) noexcept : count(ms) {}
-
-    // Implicit conversion from std::chrono::duration types
-    template <typename Rep, typename Period>
-    constexpr Milliseconds(std::chrono::duration<Rep, Period> d) noexcept
-        : count(std::chrono::duration_cast<std::chrono::milliseconds>(d)
-                  .count()) {}
 
     constexpr int64_t milliseconds() const noexcept { return count; }
 

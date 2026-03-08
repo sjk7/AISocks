@@ -107,7 +107,7 @@ void demonstrateClientConnection() {
 
     // Now try to connect a client
     auto client_result = SocketFactory::createTcpClient(AddressFamily::IPv4,
-        ConnectArgs{"127.0.0.1", server_port, std::chrono::seconds{5}});
+        ConnectArgs{"127.0.0.1", server_port, Milliseconds{5000}});
 
     if (client_result.isSuccess()) {
         auto& client = client_result.value();
@@ -175,7 +175,7 @@ void demonstrateErrorHandling() {
 
     // Try to connect to a non-existent server
     auto no_server = SocketFactory::createTcpClient(AddressFamily::IPv4,
-        ConnectArgs{"127.0.0.1", Port{65432}, std::chrono::milliseconds{1000}});
+        ConnectArgs{"127.0.0.1", Port{65432}, Milliseconds{1000}});
 
     if (no_server.isError()) {
         std::cout << "? Connection to non-existent server correctly failed\n";
@@ -226,7 +226,7 @@ void demonstratePerformanceBenefits() {
 
     // Demonstrate lazy error message construction
     auto error_result = SocketFactory::createTcpClient(AddressFamily::IPv4,
-        ConnectArgs{"127.0.0.1", Port{65432}, std::chrono::milliseconds{100}});
+        ConnectArgs{"127.0.0.1", Port{65432}, Milliseconds{100}});
 
     if (error_result.isError()) {
         std::cout << "? Error result created (message not yet constructed)\n";

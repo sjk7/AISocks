@@ -298,8 +298,8 @@ static void test_happy_options() {
         REQUIRE(s.setReuseAddress(true));
         REQUIRE(s.setNoDelay(true));
         REQUIRE(s.setKeepAlive(true));
-        REQUIRE(s.setReceiveTimeout(std::chrono::seconds(10)));
-        REQUIRE(s.setSendTimeout(std::chrono::seconds(10)));
+        REQUIRE(s.setReceiveTimeout(Milliseconds{10000}));
+        REQUIRE(s.setSendTimeout(Milliseconds{10000}));
         REQUIRE(s.setReceiveBufferSize(64 * 1024));
         REQUIRE(s.setSendBufferSize(64 * 1024));
     }
@@ -383,7 +383,7 @@ static void test_sad_operations() {
     {
         auto s = TcpSocket::createRaw();
         bool ok = s.connect(
-            "127.0.0.1", Port{21898}, std::chrono::milliseconds{100});
+            "127.0.0.1", Port{21898}, Milliseconds{100});
         REQUIRE(!ok);
         REQUIRE((s.getLastError() == SocketError::ConnectFailed
             || s.getLastError() == SocketError::Timeout));
@@ -472,7 +472,7 @@ static void test_sad_timeout() {
         auto s = TcpSocket::createRaw();
         REQUIRE(s.setBlocking(false));
         bool ok
-            = s.connect("127.0.0.1", Port{21899}, std::chrono::milliseconds{0});
+            = s.connect("127.0.0.1", Port{21899}, Milliseconds{0});
         // Non-blocking to nothing  should not succeed
         REQUIRE(!ok);
         REQUIRE((s.getLastError() == SocketError::WouldBlock
@@ -486,7 +486,7 @@ static void test_sad_timeout() {
         // Port 21898 has no listener  ECONNREFUSED arrives quickly.
         auto s = TcpSocket::createRaw();
         bool ok = s.connect(
-            "127.0.0.1", Port{21898}, std::chrono::milliseconds{100});
+            "127.0.0.1", Port{21898}, Milliseconds{100});
         REQUIRE(!ok);
         REQUIRE((s.getLastError() == SocketError::ConnectFailed
             || s.getLastError() == SocketError::Timeout));
