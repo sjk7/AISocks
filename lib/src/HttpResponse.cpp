@@ -188,7 +188,7 @@ bool HttpResponseParser::tryParseHeaders_() {
         // Case-insensitive compare
         if (lastToken.size() == 7) {
             char low[7];
-            for (int i = 0; i < 7; ++i)
+            for (size_t i = 0; i < 7; ++i)
                 low[i] = static_cast<char>(
                     ::tolower(static_cast<unsigned char>(lastToken[i])));
             if (std::string_view(low, 7) == "chunked")

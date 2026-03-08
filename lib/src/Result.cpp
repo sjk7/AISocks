@@ -30,7 +30,7 @@ std::string buildErrorMessage(
     int msg_len = snprintf(stack_buffer, SMALL_BUFFER_SIZE, "%s", description);
 
     if (sysCode != 0) {
-        msg_len += snprintf(stack_buffer + msg_len, SMALL_BUFFER_SIZE - msg_len,
+        msg_len += snprintf(stack_buffer + msg_len, SMALL_BUFFER_SIZE - static_cast<size_t>(msg_len),
             " [%d: ", sysCode);
 
         // Platform-specific error string
@@ -68,7 +68,7 @@ std::string buildErrorMessage(
             --end;
         }
 
-        msg_len += snprintf(stack_buffer + msg_len, SMALL_BUFFER_SIZE - msg_len,
+        msg_len += snprintf(stack_buffer + msg_len, SMALL_BUFFER_SIZE - static_cast<size_t>(msg_len),
             "%s]", sysErrBuf);
     }
 

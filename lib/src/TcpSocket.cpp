@@ -1,7 +1,8 @@
-// This is an independent project of an individual developer. Dear PVS-Studio, please check it.
+// This is an independent project of an individual developer. Dear PVS-Studio,
+// please check it.
 
-// PVS-Studio Static Code Analyzer for C, C++, C#, and Java: https://pvs-studio.com
-
+// PVS-Studio Static Code Analyzer for C, C++, C#, and Java:
+// https://pvs-studio.com
 
 //
 // TcpSocket.cpp  the only file besides Socket.cpp that includes SocketImpl.h.
@@ -72,7 +73,7 @@ int TcpSocket::sendfile(int fd, off_t offset, size_t count) {
     sent = ::sendfile(sockfd, fd, &offset, count);
 #elif __APPLE__
     // macOS sendfile takes different parameters
-    off_t len = count;
+    off_t len = static_cast<off_t>(count);
     sent = ::sendfile(fd, sockfd, offset, &len, nullptr, 0);
     if (sent == 0)
         sent = len; // macOS returns 0 on success, len contains bytes sent

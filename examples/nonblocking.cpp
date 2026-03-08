@@ -84,7 +84,7 @@ void runServerNonBlocking() {
             buffer.data() + bufferOffset, currentChunkSize - bufferOffset);
 
         if (bytesSent > 0) {
-            bufferOffset += bytesSent; //-V101
+            bufferOffset += static_cast<size_t>(bytesSent);
             sendCount++;
 
             // If we sent the whole chunk, reset for next chunk

@@ -564,7 +564,7 @@ static void test_span_overloads() {
             = cli.receive(Span<std::byte>{recvBuf.data(), recvBuf.size()});
         REQUIRE(recvd == static_cast<int>(payload.size()));
 
-        std::string echoed(recvd, '\0');
+        std::string echoed(static_cast<size_t>(recvd), '\0');
         for (size_t i = 0; i < static_cast<size_t>(recvd); ++i)
             echoed[i] = static_cast<char>(recvBuf[i]);
         REQUIRE(echoed == payload);
@@ -597,7 +597,7 @@ static void test_span_overloads() {
             Span<std::byte>{rxBuf.data(), rxBuf.size()}, from);
         REQUIRE(recvd == static_cast<int>(msg.size()));
 
-        std::string got(recvd, '\0');
+        std::string got(static_cast<size_t>(recvd), '\0');
         for (size_t i = 0; i < static_cast<size_t>(recvd); ++i)
             got[i] = static_cast<char>(rxBuf[i]);
         REQUIRE(got == msg);

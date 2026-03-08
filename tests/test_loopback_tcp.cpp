@@ -37,7 +37,7 @@ static void server_send(
         while (sent < payload.size()) {
             int r = client->send(payload.data() + sent, payload.size() - sent);
             if (r <= 0) break;
-            sent += r; //-V101
+            sent += static_cast<size_t>(r);
         }
         client->close();
     }
@@ -49,7 +49,7 @@ static void recv_all(TcpSocket& s, std::string& out) {
     while (true) {
         int r = s.receive(buf, sizeof(buf));
         if (r <= 0) break;
-        out.append(buf, r); //-V106
+        out.append(buf, static_cast<size_t>(r));
     }
 }
 
@@ -156,7 +156,7 @@ int main() {
             if (c) {
                 char buf[256] = {};
                 int r = c->receive(buf, sizeof(buf) - 1);
-                if (r > 0) c->send(buf, r); // echo
+                if (r > 0) c->send(buf, static_cast<size_t>(r)); // echo
                 c->close();
             }
         });
@@ -176,7 +176,7 @@ int main() {
         srvThread.join();
 
         REQUIRE(r == static_cast<int>(msg.size()));
-        REQUIRE(std::string(buf, r) == msg);
+        REQUIRE(std::string(buf, static_cast<size_t>(r)) == msg);
     }
 
     std::this_thread::sleep_for(std::chrono::milliseconds(1));
@@ -221,7 +221,7 @@ int main() {
                     int r = client->send(
                         message.data() + sent, message.size() - sent);
                     if (r <= 0) break;
-                    sent += r; //-V101
+                    sent += static_cast<size_t>(r);
                 }
                 client->close();
             }

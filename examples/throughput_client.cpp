@@ -76,7 +76,7 @@ int main(int argc, char* argv[]) {
         // Send side: push as much of the current request as the kernel takes.
         int sent = sock.send(request + sendOffset, reqLen - sendOffset);
         if (sent > 0) {
-            sendOffset += sent; // Safe: sent is positive
+            sendOffset += static_cast<size_t>(sent); // Safe: sent is positive
             if (sendOffset >= reqLen) sendOffset = 0;
         } else if (sent < 0) {
             auto err = sock.getLastError();
@@ -89,7 +89,7 @@ int main(int argc, char* argv[]) {
         // Receive side: drain everything available right now.
         int n = sock.receive(buf, sizeof(buf));
         if (n > 0) {
-            totalBytes += n; // Safe: n is positive
+            totalBytes += static_cast<uint64_t>(n); // Safe: n is positive
         } else if (n == 0) {
             printf("[error] server closed connection\n");
             break;

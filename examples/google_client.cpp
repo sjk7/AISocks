@@ -40,7 +40,7 @@ int httpConnect(const ConnectArgs& args, const char* httpRequest) {
         // Read response data until connection closes (receive returns 0 or
         // -1)
         char buffer[4096];
-        size_t bytesRead;
+        int bytesRead = 0;
         bool isFirstChunk = true;
         int retval = 0;
         printf("Reading response...\n");

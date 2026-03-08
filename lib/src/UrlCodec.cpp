@@ -24,12 +24,13 @@ std::string urlEncode(const std::string& src) {
     }();
 
     size_t outSize = src.size();
-    for (unsigned char c : src)
-        if (!safe[c]) outSize += 2;
+    for (auto ch : src)
+        if (!safe[static_cast<unsigned char>(ch)]) outSize += 2;
 
     std::string out;
     out.reserve(outSize);
-    for (unsigned char c : src) {
+    for (auto ch : src) {
+        const unsigned char c = static_cast<unsigned char>(ch);
         if (safe[c]) {
             out += static_cast<char>(c);
         } else {

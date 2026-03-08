@@ -173,9 +173,9 @@ void runClient(const std::string& addr) {
     auto startTime = std::chrono::high_resolution_clock::now();
 
     while (totalReceived < TOTAL_DATA) {
-        size_t n = clientSocket.receive(buffer.data(), buffer.size()); //-V101
+        int n = clientSocket.receive(buffer.data(), buffer.size());
         if (n <= 0) {
-            printf("  [DEBUG] receive returned %zu, error: %d\n", n,
+            printf("  [DEBUG] receive returned %d, error: %d\n", n,
                 static_cast<int>(clientSocket.getLastError()));
             fflush(stdout);
             break;

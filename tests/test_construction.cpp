@@ -171,7 +171,7 @@ static void test_connect_to_happy() {
                 auto peer = std::move(peer_result);
                 char buf[256] = {};
                 int r = peer->receive(buf, sizeof(buf) - 1);
-                if (r > 0) received.assign(buf, r);
+                if (r > 0) received.assign(buf, static_cast<size_t>(r));
                 peer->close();
             }
         });

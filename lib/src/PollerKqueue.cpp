@@ -81,8 +81,8 @@ bool Poller::add(const Socket& s, PollEvent interest) {
         return false;
     }
     pImpl_->ensureCapacity(fd);
-    pImpl_->socketArray[fd] = &s;
-    pImpl_->socketValid[fd] = true;
+    pImpl_->socketArray[static_cast<size_t>(fd)] = &s;
+    pImpl_->socketValid[static_cast<size_t>(fd)] = true;
     return true;
 }
 
@@ -117,8 +117,8 @@ bool Poller::modify(const Socket& s, PollEvent interest) {
     // kevent() returns ENOENT for filters not yet registered — benign.
     ::kevent(pImpl_->kq, changes, n, nullptr, 0, nullptr);
     pImpl_->ensureCapacity(fd);
-    pImpl_->socketArray[fd] = &s;
-    pImpl_->socketValid[fd] = true;
+    pImpl_->socketArray[static_cast<size_t>(fd)] = &s;
+    pImpl_->socketValid[static_cast<size_t>(fd)] = true;
     return true;
 }
 
@@ -135,8 +135,8 @@ bool Poller::remove(const Socket& s) {
     ::kevent(pImpl_->kq, changes, 2, nullptr, 0, nullptr);
 
     if (fd < static_cast<int>(pImpl_->socketArray.size())) {
-        pImpl_->socketArray[fd] = nullptr;
-        pImpl_->socketValid[fd] = false;
+        pImpl_->socketArray[static_cast<size_t>(fd)] = nullptr;
+        pImpl_->socketValid[static_cast<size_t>(fd)] = false;
     }
     return true;
 }
