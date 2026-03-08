@@ -87,6 +87,25 @@
             }
         },
         {
+            "name": "mingw-release",
+            "displayName": "MinGW-w64 Release (Wine)",
+            "description": "Cross-compile for Windows x86-64 with MinGW-w64 in Release mode",
+            "generator": "Unix Makefiles",
+            "binaryDir": "${sourceDir}/build-mingw-rel",
+            "toolchainFile": "${sourceDir}/cmake/toolchain-mingw64.cmake",
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Darwin"
+            },
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "BUILD_EXAMPLES": "ON",
+                "BUILD_TESTS": "ON",
+                "CMAKE_CROSSCOMPILING_EMULATOR": "/opt/homebrew/bin/wine"
+            }
+        },
+        {
             "name": "mingw-debug",
             "displayName": "MinGW-w64 Debug (Wine)",
             "description": "Cross-compile for Windows x86-64 with MinGW-w64; run tests under Wine",
@@ -244,6 +263,12 @@
             "inherits": "base-build",
             "configurePreset": "mingw-debug",
             "displayName": "Build MinGW-w64 Debug"
+        },
+        {
+            "name": "mingw-release",
+            "inherits": "base-build",
+            "configurePreset": "mingw-release",
+            "displayName": "Build MinGW-w64 Release"
         }
     ],
     "testPresets": [
