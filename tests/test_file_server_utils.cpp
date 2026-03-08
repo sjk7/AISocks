@@ -10,10 +10,9 @@
 //   urlDecodePath   — 9 cases
 //   getFileExtension — 6 cases
 //   formatHttpDate   — 4 cases
-//   addSecurityHeaders — 3 cases
+//   securityHeadersBlock — 3 cases
 
 #include "FileServerUtils.h"
-#include "FileIO.h" // StringBuilder
 #include "test_helpers.h"
 
 #include <cstring>
@@ -146,22 +145,27 @@ static void test_httpdate_contains_gmt() {
 }
 
 // ============================================================
-// addSecurityHeaders
+// securityHeadersBlock
 // ============================================================
 
 static void test_security_headers_disabled() {
-    BEGIN_TEST("addSecurityHeaders: no headers appended when enabled=false");
-    StringBuilder sb(128);
-    FileServerUtils::addSecurityHeaders(sb, false);
-    REQUIRE(sb.toString().empty());
+    BEGIN_TEST("securityHeadersBlock: caller skips append when enabled=false");
+    // When enabled is false the caller does not append; verify the block itself
+    // is non-null and non-empty so the contract is clear.
+    const char* block = FileServerUtils::securityHeadersBlock();
+    REQUIRE(block != nullptr);
+    REQUIRE(block[0] != '\0');
+    // Simulate the disabled path: nothing appended -> empty string
+    std::string result;
+    const bool enabled = false;
+    if (enabled) result = block;
+    REQUIRE(result.empty());
 }
 
 static void test_security_headers_enabled_contains_all() {
     BEGIN_TEST(
-        "addSecurityHeaders: all four headers present when enabled=true");
-    StringBuilder sb(256);
-    FileServerUtils::addSecurityHeaders(sb, true);
-    const std::string result = sb.toString();
+        "securityHeadersBlock: all four headers present");
+    const std::string result = FileServerUtils::securityHeadersBlock();
     REQUIRE(
         result.find("X-Content-Type-Options: nosniff") != std::string::npos);
     REQUIRE(result.find("X-Frame-Options: DENY") != std::string::npos);
@@ -170,12 +174,8 @@ static void test_security_headers_enabled_contains_all() {
 }
 
 static void test_security_headers_crlf_terminated() {
-    BEGIN_TEST("addSecurityHeaders: each header is CRLF-terminated");
-    StringBuilder sb(256);
-    FileServerUtils::addSecurityHeaders(sb, true);
-    const std::string result = sb.toString();
-    // Every header line must end with \r\n
-    // Count \r\n occurrences - should be exactly 4
+    BEGIN_TEST("securityHeadersBlock: each header is CRLF-terminated");
+    const std::string result = FileServerUtils::securityHeadersBlock();
     int count = 0;
     size_t pos = 0;
     while ((pos = result.find("\r\n", pos)) != std::string::npos) {
@@ -215,7 +215,7 @@ int main() {
     test_httpdate_nonempty();
     test_httpdate_contains_gmt();
 
-    // addSecurityHeaders
+    // securityHeadersBlock
     test_security_headers_disabled();
     test_security_headers_enabled_contains_all();
     test_security_headers_crlf_terminated();

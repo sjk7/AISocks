@@ -1,10 +1,7 @@
 #ifndef AISOCKS_FILE_SERVER_UTILS_H
 #define AISOCKS_FILE_SERVER_UTILS_H
 
-#include "FileIO.h" // StringBuilder
-#include <array>
 #include <cstdint>
-#include <cstdlib>
 #include <ctime>
 #include <string>
 
@@ -27,16 +24,17 @@ namespace FileServerUtils {
     // calls pay no initialisation cost.
     // ---------------------------------------------------------------------------
     inline std::string urlDecodePath(const std::string& src) {
-        static const auto fromHex = []() noexcept {
-            std::array<uint8_t, 256> t{};
-            t.fill(0xFF);
+        struct HexTable {
+            uint8_t v[256];
+        };
+        static const HexTable fromHex = []() noexcept {
+            HexTable t{};
+            for (int j = 0; j < 256; ++j) t.v[j] = 0xFF;
             for (int i = 0; i < 10; ++i)
-                t[static_cast<unsigned>('0' + i)] = static_cast<uint8_t>(i);
+                t.v[static_cast<unsigned>('0' + i)] = static_cast<uint8_t>(i);
             for (int i = 0; i < 6; ++i) {
-                t[static_cast<unsigned>('A' + i)]
-                    = static_cast<uint8_t>(10 + i);
-                t[static_cast<unsigned>('a' + i)]
-                    = static_cast<uint8_t>(10 + i);
+                t.v[static_cast<unsigned>('A' + i)] = static_cast<uint8_t>(10 + i);
+                t.v[static_cast<unsigned>('a' + i)] = static_cast<uint8_t>(10 + i);
             }
             return t;
         }();
@@ -47,9 +45,9 @@ namespace FileServerUtils {
             const unsigned char c = static_cast<unsigned char>(src[i]);
             if (c == '%' && i + 2 < n) {
                 const uint8_t hi
-                    = fromHex[static_cast<unsigned char>(src[i + 1])];
+                    = fromHex.v[static_cast<unsigned char>(src[i + 1])];
                 const uint8_t lo
-                    = fromHex[static_cast<unsigned char>(src[i + 2])];
+                    = fromHex.v[static_cast<unsigned char>(src[i + 2])];
                 if (hi != 0xFF && lo != 0xFF) {
                     out += static_cast<char>((hi << 4) | lo);
                     i += 2;
@@ -97,25 +95,23 @@ namespace FileServerUtils {
     }
 
     // ---------------------------------------------------------------------------
-    // addSecurityHeaders
+    // securityHeadersBlock
     //
-    // Appends four HTTP security response headers to `response` when
-    // `enabled` is true.  The headers are:
-    //   - X-Content-Type-Options: nosniff (prevents MIME-sniffing attacks)
-    //   - X-Frame-Options: DENY (blocks framing by any origin)
-    //   - Content-Security-Policy: default-src 'self' ... (restricts resource
-    //   loads)
-    //   - Referrer-Policy: no-referrer (omits Referer header on outbound
-    //   navigations)
+    // Returns a compile-time constant string containing the four HTTP security
+    // response headers, each CRLF-terminated, ready to append to any response
+    // builder.  The caller is responsible for checking the enabled flag.
+    //
+    //   X-Content-Type-Options: nosniff
+    //   X-Frame-Options: DENY
+    //   Content-Security-Policy: default-src 'self' ...
+    //   Referrer-Policy: no-referrer
     // ---------------------------------------------------------------------------
-    inline void addSecurityHeaders(StringBuilder& response, bool enabled) {
-        if (!enabled) return;
-        response.append("X-Content-Type-Options: nosniff\r\n");
-        response.append("X-Frame-Options: DENY\r\n");
-        response.append(
-            "Content-Security-Policy: default-src 'self'; style-src 'self' "
-            "'unsafe-inline'; script-src 'self' 'unsafe-inline'\r\n");
-        response.append("Referrer-Policy: no-referrer\r\n");
+    inline const char* securityHeadersBlock() noexcept {
+        return "X-Content-Type-Options: nosniff\r\n"
+               "X-Frame-Options: DENY\r\n"
+               "Content-Security-Policy: default-src 'self'; style-src 'self' "
+               "'unsafe-inline'; script-src 'self' 'unsafe-inline'\r\n"
+               "Referrer-Policy: no-referrer\r\n";
     }
 
 } // namespace FileServerUtils

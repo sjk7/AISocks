@@ -326,8 +326,8 @@ void HttpFileServer::handleFileRequest(HttpClientState& state,
         response.append("\r\n");
     }
 
-    FileServerUtils::addSecurityHeaders(
-        response, config_.enableSecurityHeaders);
+    if (config_.enableSecurityHeaders)
+        response.append(FileServerUtils::securityHeadersBlock());
 
     for (const auto& [name, value] : config_.customHeaders) {
         response.append(name);
@@ -359,8 +359,8 @@ void HttpFileServer::sendError(HttpClientState& state, int code,
     response.appendFormat("%zu", htmlBody.size());
     response.append("\r\n");
 
-    FileServerUtils::addSecurityHeaders(
-        response, config_.enableSecurityHeaders);
+    if (config_.enableSecurityHeaders)
+        response.append(FileServerUtils::securityHeadersBlock());
 
     for (const auto& [name, value] : config_.customHeaders) {
         response.append(name);
@@ -393,8 +393,8 @@ void HttpFileServer::sendNotModified(
         response.append("\r\n");
     }
 
-    FileServerUtils::addSecurityHeaders(
-        response, config_.enableSecurityHeaders);
+    if (config_.enableSecurityHeaders)
+        response.append(FileServerUtils::securityHeadersBlock());
 
     for (const auto& [name, value] : config_.customHeaders) {
         response.append(name);
@@ -438,8 +438,8 @@ void HttpFileServer::sendCachedFile(HttpClientState& state,
         response.append("\r\n");
     }
 
-    FileServerUtils::addSecurityHeaders(
-        response, config_.enableSecurityHeaders);
+    if (config_.enableSecurityHeaders)
+        response.append(FileServerUtils::securityHeadersBlock());
 
     for (const auto& [name, value] : config_.customHeaders) {
         response.append(name);
@@ -466,8 +466,8 @@ void HttpFileServer::sendDirectoryListing(
     response.appendFormat("%zu", htmlBody.size());
     response.append("\r\n");
 
-    FileServerUtils::addSecurityHeaders(
-        response, config_.enableSecurityHeaders);
+    if (config_.enableSecurityHeaders)
+        response.append(FileServerUtils::securityHeadersBlock());
 
     for (const auto& [name, value] : config_.customHeaders) {
         response.append(name);
