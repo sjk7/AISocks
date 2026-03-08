@@ -142,21 +142,24 @@ bool Poller::remove(const Socket& s) {
 }
 
 std::vector<PollResult> Poller::wait(Milliseconds timeout) {
-    // Convert timeout: -1 means block forever (nullptr timespec).
+    // Timeout convention:
+    //   INT64_MAX  → pass nullptr to kevent (block until an event arrives).
+    //   <= 0       → clamp to 1ms minimum.
+    //   otherwise  → use as-is in milliseconds.
     struct timespec ts{};
-    struct timespec* tsp = nullptr;
-    if (timeout.count >= 0) {
-        int64_t effectiveTimeout = timeout.count;
-        if (effectiveTimeout == 0) {
-            // Clamp 0ms to 1ms: a true zero-timeout busy-spin burns a whole
-            // CPU core and starves the TCP stack under load.
-            ts.tv_sec = 0;
-            ts.tv_nsec = 1000000L; // 1 ms
-        } else {
-            ts.tv_sec = static_cast<time_t>(effectiveTimeout / 1000);
-            ts.tv_nsec
-                = static_cast<long>((effectiveTimeout % 1000) * 1000000L);
-        }
+    struct timespec* tsp;
+    int64_t effectiveTimeout = timeout.count;
+    if (effectiveTimeout == std::numeric_limits<int64_t>::max()) {
+        tsp = nullptr; // block forever
+    } else if (effectiveTimeout <= 0) {
+        // Clamp to 1ms: a true zero-timeout busy-spin burns a whole CPU core
+        // and starves the TCP stack under load; negative means "use minimum".
+        ts.tv_sec = 0;
+        ts.tv_nsec = 1000000L; // 1 ms
+        tsp = &ts;
+    } else {
+        ts.tv_sec = static_cast<time_t>(effectiveTimeout / 1000);
+        ts.tv_nsec = static_cast<long>((effectiveTimeout % 1000) * 1000000L);
         tsp = &ts;
     }
 

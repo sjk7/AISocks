@@ -8,6 +8,7 @@
 #define AISOCKS_SOCKET_TYPES_H
 
 #include <cstdint>
+#include <limits>
 #include <string>
 
 namespace aiSocks {
@@ -62,6 +63,16 @@ constexpr Milliseconds operator/(Milliseconds a, int64_t b) noexcept {
 // Default timeout applied to all optional timeout parameters.
 inline constexpr Milliseconds defaultTimeout{30000}; // 30 seconds
 inline constexpr Milliseconds defaultConnectTimeout{10000}; // 10 seconds
+
+// Pass as the poll timeout to Poller::wait() / ServerBase::run() to poll as
+// fast as possible (clamped to 1ms minimum to avoid busy-spinning).
+inline constexpr Milliseconds poll_min{-1};
+
+// Pass as the poll timeout to Poller::wait() / ServerBase::run() to block
+// until an event arrives (no periodic wake-up).
+// NOTE: the pollers treat any value > 0 as an actual millisecond count, so
+// this uses INT64_MAX which is ~292 million years — effectively forever.
+inline constexpr Milliseconds wait_forever{std::numeric_limits<int64_t>::max()};
 
 // Platform listen() backlog constants.
 // All three OS values are always defined so the intent is readable everywhere.

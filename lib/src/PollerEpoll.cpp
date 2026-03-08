@@ -1,8 +1,8 @@
-// This is an independent project of an individual developer. Dear PVS-Studio, please check it.
+// This is an independent project of an individual developer. Dear PVS-Studio,
+// please check it.
 
-// PVS-Studio Static Code Analyzer for C, C++, C#, and Java: https://pvs-studio.com
-
-
+// PVS-Studio Static Code Analyzer for C, C++, C#, and Java:
+// https://pvs-studio.com
 
 // PollerEpoll.cpp  epoll backend for Linux.
 // Compiled only when CMAKE detects Linux.
@@ -108,15 +108,21 @@ bool Poller::remove(const Socket& s) {
 }
 
 std::vector<PollResult> Poller::wait(Milliseconds timeout) {
-    // Convert 0ms to 0.5ms minimum to prevent CPU spinning
+    // Timeout convention:
+    //   INT64_MAX  → pass -1 to epoll_wait (block until an event arrives).
+    //   <= 0       → clamp to 1ms minimum.
+    //   otherwise  → use as-is in milliseconds.
     int64_t effectiveTimeout = timeout.count;
-    if (effectiveTimeout == 0) {
-        effectiveTimeout
-            = 1; // epoll only supports millisecond precision, so 0ms -> 1ms
+    int timeoutMs;
+    if (effectiveTimeout == std::numeric_limits<int64_t>::max()) {
+        timeoutMs = -1; // block forever
+    } else if (effectiveTimeout <= 0) {
+        timeoutMs
+            = 1; // clamp: 0 = non-spinning minimum; negative = use minimum
+    } else {
+        timeoutMs = static_cast<int>(
+            std::min(effectiveTimeout, static_cast<int64_t>(INT_MAX)));
     }
-
-    const int timeoutMs
-        = (effectiveTimeout < 0) ? -1 : static_cast<int>(effectiveTimeout);
 
     const int maxEvents = static_cast<int>(pImpl_->socketArray.size()) + 1;
     std::vector<struct epoll_event> events(static_cast<size_t>(maxEvents));

@@ -634,10 +634,14 @@ int main() {
                 : HttpPollServer(bind) {}
 
             protected:
-            void onReady() override { ready_.store(true, std::memory_order_release); }
+            void onReady() override {
+                ready_.store(true, std::memory_order_release);
+            }
             void buildResponse(HttpClientState& state) override {
-                // Build large response (10KB body)
-                std::string body(10000, 'X');
+                // 512 KB body — well above the typical 128–256 KB kernel
+                // send buffer, so onWritable must be called multiple times
+                // to drain the response across several poll iterations.
+                std::string body(512 * 1024, 'X');
                 state.responseBuf = "HTTP/1.1 200 OK\r\nContent-Length: "
                     + std::to_string(body.size()) + "\r\n\r\n" + body;
                 state.responseView = state.responseBuf;
@@ -660,17 +664,19 @@ int main() {
 
         client.setReceiveTimeout(Milliseconds{2000});
 
-        std::string req = "GET / HTTP/1.1\r\nHost: localhost\r\n\r\n";
+        // Connection: close so the server closes after sending and the receive
+        // loop exits on EOF rather than blocking until the receive timeout.
+        std::string req
+            = "GET / HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n";
         assert(client.isBlocking());
         client.sendAll(req.data(), req.size());
 
-        // Receive all data
+        // Receive all data until server closes the connection (EOF)
         std::string response;
         char buf[1024];
         int n{0};
         while ((n = client.receive(buf, sizeof(buf))) > 0) {
             response.append(buf, n);
-            if (response.size() > 10200) break; // Got header + body
         }
 
         printf("[DEBUG] Test 12 - Stopping server\n");
@@ -680,7 +686,7 @@ int main() {
         serverThread.join();
         g_serverSignalStop.store(false); // Reset for next test
 
-        REQUIRE(response.size() >= 10000);
+        REQUIRE(response.size() >= 512 * 1024);
         REQUIRE(response.find("200 OK") != std::string::npos);
     }
 

@@ -180,7 +180,9 @@ template <typename ClientData> class ServerBase {
     // maxClients: ClientLimit::Unlimited = unlimited; N > 0 = stop accepting
     // after N connections,
     //             but continue serving existing clients until all disconnect.
-    // timeout:    passed to Poller::wait(); -1 = block until an event.
+    // timeout:    passed to Poller::wait(); INT64_MAX (wait_forever) blocks the
+    //             poller until an event arrives; any other value <= 0 is
+    //             clamped to 1ms (the minimum poll interval).
     //
     // Returns when there are no remaining connected clients (AND accepting is
     // stopped, either because maxClients was reached or you stopped

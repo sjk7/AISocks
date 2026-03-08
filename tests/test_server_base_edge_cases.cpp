@@ -58,6 +58,17 @@ class EdgeCaseServer : public ServerBase<EdgeCaseState> {
     std::atomic<int> errorCount{0};
     std::atomic<size_t> timedOutClientsCount{0};
     std::atomic<int> disconnectCount{0};
+    std::atomic<int> idleCallCount{0};
+
+    std::atomic<bool> ready_{false};
+    void waitReady() const {
+        while (!ready_.load(std::memory_order_acquire))
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+    void waitForMessages(int n) const {
+        while (totalMessagesReceived.load(std::memory_order_acquire) < n)
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
 
     Port serverPort() const {
         auto endpoint = getSocket().getLocalEndpoint();
@@ -81,11 +92,13 @@ class EdgeCaseServer : public ServerBase<EdgeCaseState> {
             s.messageCount++;
             totalMessagesReceived++;
         }
+        if (!s.buf.empty()) setClientWritable(sock, true);
         return ServerResult::KeepConnection;
     }
 
     ServerResult onWritable(TcpSocket& sock, EdgeCaseState& s) final {
         if (s.buf.empty()) {
+            setClientWritable(sock, false);
             return ServerResult::KeepConnection;
         }
 
@@ -93,12 +106,15 @@ class EdgeCaseServer : public ServerBase<EdgeCaseState> {
         if (sent > 0) {
             totalMessagesSent++;
             s.buf.erase(0, sent);
+            if (s.buf.empty()) setClientWritable(sock, false);
         } else if (sock.getLastError() != SocketError::WouldBlock) {
             errorCount++;
             return ServerResult::Disconnect;
         }
         return ServerResult::KeepConnection;
     }
+
+    void onReady() override { ready_.store(true, std::memory_order_release); }
 
     void onClientsTimedOut(size_t count) override {
         timedOutClientsCount += count;
@@ -109,25 +125,25 @@ class EdgeCaseServer : public ServerBase<EdgeCaseState> {
         (void)s; // Suppress warning
         disconnectCount++;
     }
+
+    ServerResult onIdle() override {
+        idleCallCount++;
+        return ServerResult::KeepConnection;
+    }
 };
 
 // ---------------------------------------------------------------------------
 // Test helpers
 // ---------------------------------------------------------------------------
-static std::thread startServerInBackground(EdgeCaseServer& server,
-    std::atomic<bool>& ready, ClientLimit maxClients = ClientLimit::Unlimited) {
-    return std::thread([&server, &ready, maxClients]() {
-        ready = true;
+static std::thread startServerInBackground(
+    EdgeCaseServer& server, ClientLimit maxClients = ClientLimit::Unlimited) {
+    return std::thread([&server, maxClients]() {
         server.run(maxClients, QUICK_POLL_TIMEOUT);
     });
 }
 
-static void waitForServerReady(std::atomic<bool>& ready) {
-    auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds{2};
-    while (!ready && std::chrono::steady_clock::now() < deadline) {
-        std::this_thread::sleep_for(std::chrono::milliseconds{5});
-    }
-    REQUIRE(ready);
+static void waitForServerReady(EdgeCaseServer& server) {
+    server.waitReady();
 }
 
 static std::unique_ptr<TcpSocket> connectClient(
@@ -151,11 +167,10 @@ int main() {
     {
         EdgeCaseServer server(Port::any);
         Port port = server.serverPort();
-        std::atomic<bool> ready{false};
 
         auto serverThread
-            = startServerInBackground(server, ready, ClientLimit::Unlimited);
-        waitForServerReady(ready);
+            = startServerInBackground(server, ClientLimit::Unlimited);
+        waitForServerReady(server);
 
         std::vector<std::unique_ptr<TcpSocket>> clients;
         const int numClients = 20; // High load
@@ -178,7 +193,7 @@ int main() {
             client->sendAll(msg, strlen(msg));
         }
 
-        std::this_thread::sleep_for(std::chrono::milliseconds{100});
+        server.waitForMessages(1);
 
         // Server should handle all without crashing
         REQUIRE(server.totalMessagesReceived.load() > 0);
@@ -193,12 +208,11 @@ int main() {
     {
         EdgeCaseServer server(Port::any);
         Port port = server.serverPort();
-        std::atomic<bool> ready{false};
 
         const size_t maxClients = 5;
         auto serverThread
-            = startServerInBackground(server, ready, ClientLimit{maxClients});
-        waitForServerReady(ready);
+            = startServerInBackground(server, ClientLimit{maxClients});
+        waitForServerReady(server);
 
         std::vector<std::unique_ptr<TcpSocket>> clients;
 
@@ -214,7 +228,7 @@ int main() {
         }
 
         // Verify we're at capacity
-        std::this_thread::sleep_for(std::chrono::milliseconds{50});
+        server.waitForMessages(1);
         printf("DEBUG: Client count = %zu (expected %zu)\n",
             server.clientCount(), maxClients);
 
@@ -229,30 +243,22 @@ int main() {
     {
         EdgeCaseServer server(Port::any);
         Port port = server.serverPort();
-        std::atomic<bool> ready{false};
 
-        auto serverThread
-            = startServerInBackground(server, ready, ClientLimit{1});
-        waitForServerReady(ready);
+        auto serverThread = startServerInBackground(server, ClientLimit{1});
+        waitForServerReady(server);
 
         // Connect one client
         auto client1 = connectClient(port, Milliseconds{100});
         REQUIRE(client1 != nullptr);
         client1->setBlocking(true);
 
-        std::this_thread::sleep_for(std::chrono::milliseconds{100});
-
         // Verify client is connected
         REQUIRE(server.clientCount() <= 1);
 
-        // Send a message
+        // Send a message and wait for it to be processed
         const char* msg = "hello";
         client1->sendAll(msg, strlen(msg));
-
-        // Give the single-threaded event loop multiple cycles to process the
-        // message The server runs with 5ms timeout, so multiple sleeps ensure
-        // processing
-        std::this_thread::sleep_for(std::chrono::milliseconds{300});
+        server.waitForMessages(1);
 
         server.requestStop();
         serverThread.join();
@@ -265,11 +271,10 @@ int main() {
     {
         EdgeCaseServer server(Port::any);
         Port port = server.serverPort();
-        std::atomic<bool> ready{false};
 
         auto serverThread
-            = startServerInBackground(server, ready, ClientLimit::Unlimited);
-        waitForServerReady(ready);
+            = startServerInBackground(server, ClientLimit::Unlimited);
+        waitForServerReady(server);
 
         server.setCustomKeepAliveTimeout(Milliseconds{5000});
 
@@ -281,32 +286,29 @@ int main() {
                 client->setBlocking(true);
                 const char* msg = "data";
                 client->sendAll(msg, strlen(msg));
-                std::this_thread::sleep_for(std::chrono::milliseconds{10});
             }
             // Client disconnects when it goes out of scope
         }
 
-        std::this_thread::sleep_for(std::chrono::milliseconds{100});
+        server.waitForMessages(cycles);
 
         server.requestStop();
         serverThread.join();
 
         printf("DEBUG: Completed %d cycles\n", cycles);
-        REQUIRE(server.totalMessagesReceived.load() >= cycles - 2);
+        REQUIRE(server.totalMessagesReceived.load() >= cycles);
     }
 
     // Test 5: Keep-alive timeout detection
     BEGIN_TEST("Edge case: keep-alive timeout disconnects idle clients");
     {
         EdgeCaseServer server(Port::any);
-        server.setCustomKeepAliveTimeout(
-            Milliseconds{50}); // Use 150ms for this specific test
+        server.setCustomKeepAliveTimeout(Milliseconds{10});
         Port port = server.serverPort();
-        std::atomic<bool> ready{false};
 
         auto serverThread
-            = startServerInBackground(server, ready, ClientLimit::Unlimited);
-        waitForServerReady(ready);
+            = startServerInBackground(server, ClientLimit::Unlimited);
+        waitForServerReady(server);
 
         // Connect a client
         auto client = connectClient(port, Milliseconds{100});
@@ -316,8 +318,8 @@ int main() {
             const char* msg = "test";
             client->sendAll(msg, strlen(msg));
 
-            // Wait longer than keep-alive timeout
-            std::this_thread::sleep_for(std::chrono::milliseconds{300});
+            // Wait just long enough for the 10ms keep-alive to fire
+            std::this_thread::sleep_for(std::chrono::milliseconds{30});
 
             // Try to send another message
             bool sent = client->sendAll(msg, strlen(msg));
@@ -325,8 +327,6 @@ int main() {
             printf("DEBUG: After timeout, send %s\n",
                 (sent ? "succeeded" : "failed"));
         }
-
-        std::this_thread::sleep_for(std::chrono::milliseconds{100});
 
         server.requestStop();
         serverThread.join();
@@ -341,11 +341,10 @@ int main() {
     {
         EdgeCaseServer server(Port::any);
         Port port = server.serverPort();
-        std::atomic<bool> ready{false};
 
         auto serverThread
-            = startServerInBackground(server, ready, ClientLimit::Unlimited);
-        waitForServerReady(ready);
+            = startServerInBackground(server, ClientLimit::Unlimited);
+        waitForServerReady(server);
 
         std::vector<std::unique_ptr<TcpSocket>> clients;
         const int numClients = 5;
@@ -368,7 +367,7 @@ int main() {
             }
         }
 
-        std::this_thread::sleep_for(std::chrono::milliseconds{500});
+        server.waitForMessages(numClients - 1);
 
         server.requestStop();
         serverThread.join();
@@ -383,23 +382,24 @@ int main() {
     {
         EdgeCaseServer server(Port::any);
         Port port = server.serverPort();
-        std::atomic<bool> ready{false};
 
         auto serverThread
-            = startServerInBackground(server, ready, ClientLimit::Unlimited);
-        waitForServerReady(ready);
+            = startServerInBackground(server, ClientLimit::Unlimited);
+        waitForServerReady(server);
 
         std::vector<std::unique_ptr<TcpSocket>> clients;
 
-        // Connect several clients
+        // Connect several clients and send data so we can sync
         for (int i = 0; i < 5; ++i) {
             auto client = connectClient(port, Milliseconds{100});
             if (client) {
+                client->setBlocking(true);
+                client->sendAll("hi", 2);
                 clients.push_back(std::move(client));
             }
         }
 
-        std::this_thread::sleep_for(std::chrono::milliseconds{50});
+        server.waitForMessages(static_cast<int>(clients.size()));
 
         // Request stop with active connections
         server.requestStop();
@@ -415,22 +415,23 @@ int main() {
     {
         EdgeCaseServer server(Port::any);
         Port port = server.serverPort();
-        std::atomic<bool> ready{false};
 
         auto serverThread
-            = startServerInBackground(server, ready, ClientLimit::Unlimited);
-        waitForServerReady(ready);
+            = startServerInBackground(server, ClientLimit::Unlimited);
+        waitForServerReady(server);
 
-        // Connect a few clients
+        // Connect a few clients and send data so we can sync
         std::vector<std::unique_ptr<TcpSocket>> clients;
         for (int i = 0; i < 3; ++i) {
             auto client = connectClient(port, Milliseconds{100});
             if (client) {
+                client->setBlocking(true);
+                client->sendAll("hi", 2);
                 clients.push_back(std::move(client));
             }
         }
 
-        std::this_thread::sleep_for(std::chrono::milliseconds{50});
+        server.waitForMessages(static_cast<int>(clients.size()));
 
         // clientCount() is unsigned, so it's always >= 0
 
@@ -443,24 +444,25 @@ int main() {
     {
         EdgeCaseServer server(Port::any);
         Port port = server.serverPort();
-        std::atomic<bool> ready{false};
 
         const size_t maxClients = 3;
         auto serverThread
-            = startServerInBackground(server, ready, ClientLimit{maxClients});
-        waitForServerReady(ready);
+            = startServerInBackground(server, ClientLimit{maxClients});
+        waitForServerReady(server);
 
         std::vector<std::unique_ptr<TcpSocket>> clients;
 
-        // Fill to capacity
+        // Fill to capacity - each client sends a message so we can sync
         for (size_t i = 0; i < maxClients; ++i) {
             auto client = connectClient(port, Milliseconds{100});
             if (client) {
+                client->setBlocking(true);
+                client->sendAll("hi", 2);
                 clients.push_back(std::move(client));
             }
         }
 
-        std::this_thread::sleep_for(std::chrono::milliseconds{100});
+        server.waitForMessages(static_cast<int>(clients.size()));
 
         // Try to connect beyond limit
         auto extraClient = connectClient(port, Milliseconds{100});
@@ -484,18 +486,18 @@ int main() {
     {
         EdgeCaseServer server(Port::any);
         Port port = server.serverPort();
-        std::atomic<bool> ready{false};
 
         auto start = std::chrono::steady_clock::now();
 
         auto serverThread
-            = startServerInBackground(server, ready, ClientLimit::Unlimited);
-        waitForServerReady(ready);
+            = startServerInBackground(server, ClientLimit::Unlimited);
+        waitForServerReady(server);
 
         // Connect and send data quickly
         auto client = connectClient(port, Milliseconds{200});
         if (client) {
             client->setBlocking(true);
+            client->setReceiveTimeout(Milliseconds{500});
             const char* msg = "quick";
             client->sendAll(msg, strlen(msg));
 
@@ -512,6 +514,41 @@ int main() {
         }
 
         server.requestStop();
+        serverThread.join();
+    }
+
+    // Test 11: wait_forever suppresses onIdle()
+    BEGIN_TEST("Edge case: wait_forever — onIdle() never called while idle");
+    {
+        EdgeCaseServer server(Port::any);
+        Port port = server.serverPort();
+
+        // Run with wait_forever: poller blocks until a real event fires,
+        // so onIdle() must never be called during a quiet period.
+        auto serverThread = std::thread([&server]() {
+            server.run(ClientLimit::Unlimited, wait_forever);
+        });
+        waitForServerReady(server);
+
+        // Sit quietly for 30ms — server should be blocked in the poller.
+        std::this_thread::sleep_for(std::chrono::milliseconds(30));
+        REQUIRE(server.idleCallCount.load() == 0);
+
+        // Connect and send data to prove the server is still alive.
+        auto client = connectClient(port, Milliseconds{200});
+        REQUIRE(client != nullptr);
+        client->setBlocking(true);
+        client->sendAll("ping", 4);
+        server.waitForMessages(1);
+        REQUIRE(server.totalMessagesReceived.load() > 0);
+
+        // onIdle() still must not have fired.
+        REQUIRE(server.idleCallCount.load() == 0);
+
+        // requestStop() sets the flag, then closing the client generates a
+        // socket event that wakes the poller out of its indefinite wait.
+        server.requestStop();
+        client.reset(); // closes socket → wakes poller → stop flag is seen
         serverThread.join();
     }
 

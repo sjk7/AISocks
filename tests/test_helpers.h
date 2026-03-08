@@ -9,6 +9,7 @@
 #include <string>
 #include <cstdint>
 #include <stdexcept>
+#include "Stopwatch.h"
 
 #ifdef _WIN32
 #include <winsock2.h>
@@ -24,6 +25,9 @@
 
 static int g_failed = 0;
 static int g_passed = 0;
+static aiSocks::Stopwatch g_totalTimer;
+static aiSocks::Stopwatch g_testTimer;
+static std::string g_currentTest;
 
 #define REQUIRE(expr)                                                          \
     do {                                                                       \
@@ -39,22 +43,31 @@ static int g_passed = 0;
 #define REQUIRE_MSG(expr, msg)                                                 \
     do {                                                                       \
         if (!(expr)) {                                                         \
-            fprintf(stderr, "  FAIL [%s:%d] %s\n", __FILE__, __LINE__,        \
-                    std::string(msg).c_str());                                 \
+            fprintf(stderr, "  FAIL [%s:%d] %s\n", __FILE__, __LINE__,         \
+                std::string(msg).c_str());                                     \
             ++g_failed;                                                        \
         } else {                                                               \
-            printf("  pass: %s\n", std::string(msg).c_str());                 \
+            printf("  pass: %s\n", std::string(msg).c_str());                  \
             ++g_passed;                                                        \
         }                                                                      \
     } while (0)
 
 #define BEGIN_TEST(name)                                                       \
     do {                                                                       \
+        if (!g_currentTest.empty()) {                                          \
+            printf("  [%.1f ms]\n", g_testTimer.elapsedMs());                  \
+        }                                                                      \
+        g_currentTest = (name);                                                \
+        g_testTimer.reset();                                                   \
         printf("\n--- %s ---\n", name);                                        \
     } while (0)
 
 inline int test_summary() {
+    if (!g_currentTest.empty()) {
+        printf("  [%.1f ms]\n", g_testTimer.elapsedMs());
+    }
     printf("\n==============================\n");
     printf("Results: %d passed, %d failed\n", g_passed, g_failed);
+    printf("Total time: %.1f ms\n", g_totalTimer.elapsedMs());
     return (g_failed > 0) ? 1 : 0;
 }

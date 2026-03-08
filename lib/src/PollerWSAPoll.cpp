@@ -1,8 +1,8 @@
-// This is an independent project of an individual developer. Dear PVS-Studio, please check it.
+// This is an independent project of an individual developer. Dear PVS-Studio,
+// please check it.
 
-// PVS-Studio Static Code Analyzer for C, C++, C#, and Java: https://pvs-studio.com
-
-
+// PVS-Studio Static Code Analyzer for C, C++, C#, and Java:
+// https://pvs-studio.com
 
 // PollerWSAPoll.cpp  WSAPoll backend for Windows.
 // Compiled only when CMAKE detects WIN32.
@@ -85,20 +85,26 @@ bool Poller::remove(const Socket& s) {
 std::vector<PollResult> Poller::wait(Milliseconds timeout) {
     if (pImpl_->fds.empty()) return {};
 
-    // Convert 0ms to 0.5ms minimum to prevent CPU spinning
+    // Timeout convention:
+    //   INT64_MAX  → pass -1 to WSAPoll (block until an event arrives).
+    //   <= 0       → clamp to 1ms minimum.
+    //   otherwise  → use as-is in milliseconds, capped at MAX_WAIT_MS so the
+    //               run() loop can check the stop flag periodically.
     int64_t effectiveTimeout = timeout.count;
-    if (effectiveTimeout == 0) {
-        effectiveTimeout
-            = 1; // WSAPoll only supports millisecond precision, so 0ms -> 1ms
+    int timeoutMs;
+    if (effectiveTimeout == std::numeric_limits<int64_t>::max()) {
+        timeoutMs = -1; // block forever
+    } else {
+        if (effectiveTimeout <= 0)
+            effectiveTimeout
+                = 1; // clamp: 0 = non-spinning minimum; negative = use minimum
+        // On Windows, std::signal handlers fire on a separate thread, so cap
+        // the wait at 100ms so the run() loop can check the stop flag cleanly.
+        static constexpr int MAX_WAIT_MS = 100;
+        timeoutMs = (effectiveTimeout > MAX_WAIT_MS)
+            ? MAX_WAIT_MS
+            : static_cast<int>(effectiveTimeout);
     }
-
-    // On Windows, std::signal handlers fire on a separate thread, so WSAPoll
-    // with an infinite timeout will never be interrupted. Cap the wait at 100ms
-    // so the run() loop can check the stop flag and exit cleanly.
-    static constexpr int MAX_WAIT_MS = 100;
-    const int timeoutMs = (effectiveTimeout < 0)
-        ? MAX_WAIT_MS
-        : static_cast<int>(effectiveTimeout);
 
     // WSAPoll modifies revents in-place; clear them first.
     for (auto& pfd : pImpl_->fds) {
