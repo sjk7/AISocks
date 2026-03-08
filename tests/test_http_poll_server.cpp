@@ -15,6 +15,7 @@
 #include <string>
 #include <thread>
 #include <chrono>
+#include <atomic>
 
 using namespace aiSocks;
 using namespace std::chrono_literals;
@@ -29,6 +30,12 @@ class TestHttpServer : public HttpPollServer {
     bool useStaticResponse = false;
     std::string staticResponseStorage
         = "HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\nHello";
+
+    std::atomic<bool> ready_{false};
+    void waitReady() const {
+        while (!ready_.load(std::memory_order_acquire))
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
 
     explicit TestHttpServer(const ServerBind& bind) : HttpPollServer(bind) {
         // Reset test state for this instance
@@ -54,6 +61,8 @@ class TestHttpServer : public HttpPollServer {
         }
         lastResponse = std::string(state.responseView);
     }
+
+    void onReady() override { ready_.store(true, std::memory_order_release); }
 
     void onResponseBegin(HttpClientState& state) override {
         responseBeginCount++;
@@ -280,9 +289,8 @@ int main() {
             fflush(stdout);
         });
 
-        printf("[DEBUG] Test 3 - Waiting 50ms for server to start\n");
         fflush(stdout);
-        std::this_thread::sleep_for(50ms);
+        server.waitReady();
 
         printf("[DEBUG] Test 3 - Client sending request\n");
         fflush(stdout);
@@ -317,7 +325,7 @@ int main() {
             server.run(ClientLimit::Unlimited, Milliseconds{100});
         });
 
-        std::this_thread::sleep_for(50ms);
+        server.waitReady();
 
         sendHttpRequest(
             server.serverPort(), "GET / HTTP/1.1\r\nHost: localhost\r\n\r\n");
@@ -340,7 +348,7 @@ int main() {
             server.run(ClientLimit::Unlimited, Milliseconds{100});
         });
 
-        std::this_thread::sleep_for(50ms);
+        server.waitReady();
 
         sendHttpRequest(
             server.serverPort(), "GET / HTTP/1.1\r\nHost: localhost\r\n\r\n");
@@ -374,9 +382,8 @@ int main() {
             fflush(stdout);
         });
 
-        printf("[DEBUG] Test 6 - Waiting 50ms for server to start\n");
         fflush(stdout);
-        std::this_thread::sleep_for(50ms);
+        server.waitReady();
 
         printf("[DEBUG] Test 6 - Client sending HTTP/1.0 request\n");
         fflush(stdout);
@@ -410,7 +417,7 @@ int main() {
         std::thread serverThread(
             [&server]() { server.run(ClientLimit{1}, Milliseconds{100}); });
 
-        std::this_thread::sleep_for(50ms);
+        server.waitReady();
 
         auto clientResult = SocketFactory::createTcpClient(
             AddressFamily::IPv4, ConnectArgs{"127.0.0.1", server.serverPort()});
@@ -462,9 +469,8 @@ int main() {
             fflush(stdout);
         });
 
-        printf("[DEBUG] Test 8 - Waiting 50ms for server to start\n");
         fflush(stdout);
-        std::this_thread::sleep_for(50ms);
+        server.waitReady();
 
         printf("[DEBUG] Test 8 - Client sending Connection: close request\n");
         fflush(stdout);
@@ -497,7 +503,7 @@ int main() {
         std::thread serverThread(
             [&server]() { server.run(ClientLimit{10}, Milliseconds{100}); });
 
-        std::this_thread::sleep_for(50ms);
+        server.waitReady();
 
         auto clientResult = SocketFactory::createTcpClient(
             AddressFamily::IPv4, ConnectArgs{"127.0.0.1", server.serverPort()});
@@ -534,7 +540,7 @@ int main() {
         std::thread serverThread(
             [&server]() { server.run(ClientLimit{1}, Milliseconds{100}); });
 
-        std::this_thread::sleep_for(50ms);
+        server.waitReady();
 
         auto clientResult = SocketFactory::createTcpClient(
             AddressFamily::IPv4, ConnectArgs{"127.0.0.1", server.serverPort()});
@@ -549,7 +555,7 @@ int main() {
 
         client.sendAll(part1.data(), part1.size());
         printf("DEBUG: Sent part1\n");
-        std::this_thread::sleep_for(50ms);
+        server.waitReady();
         client.sendAll(part2.data(), part2.size());
         printf("DEBUG: Sent part2\n");
 
@@ -578,7 +584,7 @@ int main() {
         std::thread serverThread(
             [&server]() { server.run(ClientLimit{1}, Milliseconds{100}); });
 
-        std::this_thread::sleep_for(50ms);
+        server.waitReady();
 
         auto clientResult = SocketFactory::createTcpClient(
             AddressFamily::IPv4, ConnectArgs{"127.0.0.1", server.serverPort()});
@@ -612,10 +618,16 @@ int main() {
     {
         class LargeResponseServer : public HttpPollServer {
             public:
+            std::atomic<bool> ready_{false};
+            void waitReady() const {
+                while (!ready_.load(std::memory_order_acquire))
+                    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+            }
             explicit LargeResponseServer(const ServerBind& bind)
                 : HttpPollServer(bind) {}
 
             protected:
+            void onReady() override { ready_.store(true, std::memory_order_release); }
             void buildResponse(HttpClientState& state) override {
                 // Build large response (10KB body)
                 std::string body(10000, 'X');
@@ -631,7 +643,7 @@ int main() {
         std::thread serverThread(
             [&server]() { server.run(ClientLimit{1}, Milliseconds{100}); });
 
-        std::this_thread::sleep_for(50ms);
+        server.waitReady();
 
         auto clientResult = SocketFactory::createTcpClient(
             AddressFamily::IPv4, ConnectArgs{"127.0.0.1", server.serverPort()});
@@ -674,7 +686,7 @@ int main() {
         std::thread serverThread(
             [&server]() { server.run(ClientLimit{1}, Milliseconds{100}); });
 
-        std::this_thread::sleep_for(50ms);
+        server.waitReady();
 
         sendHttpRequest(
             server.serverPort(), "GET / HTTP/1.1\r\nHost: localhost\r\n\r\n");
@@ -701,7 +713,7 @@ int main() {
             server.run(ClientLimit::Unlimited, Milliseconds{100});
         });
 
-        std::this_thread::sleep_for(50ms);
+        server.waitReady();
 
         std::vector<std::thread> clients;
         std::atomic<int> successCount{0};
@@ -745,7 +757,7 @@ int main() {
         std::thread serverThread(
             [&server]() { server.run(ClientLimit{1}, Milliseconds{100}); });
 
-        std::this_thread::sleep_for(50ms);
+        server.waitReady();
 
         auto clientResult = SocketFactory::createTcpClient(
             AddressFamily::IPv4, ConnectArgs{"127.0.0.1", server.serverPort()});

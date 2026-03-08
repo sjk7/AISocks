@@ -210,6 +210,8 @@ template <typename ClientData> class ServerBase {
         bool accepting = true;
         size_t accepted = 0;
 
+        onReady();
+
         loop_.run(
             timeout,
 
@@ -489,6 +491,11 @@ template <typename ClientData> class ServerBase {
 
     // Called just before a client is removed.  Default: no-op.
     virtual void onDisconnect(ClientData& /*data*/) {}
+
+    // Called once the server has been added to the poller and is ready to
+    // accept connections.  Override to signal waiting threads instead of
+    // using a fixed sleep.
+    virtual void onReady() {}
 
     // Called when a poll error event fires on a client socket.
     // sock is still valid at this point.
