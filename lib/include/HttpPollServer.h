@@ -22,6 +22,7 @@
 
 #include "BuildInfo.h"
 #include "CallIntervalTracker.h"
+#include "HtmlEscape.h"
 #include "ServerBase.h"
 #include <algorithm>
 #include <chrono>
@@ -178,10 +179,6 @@ class HttpPollServer : public ServerBase<HttpClientState> {
     ServerResult onIdle() override;
 
     CallIntervalTracker tracker_;
-
-    protected:
-    /// (Used for Reflected XSS prevention)
-    static std::string escapeHtml(const std::string& input);
 };
 
 } // namespace aiSocks

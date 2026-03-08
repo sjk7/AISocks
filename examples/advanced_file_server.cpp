@@ -177,7 +177,7 @@ class CustomFileServer : public HttpFileServer {
         html.append("<html><head><title>");
         html.appendFormat("%d", code);
         html.append(" ");
-        html.append(HttpPollServer::escapeHtml(status));
+        html.append(HtmlEscape::encode(status));
         html.append("</title>\n");
         html.append("<style>\n");
         html.append("body { font-family: Arial, sans-serif; margin: 40px; "
@@ -196,10 +196,10 @@ class CustomFileServer : public HttpFileServer {
         html.append("<h1>");
         html.appendFormat("%d", code);
         html.append(" ");
-        html.append(HttpPollServer::escapeHtml(status));
+        html.append(HtmlEscape::encode(status));
         html.append("</h1>\n");
         html.append("<p>");
-        html.append(HttpPollServer::escapeHtml(message));
+        html.append(HtmlEscape::encode(message));
         html.append("</p>\n");
         html.append("<a href=\"/\" class=\"back-link\">← Back to Home</a>\n");
         html.append("</div></body></html>");
@@ -699,7 +699,8 @@ class CustomFileServer : public HttpFileServer {
             request.path.c_str());
 #else
         struct tm* timeinfo = localtime(&time_t);
-        logFile_.printf("%04d-%02d-%02d %02d:%02d:%02d %s %s from client\n", //-V111 //-V111
+        logFile_.printf(
+            "%04d-%02d-%02d %02d:%02d:%02d %s %s from client\n", //-V111 //-V111
             static_cast<int>(timeinfo->tm_year + 1900),
             static_cast<int>(timeinfo->tm_mon + 1),
             static_cast<int>(timeinfo->tm_mday),

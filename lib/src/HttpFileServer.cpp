@@ -490,15 +490,15 @@ std::string HttpFileServer::generateErrorHtml(
     html.append("<html><head><title>");
     html.appendFormat("%d", code);
     html.append(" ");
-    html.append(htmlEscape(status));
+    html.append(HtmlEscape::encode(status));
     html.append("</title></head>\n");
     html.append("<body><h1>");
     html.appendFormat("%d", code);
     html.append(" ");
-    html.append(htmlEscape(status));
+    html.append(HtmlEscape::encode(status));
     html.append("</h1>\n");
     html.append("<p>");
-    html.append(htmlEscape(message));
+    html.append(HtmlEscape::encode(message));
     html.append("</p>\n");
     if (!config_.hideServerVersion) {
         html.append("<hr><address>aiSocks HttpFileServer</address>\n");
@@ -530,7 +530,7 @@ std::string HttpFileServer::generateDirectoryListing(
             html.append(urlEncode(name));
             if (isDir) html.append("/");
             html.append("\">");
-            html.append(htmlEscape(name));
+            html.append(HtmlEscape::encode(name));
             if (isDir) html.append("/");
             html.append("</a></li>\n");
         }
@@ -550,22 +550,6 @@ const HttpFileServer::Config& HttpFileServer::getConfig() const {
 
 FileCache& HttpFileServer::getFileCache() {
     return fileCache_;
-}
-
-std::string HttpFileServer::htmlEscape(const std::string& str) {
-    std::string escaped;
-    escaped.reserve(str.size());
-    for (char c : str) {
-        switch (c) {
-            case '&': escaped.append("&amp;"); break;
-            case '<': escaped.append("&lt;"); break;
-            case '>': escaped.append("&gt;"); break;
-            case '"': escaped.append("&quot;"); break;
-            case '\'': escaped.append("&#39;"); break;
-            default: escaped.push_back(c); break;
-        }
-    }
-    return escaped;
 }
 
 } // namespace aiSocks

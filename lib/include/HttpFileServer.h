@@ -8,6 +8,7 @@
 
 #include "FileCache.h"
 #include "FileServerUtils.h"
+#include "HtmlEscape.h"
 #include "HttpPollServer.h"
 #include "HttpRequest.h"
 #include <ctime>
@@ -115,8 +116,6 @@ class HttpFileServer : public HttpPollServer {
     private:
     Config config_;
     FileCache fileCache_;
-
-    static std::string htmlEscape(const std::string& str);
 };
 
 } // namespace aiSocks
