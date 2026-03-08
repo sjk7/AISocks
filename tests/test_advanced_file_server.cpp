@@ -14,6 +14,7 @@
 #include "PathHelper.h"
 #include "test_string_literals.h"
 #include <string>
+#include <array>
 #include <thread>
 #include <chrono>
 #include <cassert>
@@ -1099,7 +1100,7 @@ void testCachingHeadersBehavior() {
             state.responseBuf, "Last-Modified");
 
         TestFramework::assert_true(
-            lastModified.empty() || lastModified.find("-") != std::string::npos,
+            lastModified.empty() || lastModified.find('-') != std::string::npos,
             "Server should include Last-Modified or not - acceptable either "
             "way");
     }
@@ -1248,12 +1249,12 @@ void testConcurrencyBehavior() {
 
     // Behavior: Multiple clients requesting different files
     {
-        std::vector<std::pair<std::string, std::string>> requests = {
+        std::array<std::pair<std::string, std::string>, 3> requests = {{
             {"/index.html", "Testing"}, // index.html returns testing
                                         // instructions, not "Test Page"
             {"/style.css", "color: red"},
             {"/script.js", "console.log"},
-        };
+        }};
 
         int successCount = 0;
         for (const auto& [path, expectedContent] : requests) {

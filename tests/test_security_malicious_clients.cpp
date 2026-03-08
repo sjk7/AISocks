@@ -128,7 +128,7 @@ std::string extractHeader(
     size_t start = response.find(search);
     if (start == std::string::npos) return "";
 
-    start = response.find(":", start) + 1;
+    start = response.find(':', start) + 1;
     while (start < response.size()
         && (response[start] == ' ' || response[start] == '\t')) {
         start++;

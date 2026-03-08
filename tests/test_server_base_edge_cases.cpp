@@ -487,8 +487,6 @@ int main() {
         EdgeCaseServer server(Port::any);
         Port port = server.serverPort();
 
-        auto start = std::chrono::steady_clock::now();
-
         auto serverThread
             = startServerInBackground(server, ClientLimit::Unlimited);
         waitForServerReady(server);
@@ -499,6 +497,7 @@ int main() {
             client->setBlocking(true);
             client->setReceiveTimeout(Milliseconds{500});
             const char* msg = "quick";
+            auto start = std::chrono::steady_clock::now();
             client->sendAll(msg, strlen(msg));
 
             char buf[100];

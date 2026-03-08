@@ -123,7 +123,7 @@ template <typename T> class [[nodiscard]] Result {
     // and no explicit destructor call for the error arm.
     SocketError error_{SocketError::None};
     int sysCode_{0}; // errno / WSAGetLastError at error time
-    bool has_value_;
+    bool has_value_{false};
     bool isDns_{false}; // true → gai_strerror, false → strerror
     // 2 bytes padding here (implicit, to align description_ to 8 bytes)
     const char* description_{

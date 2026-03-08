@@ -98,9 +98,9 @@ class KeepAliveTimeoutManager {
     // Adjust timeout based on current client count.  Call once per event batch.
     void adjustForLoad(size_t clientCount) {
         constexpr size_t HIGH_LOAD_THRESHOLD = 256;
-        constexpr auto AGGRESSIVE = std::chrono::milliseconds{5000};
 
         if (!inHighLoad_ && clientCount > HIGH_LOAD_THRESHOLD) {
+            constexpr auto AGGRESSIVE = std::chrono::milliseconds{5000};
             normal_ = timeout_;
             timeout_ = AGGRESSIVE;
             inHighLoad_ = true;

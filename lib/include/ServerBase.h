@@ -276,18 +276,19 @@ template <typename ClientData> class ServerBase {
                 timeouts_.adjustForLoad(clientFds_.size());
 
                 if (timeouts_.sweepDue(clientFds_.size())) {
+                    ClientEntry* sweepCe = nullptr;
                     size_t closed = timeouts_.sweepRaw(
                         [&](uintptr_t fd)
                             -> std::pair<bool, SteadyClock::time_point> {
-                            ClientEntry* ce = findClient(fd);
-                            if (!ce) return {false, {}};
-                            return {true, ce->lastActivity};
+                            sweepCe = findClient(fd);
+                            if (!sweepCe) return {false, {}};
+                            return {true, sweepCe->lastActivity};
                         },
                         [&](uintptr_t fd) {
-                            ClientEntry* ce = findClient(fd);
-                            onDisconnect(ce->data);
-                            ce->socket->shutdown(ShutdownHow::Both);
-                            (void)loop_.remove(*ce->socket);
+                            if (!sweepCe) return;
+                            onDisconnect(sweepCe->data);
+                            sweepCe->socket->shutdown(ShutdownHow::Both);
+                            (void)loop_.remove(*sweepCe->socket);
                             eraseClient(fd);
                         });
                     if (closed > 0) onClientsTimedOut(closed);

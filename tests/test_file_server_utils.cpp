@@ -27,7 +27,7 @@ using namespace aiSocks;
 
 static void test_urldecode_empty() {
     BEGIN_TEST("urlDecodePath: empty string returns empty string");
-    REQUIRE(FileServerUtils::urlDecodePath("") == "");
+    REQUIRE(FileServerUtils::urlDecodePath("").empty());
 }
 
 static void test_urldecode_plain() {
@@ -84,12 +84,12 @@ static void test_ext_html() {
 
 static void test_ext_no_extension() {
     BEGIN_TEST("getFileExtension: no dot returns empty string");
-    REQUIRE(FileServerUtils::getFileExtension("Makefile") == "");
+    REQUIRE(FileServerUtils::getFileExtension("Makefile").empty());
 }
 
 static void test_ext_empty() {
     BEGIN_TEST("getFileExtension: empty path returns empty string");
-    REQUIRE(FileServerUtils::getFileExtension("") == "");
+    REQUIRE(FileServerUtils::getFileExtension("").empty());
 }
 
 static void test_ext_last_dot_wins() {
@@ -100,7 +100,7 @@ static void test_ext_last_dot_wins() {
 static void test_ext_dot_only() {
     BEGIN_TEST("getFileExtension: lone dot returns empty string");
     // dotPos == length-1, condition is dotPos < length-1, so returns ""
-    REQUIRE(FileServerUtils::getFileExtension(".") == "");
+    REQUIRE(FileServerUtils::getFileExtension(".").empty());
 }
 
 static void test_ext_hidden_file() {
