@@ -9,6 +9,7 @@
 #include "FileCache.h"
 #include "FileServerUtils.h"
 #include "HtmlEscape.h"
+#include "HtmlPageGenerator.h"
 #include "HttpPollServer.h"
 #include "HttpRequest.h"
 #include <ctime>
@@ -116,6 +117,7 @@ class HttpFileServer : public HttpPollServer {
     private:
     Config config_;
     FileCache fileCache_;
+    HtmlPageGenerator htmlGen_;
 };
 
 } // namespace aiSocks

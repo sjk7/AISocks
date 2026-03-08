@@ -7,9 +7,7 @@
 #include "HttpFileServer.h"
 
 #include "FileIO.h"
-#include "HtmlEscape.h"
 #include "PathHelper.h"
-#include "UrlCodec.h"
 
 #include <array>
 #include <cstdint>
@@ -49,6 +47,8 @@ HttpFileServer::HttpFileServer(
     if (!config_.documentRoot.empty() && config_.documentRoot.back() != '/') {
         config_.documentRoot += '/';
     }
+
+    htmlGen_ = HtmlPageGenerator(config_.hideServerVersion);
 }
 
 void HttpFileServer::buildResponse(HttpClientState& state) {
@@ -488,63 +488,12 @@ void HttpFileServer::sendDirectoryListing(
 
 std::string HttpFileServer::generateErrorHtml(
     int code, const std::string& status, const std::string& message) const {
-    StringBuilder html(512);
-    html.append("<!DOCTYPE html>\n");
-    html.append("<html><head><title>");
-    html.appendFormat("%d", code);
-    html.append(" ");
-    html.append(HtmlEscape::encode(status));
-    html.append("</title></head>\n");
-    html.append("<body><h1>");
-    html.appendFormat("%d", code);
-    html.append(" ");
-    html.append(HtmlEscape::encode(status));
-    html.append("</h1>\n");
-    html.append("<p>");
-    html.append(HtmlEscape::encode(message));
-    html.append("</p>\n");
-    if (!config_.hideServerVersion) {
-        html.append("<hr><address>aiSocks HttpFileServer</address>\n");
-    }
-    html.append("</body></html>");
-    return html.toString();
+    return htmlGen_.errorPage(code, status, message);
 }
 
 std::string HttpFileServer::generateDirectoryListing(
     const std::string& dirPath) const {
-    StringBuilder html(2048);
-    html.append("<!DOCTYPE html>\n");
-    html.append("<html><head><title>Directory listing</title></head>\n");
-    html.append("<body><h1>Directory listing</h1>\n");
-    html.append("<ul>\n");
-
-    std::vector<PathHelper::DirEntry> entries
-        = PathHelper::listDirectory(dirPath);
-    if (entries.empty()) {
-        html.append("<li>Error reading directory</li>\n");
-    } else {
-        for (const auto& entry : entries) {
-            const std::string& name = entry.name;
-            if (name.empty() || name[0] == '.') continue;
-
-            bool isDir = entry.isDirectory;
-
-            html.append("<li><a href=\"");
-            html.append(urlEncode(name));
-            if (isDir) html.append("/");
-            html.append("\">");
-            html.append(HtmlEscape::encode(name));
-            if (isDir) html.append("/");
-            html.append("</a></li>\n");
-        }
-    }
-
-    html.append("</ul>\n");
-    if (!config_.hideServerVersion) {
-        html.append("<hr><address>aiSocks HttpFileServer</address>\n");
-    }
-    html.append("</body></html>");
-    return html.toString();
+    return htmlGen_.directoryListing(dirPath);
 }
 
 const HttpFileServer::Config& HttpFileServer::getConfig() const {

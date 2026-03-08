@@ -32,6 +32,7 @@ set(TEST_SOURCES
     test_extracted_components
     test_file_server_utils
     test_html_escape
+    test_html_page_generator
     test_http_poll_server_simple
     test_security_malicious_clients
 )
