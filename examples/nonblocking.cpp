@@ -109,7 +109,7 @@ void runServerNonBlocking() {
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(
         endTime - startTime);
 
-    double seconds = duration.count() / 1000.0;
+    double seconds = static_cast<double>(duration.count()) / 1000.0;
     double megabytes = static_cast<double>(totalSent) / (1024.0 * 1024.0);
     double speedMBps = megabytes / seconds;
     double speedMbps = speedMBps * 8;
@@ -190,7 +190,7 @@ void runClientNonBlocking() {
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(
         endTime - startTime);
 
-    double seconds = duration.count() / 1000.0;
+    double seconds = static_cast<double>(duration.count()) / 1000.0;
     double megabytes = static_cast<double>(totalReceived) / (1024.0 * 1024.0);
     double speedMBps = megabytes / seconds;
     double speedMbps = speedMBps * 8;
