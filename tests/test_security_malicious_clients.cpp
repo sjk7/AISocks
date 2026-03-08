@@ -146,10 +146,12 @@ void setupTestEnvironment() {
     _mkdir("test_secure");
     _mkdir("test_secure\\public");
     _mkdir("test_secure\\secret");
+    _mkdir("test_secure\\xss");
 #else
     mkdir("test_secure", 0755);
     mkdir("test_secure/public", 0755);
     mkdir("test_secure/secret", 0755);
+    mkdir("test_secure/xss", 0755);
 #endif
 
     // Public files
@@ -157,7 +159,10 @@ void setupTestEnvironment() {
     publicFile.writeString("<html><body>Public content</body></html>");
     publicFile.close();
 
-    File xssFile("test_secure/public/<script>alert(1)</script>.html", "w");
+    // XSS test directory: no index.html so directory listing is always shown.
+    // Uses & in the filename — valid on all filesystems — to verify HTML
+    // escaping is applied to all special chars, not just angle brackets.
+    File xssFile("test_secure/xss/test&xss.html", "w");
     xssFile.writeString("<html><body>XSS test file</body></html>");
     xssFile.close();
 
@@ -176,16 +181,18 @@ void setupTestEnvironment() {
 /// Cleanup test environment
 void cleanupTestEnvironment() {
     std::remove("test_secure/public/index.html");
-    std::remove("test_secure/public/<script>alert(1)</script>.html");
     std::remove("test_secure/public/large.bin");
     std::remove("test_secure/secret/passwords.txt");
+    std::remove("test_secure/xss/test&xss.html");
 #ifdef _WIN32
     _rmdir("test_secure\\public");
     _rmdir("test_secure\\secret");
+    _rmdir("test_secure\\xss");
     _rmdir("test_secure");
 #else
     rmdir("test_secure/public");
     rmdir("test_secure/secret");
+    rmdir("test_secure/xss");
     rmdir("test_secure");
 #endif
 }
@@ -296,11 +303,12 @@ void testXSSAttacks() {
     printf("\n=== TEST 2: XSS ATTACKS ===\n");
 
     HttpFileServer::Config config;
-    config.documentRoot = "test_secure/public";
+    config.documentRoot = "test_secure/xss"; // no index.html → always lists dir
     config.enableDirectoryListing = true;
     TestableHttpFileServer server(ServerBind{"127.0.0.1", Port{0}}, config);
 
     // Attack 1: XSS in directory listing via malicious filename
+    // Uses '&' in filename (valid on all filesystems, needs HTML escaping)
     {
         std::string request = makeRequest("GET", "/");
         HttpClientState state;
@@ -309,13 +317,11 @@ void testXSSAttacks() {
         server.testBuildResponse(state);
         std::string body = extractBody(state.responseBuf);
 
-        // The filename contains <script>alert(1)</script>
-        // It should be HTML-escaped in the directory listing
-        SecurityTestFramework::assert_not_contains(body,
-            "<script>alert(1)</script>",
-            "Script tags in filenames should be HTML-escaped");
-        SecurityTestFramework::assert_contains(body, "&lt;script&gt;",
-            "Script tags should be escaped as &lt;script&gt;");
+        // The filename contains &  — it must be HTML-escaped as &amp;
+        SecurityTestFramework::assert_not_contains(body, "test&xss",
+            "Raw & in filenames should be HTML-escaped in directory listing");
+        SecurityTestFramework::assert_contains(body, "test&amp;xss",
+            "& in filename should be escaped as &amp; in directory listing");
     }
 
     // Attack 2: XSS in error messages

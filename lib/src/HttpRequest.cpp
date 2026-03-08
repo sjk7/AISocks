@@ -1,6 +1,6 @@
-// This is an independent project of an individual developer. Dear PVS-Studio, please check it.
-// PVS-Studio Static Code Analyzer for C, C++, C#, and Java: https://pvs-studio.com
-
+// This is an independent project of an individual developer. Dear PVS-Studio,
+// please check it. PVS-Studio Static Code Analyzer for C, C++, C#, and Java:
+// https://pvs-studio.com
 
 #include "HttpRequest.h"
 #include "UrlCodec.h"
@@ -63,7 +63,7 @@ HttpRequest HttpRequest::parse(const std::string& raw) {
             req.rawPath = target.substr(0, qmark);
             req.queryString = target.substr(qmark + 1);
         }
-        req.path = urlDecode(req.rawPath);
+        req.path = urlDecodePath(req.rawPath);
     }
 
     // ------------------------------------------------------------------ //

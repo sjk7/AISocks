@@ -109,8 +109,9 @@ bool PathHelper::hasSymlinkComponentWithin(
 
     std::string current = root;
     // NOTE: !current.empty() is always true here (root was validated above),
-    // but kept for defensive programming clarity. 
-    if (!current.empty() && current.back() == '/') current.pop_back(); //-V560 //-V560
+    // but kept for defensive programming clarity.
+    if (!current.empty() && current.back() == '/')
+        current.pop_back(); //-V560 //-V560
 
     const std::string rel = path.substr(root.size());
     size_t i = 0;

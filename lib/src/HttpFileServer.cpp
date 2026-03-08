@@ -67,7 +67,8 @@ void HttpFileServer::buildResponse(HttpClientState& state) {
 
     std::string filePath = resolveFilePath(request.path);
 
-    if (!PathHelper::isPathWithin(filePath, config_.documentRoot)) {
+    if (!PathHelper::isPathWithin(filePath, config_.documentRoot)
+        && filePath != config_.documentRoot) {
         sendError(state, 403, "Forbidden", "Access denied");
         return;
     }
@@ -103,11 +104,12 @@ std::string HttpFileServer::resolveFilePath(const std::string& target) const {
         path = path.substr(0, fragmentPos);
     }
 
-    path = FileServerUtils::urlDecodePath(path);
+    // Strip trailing slash so stat() works uniformly; root "/" becomes "".
+    if (!path.empty() && path.back() == '/' && path.size() > 1) path.pop_back();
 
-    if (path == "/") {
-        path = "/" + config_.indexFile;
-    }
+    // "/" maps to the document root directory itself.
+    // handleDirectoryRequest will try config_.indexFile first, then listing.
+    if (path == "/") return config_.documentRoot;
 
     return config_.documentRoot + path.substr(1);
 }

@@ -9,6 +9,7 @@
 
 #include "Socket.h"
 #include "SocketTypes.h" // ConnectArgs, ServerBind, Port, Milliseconds, etc.
+#include <limits>
 #include <memory>
 
 namespace aiSocks {

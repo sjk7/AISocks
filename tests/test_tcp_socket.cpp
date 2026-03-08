@@ -382,8 +382,7 @@ static void test_sad_operations() {
     BEGIN_TEST("TcpSocket: connect() fails when nothing is listening");
     {
         auto s = TcpSocket::createRaw();
-        bool ok = s.connect(
-            "127.0.0.1", Port{21898}, Milliseconds{100});
+        bool ok = s.connect("127.0.0.1", Port{21898}, Milliseconds{100});
         REQUIRE(!ok);
         REQUIRE((s.getLastError() == SocketError::ConnectFailed
             || s.getLastError() == SocketError::Timeout));
@@ -471,8 +470,7 @@ static void test_sad_timeout() {
         // Both are valid outcomes for a non-blocking connect attempt.
         auto s = TcpSocket::createRaw();
         REQUIRE(s.setBlocking(false));
-        bool ok
-            = s.connect("127.0.0.1", Port{21899}, Milliseconds{0});
+        bool ok = s.connect("127.0.0.1", Port{21899}, Milliseconds{0});
         // Non-blocking to nothing  should not succeed
         REQUIRE(!ok);
         REQUIRE((s.getLastError() == SocketError::WouldBlock
@@ -485,8 +483,7 @@ static void test_sad_timeout() {
     {
         // Port 21898 has no listener  ECONNREFUSED arrives quickly.
         auto s = TcpSocket::createRaw();
-        bool ok = s.connect(
-            "127.0.0.1", Port{21898}, Milliseconds{100});
+        bool ok = s.connect("127.0.0.1", Port{21898}, Milliseconds{100});
         REQUIRE(!ok);
         REQUIRE((s.getLastError() == SocketError::ConnectFailed
             || s.getLastError() == SocketError::Timeout));

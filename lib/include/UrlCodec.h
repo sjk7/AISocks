@@ -1,7 +1,8 @@
-// This is an independent project of an individual developer. Dear PVS-Studio, please check it.
+// This is an independent project of an individual developer. Dear PVS-Studio,
+// please check it.
 
-// PVS-Studio Static Code Analyzer for C, C++, C#, and Java: https://pvs-studio.com
-
+// PVS-Studio Static Code Analyzer for C, C++, C#, and Java:
+// https://pvs-studio.com
 
 #ifndef AISOCKS_URL_CODEC_H
 #define AISOCKS_URL_CODEC_H
@@ -27,7 +28,12 @@ namespace aiSocks {
 std::string urlEncode(const std::string& src);
 
 // Decode a percent-encoded string.  Invalid sequences are passed verbatim.
+// Treats '+' as space (form-encoding / query-string convention).
 std::string urlDecode(const std::string& src);
+
+// Decode a percent-encoded URL path.  Like urlDecode but '+' is kept as '+'.
+// Use this for RFC 3986 path components; use urlDecode for query strings.
+std::string urlDecodePath(const std::string& src);
 
 } // namespace aiSocks
 
