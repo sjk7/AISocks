@@ -22,6 +22,8 @@
 
 #include <atomic>
 #include <chrono>
+#include <condition_variable>
+#include <mutex>
 #include <string>
 #include <thread>
 #include <type_traits>
@@ -66,6 +68,26 @@ class BaseServer : public ServerBase<TS> {
     std::atomic<int> errorCalls{0};
     ServerResult errorReturn{ServerResult::Disconnect};
     bool partialReadMode{false}; // For onIdle test: read only small chunks
+
+    // Signals waitReady() callers the moment the server enters the poll loop.
+    void waitReady() {
+        std::unique_lock<std::mutex> lk(readyMtx_);
+        readyCv_.wait(lk, [this] { return ready_.load(); });
+    }
+
+    protected:
+    void onReady() override {
+        {
+            std::lock_guard<std::mutex> lk(readyMtx_);
+            ready_ = true;
+        }
+        readyCv_.notify_all();
+    }
+
+    private:
+    std::atomic<bool> ready_{false};
+    std::mutex readyMtx_;
+    std::condition_variable readyCv_;
 
     protected:
     ServerResult onReadable(TcpSocket& sock, TS& s) override {
@@ -161,23 +183,20 @@ static void test_signal_opt_out() {
     REQUIRE(sensitive.handlesSignals() == true);
     REQUIRE(immune.handlesSignals() == false);
 
-    std::atomic<bool> r1{false}, r2{false};
     std::atomic<bool> done1{false}, done2{false};
 
     std::thread t1([&] {
-        r1 = true;
         sensitive.run(ClientLimit::Unlimited, POLL_TIMEOUT);
         done1 = true;
     });
     std::thread t2([&] {
-        r2 = true;
         immune.run(ClientLimit::Unlimited, POLL_TIMEOUT);
         done2 = true;
     });
 
-    // Wait for both threads to enter run()
-    waitFor([&] { return r1.load() && r2.load(); });
-    std::this_thread::sleep_for(std::chrono::milliseconds{30});
+    // Wait for both servers to enter the poll loop.
+    sensitive.waitReady();
+    immune.waitReady();
 
     // Fire the process-wide signal flag — without a real SIGINT.
     g_serverSignalStop.store(true);
@@ -234,17 +253,14 @@ static void test_on_error_returns_server_result() {
     }
     REQUIRE(srvPort102 != Port::any);
 
-    std::atomic<bool> running{false};
     std::atomic<bool> done{false};
 
     std::thread t([&] {
-        running = true;
         server.run(ClientLimit::Unlimited, POLL_TIMEOUT);
         done = true;
     });
 
-    waitFor([&] { return running.load(); });
-    std::this_thread::sleep_for(std::chrono::milliseconds{20});
+    server.waitReady();
 
     // Connect then abruptly close with RST to trigger an error/hangup event.
     auto res = SocketFactory::createTcpClient(AddressFamily::IPv4,
@@ -295,13 +311,10 @@ static void test_on_idle_only_on_timeout() {
     // time.
     {
         BaseServer server(Port::any);
-        std::atomic<bool> started{false};
-        std::thread t([&] {
-            started = true;
-            server.run(ClientLimit::Unlimited, POLL_TIMEOUT);
-        });
-        waitFor([&] { return started.load(); });
-        std::this_thread::sleep_for(std::chrono::milliseconds{200});
+        std::thread t(
+            [&] { server.run(ClientLimit::Unlimited, POLL_TIMEOUT); });
+        server.waitReady();
+        std::this_thread::sleep_for(std::chrono::milliseconds{80});
         int idleNoClients = server.idleCalls.load();
         server.requestStop();
         t.join();
@@ -327,13 +340,9 @@ static void test_on_idle_only_on_timeout() {
         }
         REQUIRE(srvPort104 != Port::any);
 
-        std::atomic<bool> started{false};
-        std::thread t([&] {
-            started = true;
-            server.run(ClientLimit::Unlimited, POLL_TIMEOUT);
-        });
-        waitFor([&] { return started.load(); });
-        std::this_thread::sleep_for(std::chrono::milliseconds{20});
+        std::thread t(
+            [&] { server.run(ClientLimit::Unlimited, POLL_TIMEOUT); });
+        server.waitReady();
 
         auto res = SocketFactory::createTcpClient(AddressFamily::IPv4,
             ConnectArgs{"127.0.0.1", srvPort104, Milliseconds{200}});
@@ -353,7 +362,7 @@ static void test_on_idle_only_on_timeout() {
         }
 
         // Give server time to process the data
-        std::this_thread::sleep_for(std::chrono::milliseconds{150});
+        std::this_thread::sleep_for(std::chrono::milliseconds{80});
 
         int idleAfterData = server.idleCalls.load();
         int readableAfterData = server.readableCalls.load();
