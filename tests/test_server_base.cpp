@@ -16,7 +16,9 @@
 #include "test_helpers.h"
 #include <atomic>
 #include <chrono>
+#include <condition_variable>
 #include <cstring>
+#include <mutex>
 #include <string>
 #include <thread>
 
@@ -42,6 +44,11 @@ class EchoServer : public ServerBase<EchoState> {
 
     std::atomic<int> idleCalls{0};
     std::atomic<int> disconnectCalls{0};
+
+    void waitReady() {
+        std::unique_lock<std::mutex> lk(readyMtx_);
+        readyCv_.wait(lk, [this] { return ready_.load(); });
+    }
 
     // Get the actual port the server is listening on
     Port serverPort() const {
@@ -91,25 +98,29 @@ class EchoServer : public ServerBase<EchoState> {
         ++disconnectCalls;
         s.disconnected = true;
     }
+
+    protected:
+    void onReady() override {
+        {
+            std::lock_guard<std::mutex> lk(readyMtx_);
+            ready_ = true;
+        }
+        readyCv_.notify_all();
+    }
+
+    private:
+    std::atomic<bool> ready_{false};
+    std::mutex readyMtx_;
+    std::condition_variable readyCv_;
 };
 
 // ---------------------------------------------------------------------------
 // Test helpers - server runs in separate thread, clients in main thread
 // ---------------------------------------------------------------------------
-static std::thread startServerInBackground(EchoServer& server,
-    std::atomic<bool>& ready, ClientLimit maxClients = ClientLimit::Unlimited) {
-    return std::thread([&server, &ready, maxClients]() {
-        ready = true;
-        server.run(maxClients, TEST_POLL_TIMEOUT);
-    });
-}
-
-static void waitForServerReady(std::atomic<bool>& ready) {
-    auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds{2};
-    while (!ready && std::chrono::steady_clock::now() < deadline) {
-        std::this_thread::sleep_for(std::chrono::milliseconds{5});
-    }
-    REQUIRE(ready);
+static std::thread startServerInBackground(
+    EchoServer& server, ClientLimit maxClients = ClientLimit::Unlimited) {
+    return std::thread(
+        [&server, maxClients]() { server.run(maxClients, TEST_POLL_TIMEOUT); });
 }
 
 // Helper: Wait for condition with timeout, reporting actual wait time
@@ -151,13 +162,12 @@ int main() {
     BEGIN_TEST("ServerBase::requestStop() from another thread");
     {
         EchoServer server(Port::any);
-        std::atomic<bool> ready{false};
-        auto serverThread = startServerInBackground(server, ready);
-        waitForServerReady(ready);
+        auto serverThread = startServerInBackground(server);
+        server.waitReady();
 
         // Request stop from another thread
         std::thread stopper([&server]() {
-            std::this_thread::sleep_for(std::chrono::milliseconds{50});
+            std::this_thread::sleep_for(std::chrono::milliseconds{5});
             server.requestStop();
         });
 
@@ -174,11 +184,10 @@ int main() {
     {
         EchoServer server(Port::any);
         Port port = server.serverPort();
-        std::atomic<bool> ready{false};
         const int maxClients = 3;
         auto serverThread = startServerInBackground(
-            server, ready, ClientLimit{static_cast<size_t>(maxClients)});
-        waitForServerReady(ready);
+            server, ClientLimit{static_cast<size_t>(maxClients)});
+        server.waitReady();
 
         // Connect clients up to the limit
         std::vector<std::unique_ptr<TcpSocket>> clients;
@@ -211,12 +220,13 @@ int main() {
     BEGIN_TEST("ServerBase: onIdle() is called periodically with timeout");
     {
         EchoServer server(Port::any);
-        std::atomic<bool> ready{false};
-        auto serverThread = startServerInBackground(server, ready);
-        waitForServerReady(ready);
+        auto serverThread = startServerInBackground(server);
+        server.waitReady();
 
-        // Give server time to call onIdle() multiple times
-        std::this_thread::sleep_for(std::chrono::milliseconds{300});
+        // Wait for onIdle() to fire at least once (10ms poll timeout → fast)
+        waitForCondition(
+            "onIdle to fire", [&]() { return server.idleCalls.load() > 0; },
+            std::chrono::milliseconds{200});
 
         // onIdle() should have been called
         REQUIRE(server.idleCalls.load() > 0);
@@ -230,9 +240,8 @@ int main() {
     {
         EchoServer server(Port::any);
         Port port = server.serverPort();
-        std::atomic<bool> ready{false};
-        auto serverThread = startServerInBackground(server, ready);
-        waitForServerReady(ready);
+        auto serverThread = startServerInBackground(server);
+        server.waitReady();
 
         // Connect and disconnect a client
         {
@@ -289,10 +298,9 @@ int main() {
         printf("DEBUG: Starting unlimited test\n");
         EchoServer server(Port::any);
         Port port = server.serverPort();
-        std::atomic<bool> ready{false};
         auto serverThread
-            = startServerInBackground(server, ready, ClientLimit::Unlimited);
-        waitForServerReady(ready);
+            = startServerInBackground(server, ClientLimit::Unlimited);
+        server.waitReady();
 
         printf("DEBUG: About to connect clients\n");
         // Connect many clients
@@ -343,10 +351,9 @@ int main() {
     {
         EchoServer server(Port::any);
         Port port = server.serverPort();
-        std::atomic<bool> ready{false};
         auto serverThread
-            = startServerInBackground(server, ready, ClientLimit::Default);
-        waitForServerReady(ready);
+            = startServerInBackground(server, ClientLimit::Default);
+        server.waitReady();
 
         // Connect clients up to the default limit (but limit to reasonable
         // number for test)
@@ -383,9 +390,8 @@ int main() {
     {
         EchoServer server1(Port::any);
         Port port = server1.serverPort();
-        std::atomic<bool> ready1{false};
-        auto serverThread1 = startServerInBackground(server1, ready1);
-        waitForServerReady(ready1);
+        auto serverThread1 = startServerInBackground(server1);
+        server1.waitReady();
 
         // Connect a client to first server
         auto result = SocketFactory::createTcpClient(AddressFamily::IPv4,
@@ -395,14 +401,10 @@ int main() {
         server1.requestStop();
         serverThread1.join();
 
-        // Small delay to allow port to be released
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
-
         // Create a new server using Port::any to avoid TIME_WAIT conflicts
         EchoServer server2(Port::any);
-        std::atomic<bool> ready2{false};
-        auto serverThread2 = startServerInBackground(server2, ready2);
-        waitForServerReady(ready2);
+        auto serverThread2 = startServerInBackground(server2);
+        server2.waitReady();
 
         // Should be able to connect again to server2
         Port port2 = server2.serverPort();
