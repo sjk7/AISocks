@@ -423,6 +423,9 @@ build/
 
 # PVS-Studio analyzer UI state (not suppressions — those live as inline comments)
 .PVS-Studio/
+# PVS-Studio intermediate analysis files
+*.PVS-Studio.i
+*.PVS-Studio.cfg
 
 # CMake compile commands (build artifact, machine-specific)
 compile_commands.json
