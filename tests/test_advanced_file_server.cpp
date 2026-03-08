@@ -111,17 +111,6 @@ class CustomFileServer : public HttpFileServer {
         return true;
     }
 
-    std::string getMimeType(const std::string& filePath) const override {
-        std::string ext = getFileExtension(filePath);
-
-        if (ext == ".wasm") return "application/wasm";
-        if (ext == ".ts") return "application/typescript";
-        if (ext == ".jsx") return "text/jsx";
-        if (ext == ".tsx") return "text/tsx";
-
-        return HttpFileServer::getMimeType(filePath);
-    }
-
     std::string generateErrorHtml(int code, const std::string& status,
         const std::string& message) const override {
         StringBuilder html;

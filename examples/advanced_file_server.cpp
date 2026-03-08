@@ -123,20 +123,6 @@ class CustomFileServer : public HttpFileServer {
         HttpFileServer::buildResponse(state);
     }
 
-    /// Override to add custom MIME types
-    std::string getMimeType(const std::string& filePath) const override {
-        std::string ext = getFileExtension(filePath);
-
-        // Add custom MIME types
-        if (ext == ".wasm") return "application/wasm";
-        if (ext == ".ts") return "application/typescript";
-        if (ext == ".jsx") return "text/jsx";
-        if (ext == ".tsx") return "text/tsx";
-
-        // Fall back to base implementation
-        return HttpFileServer::getMimeType(filePath);
-    }
-
     /// Override to allow large test file to bypass size limit
     bool isFileSizeAcceptable(
         const std::string& filePath, size_t fileSize) const override {

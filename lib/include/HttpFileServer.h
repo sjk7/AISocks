@@ -11,6 +11,7 @@
 #include "HtmlEscape.h"
 #include "HttpPollServer.h"
 #include "HttpRequest.h"
+#include "MimeTypes.h"
 #include <ctime>
 #include <map>
 #include <string>
@@ -68,9 +69,6 @@ class HttpFileServer : public HttpPollServer {
 
     /// Virtual customization point: get file information
     virtual FileInfo getFileInfo(const std::string& filePath) const;
-
-    /// Virtual customization point: get MIME type for file
-    virtual std::string getMimeType(const std::string& filePath) const;
 
     /// Virtual customization point: check if file access is allowed
     virtual bool isAccessAllowed(

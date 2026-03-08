@@ -146,30 +146,6 @@ HttpFileServer::FileInfo HttpFileServer::getFileInfo(
     return info;
 }
 
-std::string HttpFileServer::getMimeType(const std::string& filePath) const {
-    std::string ext = FileServerUtils::getFileExtension(filePath);
-
-    static const std::map<std::string, std::string> mimeTypes = {
-        {".html", "text/html"}, {".htm", "text/html"}, {".css", "text/css"},
-        {".js", "application/javascript"}, {".json", "application/json"},
-        {".xml", "application/xml"}, {".txt", "text/plain"},
-        {".md", "text/markdown"}, {".png", "image/png"}, {".jpg", "image/jpeg"},
-        {".jpeg", "image/jpeg"}, {".gif", "image/gif"},
-        {".svg", "image/svg+xml"}, {".ico", "image/x-icon"},
-        {".pdf", "application/pdf"}, {".zip", "application/zip"},
-        {".gz", "application/gzip"}, {".mp3", "audio/mpeg"},
-        {".mp4", "video/mp4"}, {".webm", "video/webm"}, {".woff", "font/woff"},
-        {".woff2", "font/woff2"}, {".ttf", "font/ttf"},
-        {".eot", "application/vnd.ms-fontobject"}};
-
-    auto it = mimeTypes.find(ext);
-    if (it != mimeTypes.end()) {
-        return it->second;
-    }
-
-    return "application/octet-stream";
-}
-
 bool HttpFileServer::isAccessAllowed(
     const std::string& filePath, const FileInfo& fileInfo) const {
     if (!fileInfo.exists) return false;
@@ -307,9 +283,9 @@ void HttpFileServer::handleFileRequest(HttpClientState& state,
     StringBuilder response(512 + fileContent.size());
     response.append("HTTP/1.1 200 OK\r\n");
     response.append("Content-Type: ");
-    response.append(getMimeType(filePath));
-    if (getMimeType(filePath).find("text/") == 0
-        || getMimeType(filePath) == "application/javascript") {
+    response.append(MimeTypes::fromPath(filePath));
+    if (MimeTypes::fromPath(filePath).find("text/") == 0
+        || MimeTypes::fromPath(filePath) == "application/javascript") {
         response.append("; charset=utf-8");
     }
     response.append("\r\nContent-Length: ");
@@ -419,9 +395,9 @@ void HttpFileServer::sendCachedFile(HttpClientState& state,
     StringBuilder response(512 + cached.size);
     response.append("HTTP/1.1 200 OK\r\n");
     response.append("Content-Type: ");
-    response.append(getMimeType(filePath));
-    if (getMimeType(filePath).find("text/") == 0
-        || getMimeType(filePath) == "application/javascript") {
+    response.append(MimeTypes::fromPath(filePath));
+    if (MimeTypes::fromPath(filePath).find("text/") == 0
+        || MimeTypes::fromPath(filePath) == "application/javascript") {
         response.append("; charset=utf-8");
     }
     response.append("\r\nContent-Length: ");
