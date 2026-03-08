@@ -16,6 +16,7 @@
 #include <unistd.h>
 #include <cerrno>
 #include <cstring>
+#include <climits>
 #include <unordered_map>
 #include <vector>
 
