@@ -10,7 +10,6 @@
 #include <chrono>
 #include <cstdint>
 #include <cstdio>
-#include <utility>
 #include <vector>
 
 namespace aiSocks {
@@ -36,21 +35,18 @@ namespace aiSocks {
 //   reduced to an aggressive 5 s value.  It is restored when load drops.
 // ---------------------------------------------------------------------------
 class KeepAliveTimeoutManager {
-public:
+    public:
     using Clock = std::chrono::steady_clock;
 
     // Pre-size internal vectors; pass expected max client count.
-    void reserve(size_t capacity) {
-        heap_.reserve(capacity * 2);
-    }
+    void reserve(size_t capacity) { heap_.reserve(capacity * 2); }
 
     // Record activity for `fd`.  lastActivity is the timestamp to use (pass
     // steady_clock::now() from the caller to avoid redundant clock reads).
     // lastTimeoutPush is the per-client throttle timestamp (stored in
     // ClientEntry); it is updated in-place when a heap entry is pushed.
     void touch(uintptr_t fd, Clock::time_point lastActivity,
-        Clock::time_point& lastTimeoutPush)
-    {
+        Clock::time_point& lastTimeoutPush) {
         if (timeout_.count() == 0) return;
         const auto sincePush = lastActivity - lastTimeoutPush;
         const int64_t DOWNSAMPLE = 4;
@@ -75,8 +71,7 @@ public:
     //
     // Returns the number of connections that were expired.
     template <typename Query, typename OnExpire>
-    size_t sweepRaw(Query&& query, OnExpire&& onExpire)
-    {
+    size_t sweepRaw(Query&& query, OnExpire&& onExpire) {
         if (timeout_.count() == 0 || heap_.empty()) return 0;
         const auto now = Clock::now();
         if (heap_.front().expiry > now) return 0;
@@ -90,7 +85,8 @@ public:
             auto result = query(entry.fd);
             // Stale check 1: client no longer active.
             if (!result.first) continue;
-            // Stale check 2: activity was refreshed after this entry was pushed.
+            // Stale check 2: activity was refreshed after this entry was
+            // pushed.
             if (result.second != entry.lastActivitySnap) continue;
 
             onExpire(entry.fd);
@@ -100,8 +96,7 @@ public:
     }
 
     // Adjust timeout based on current client count.  Call once per event batch.
-    void adjustForLoad(size_t clientCount)
-    {
+    void adjustForLoad(size_t clientCount) {
         constexpr size_t HIGH_LOAD_THRESHOLD = 256;
         constexpr auto AGGRESSIVE = std::chrono::milliseconds{5000};
 
@@ -121,8 +116,7 @@ public:
         }
     }
 
-    void setTimeout(std::chrono::milliseconds t)
-    {
+    void setTimeout(std::chrono::milliseconds t) {
         if (inHighLoad_)
             normal_ = t;
         else {
@@ -136,8 +130,7 @@ public:
     // Returns true (and records the sweep time) if enough time has elapsed
     // to warrant running a sweep.  Throttles to at most once per 100 ms
     // when client count >= 1000.
-    bool sweepDue(size_t clientCount)
-    {
+    bool sweepDue(size_t clientCount) {
         const auto now = Clock::now();
         if (clientCount < 1000
             || (now - lastSweep_) >= std::chrono::milliseconds{100}) {
@@ -147,20 +140,20 @@ public:
         return false;
     }
 
-private:
+    private:
     struct Entry {
         Clock::time_point expiry;
         Clock::time_point lastActivitySnap;
         uintptr_t fd;
 
-        // Inverted for min-heap behaviour (std::push/pop_heap build a max-heap).
+        // Inverted for min-heap behaviour (std::push/pop_heap build a
+        // max-heap).
         bool operator<(const Entry& o) const noexcept {
             return expiry > o.expiry;
         }
     };
 
-    void pushEntry(uintptr_t fd, Clock::time_point activity)
-    {
+    void pushEntry(uintptr_t fd, Clock::time_point activity) {
         heap_.push_back({activity + timeout_, activity, fd});
         std::push_heap(heap_.begin(), heap_.end());
     }

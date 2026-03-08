@@ -7,6 +7,7 @@
 #include "HttpFileServer.h"
 
 #include "FileIO.h"
+#include "HtmlPageGenerator.h"
 #include "PathHelper.h"
 
 #include <array>
@@ -47,8 +48,6 @@ HttpFileServer::HttpFileServer(
     if (!config_.documentRoot.empty() && config_.documentRoot.back() != '/') {
         config_.documentRoot += '/';
     }
-
-    htmlGen_ = HtmlPageGenerator(config_.hideServerVersion);
 }
 
 void HttpFileServer::buildResponse(HttpClientState& state) {
@@ -488,12 +487,14 @@ void HttpFileServer::sendDirectoryListing(
 
 std::string HttpFileServer::generateErrorHtml(
     int code, const std::string& status, const std::string& message) const {
-    return htmlGen_.errorPage(code, status, message);
+    return HtmlPageGenerator(config_.hideServerVersion)
+        .errorPage(code, status, message);
 }
 
 std::string HttpFileServer::generateDirectoryListing(
     const std::string& dirPath) const {
-    return htmlGen_.directoryListing(dirPath);
+    return HtmlPageGenerator(config_.hideServerVersion)
+        .directoryListing(dirPath);
 }
 
 const HttpFileServer::Config& HttpFileServer::getConfig() const {

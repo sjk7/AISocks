@@ -14,7 +14,6 @@
 #include "ServerTypes.h"
 #include "TcpSocket.h"
 #include "SocketFactory.h"
-#include <algorithm>
 #include <atomic>
 #include <cassert>
 #include <chrono>
@@ -278,7 +277,8 @@ template <typename ClientData> class ServerBase {
 
                 if (timeouts_.sweepDue(clientFds_.size())) {
                     size_t closed = timeouts_.sweepRaw(
-                        [&](uintptr_t fd) -> std::pair<bool, SteadyClock::time_point> {
+                        [&](uintptr_t fd)
+                            -> std::pair<bool, SteadyClock::time_point> {
                             ClientEntry* ce = findClient(fd);
                             if (!ce) return {false, {}};
                             return {true, ce->lastActivity};
