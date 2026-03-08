@@ -445,7 +445,8 @@ static void test_bulk_throughput() {
         size_t dropped = static_cast<size_t>(COUNT) - recvCount.load();
         double mbRecv = static_cast<double>(recvTotal.load()) / BYTES_PER_MB;
         double mbSend = static_cast<double>(TOTAL) / BYTES_PER_MB;
-        double mbps = mbSend / (ms / MS_PER_SEC); // throughput = sent / sender time
+        double mbps
+            = mbSend / (ms / MS_PER_SEC); // throughput = sent / sender time
 
         printf("  datagrams: %d  size: %zu B  sent: %.1f MB  received: %.1f MB "
                " dropped: %zu\n",
