@@ -259,6 +259,15 @@
             ]
         },
         {
+            "name": "advanced-file-server-relwithdebinfo",
+            "inherits": "base-build",
+            "configurePreset": "relwithdebinfo",
+            "displayName": "Build advanced_file_server (RelWithDebInfo)",
+            "targets": [
+                "advanced_file_server"
+            ]
+        },
+        {
             "name": "mingw-debug",
             "inherits": "base-build",
             "configurePreset": "mingw-debug",

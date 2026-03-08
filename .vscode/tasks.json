@@ -42,6 +42,24 @@
       }
     },
     {
+      "label": "Build advanced_file_server (RelWithDebInfo)",
+      "type": "shell",
+      "command": "cmake",
+      "args": [
+        "--build",
+        "build-relwithdebinfo",
+        "--target",
+        "advanced_file_server"
+      ],
+      "group": {
+        "kind": "build"
+      },
+      "presentation": {
+        "echo": true,
+        "reveal": "always"
+      }
+    },
+    {
       "label": "Docker: Build msan-arm64 image",
       "type": "shell",
       "command": "docker",

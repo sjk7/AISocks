@@ -79,6 +79,21 @@ class CustomFileServer : public HttpFileServer {
             logRequest(request, state);
         }
 
+        // Root redirects to the public landing page (no auth required)
+        if (request.path == "/") {
+            state.responseBuf
+                = "HTTP/1.1 302 Found\r\nLocation: "
+                  "/public.html\r\nContent-Length: 0\r\n\r\n";
+            state.responseView = state.responseBuf;
+            return;
+        }
+
+        // Allow a small set of paths without authentication
+        if (isPublicPath(request.path)) {
+            HttpFileServer::buildResponse(state);
+            return;
+        }
+
         // Check authentication
         if (!isAuthenticated(request)) {
             sendAuthRequired(state);
@@ -88,34 +103,6 @@ class CustomFileServer : public HttpFileServer {
         // Special handling for large test file - generate on-the-fly
         if (request.path == "/large500MB.bin") {
             generateLargeFile(state, request);
-            return;
-        }
-
-        // Special handling for root path - show testing instructions
-        if (request.path == "/") {
-            std::string instructions = generateTestingInstructions();
-
-            StringBuilder response(
-                256 + instructions.size()); // Reserve for headers + body
-            response.append("HTTP/1.1 200 OK\r\n");
-            response.append(
-                "Content-Type: text/html; charset=utf-8\r\nContent-Length: ");
-            response.appendFormat("%zu", instructions.size());
-            response.append("\r\n");
-
-            // Add custom headers
-            for (const auto& [name, value] : getConfig().customHeaders) {
-                response.append(name);
-                response.append(": ");
-                response.append(value);
-                response.append("\r\n");
-            }
-
-            response.append("\r\n");
-            response.append(instructions);
-
-            state.responseBuf = response.toString();
-            state.responseView = state.responseBuf;
             return;
         }
 
@@ -192,39 +179,10 @@ class CustomFileServer : public HttpFileServer {
         return html.toString();
     }
 
-    /// Override to show testing instructions as default page
+    /// Override to customize directory request handling
     void handleDirectoryRequest(HttpClientState& state,
         const std::string& dirPath, const HttpRequest& request) override {
-        // If this is the root directory, show testing instructions instead of
-        // directory listing
-        if (dirPath == getConfig().documentRoot) {
-            std::string instructions = generateTestingInstructions();
-
-            StringBuilder response(
-                256 + instructions.size()); // Reserve for headers + body
-            response.append("HTTP/1.1 200 OK\r\n");
-            response.append(
-                "Content-Type: text/html; charset=utf-8\r\nContent-Length: ");
-            response.appendFormat("%zu", instructions.size());
-            response.append("\r\n");
-
-            // Add custom headers
-            for (const auto& [name, value] : getConfig().customHeaders) {
-                response.append(name);
-                response.append(": ");
-                response.append(value);
-                response.append("\r\n");
-            }
-
-            response.append("\r\n");
-            response.append(instructions);
-
-            state.responseBuf = response.toString();
-            state.responseView = state.responseBuf;
-            return;
-        }
-
-        // For subdirectories, show normal directory listing
+        // For all directories, show normal directory listing
         HttpFileServer::handleDirectoryRequest(state, dirPath, request);
     }
 
@@ -299,6 +257,8 @@ class CustomFileServer : public HttpFileServer {
                     "URL.</p>\n");
         html.append("<div class=\"success\">✓ All requests are logged to "
                     "<code>access.log</code></div>\n");
+        html.append("<p><strong>Public page</strong> (no login required):</p>\n");
+        html.append("<div class=\"url\"><a href=\"/public.html\">/public.html</a></div>\n");
         html.append("</div>\n");
 
         // File Serving Section
@@ -698,6 +658,17 @@ class CustomFileServer : public HttpFileServer {
         logFile_.flush();
     }
 
+    /// Returns true for paths that are served without authentication.
+    bool isPublicPath(const std::string& path) const {
+        static const std::string publicPaths[] = {
+            "/public.html",
+        };
+        for (const auto& p : publicPaths) {
+            if (path == p) return true;
+        }
+        return false;
+    }
+
     bool isAuthenticated(const HttpRequest& request) const {
         // Simple basic authentication (username: admin, password: secret)
         auto authIt = request.headers.find("authorization");
@@ -832,6 +803,7 @@ int main(int argc, char* argv[]) {
 
     printf(ServerStrings::STARTING, port);
     printf("%s%s\n", ServerStrings::SERVING_FROM, config.documentRoot.c_str());
+    printf(ServerStrings::PUBLIC_PAGE, port);
 
     server.run();
 

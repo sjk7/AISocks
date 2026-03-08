@@ -319,21 +319,12 @@ template <typename ClientData> class ServerBase {
             const bool stoppedBySignal = handleSignals_
                 && g_serverSignalStop.load(std::memory_order_relaxed);
             const bool noMore = !accepting && clientFds_.empty();
-            printf("=== Server exited gracefully ===\n");
-            printf("Exit reason: ");
-            if (stoppedByFlag)
-                printf("STOP flag was set (requestStop() called)\n");
-            else if (stoppedBySignal)
-                printf("SIGINT/SIGTERM signal received (Ctrl+C)\n");
-            else if (noMore)
-                printf("No clients AND not accepting (maxClients limit "
-                       "reached)\n");
-            else
-                printf("Unknown reason\n");
-            printf(
-                "Final state: stop=%d, signal=%d, accepting=%d, clients=%zu\n",
-                stoppedByFlag, stoppedBySignal, accepting, clientFds_.size());
-            printf("===============================\n");
+            const char* reason =
+                stoppedByFlag   ? "requestStop() was called"
+                : stoppedBySignal ? "shutdown signal received (Ctrl+C / SIGTERM)"
+                : noMore          ? "client limit reached and all clients disconnected"
+                                  : "unknown";
+            printf("\nServer stopped gracefully: %s.\n", reason);
         }
 
         if (timeoutLogCount_ > 0) {

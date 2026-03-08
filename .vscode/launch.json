@@ -26,6 +26,16 @@
         "${workspaceFolder}": "${workspaceFolder}"
       },
       "preLaunchTask": "Build advanced_file_server"
+    },
+    {
+      "name": "Launch advanced_file_server (RelWithDebInfo)",
+      "type": "cppvsdbg",
+      "request": "launch",
+      "program": "${workspaceFolder}/build-relwithdebinfo/advanced_file_server.exe",
+      "args": [],
+      "cwd": "${workspaceFolder}/build-relwithdebinfo",
+      "console": "integratedTerminal",
+      "preLaunchTask": "Build advanced_file_server (RelWithDebInfo)"
     }
     ,
     {

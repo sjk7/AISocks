@@ -17,6 +17,7 @@ inline const char* STARTING
 inline const char* SERVING_FROM = "Serving files from: ";
 inline const char* BUILD_INFO_PREFIX = "Build: ";
 inline const char* MAX_CLIENTS_PREFIX = "Max concurrent clients: ";
+inline const char* PUBLIC_PAGE = "Public page (no auth): http://localhost:%d/public.html\n";
 
 // Browser testing guide
 inline const char* GUIDE_HEADER = "\n=== BROWSER TESTING GUIDE ===\n";
