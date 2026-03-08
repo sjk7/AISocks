@@ -8,7 +8,7 @@ This guide explains how to use MemorySanitizer (MSan) and AddressSanitizer (ASan
 
 1. **Configure the build:**
    ```bash
-   ./setup_msan.sh
+   ./scripts/setup_msan.sh
    ```
 
 2. **Build the project:**
