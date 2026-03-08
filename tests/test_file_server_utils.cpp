@@ -163,8 +163,7 @@ static void test_security_headers_disabled() {
 }
 
 static void test_security_headers_enabled_contains_all() {
-    BEGIN_TEST(
-        "securityHeadersBlock: all four headers present");
+    BEGIN_TEST("securityHeadersBlock: all four headers present");
     const std::string result = FileServerUtils::securityHeadersBlock();
     REQUIRE(
         result.find("X-Content-Type-Options: nosniff") != std::string::npos);

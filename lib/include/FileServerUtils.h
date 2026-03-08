@@ -33,8 +33,10 @@ namespace FileServerUtils {
             for (int i = 0; i < 10; ++i)
                 t.v[static_cast<unsigned>('0' + i)] = static_cast<uint8_t>(i);
             for (int i = 0; i < 6; ++i) {
-                t.v[static_cast<unsigned>('A' + i)] = static_cast<uint8_t>(10 + i);
-                t.v[static_cast<unsigned>('a' + i)] = static_cast<uint8_t>(10 + i);
+                t.v[static_cast<unsigned>('A' + i)]
+                    = static_cast<uint8_t>(10 + i);
+                t.v[static_cast<unsigned>('a' + i)]
+                    = static_cast<uint8_t>(10 + i);
             }
             return t;
         }();
