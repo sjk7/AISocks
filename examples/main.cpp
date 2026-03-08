@@ -134,9 +134,9 @@ void runServer(const std::string& bindAddr) {
     }
 
     auto endTime = std::chrono::high_resolution_clock::now();
-    double seconds = std::chrono::duration_cast<std::chrono::milliseconds>(
+    double seconds = static_cast<double>(std::chrono::duration_cast<std::chrono::milliseconds>(
                          endTime - startTime)
-                         .count()
+                         .count())
         / 1000.0;
     double mb = static_cast<double>(totalSent) / (1024.0 * 1024.0);
 
@@ -189,9 +189,9 @@ void runClient(const std::string& addr) {
     }
 
     auto endTime = std::chrono::high_resolution_clock::now();
-    double seconds = std::chrono::duration_cast<std::chrono::milliseconds>(
+    double seconds = static_cast<double>(std::chrono::duration_cast<std::chrono::milliseconds>(
                          endTime - startTime)
-                         .count()
+                         .count())
         / 1000.0;
     double mb = static_cast<double>(totalReceived) / (1024.0 * 1024.0);
 
