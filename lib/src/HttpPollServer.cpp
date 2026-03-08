@@ -212,32 +212,7 @@ ServerResult HttpPollServer::onWritable(TcpSocket& sock, HttpClientState& s) {
 }
 
 ServerResult HttpPollServer::onIdle() {
-    auto now = std::chrono::steady_clock::now();
-    auto interval
-        = std::chrono::duration<double, std::milli>(now - last_call_).count();
-    last_call_ = now;
-    intervals_.push_back(interval);
-    ++call_count_;
-
-    auto since_print = std::chrono::duration<double>(now - last_print_).count();
-    double print_interval = first_output_done_ ? 60.0 : 0.5;
-
-    if (since_print >= print_interval) {
-        if (!intervals_.empty()) {
-            double sum = 0;
-            for (double v : intervals_) sum += v;
-            printf("onIdle() called %d times, avg interval: %.1fms  "
-                   "clients: %zu  peak: %zu\n",
-                call_count_, sum / static_cast<double>(intervals_.size()),
-                static_cast<size_t>(clientCount()),
-                static_cast<size_t>(peakClientCount()));
-        }
-        intervals_.clear();
-        call_count_ = 0;
-        last_print_ = now;
-        first_output_done_ = true;
-    }
-
+    tracker_.record(clientCount(), peakClientCount());
     return ServerBase<HttpClientState>::onIdle();
 }
 

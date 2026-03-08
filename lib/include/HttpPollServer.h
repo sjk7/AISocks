@@ -21,12 +21,12 @@
 // ---------------------------------------------------------------------------
 
 #include "BuildInfo.h"
+#include "CallIntervalTracker.h"
 #include "ServerBase.h"
 #include <algorithm>
 #include <chrono>
 #include <string>
 #include <string_view>
-#include <vector>
 
 namespace aiSocks {
 
@@ -177,13 +177,7 @@ class HttpPollServer : public ServerBase<HttpClientState> {
     ServerResult onWritable(TcpSocket& sock, HttpClientState& s) final;
     ServerResult onIdle() override;
 
-    std::chrono::steady_clock::time_point last_call_
-        = std::chrono::steady_clock::now();
-    std::chrono::steady_clock::time_point last_print_
-        = std::chrono::steady_clock::now();
-    std::vector<double> intervals_;
-    int call_count_ = 0;
-    bool first_output_done_ = false;
+    CallIntervalTracker tracker_;
 
     protected:
     /// (Used for Reflected XSS prevention)
