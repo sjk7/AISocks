@@ -20,6 +20,7 @@
 //   onResponseSent(s)   -- called after the last byte of a response is sent
 // ---------------------------------------------------------------------------
 
+#include "BuildInfo.h"
 #include "ServerBase.h"
 #include <algorithm>
 #include <chrono>
@@ -135,27 +136,6 @@ class HttpPollServer : public ServerBase<HttpClientState> {
 
     protected:
     ServerBind bind_;
-
-    // Trivial platform/build queries — kept inline to avoid any overhead
-    static const char* buildOS() noexcept {
-#if defined(__APPLE__)
-        return "macOS";
-#elif defined(__linux__)
-        return "Linux";
-#elif defined(_WIN32)
-        return "Windows";
-#else
-        return "Unknown";
-#endif
-    }
-
-    static const char* buildKind() noexcept {
-#if defined(NDEBUG)
-        return "Release";
-#else
-        return "Debug";
-#endif
-    }
 
     virtual void printStartupBanner();
 

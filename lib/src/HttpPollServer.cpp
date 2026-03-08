@@ -21,7 +21,7 @@ void HttpPollServer::run(ClientLimit maxClients, Milliseconds timeout) {
     fflush(stdout);
 
     ServerBase<HttpClientState>::run(maxClients, timeout);
-    
+
     printf("[DEBUG] HttpPollServer::run() - Server completed\n");
     fflush(stdout);
 
@@ -29,15 +29,14 @@ void HttpPollServer::run(ClientLimit maxClients, Milliseconds timeout) {
 }
 
 void HttpPollServer::printBuildInfo() {
-    printf("Built: %s %s  |  OS: %s  |  Build: %s\n", __DATE__, __TIME__,
-        buildOS(), buildKind());
+    BuildInfo::print();
 }
 
 void HttpPollServer::printStartupBanner() {
     // Default implementation prints build info.
     // Subclasses can override and call HttpPollServer::printStartupBanner()
     // to include build info alongside custom startup messages.
-    printBuildInfo();
+    BuildInfo::print();
 }
 
 ServerResult HttpPollServer::onError(TcpSocket& sock, HttpClientState& /*s*/) {
@@ -124,7 +123,8 @@ ServerResult HttpPollServer::onReadable(TcpSocket& sock, HttpClientState& s) {
             auto now = std::chrono::steady_clock::now();
             auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(
                 now - s.startTime);
-            // Only check timeout if we've received some data or if it's been too long
+            // Only check timeout if we've received some data or if it's been
+            // too long
             if (elapsed.count() > 5 && !s.request.empty()) {
                 printf("[DEBUG] Header timeout - disconnecting\n");
                 fflush(stdout);
@@ -133,7 +133,7 @@ ServerResult HttpPollServer::onReadable(TcpSocket& sock, HttpClientState& s) {
         }
 
         int n = sock.receive(buf, sizeof(buf));
-        
+
         if (n > 0) {
             touchClient(sock);
             s.request.append(buf, static_cast<size_t>(n));
@@ -179,7 +179,7 @@ ServerResult HttpPollServer::onWritable(TcpSocket& sock, HttpClientState& s) {
 
     int sent = sock.sendChunked(
         s.responseView.data() + s.sent, s.responseView.size() - s.sent);
-    
+
     if (sent > 0) {
         touchClient(sock);
         s.sent += static_cast<size_t>(sent);
