@@ -24,8 +24,8 @@ using namespace std::chrono;
 // Test server with instrumented hooks
 class TestHttpServer : public HttpPollServer {
     public:
-    int responseBeginCount = 0;
-    int responseSentCount = 0;
+    std::atomic<int> responseBeginCount{0};
+    std::atomic<int> responseSentCount{0};
     std::string lastResponse;
     bool useStaticResponse = false;
     std::string staticResponseStorage
@@ -36,11 +36,19 @@ class TestHttpServer : public HttpPollServer {
         while (!ready_.load(std::memory_order_acquire))
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
+    void waitForResponseBegin(int n = 1) const {
+        while (responseBeginCount.load(std::memory_order_acquire) < n)
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+    void waitForResponseSent(int n = 1) const {
+        while (responseSentCount.load(std::memory_order_acquire) < n)
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
 
     explicit TestHttpServer(const ServerBind& bind) : HttpPollServer(bind) {
         // Reset test state for this instance
-        responseBeginCount = 0;
-        responseSentCount = 0;
+        responseBeginCount.store(0);
+        responseSentCount.store(0);
         lastResponse.clear();
         useStaticResponse = false;
         staticResponseStorage
@@ -65,12 +73,12 @@ class TestHttpServer : public HttpPollServer {
     void onReady() override { ready_.store(true, std::memory_order_release); }
 
     void onResponseBegin(HttpClientState& state) override {
-        responseBeginCount++;
+        responseBeginCount.fetch_add(1, std::memory_order_release);
         HttpPollServer::onResponseBegin(state);
     }
 
     void onResponseSent(HttpClientState& state) override {
-        responseSentCount++;
+        responseSentCount.fetch_add(1, std::memory_order_release);
         HttpPollServer::onResponseSent(state);
     }
 };
@@ -284,7 +292,7 @@ int main() {
         std::thread serverThread([&server]() {
             printf("[DEBUG] Test 3 - Server thread: starting run()\n");
             fflush(stdout);
-            server.run(ClientLimit{1}, Milliseconds{100});
+            server.run(ClientLimit{1}, Milliseconds{20});
             printf("[DEBUG] Test 3 - Server thread: run() completed\n");
             fflush(stdout);
         });
@@ -322,7 +330,7 @@ int main() {
         REQUIRE(server.isValid());
 
         std::thread serverThread([&server]() {
-            server.run(ClientLimit::Unlimited, Milliseconds{100});
+            server.run(ClientLimit::Unlimited, Milliseconds{20});
         });
 
         server.waitReady();
@@ -330,7 +338,7 @@ int main() {
         sendHttpRequest(
             server.serverPort(), "GET / HTTP/1.1\r\nHost: localhost\r\n\r\n");
 
-        std::this_thread::sleep_for(100ms);
+        server.waitForResponseBegin();
         g_serverSignalStop.store(true);
         serverThread.join();
         g_serverSignalStop.store(false);
@@ -345,7 +353,7 @@ int main() {
         REQUIRE(server.isValid());
 
         std::thread serverThread([&server]() {
-            server.run(ClientLimit::Unlimited, Milliseconds{100});
+            server.run(ClientLimit::Unlimited, Milliseconds{20});
         });
 
         server.waitReady();
@@ -353,7 +361,7 @@ int main() {
         sendHttpRequest(
             server.serverPort(), "GET / HTTP/1.1\r\nHost: localhost\r\n\r\n");
 
-        std::this_thread::sleep_for(100ms);
+        server.waitForResponseSent();
         g_serverSignalStop.store(true);
         serverThread.join();
         g_serverSignalStop.store(false);
@@ -377,7 +385,7 @@ int main() {
         std::thread serverThread([&server]() {
             printf("[DEBUG] Test 6 - Server thread: starting run()\n");
             fflush(stdout);
-            server.run(ClientLimit{1}, Milliseconds{100});
+            server.run(ClientLimit{1}, Milliseconds{20});
             printf("[DEBUG] Test 6 - Server thread: run() completed\n");
             fflush(stdout);
         });
@@ -415,7 +423,7 @@ int main() {
         REQUIRE(server.isValid());
 
         std::thread serverThread(
-            [&server]() { server.run(ClientLimit{1}, Milliseconds{100}); });
+            [&server]() { server.run(ClientLimit{1}, Milliseconds{20}); });
 
         server.waitReady();
 
@@ -464,7 +472,7 @@ int main() {
         std::thread serverThread([&server]() {
             printf("[DEBUG] Test 8 - Server thread: starting run()\n");
             fflush(stdout);
-            server.run(ClientLimit{1}, Milliseconds{100});
+            server.run(ClientLimit{1}, Milliseconds{20});
             printf("[DEBUG] Test 8 - Server thread: run() completed\n");
             fflush(stdout);
         });
@@ -501,7 +509,7 @@ int main() {
         REQUIRE(server.isValid());
 
         std::thread serverThread(
-            [&server]() { server.run(ClientLimit{10}, Milliseconds{100}); });
+            [&server]() { server.run(ClientLimit{10}, Milliseconds{20}); });
 
         server.waitReady();
 
@@ -538,7 +546,7 @@ int main() {
         REQUIRE(server.isValid());
 
         std::thread serverThread(
-            [&server]() { server.run(ClientLimit{1}, Milliseconds{100}); });
+            [&server]() { server.run(ClientLimit{1}, Milliseconds{20}); });
 
         server.waitReady();
 
@@ -582,7 +590,7 @@ int main() {
 
         printf("DEBUG: Test 11 - Running server with ClientLimit{1}\n");
         std::thread serverThread(
-            [&server]() { server.run(ClientLimit{1}, Milliseconds{100}); });
+            [&server]() { server.run(ClientLimit{1}, Milliseconds{20}); });
 
         server.waitReady();
 
@@ -598,9 +606,8 @@ int main() {
             printf("DEBUG: Test 11 - Sent partial request line: %s\n",
                 partial.c_str());
 
-            // Wait for timeout
-            printf("DEBUG: Test 11 - Waiting for server idle/shutdown...\n");
-            std::this_thread::sleep_for(200ms);
+            // Wait for the partial-request timeout to fire
+            std::this_thread::sleep_for(50ms);
         }
 
         printf("DEBUG: Test 11 - Stopping server...\n");
@@ -641,7 +648,7 @@ int main() {
         REQUIRE(server.isValid());
 
         std::thread serverThread(
-            [&server]() { server.run(ClientLimit{1}, Milliseconds{100}); });
+            [&server]() { server.run(ClientLimit{1}, Milliseconds{20}); });
 
         server.waitReady();
 
@@ -684,7 +691,7 @@ int main() {
         REQUIRE(server.isValid());
 
         std::thread serverThread(
-            [&server]() { server.run(ClientLimit{1}, Milliseconds{100}); });
+            [&server]() { server.run(ClientLimit{1}, Milliseconds{20}); });
 
         server.waitReady();
 
@@ -710,7 +717,7 @@ int main() {
         REQUIRE(server.isValid());
 
         std::thread serverThread([&server]() {
-            server.run(ClientLimit::Unlimited, Milliseconds{100});
+            server.run(ClientLimit::Unlimited, Milliseconds{20});
         });
 
         server.waitReady();
@@ -733,9 +740,9 @@ int main() {
             t.join();
         }
 
-        // Give server a moment to finish any processing before signaling stop
-        std::this_thread::sleep_for(100ms);
-        REQUIRE(successCount.load() == 5); // They shuuld all complete.
+        // Wait until server has sent all 5 responses before stopping
+        server.waitForResponseSent(5);
+        REQUIRE(successCount.load() == 5);
 
         printf("[DEBUG] Test 14 - Stopping server\n");
         fflush(stdout);
@@ -755,7 +762,7 @@ int main() {
         REQUIRE(server.isValid());
 
         std::thread serverThread(
-            [&server]() { server.run(ClientLimit{1}, Milliseconds{100}); });
+            [&server]() { server.run(ClientLimit{1}, Milliseconds{20}); });
 
         server.waitReady();
 
