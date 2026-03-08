@@ -102,7 +102,7 @@ std::string HttpFileServer::resolveFilePath(const std::string& target) const {
         path = path.substr(0, fragmentPos);
     }
 
-    path = urlDecodePath(path);
+    path = FileServerUtils::urlDecodePath(path);
 
     if (path == "/") {
         path = "/" + config_.indexFile;
@@ -145,7 +145,7 @@ HttpFileServer::FileInfo HttpFileServer::getFileInfo(
 }
 
 std::string HttpFileServer::getMimeType(const std::string& filePath) const {
-    std::string ext = getFileExtension(filePath);
+    std::string ext = FileServerUtils::getFileExtension(filePath);
 
     static const std::map<std::string, std::string> mimeTypes = {
         {".html", "text/html"}, {".htm", "text/html"}, {".css", "text/css"},
@@ -283,7 +283,8 @@ void HttpFileServer::handleFileRequest(HttpClientState& state,
         auto ifModifiedSince = request.headers.find("if-modified-since");
         if (ifModifiedSince != request.headers.end()) {
             StringBuilder lastModified(64);
-            lastModified.append(formatHttpDate(fileInfo.lastModified));
+            lastModified.append(
+                FileServerUtils::formatHttpDate(fileInfo.lastModified));
             if (ifModifiedSince->second == lastModified.toString()) {
                 sendNotModified(state, fileInfo);
                 return;
@@ -315,7 +316,7 @@ void HttpFileServer::handleFileRequest(HttpClientState& state,
 
     if (config_.enableLastModified) {
         response.append("Last-Modified: ");
-        response.append(formatHttpDate(fileInfo.lastModified));
+        response.append(FileServerUtils::formatHttpDate(fileInfo.lastModified));
         response.append("\r\n");
     }
 
@@ -325,7 +326,8 @@ void HttpFileServer::handleFileRequest(HttpClientState& state,
         response.append("\r\n");
     }
 
-    addSecurityHeaders(response);
+    FileServerUtils::addSecurityHeaders(
+        response, config_.enableSecurityHeaders);
 
     for (const auto& [name, value] : config_.customHeaders) {
         response.append(name);
@@ -357,7 +359,8 @@ void HttpFileServer::sendError(HttpClientState& state, int code,
     response.appendFormat("%zu", htmlBody.size());
     response.append("\r\n");
 
-    addSecurityHeaders(response);
+    FileServerUtils::addSecurityHeaders(
+        response, config_.enableSecurityHeaders);
 
     for (const auto& [name, value] : config_.customHeaders) {
         response.append(name);
@@ -380,7 +383,7 @@ void HttpFileServer::sendNotModified(
 
     if (config_.enableLastModified) {
         response.append("Last-Modified: ");
-        response.append(formatHttpDate(fileInfo.lastModified));
+        response.append(FileServerUtils::formatHttpDate(fileInfo.lastModified));
         response.append("\r\n");
     }
 
@@ -390,7 +393,8 @@ void HttpFileServer::sendNotModified(
         response.append("\r\n");
     }
 
-    addSecurityHeaders(response);
+    FileServerUtils::addSecurityHeaders(
+        response, config_.enableSecurityHeaders);
 
     for (const auto& [name, value] : config_.customHeaders) {
         response.append(name);
@@ -424,7 +428,7 @@ void HttpFileServer::sendCachedFile(HttpClientState& state,
 
     if (config_.enableLastModified) {
         response.append("Last-Modified: ");
-        response.append(formatHttpDate(fileInfo.lastModified));
+        response.append(FileServerUtils::formatHttpDate(fileInfo.lastModified));
         response.append("\r\n");
     }
 
@@ -434,7 +438,8 @@ void HttpFileServer::sendCachedFile(HttpClientState& state,
         response.append("\r\n");
     }
 
-    addSecurityHeaders(response);
+    FileServerUtils::addSecurityHeaders(
+        response, config_.enableSecurityHeaders);
 
     for (const auto& [name, value] : config_.customHeaders) {
         response.append(name);
@@ -461,7 +466,8 @@ void HttpFileServer::sendDirectoryListing(
     response.appendFormat("%zu", htmlBody.size());
     response.append("\r\n");
 
-    addSecurityHeaders(response);
+    FileServerUtils::addSecurityHeaders(
+        response, config_.enableSecurityHeaders);
 
     for (const auto& [name, value] : config_.customHeaders) {
         response.append(name);
@@ -546,17 +552,6 @@ FileCache& HttpFileServer::getFileCache() {
     return fileCache_;
 }
 
-void HttpFileServer::addSecurityHeaders(StringBuilder& response) const {
-    if (!config_.enableSecurityHeaders) return;
-
-    response.append("X-Content-Type-Options: nosniff\r\n");
-    response.append("X-Frame-Options: DENY\r\n");
-    response.append(
-        "Content-Security-Policy: default-src 'self'; style-src 'self' "
-        "'unsafe-inline'; script-src 'self' 'unsafe-inline'\r\n");
-    response.append("Referrer-Policy: no-referrer\r\n");
-}
-
 std::string HttpFileServer::htmlEscape(const std::string& str) {
     std::string escaped;
     escaped.reserve(str.size());
@@ -571,59 +566,6 @@ std::string HttpFileServer::htmlEscape(const std::string& str) {
         }
     }
     return escaped;
-}
-
-std::string HttpFileServer::urlDecodePath(const std::string& src) {
-    static const auto fromHex = []() noexcept {
-        std::array<uint8_t, 256> t{};
-        t.fill(0xFF);
-        for (int i = 0; i < 10; ++i)
-            t[static_cast<unsigned>('0' + i)] = static_cast<uint8_t>(i);
-        for (int i = 0; i < 6; ++i) {
-            t[static_cast<unsigned>('A' + i)] = static_cast<uint8_t>(10 + i);
-            t[static_cast<unsigned>('a' + i)] = static_cast<uint8_t>(10 + i);
-        }
-        return t;
-    }();
-
-    std::string out;
-    out.reserve(src.size());
-    for (size_t i = 0, n = src.size(); i < n; ++i) {
-        const unsigned char c = static_cast<unsigned char>(src[i]);
-        if (c == '%' && i + 2 < n) {
-            const uint8_t hi = fromHex[static_cast<unsigned char>(src[i + 1])];
-            const uint8_t lo = fromHex[static_cast<unsigned char>(src[i + 2])];
-            if (hi != 0xFF && lo != 0xFF) {
-                out += static_cast<char>((hi << 4) | lo);
-                i += 2;
-                continue;
-            }
-        }
-        out += static_cast<char>(c);
-    }
-    return out;
-}
-
-std::string HttpFileServer::getFileExtension(
-    const std::string& filePath) const {
-    size_t dotPos = filePath.find_last_of('.');
-    if (dotPos != std::string::npos && dotPos < filePath.length() - 1) {
-        return filePath.substr(dotPos);
-    }
-    return "";
-}
-
-std::string HttpFileServer::formatHttpDate(time_t fileTime) const {
-    char buffer[32];
-#ifdef _WIN32
-    struct tm timeinfo = {};
-    gmtime_s(&timeinfo, &fileTime);
-    strftime(buffer, sizeof(buffer), "%a, %d %b %Y %H:%M:%S GMT", &timeinfo);
-#else
-    struct tm* timeinfo = gmtime(&fileTime);
-    strftime(buffer, sizeof(buffer), "%a, %d %b %Y %H:%M:%S GMT", timeinfo);
-#endif
-    return std::string(buffer);
 }
 
 } // namespace aiSocks

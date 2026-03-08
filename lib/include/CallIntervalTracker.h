@@ -30,8 +30,8 @@ struct CallIntervalTracker {
     // no dependency on ServerBase.
     void record(size_t clientCount, size_t peakCount) {
         using Clock = std::chrono::steady_clock;
-        using Sec   = std::chrono::duration<double>;
-        using Ms    = std::chrono::duration<double, std::milli>;
+        using Sec = std::chrono::duration<double>;
+        using Ms = std::chrono::duration<double, std::milli>;
 
         const auto now = Clock::now();
         intervals_.push_back(Ms(now - last_call_).count());
@@ -47,25 +47,24 @@ struct CallIntervalTracker {
                 for (double v : intervals_) sum += v;
                 printf("onIdle() called %d times, avg interval: %.1fms  "
                        "clients: %zu  peak: %zu\n",
-                    call_count_,
-                    sum / static_cast<double>(intervals_.size()),
+                    call_count_, sum / static_cast<double>(intervals_.size()),
                     clientCount, peakCount);
             }
             intervals_.clear();
-            call_count_        = 0;
-            last_print_        = now;
+            call_count_ = 0;
+            last_print_ = now;
             first_output_done_ = true;
         }
     }
 
-private:
+    private:
     using Clock = std::chrono::steady_clock;
 
-    Clock::time_point   last_call_         = Clock::now();
-    Clock::time_point   last_print_        = Clock::now();
+    Clock::time_point last_call_ = Clock::now();
+    Clock::time_point last_print_ = Clock::now();
     std::vector<double> intervals_;
-    int                 call_count_        = 0;
-    bool                first_output_done_ = false;
+    int call_count_ = 0;
+    bool first_output_done_ = false;
 };
 
 } // namespace aiSocks

@@ -1,12 +1,13 @@
-// This is an independent project of an individual developer. Dear PVS-Studio, please check it.
+// This is an independent project of an individual developer. Dear PVS-Studio,
+// please check it.
 
-// PVS-Studio Static Code Analyzer for C, C++, C#, and Java: https://pvs-studio.com
-
-
+// PVS-Studio Static Code Analyzer for C, C++, C#, and Java:
+// https://pvs-studio.com
 
 #pragma once
 
 #include "FileCache.h"
+#include "FileServerUtils.h"
 #include "HttpPollServer.h"
 #include "HttpRequest.h"
 #include <ctime>
@@ -14,11 +15,6 @@
 #include <string>
 
 namespace aiSocks {
-
-// Forward declaration — addSecurityHeaders takes StringBuilder& but
-// StringBuilder is defined in FileIO.h, which we avoid pulling into every
-// including TU (it drags in platform headers).
-class StringBuilder;
 
 /// HTTP file server that serves files from the current directory.
 /// This is a base class with virtual customization points for:
@@ -120,11 +116,7 @@ class HttpFileServer : public HttpPollServer {
     Config config_;
     FileCache fileCache_;
 
-    void addSecurityHeaders(StringBuilder& response) const;
     static std::string htmlEscape(const std::string& str);
-    static std::string urlDecodePath(const std::string& src);
-    std::string getFileExtension(const std::string& filePath) const;
-    std::string formatHttpDate(time_t fileTime) const;
 };
 
 } // namespace aiSocks
