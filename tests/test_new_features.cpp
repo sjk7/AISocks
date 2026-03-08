@@ -441,7 +441,7 @@ static void test_bulk_throughput() {
 
         double ms = std::chrono::duration<double, std::milli>(t1 - t0).count();
         size_t dropped = static_cast<size_t>(COUNT) - recvCount.load();
-        double mbRecv = recvTotal.load() / (1024.0 * 1024.0);
+        double mbRecv = static_cast<double>(recvTotal.load()) / (1024.0 * 1024.0);
         double mbSend = static_cast<double>(TOTAL) / (1024.0 * 1024.0);
         double mbps = mbSend / (ms / 1000.0); // throughput = sent / sender time
 
