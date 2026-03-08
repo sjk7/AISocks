@@ -22,11 +22,11 @@ The Visual Studio solution includes an auto-generated `RUN_TESTS` project that r
 ```
 Test project C:/Users/cool/Desktop/AISocks/build-vs
     Start 1: test_socket_basics
-1/22 Test #1: test_socket_basics ...............   Passed    0.02 sec
+1/36 Test #1: test_socket_basics ...............   Passed    0.02 sec
     Start 2: test_ip_utils
-2/22 Test #2: test_ip_utils ....................   Passed    0.03 sec
+2/36 Test #2: test_ip_utils ....................   Passed    0.03 sec
 ...
-100% tests passed, 0 tests failed out of 22
+100% tests passed, 0 tests failed out of 36
 ```
 
 ---
@@ -42,27 +42,42 @@ Each test is a standalone executable that you can run directly.
 4. Press **F5** (Debug) or **Ctrl+F5** (Run without debugging)
 
 ### Available Test Projects:
-- `test_socket_basics` - Basic socket operations
-- `test_tcp_socket` - TCP socket functionality
-- `test_server_base` - Server base class
-- `test_error_messages` - Error handling and messages
-- `test_poller` - Polling mechanism
+- `test_advanced_file_server` - Advanced file server (auth, happy/sad path)
+- `test_blocking` - Blocking mode behavior
 - `test_construction` - Object construction
 - `test_error_handling` - Error handling paths
+- `test_error_messages` - Error handling and messages
+- `test_extracted_components` - Components extracted from HttpPollServer/ServerBase
+- `test_file_cache` - File cache (put/get/invalidation)
+- `test_file_io` - File I/O (create, read, write)
+- `test_file_server_utils` - URL decode and file server utilities
+- `test_fixes` - Bug fix verification
+- `test_html_escape` - HtmlEscape utility
+- `test_html_page_generator` - HtmlPageGenerator (error pages, directory listings)
+- `test_http_poll_server` - HTTP poll server integration
+- `test_http_poll_server_simple` - HTTP poll server basic construction
+- `test_http_request` - HTTP request parsing
+- `test_ip_utils` - IP address utilities
 - `test_loopback_tcp` - Loopback connections
-- `test_blocking` - Blocking mode behavior
 - `test_move_semantics` - Move operations
 - `test_new_features` - New feature tests
-- `test_simple_client` - Simple client tests
-- `test_http_request` - HTTP request parsing
-- `test_url_codec` - URL encoding/decoding
-- `test_socket_factory` - Socket factory pattern
-- `test_server_base_simple` - Simple server tests
-- `test_server_base_minimal` - Minimal server tests
+- `test_path_helper` - Path normalization and canonicalization
+- `test_poller` - Polling mechanism
+- `test_result` - Result<T> success/error state and move/copy semantics
+- `test_security_malicious_clients` - Security mitigations against malicious clients
+- `test_server_base` - Server base class
 - `test_server_base_echo_simple` - Echo server tests
+- `test_server_base_edge_cases` - Server base edge cases
+- `test_server_base_minimal` - Minimal server tests
 - `test_server_base_no_timeout` - No-timeout server tests
-- `test_fixes` - Bug fix verification
+- `test_server_base_simple` - Simple server tests
+- `test_server_signal` - g_serverSignalStop flag and signal handler
+- `test_simple_client` - Simple client tests
 - `test_simple_server` - Simple server implementation
+- `test_socket_basics` - Basic socket operations
+- `test_socket_factory` - Socket factory pattern
+- `test_tcp_socket` - TCP socket functionality
+- `test_url_codec` - URL encoding/decoding
 
 ### Test Output:
 Each test prints results to the console:
