@@ -7,6 +7,7 @@
 #ifndef AISOCKS_SERVER_BASE_H
 #define AISOCKS_SERVER_BASE_H
 
+#include "PollEventLoop.h"
 #include "Poller.h"
 #include "ServerSignal.h"
 #include "ServerTypes.h"
@@ -16,9 +17,7 @@
 #include <atomic>
 #include <cassert>
 #include <chrono>
-#include <csignal>
 #include <cstdint>
-#include <functional>
 #include <memory>
 #include <vector>
 #ifndef _WIN32
@@ -165,7 +164,6 @@ template <typename ClientData> class ServerBase {
         // Full clear here (unlike run() cleanup) since the object is gone.
         clientSlots_.clear();
         clientFds_.clear();
-        current_poller_ = nullptr;
     }
 
     // Non-copyable, movable.
@@ -190,115 +188,58 @@ template <typename ClientData> class ServerBase {
     // ServerResult::StopServer from one of the, or if CTRL+C is detected.
     void run(ClientLimit maxClients = ClientLimit::Default,
         Milliseconds timeout = Milliseconds{-1}) {
-        if (!isValid()) return; // Server not valid, exit early
+        if (!isValid()) return;
 
         stop_.store(false, std::memory_order_relaxed);
+        loop_.setHandleSignals(handleSignals_);
 
-        // Install SIGINT/SIGTERM for Ctrl+C shutdown; restore on exit.
-        //
-        // NOTE: signal_stop_ is a process-wide static flag shared by every
-        // ServerBase instance.  If two servers run concurrently and both have
-        // signal handling enabled, SIGINT will stop both.  Use
-        // setHandleSignals(false) on instances that should be unaffected.
-        using SigHandler = void (*)(int);
-        SigHandler prevInt = SIG_DFL;
-        SigHandler prevTerm = SIG_DFL;
-        if (handleSignals_) {
-            prevInt = std::signal(SIGINT, serverHandleSignal);
-            prevTerm = std::signal(SIGTERM, serverHandleSignal);
-        }
-        struct SigGuard {
-            bool active;
-            SigHandler pi;
-            SigHandler pt;
-            ~SigGuard() {
-                if (active) {
-                    std::signal(SIGINT, pi);
-                    std::signal(SIGTERM, pt);
-                }
-            }
-        } guard{handleSignals_, prevInt, prevTerm};
+        if (!loop_.add(*listener_, PollEvent::Readable | PollEvent::Error))
+            return;
 
-        Poller poller;
-        current_poller_ = &poller;
-        if (!poller.add(*listener_, PollEvent::Readable | PollEvent::Error)) {
-            return; // Failed to register with poller
-        }
-
-        // Always pre-reserve both containers so that the first burst of
-        // connections never triggers a rehash or vector reallocation.
-        // When Unlimited is requested we still use defaultMaxClients as a
-        // sensible starting capacity; the containers will grow automatically
-        // if more clients arrive.
+        // Pre-reserve containers so the first burst of connections never
+        // triggers reallocation in the hot path.
         {
             const size_t cap = (maxClients == ClientLimit::Unlimited)
                 ? defaultMaxClients
                 : static_cast<size_t>(maxClients);
-            // Pre-size the sparse fd→client array to the process fd ceiling
-            // once so that emplaceClient() never resizes in the hot path.
-            // The OS cannot issue an fd at or beyond its own limit, so this
-            // single upfront allocation is exact — no gap, no over-run.
             if (clientSlots_.empty()) clientSlots_.resize(getFdCeiling());
             clientFds_.reserve(cap);
-            // Each client can have multiple heap entries while stale ones
-            // accumulate between sweeps, so reserve 2x the client capacity.
             timeout_heap_.reserve(cap * 2);
         }
 
         bool accepting = true;
         size_t accepted = 0;
 
-        while (true) {
-            // Check if server should stop
-            bool shouldStop = stop_.load(std::memory_order_relaxed);
-            bool signalReceived = handleSignals_
-                && g_serverSignalStop.load(std::memory_order_relaxed);
-            bool hasClientsOrAccepting = accepting || !clientFds_.empty();
+        loop_.run(
+            timeout,
 
-            if (shouldStop || signalReceived || !hasClientsOrAccepting) {
-                break;
-            }
-
-            auto ready = poller.wait(timeout);
-            if (stop_.load(std::memory_order_relaxed)
-                || (handleSignals_
-                    && g_serverSignalStop.load(std::memory_order_relaxed)))
-                break;
-            for (const auto& event : ready) {
-                if (event.socket == listener_.get()) {
-                    if (!accepting) continue;
-                    drainAccept(poller, accepting, accepted, maxClients);
-                    continue;
+            // --- EventHandler: dispatched once per ready socket --------------
+            [&](TcpSocket& sock, PollEvent ev) -> bool {
+                if (&sock == listener_.get()) {
+                    if (accepting)
+                        drainAccept(loop_, accepting, accepted, maxClients);
+                    return true;
                 }
 
-                uintptr_t cfd = event.socket->getNativeHandle();
+                uintptr_t cfd = sock.getNativeHandle();
                 ClientEntry* ce = findClient(cfd);
-                if (!ce) continue;
+                if (!ce) return true;
 
-                bool keep = !hasFlag(event.events, PollEvent::Error);
+                bool keep = !hasFlag(ev, PollEvent::Error);
                 if (!keep) {
-                    ServerResult errResult = onError(*ce->socket, ce->data);
-                    if (errResult == ServerResult::StopServer) {
-                        stop_.store(true);
-                        break;
-                    }
-                    keep = (errResult == ServerResult::KeepConnection);
+                    ServerResult r = onError(*ce->socket, ce->data);
+                    if (r == ServerResult::StopServer) return false;
+                    keep = (r == ServerResult::KeepConnection);
                 }
-                if (keep && hasFlag(event.events, PollEvent::Readable)) {
-                    ServerResult result = onReadable(*ce->socket, ce->data);
-                    if (result == ServerResult::StopServer) {
-                        stop_.store(true);
-                        break;
-                    }
-                    keep = (result == ServerResult::KeepConnection);
+                if (keep && hasFlag(ev, PollEvent::Readable)) {
+                    ServerResult r = onReadable(*ce->socket, ce->data);
+                    if (r == ServerResult::StopServer) return false;
+                    keep = (r == ServerResult::KeepConnection);
                 }
-                if (keep && hasFlag(event.events, PollEvent::Writable)) {
-                    ServerResult result = onWritable(*ce->socket, ce->data);
-                    if (result == ServerResult::StopServer) {
-                        stop_.store(true);
-                        break;
-                    }
-                    keep = (result == ServerResult::KeepConnection);
+                if (keep && hasFlag(ev, PollEvent::Writable)) {
+                    ServerResult r = onWritable(*ce->socket, ce->data);
+                    if (r == ServerResult::StopServer) return false;
+                    keep = (r == ServerResult::KeepConnection);
                 }
 
                 if (!keep) {
@@ -307,127 +248,115 @@ template <typename ClientData> class ServerBase {
                     fflush(stdout);
                     onDisconnect(ce->data);
                     ce->socket->shutdown(ShutdownHow::Both);
-                    (void)poller.remove(*ce->socket);
+                    (void)loop_.remove(*ce->socket);
                     eraseClient(cfd);
 
-                    // Re-enable accepting if we were at the limit and now have
-                    // room
                     if (!accepting && maxClients != ClientLimit::Unlimited
                         && clientFds_.size()
                             < static_cast<size_t>(maxClients)) {
-                        if (poller.add(*listener_,
-                                PollEvent::Readable | PollEvent::Error)) {
+                        if (loop_.add(*listener_,
+                                PollEvent::Readable | PollEvent::Error))
                             accepting = true;
-                        }
                     }
 #ifdef SERVER_STATS
                     printf("[stats] clients: %zu  peak: %zu\n",
                         clientFds_.size(), peak_clients_);
 #endif
                 }
-            }
+                return true;
+            },
 
-            // Dynamic timeout adjustment: under high load (>256 clients),
-            // switch to aggressive 5s timeout to quickly reclaim connections.
-            // Restore normal timeout when load drops.
-            {
-                constexpr size_t HIGH_LOAD_THRESHOLD = 256;
-
-                if (!inHighLoadMode_
-                    && clientFds_.size() > HIGH_LOAD_THRESHOLD) {
-                    // Entering high-load mode: save normal timeout and switch
-                    // to aggressive
-                    constexpr auto AGGRESSIVE_TIMEOUT
-                        = std::chrono::milliseconds{5000};
-                    normalKeepAliveTimeout_ = keepAliveTimeout_;
-                    keepAliveTimeout_ = AGGRESSIVE_TIMEOUT;
-                    inHighLoadMode_ = true;
-                    printf("[ServerBase] High load detected (%zu clients), "
-                           "switching to aggressive %lld ms timeout\n",
-                        clientFds_.size(),
-                        static_cast<long long>(AGGRESSIVE_TIMEOUT.count()));
-                } else if (inHighLoadMode_
-                    && clientFds_.size() <= HIGH_LOAD_THRESHOLD) {
-                    // Exiting high-load mode: restore normal timeout
-                    keepAliveTimeout_ = normalKeepAliveTimeout_;
-                    inHighLoadMode_ = false;
-                    printf("[ServerBase] Load normalized (%zu clients), "
-                           "restoring normal %lld ms timeout\n",
-                        clientFds_.size(),
-                        static_cast<long long>(
-                            normalKeepAliveTimeout_.count()));
+            // --- AfterBatchFn: once per poller.wait() call -------------------
+            // `idle` is true when no events fired (genuine timeout).
+            [&](bool idle) -> bool {
+                // Dynamic keep-alive timeout under high load.
+                {
+                    constexpr size_t HIGH_LOAD_THRESHOLD = 256;
+                    if (!inHighLoadMode_
+                        && clientFds_.size() > HIGH_LOAD_THRESHOLD) {
+                        constexpr auto AGGRESSIVE
+                            = std::chrono::milliseconds{5000};
+                        normalKeepAliveTimeout_ = keepAliveTimeout_;
+                        keepAliveTimeout_ = AGGRESSIVE;
+                        inHighLoadMode_ = true;
+                        printf("[ServerBase] High load detected (%zu clients), "
+                               "switching to aggressive %lld ms timeout\n",
+                            clientFds_.size(),
+                            static_cast<long long>(AGGRESSIVE.count()));
+                    } else if (inHighLoadMode_
+                        && clientFds_.size() <= HIGH_LOAD_THRESHOLD) {
+                        keepAliveTimeout_ = normalKeepAliveTimeout_;
+                        inHighLoadMode_ = false;
+                        printf("[ServerBase] Load normalized (%zu clients), "
+                               "restoring normal %lld ms timeout\n",
+                            clientFds_.size(),
+                            static_cast<long long>(
+                                normalKeepAliveTimeout_.count()));
+                    }
                 }
-            }
 
-            // Drain expired keep-alive entries.  Under heavy load (>1000
-            // clients) throttle to at most one sweep per 100 ms: the
-            // fast-path SteadyClock::now() is cheap but not free, and the
-            // event loop iterates far faster than timeouts actually fire.
-            {
-                const auto sweepNow = SteadyClock::now();
-                if (clientFds_.size() < 1000
-                    || (sweepNow - lastSweepTime_)
-                        >= std::chrono::milliseconds{100}) {
-                    sweepTimeouts(poller);
-                    lastSweepTime_ = sweepNow;
+                // Throttled keep-alive sweep (at most once per 100 ms when
+                // client count ≥ 1000).
+                {
+                    const auto now = SteadyClock::now();
+                    if (clientFds_.size() < 1000
+                        || (now - lastSweepTime_)
+                            >= std::chrono::milliseconds{100}) {
+                        sweepTimeouts(loop_);
+                        lastSweepTime_ = now;
 
-                    // Re-enable accepting if timeouts freed up space
-                    if (!accepting && maxClients != ClientLimit::Unlimited
-                        && clientFds_.size()
-                            < static_cast<size_t>(maxClients)) {
-                        if (poller.add(*listener_,
-                                PollEvent::Readable | PollEvent::Error)) {
-                            accepting = true;
+                        if (!accepting && maxClients != ClientLimit::Unlimited
+                            && clientFds_.size()
+                                < static_cast<size_t>(maxClients)) {
+                            if (loop_.add(*listener_,
+                                    PollEvent::Readable | PollEvent::Error))
+                                accepting = true;
                         }
                     }
                 }
-            }
 
-            // onIdle() is called only when poller.wait() returned with no
-            // ready events, i.e. a genuine timeout.  Callers that want
-            // reliable periodic semantics should pass a bounded timeout to
-            // run() (e.g. Milliseconds{100}) rather than guarding with their
-            // own wall-clock timer.
-            if (ready.empty()) {
-                if (onIdle() == ServerResult::StopServer) {
-                    stop_.store(true);
-                    break;
-                }
-            }
+                // onIdle() is called only on genuine timeouts (no events).
+                if (idle) return onIdle() != ServerResult::StopServer;
+                return true;
+            },
+
+            // --- StopPredicate -----------------------------------------------
+            [&]() -> bool {
+                return stop_.load(std::memory_order_relaxed)
+                    || (!accepting && clientFds_.empty());
+            });
+
+        // Exit-reason logging.
+        {
+            const bool stoppedByFlag = stop_.load(std::memory_order_relaxed);
+            const bool stoppedBySignal = handleSignals_
+                && g_serverSignalStop.load(std::memory_order_relaxed);
+            const bool noMore = !accepting && clientFds_.empty();
+            printf("=== Server exited gracefully ===\n");
+            printf("Exit reason: ");
+            if (stoppedByFlag)
+                printf("STOP flag was set (requestStop() called)\n");
+            else if (stoppedBySignal)
+                printf("SIGINT/SIGTERM signal received (Ctrl+C)\n");
+            else if (noMore)
+                printf("No clients AND not accepting (maxClients limit "
+                       "reached)\n");
+            else
+                printf("Unknown reason\n");
+            printf(
+                "Final state: stop=%d, signal=%d, accepting=%d, clients=%zu\n",
+                stoppedByFlag, stoppedBySignal, accepting, clientFds_.size());
+            printf("===============================\n");
         }
 
-        // Enhanced exit reason logging
-        bool shouldStop = stop_.load(std::memory_order_relaxed);
-        bool signalReceived = handleSignals_
-            && g_serverSignalStop.load(std::memory_order_relaxed);
-        bool hasClientsOrAccepting = accepting || !clientFds_.empty();
-
-        printf("=== Server exited gracefully ===\n");
-        printf("Exit reason: ");
-        if (shouldStop) {
-            printf("STOP flag was set (requestStop() called)\n");
-        } else if (signalReceived) {
-            printf("SIGINT/SIGTERM signal received (Ctrl+C)\n");
-        } else if (!hasClientsOrAccepting) {
-            printf("No clients AND not accepting (maxClients limit reached)\n");
-        } else {
-            printf("Unknown reason\n");
-        }
-        printf("Final state: stop=%d, signal=%d, accepting=%d, clients=%zu\n",
-            shouldStop, signalReceived, accepting, clientFds_.size());
-        printf("===============================\n");
-
-        // Flush any accumulated keep-alive timeout count before exiting.
         if (timeoutLogCount_ > 0) {
             printf("[keepalive] closed %zu idle connection%s total\n",
                 timeoutLogCount_, timeoutLogCount_ == 1 ? "" : "s");
             timeoutLogCount_ = 0;
         }
 
-        // Clean up any remaining clients when stopping.  Reset individual
-        // slots rather than clearing the whole vector so that the
-        // getFdCeiling()-sized pre-allocation from the constructor is
-        // preserved across repeated run() calls.
+        // Reset individual slots (not clear()) so the pre-allocation from
+        // the constructor is preserved across repeated run() calls.
         for (auto fd : clientFds_) {
             if (fd < clientSlots_.size() && clientSlots_[fd]) {
                 onDisconnect(clientSlots_[fd]->data);
@@ -435,7 +364,6 @@ template <typename ClientData> class ServerBase {
             }
         }
         clientFds_.clear();
-        current_poller_ = nullptr;
     }
 
     // Access the underlying listening socket (e.g. to set socket options).
@@ -467,9 +395,9 @@ template <typename ClientData> class ServerBase {
     //   We update lastActivity in the ClientEntry, then push a *new*
     //   TimeoutEntry with the refreshed expiry.  The old entry stays in the
     //   heap but is treated as stale by sweepTimeouts() because its
-    //   lastActivitySnap will no longer match the ClientEntry's lastActivity.
-    //   This is the core of the lazy-deletion strategy: O(log n) push, zero
-    //   removal cost.
+    //   lastActivitySnap will no longer match the ClientEntry's
+    //   lastActivity. This is the core of the lazy-deletion strategy: O(log
+    //   n) push, zero removal cost.
     //
     //   To prevent unbounded heap growth under high-throughput workloads
     //   (e.g. wrk with 15 000 keep-alive connections), we only push a new
@@ -499,21 +427,22 @@ template <typename ClientData> class ServerBase {
     // Enable or disable Writable interest for a client socket.
     // Call with true when you have data to send, false when done sending.
     void setClientWritable(const TcpSocket& sock, bool writable) {
-        if (!current_poller_) return;
         PollEvent interest = PollEvent::Readable | PollEvent::Error;
         if (writable) interest = interest | PollEvent::Writable;
-        current_poller_->modify(sock, interest);
+        loop_.modify(sock, interest);
     }
 
     // Keep-alive idle timeout. Connections that have been idle longer than
-    // this will be closed gracefully. Set to 0 to disable. Default: 65000ms.
-    // Uses the Milliseconds type so callers can specify sub-second timeouts
-    // without the silent truncation-to-zero that chrono::seconds would cause.
+    // this will be closed gracefully. Set to 0 to disable. Default:
+    // 65000ms. Uses the Milliseconds type so callers can specify sub-second
+    // timeouts without the silent truncation-to-zero that chrono::seconds
+    // would cause.
     void setKeepAliveTimeout(Milliseconds timeout) {
         std::chrono::milliseconds ms{timeout.count};
         if (inHighLoadMode_) {
-            // In high-load mode: save the new timeout for later restoration,
-            // but keep the aggressive timeout active to handle current load
+            // In high-load mode: save the new timeout for later
+            // restoration, but keep the aggressive timeout active to handle
+            // current load
             normalKeepAliveTimeout_ = ms;
         } else {
             // Normal mode: apply immediately and keep backup in sync
@@ -538,15 +467,19 @@ template <typename ClientData> class ServerBase {
     //
     // Default: true (signal handling enabled).
     //
-    // When enabled, SIGINT/SIGTERM set a process-wide static flag that causes
-    // every ServerBase whose handleSignals_ is true to stop on the next loop
-    // iteration.  Set to false on secondary servers (or servers running in
-    // threads) that should be stopped via requestStop() instead.
-    void setHandleSignals(bool enable) noexcept { handleSignals_ = enable; }
+    // When enabled, SIGINT/SIGTERM set a process-wide static flag that
+    // causes every ServerBase whose handleSignals_ is true to stop on the
+    // next loop iteration.  Set to false on secondary servers (or servers
+    // running in threads) that should be stopped via requestStop() instead.
+    void setHandleSignals(bool enable) noexcept {
+        handleSignals_ = enable;
+        loop_.setHandleSignals(enable);
+    }
     bool handlesSignals() const noexcept { return handleSignals_; }
 
     protected:
-    // -- Override in derived classes ------------------------------------------
+    // -- Override in derived classes
+    // ------------------------------------------
 
     // Called when the client socket is readable.
     virtual ServerResult onReadable(TcpSocket& sock, ClientData& data) = 0;
@@ -566,24 +499,25 @@ template <typename ClientData> class ServerBase {
         return ServerResult::Disconnect;
     }
 
-    // Called after the keep-alive sweep closes one or more idle connections.
-    // Default: accumulates count and prints at most once per minute.
+    // Called after the keep-alive sweep closes one or more idle
+    // connections. Default: accumulates count and prints at most once per
+    // minute.
     virtual void onClientsTimedOut(size_t count) {
         timeoutLogCount_ += count;
         auto now = SteadyClock::now();
         if (now - timeoutLogLast_ >= std::chrono::minutes{1}) {
-            printf(
-                "[keepalive] closed %zu idle connection%s in the last minute\n",
+            printf("[keepalive] closed %zu idle connection%s in the last "
+                   "minute\n",
                 timeoutLogCount_, timeoutLogCount_ == 1 ? "" : "s");
             timeoutLogCount_ = 0;
             timeoutLogLast_ = now;
         }
     }
 
-    // Called when a newly accepted socket cannot be registered with the poller
-    // (a rare OS error — e.g. ENOMEM or the process fd table is full).
-    // The socket has been accepted from the OS but cannot be served; it will
-    // be closed immediately after this call returns.
+    // Called when a newly accepted socket cannot be registered with the
+    // poller (a rare OS error — e.g. ENOMEM or the process fd table is
+    // full). The socket has been accepted from the OS but cannot be served;
+    // it will be closed immediately after this call returns.
     //
     // Parameters:
     //   fd       — the OS fd/SOCKET handle of the accepted (but unserved)
@@ -591,8 +525,9 @@ template <typename ClientData> class ServerBase {
     //   unavailable.
     //
     // The TcpSocket itself is NOT passed because the callee cannot usefully
-    // send or receive on it (the poller never registered it).  Read the peer
-    // address for logging/metrics; the socket is closed immediately on return.
+    // send or receive on it (the poller never registered it).  Read the
+    // peer address for logging/metrics; the socket is closed immediately on
+    // return.
     //
     // Default: logs a warning to stderr.
     // Override to suppress the log, record metrics, or increment a counter.
@@ -603,9 +538,9 @@ template <typename ClientData> class ServerBase {
             fd, peerAddr.c_str());
     }
 
-    // Called when poller.wait() returns with no ready events, i.e. a genuine
-    // poll timeout.  Use this for periodic bookkeeping on the server thread
-    // without spawning extra threads.
+    // Called when poller.wait() returns with no ready events, i.e. a
+    // genuine poll timeout.  Use this for periodic bookkeeping on the
+    // server thread without spawning extra threads.
     //
     // For reliable periodic calls, pass a bounded timeout to run()
     // (e.g. Milliseconds{100}).  onIdle() is NOT called when events fire,
@@ -667,12 +602,12 @@ template <typename ClientData> class ServerBase {
     //   lets us stop as soon as the front entry hasn't expired yet.
     //
     //   The tricky part is that touchClient() *updates* a client's expiry.
-    //   Rather than finding and moving the old heap node (which would require
-    //   an index and O(log n) decrease-key), we simply push a *new* entry
-    //   with the refreshed expiry and leave the old one in place.
+    //   Rather than finding and moving the old heap node (which would
+    //   require an index and O(log n) decrease-key), we simply push a *new*
+    //   entry with the refreshed expiry and leave the old one in place.
     //
-    //   On each sweep we pop entries in expiry order and discard any that are
-    //   stale before touching the socket:
+    //   On each sweep we pop entries in expiry order and discard any that
+    //   are stale before touching the socket:
     //     - fd no longer in clients_     -> client already gone, skip.
     //     - lastActivitySnap != current   -> client was touched after this
     //                                      entry was pushed; a newer entry
@@ -719,7 +654,7 @@ template <typename ClientData> class ServerBase {
     // Called from the main event loop (throttled to once per 100ms under
     // heavy load ≥1000 clients).  The fast-path (nothing expired) costs
     // one time comparison against the heap front and then returns -- O(1).
-    void sweepTimeouts(Poller& poller) {
+    void sweepTimeouts(PollEventLoop& loop) {
         if (keepAliveTimeout_.count() == 0 || timeout_heap_.empty()) return;
 
         const auto now = SteadyClock::now();
@@ -737,30 +672,34 @@ template <typename ClientData> class ServerBase {
         // the heap.  Each iteration is O(log n) for the re-heapify.
         while (!timeout_heap_.empty() && timeout_heap_.front().expiry <= now) {
             // Copy the front entry out before popping.
-            // (pop_heap moves front to back, then re-heapifies [begin, end-1)
+            // (pop_heap moves front to back, then re-heapifies [begin,
+            // end-1)
             //  so we must read it *before* calling pop_heap.)
             TimeoutEntry entry = timeout_heap_.front();
             std::pop_heap(timeout_heap_.begin(), timeout_heap_.end());
             timeout_heap_.pop_back(); // remove the element now sitting at back
 
-            // ---- Stale-entry check 1 ----------------------------------------
-            // The client was already removed via a non-timeout path (e.g. a
-            // read error, or the remote half closed).  The heap entry is a
-            // dangling reference -- discard it.
+            // ---- Stale-entry check 1
+            // ---------------------------------------- The client was
+            // already removed via a non-timeout path (e.g. a read error, or
+            // the remote half closed).  The heap entry is a dangling
+            // reference -- discard it.
             ClientEntry* ce = findClient(entry.fd);
             if (!ce) continue;
 
-            // ---- Stale-entry check 2 ----------------------------------------
-            // touchClient() was called after this entry was pushed, updating
-            // lastActivity in the ClientEntry and pushing a newer heap entry.
-            // Our snapshot no longer matches — a more recent expiry entry
-            // exists further back in the heap.  Discard this stale entry.
+            // ---- Stale-entry check 2
+            // ---------------------------------------- touchClient() was
+            // called after this entry was pushed, updating lastActivity in
+            // the ClientEntry and pushing a newer heap entry. Our snapshot
+            // no longer matches — a more recent expiry entry exists further
+            // back in the heap.  Discard this stale entry.
             if (ce->lastActivity != entry.lastActivitySnap) continue;
 
-            // ---- Genuine timeout: close the idle connection. ----------------
+            // ---- Genuine timeout: close the idle connection.
+            // ----------------
             onDisconnect(ce->data);
             ce->socket->shutdown(ShutdownHow::Both);
-            (void)poller.remove(*ce->socket);
+            (void)loop.remove(*ce->socket);
             eraseClient(entry.fd);
             ++closedCount;
         }
@@ -773,11 +712,12 @@ template <typename ClientData> class ServerBase {
     size_t max_clients_{0};
 #endif
 
-    // Returns the process's current soft fd limit as the sparse-array ceiling.
-    // Called once in run() to pre-size clientSlots_ before any accept().
-    // On POSIX this is getrlimit(RLIMIT_NOFILE).  On Windows, SOCKET handles
-    // are opaque UINT_PTR values; in practice they start small, but we cap at
-    // 65 536 which comfortably exceeds the default WSA socket limit.
+    // Returns the process's current soft fd limit as the sparse-array
+    // ceiling. Called once in run() to pre-size clientSlots_ before any
+    // accept(). On POSIX this is getrlimit(RLIMIT_NOFILE).  On Windows,
+    // SOCKET handles are opaque UINT_PTR values; in practice they start
+    // small, but we cap at 65 536 which comfortably exceeds the default WSA
+    // socket limit.
     static size_t getFdCeiling() noexcept {
 #ifdef _WIN32
         return 65536;
@@ -791,7 +731,7 @@ template <typename ClientData> class ServerBase {
     }
 
     bool handleSignals_{true}; // per-instance opt-out; see setHandleSignals()
-    Poller* current_poller_{nullptr};
+    PollEventLoop loop_;
     std::unique_ptr<TcpSocket> listener_;
     // Flat O(1)-by-fd client table.  Replaces unordered_map to eliminate
     // hashing, pointer chasing, and rehash pauses under load.
@@ -819,11 +759,11 @@ template <typename ClientData> class ServerBase {
 
     // O(1) amortised insert.  Stores activeIdx for O(1) future erase.
     ClientEntry& emplaceClient(uintptr_t fd, std::unique_ptr<TcpSocket> sock) {
-        // clientSlots_ is pre-sized in the constructor to getFdCeiling(), so
-        // the OS should never hand us an fd that falls outside the array.
-        // Assert in debug builds to catch any violation immediately; the
-        // resize below is an absolute last-resort safety net (e.g. the app
-        // called setrlimit() to raise the limit after construction).
+        // clientSlots_ is pre-sized in the constructor to getFdCeiling(),
+        // so the OS should never hand us an fd that falls outside the
+        // array. Assert in debug builds to catch any violation immediately;
+        // the resize below is an absolute last-resort safety net (e.g. the
+        // app called setrlimit() to raise the limit after construction).
         assert(fd < clientSlots_.size()
             && "emplaceClient: fd exceeds getFdCeiling() — "
                "was setrlimit() called after ServerBase construction?");
@@ -850,7 +790,7 @@ template <typename ClientData> class ServerBase {
     }
     // ---------------------------------------------------------------------------
 
-    void drainAccept(Poller& poller, bool& accepting, size_t& accepted,
+    void drainAccept(PollEventLoop& loop, bool& accepting, size_t& accepted,
         ClientLimit maxClients) {
         for (;;) {
             auto client = listener_->accept();
@@ -860,11 +800,12 @@ template <typename ClientData> class ServerBase {
             }
             // Non-blocking mode and TCP_NODELAY are already propagated from
             // the listener by SocketImpl::propagateSocketProps (called by
-            // accept()).  Buffer sizes are set on the listener at construction
-            // time and also propagated.  Nothing extra needed here.
+            // accept()).  Buffer sizes are set on the listener at
+            // construction time and also propagated.  Nothing extra needed
+            // here.
 
             uintptr_t key = client->getNativeHandle();
-            if (!poller.add(*client, PollEvent::Readable | PollEvent::Error)) {
+            if (!loop.add(*client, PollEvent::Readable | PollEvent::Error)) {
                 // Capture peer address before the socket is destroyed.
                 std::string peer;
                 auto ep = client->getPeerEndpoint();
@@ -890,7 +831,7 @@ template <typename ClientData> class ServerBase {
 
             if (maxClients != ClientLimit::Unlimited
                 && clientFds_.size() >= static_cast<size_t>(maxClients)) {
-                (void)poller.remove(*listener_);
+                (void)loop.remove(*listener_);
                 accepting = false;
                 break;
             }
