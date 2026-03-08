@@ -29,6 +29,7 @@ set(TEST_SOURCES
     test_result
     test_server_signal
     test_http_poll_server
+    test_extracted_components
 )
 
 # Slow tests (disabled by default, enable with -DALLOW_SLOW_TESTS=ON)
