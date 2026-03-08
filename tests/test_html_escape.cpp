@@ -58,49 +58,55 @@ static void test_encode_all_special_chars() {
 }
 
 static void test_encode_xss_script_tag() {
-    BEGIN_TEST("HtmlEscape::encode: typical reflected-XSS payload is neutralised");
-    std::string input  = "<script>alert('xss')</script>";
+    BEGIN_TEST(
+        "HtmlEscape::encode: typical reflected-XSS payload is neutralised");
+    std::string input = "<script>alert('xss')</script>";
     std::string expect = "&lt;script&gt;alert(&#39;xss&#39;)&lt;/script&gt;";
     REQUIRE(HtmlEscape::encode(input) == expect);
 }
 
 static void test_encode_xss_attribute_injection() {
-    BEGIN_TEST("HtmlEscape::encode: attribute-injection payload is neutralised");
-    std::string input  = "\" onload=\"alert(1)";
+    BEGIN_TEST(
+        "HtmlEscape::encode: attribute-injection payload is neutralised");
+    std::string input = "\" onload=\"alert(1)";
     std::string expect = "&quot; onload=&quot;alert(1)";
     REQUIRE(HtmlEscape::encode(input) == expect);
 }
 
 static void test_encode_multiple_special_chars_scattered() {
     BEGIN_TEST("HtmlEscape::encode: special chars scattered among plain text");
-    REQUIRE(HtmlEscape::encode("a&b<c>d\"e'f") ==
-            "a&amp;b&lt;c&gt;d&quot;e&#39;f");
+    REQUIRE(
+        HtmlEscape::encode("a&b<c>d\"e'f") == "a&amp;b&lt;c&gt;d&quot;e&#39;f");
 }
 
 static void test_encode_only_special_chars() {
-    BEGIN_TEST("HtmlEscape::encode: input consisting entirely of special chars");
+    BEGIN_TEST(
+        "HtmlEscape::encode: input consisting entirely of special chars");
     REQUIRE(HtmlEscape::encode("<<<") == "&lt;&lt;&lt;");
     REQUIRE(HtmlEscape::encode(">>>") == "&gt;&gt;&gt;");
     REQUIRE(HtmlEscape::encode("&&&") == "&amp;&amp;&amp;");
 }
 
 static void test_encode_does_not_double_encode() {
-    BEGIN_TEST("HtmlEscape::encode: already-escaped entities are re-escaped (no double-encode)");
+    BEGIN_TEST("HtmlEscape::encode: already-escaped entities are re-escaped "
+               "(no double-encode)");
     // The function escapes '&' unconditionally, so "&amp;" becomes "&amp;amp;".
     // This is the correct, safe behaviour for a raw-input encoder.
     REQUIRE(HtmlEscape::encode("&amp;") == "&amp;amp;");
 }
 
 static void test_encode_preserves_unicode_bytes() {
-    BEGIN_TEST("HtmlEscape::encode: non-ASCII bytes are passed through unchanged");
+    BEGIN_TEST(
+        "HtmlEscape::encode: non-ASCII bytes are passed through unchanged");
     // UTF-8 for U+00E9 (é): 0xC3 0xA9
-    std::string input  = "\xC3\xA9";
+    std::string input = "\xC3\xA9";
     std::string result = HtmlEscape::encode(input);
     REQUIRE(result == input);
 }
 
 static void test_encode_long_plain_string() {
-    BEGIN_TEST("HtmlEscape::encode: long plain string has same content after encode");
+    BEGIN_TEST(
+        "HtmlEscape::encode: long plain string has same content after encode");
     std::string plain(1000, 'a');
     REQUIRE(HtmlEscape::encode(plain) == plain);
 }

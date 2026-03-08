@@ -4,6 +4,7 @@
 
 #include "HttpPollServer.h"
 
+#include "BuildInfo.h"
 #include <cstdio>
 #include <string>
 

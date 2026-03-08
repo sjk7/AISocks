@@ -20,11 +20,8 @@
 //   onResponseSent(s)   -- called after the last byte of a response is sent
 // ---------------------------------------------------------------------------
 
-#include "BuildInfo.h"
 #include "CallIntervalTracker.h"
-#include "HtmlEscape.h"
 #include "ServerBase.h"
-#include <algorithm>
 #include <chrono>
 #include <string>
 #include <string_view>

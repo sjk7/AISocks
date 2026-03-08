@@ -11,7 +11,6 @@
 
 // Forward declaration
 struct ErrorContext;
-#include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <memory>

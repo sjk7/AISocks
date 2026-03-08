@@ -7,6 +7,7 @@
 #include "HttpFileServer.h"
 
 #include "FileIO.h"
+#include "HtmlEscape.h"
 #include "PathHelper.h"
 #include "UrlCodec.h"
 
