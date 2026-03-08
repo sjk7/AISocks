@@ -92,12 +92,10 @@ static void test_tracker_independent_instances() {
 }
 
 static void test_tracker_first_output_after_delay() {
-    BEGIN_TEST("CallIntervalTracker: fires throttled print after 0.5 s delay");
-    // After construction we sleep past the 0.5 s early-output threshold so
-    // the next record() call triggers the first output path.  We verify the
-    // call returns without crashing and doesn't block.
-    CallIntervalTracker t;
-    std::this_thread::sleep_for(std::chrono::milliseconds(600));
+    BEGIN_TEST("CallIntervalTracker: fires throttled print after threshold delay");
+    // Use a 50 ms threshold so we only need a short sleep instead of 600 ms.
+    CallIntervalTracker t{0.05};
+    std::this_thread::sleep_for(std::chrono::milliseconds(60));
     t.record(0, 0); // Should print once.
     // If we call again immediately, the 60 s post-first-output throttle
     // means it should NOT print.

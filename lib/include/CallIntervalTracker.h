@@ -25,6 +25,11 @@ namespace aiSocks {
 //   tracker_.record(clientCount(), peakClientCount());
 // ---------------------------------------------------------------------------
 struct CallIntervalTracker {
+    // first_output_seconds: how long after construction before the first
+    // summary is printed (default 0.5 s).  Pass a smaller value in tests.
+    explicit CallIntervalTracker(double first_output_seconds = 0.5)
+        : first_output_seconds_(first_output_seconds) {}
+
     // Record one call and print a summary when the throttle interval elapses.
     // clientCount / peakCount are passed in by the caller so this struct has
     // no dependency on ServerBase.
@@ -39,8 +44,8 @@ struct CallIntervalTracker {
         ++call_count_;
 
         // Print at most once per 60 s after the first output; before that,
-        // print after 0.5 s so the operator gets quick feedback on startup.
-        const double print_interval = first_output_done_ ? 60.0 : 0.5;
+        // print after first_output_seconds_ so the operator gets quick feedback on startup.
+        const double print_interval = first_output_done_ ? 60.0 : first_output_seconds_;
         if (Sec(now - last_print_).count() >= print_interval) {
             if (!intervals_.empty()) {
                 double sum = 0;
@@ -60,6 +65,7 @@ struct CallIntervalTracker {
     private:
     using Clock = std::chrono::steady_clock;
 
+    double first_output_seconds_;
     Clock::time_point last_call_ = Clock::now();
     Clock::time_point last_print_ = Clock::now();
     std::vector<double> intervals_;
