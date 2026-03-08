@@ -15,7 +15,7 @@ using namespace aiSocks;
 
 static void test_encode_empty() {
     BEGIN_TEST("HtmlEscape::encode: empty string -> empty string");
-    REQUIRE(HtmlEscape::encode("") == "");
+    REQUIRE(HtmlEscape::encode("").empty());
 }
 
 static void test_encode_no_special_chars() {

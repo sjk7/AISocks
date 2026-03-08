@@ -497,7 +497,7 @@ int main() {
             client->setBlocking(true);
             client->setReceiveTimeout(Milliseconds{500});
             const char* msg = "quick";
-            auto start = std::chrono::steady_clock::now();
+            auto start = std::chrono::steady_clock::now(); //-V821
             client->sendAll(msg, strlen(msg));
 
             char buf[100];
@@ -524,9 +524,8 @@ int main() {
 
         // Run with wait_forever: poller blocks until a real event fires,
         // so onIdle() must never be called during a quiet period.
-        auto serverThread = std::thread([&server]() {
-            server.run(ClientLimit::Unlimited, wait_forever);
-        });
+        auto serverThread = std::thread(
+            [&server]() { server.run(ClientLimit::Unlimited, wait_forever); });
         waitForServerReady(server);
 
         // Sit quietly for 30ms — server should be blocked in the poller.
