@@ -7,6 +7,7 @@
 #ifndef AISOCKS_SERVER_BASE_H
 #define AISOCKS_SERVER_BASE_H
 
+#include "KeepAliveTimeoutManager.h"
 #include "PollEventLoop.h"
 #include "Poller.h"
 #include "ServerSignal.h"
@@ -206,7 +207,7 @@ template <typename ClientData> class ServerBase {
                 : static_cast<size_t>(maxClients);
             if (clientSlots_.empty()) clientSlots_.resize(getFdCeiling());
             clientFds_.reserve(cap);
-            timeout_heap_.reserve(cap * 2);
+            timeouts_.reserve(cap);
         }
 
         bool accepting = true;
@@ -273,49 +274,30 @@ template <typename ClientData> class ServerBase {
             // --- AfterBatchFn: once per poller.wait() call -------------------
             // `idle` is true when no events fired (genuine timeout).
             [&](bool idle) -> bool {
-                // Dynamic keep-alive timeout under high load.
-                {
-                    constexpr size_t HIGH_LOAD_THRESHOLD = 256;
-                    if (!inHighLoadMode_
-                        && clientFds_.size() > HIGH_LOAD_THRESHOLD) {
-                        constexpr auto AGGRESSIVE
-                            = std::chrono::milliseconds{5000};
-                        normalKeepAliveTimeout_ = keepAliveTimeout_;
-                        keepAliveTimeout_ = AGGRESSIVE;
-                        inHighLoadMode_ = true;
-                        printf("[ServerBase] High load detected (%zu clients), "
-                               "switching to aggressive %lld ms timeout\n",
-                            clientFds_.size(),
-                            static_cast<long long>(AGGRESSIVE.count()));
-                    } else if (inHighLoadMode_
-                        && clientFds_.size() <= HIGH_LOAD_THRESHOLD) {
-                        keepAliveTimeout_ = normalKeepAliveTimeout_;
-                        inHighLoadMode_ = false;
-                        printf("[ServerBase] Load normalized (%zu clients), "
-                               "restoring normal %lld ms timeout\n",
-                            clientFds_.size(),
-                            static_cast<long long>(
-                                normalKeepAliveTimeout_.count()));
-                    }
-                }
+                timeouts_.adjustForLoad(clientFds_.size());
 
-                // Throttled keep-alive sweep (at most once per 100 ms when
-                // client count ≥ 1000).
-                {
-                    const auto now = SteadyClock::now();
-                    if (clientFds_.size() < 1000
-                        || (now - lastSweepTime_)
-                            >= std::chrono::milliseconds{100}) {
-                        sweepTimeouts(loop_);
-                        lastSweepTime_ = now;
+                if (timeouts_.sweepDue(clientFds_.size())) {
+                    size_t closed = timeouts_.sweepRaw(
+                        [&](uintptr_t fd) -> std::pair<bool, SteadyClock::time_point> {
+                            ClientEntry* ce = findClient(fd);
+                            if (!ce) return {false, {}};
+                            return {true, ce->lastActivity};
+                        },
+                        [&](uintptr_t fd) {
+                            ClientEntry* ce = findClient(fd);
+                            onDisconnect(ce->data);
+                            ce->socket->shutdown(ShutdownHow::Both);
+                            (void)loop_.remove(*ce->socket);
+                            eraseClient(fd);
+                        });
+                    if (closed > 0) onClientsTimedOut(closed);
 
-                        if (!accepting && maxClients != ClientLimit::Unlimited
-                            && clientFds_.size()
-                                < static_cast<size_t>(maxClients)) {
-                            if (loop_.add(*listener_,
-                                    PollEvent::Readable | PollEvent::Error))
-                                accepting = true;
-                        }
+                    if (!accepting && maxClients != ClientLimit::Unlimited
+                        && clientFds_.size()
+                            < static_cast<size_t>(maxClients)) {
+                        if (loop_.add(*listener_,
+                                PollEvent::Readable | PollEvent::Error))
+                            accepting = true;
                     }
                 }
 
@@ -413,19 +395,9 @@ template <typename ClientData> class ServerBase {
         const uintptr_t fd = sock.getNativeHandle();
         ClientEntry* ce = findClient(fd);
         if (!ce) return;
-
         const auto now = SteadyClock::now();
         ce->lastActivity = now;
-
-        // Only bother pushing if keep-alive timeouts are enabled.
-        if (keepAliveTimeout_.count() > 0) {
-            const auto sincePush = now - ce->lastTimeoutPush;
-            const int64_t PVS_FIX_DOWNSAMPLE_FACTOR = 4;
-            if (sincePush >= keepAliveTimeout_ / PVS_FIX_DOWNSAMPLE_FACTOR) {
-                pushTimeoutEntry(fd, now);
-                ce->lastTimeoutPush = now;
-            }
-        }
+        timeouts_.touch(fd, now, ce->lastTimeoutPush);
     }
 
     // Enable or disable Writable interest for a client socket.
@@ -442,20 +414,10 @@ template <typename ClientData> class ServerBase {
     // timeouts without the silent truncation-to-zero that chrono::seconds
     // would cause.
     void setKeepAliveTimeout(Milliseconds timeout) {
-        std::chrono::milliseconds ms{timeout.count};
-        if (inHighLoadMode_) {
-            // In high-load mode: save the new timeout for later
-            // restoration, but keep the aggressive timeout active to handle
-            // current load
-            normalKeepAliveTimeout_ = ms;
-        } else {
-            // Normal mode: apply immediately and keep backup in sync
-            keepAliveTimeout_ = ms;
-            normalKeepAliveTimeout_ = ms;
-        }
+        timeouts_.setTimeout(std::chrono::milliseconds{timeout.count});
     }
     Milliseconds getKeepAliveTimeout() const {
-        return Milliseconds{keepAliveTimeout_.count()};
+        return Milliseconds{timeouts_.getTimeout().count()};
     }
 
     // Request a graceful shutdown. Safe to call from any thread.
@@ -602,120 +564,6 @@ template <typename ClientData> class ServerBase {
         ~ClientEntry() = default;
     };
 
-    // -----------------------------------------------------------------------
-    // TimeoutEntry: one node in the lazy-deletion min-heap.
-    //
-    // Design -- why lazy deletion?
-    //   A keep-alive sweep must visit only the clients that have *actually*
-    //   expired, not all connected clients.  A sorted structure (heap, set)
-    //   lets us stop as soon as the front entry hasn't expired yet.
-    //
-    //   The tricky part is that touchClient() *updates* a client's expiry.
-    //   Rather than finding and moving the old heap node (which would
-    //   require an index and O(log n) decrease-key), we simply push a *new*
-    //   entry with the refreshed expiry and leave the old one in place.
-    //
-    //   On each sweep we pop entries in expiry order and discard any that
-    //   are stale before touching the socket:
-    //     - fd no longer in clients_     -> client already gone, skip.
-    //     - lastActivitySnap != current   -> client was touched after this
-    //                                      entry was pushed; a newer entry
-    //                                      exists further back in the heap.
-    //
-    //   Cost: O(1) when nothing has expired (single comparison at front).
-    //         O(k log n) for k genuine + stale entries popped per sweep.
-    //         O(log n) per touchClient() call.
-    // -----------------------------------------------------------------------
-    struct TimeoutEntry {
-        SteadyClock::time_point expiry; // absolute time this fires
-        SteadyClock::time_point lastActivitySnap; // lastActivity when pushed;
-                                                  //   stale if it differs from
-                                                  //   the ClientEntry's value
-        uintptr_t fd; // key into clients_
-
-        // operator< is intentionally inverted relative to wall-clock order.
-        // std::push_heap / std::pop_heap build a MAX-heap (largest value at
-        // front).  By making "larger expiry" compare as less-than we make
-        // "smaller expiry" sort as the largest value -- so the soonest-to-
-        // expire entry stays at the front, giving us a min-heap by expiry
-        // with no extra comparator object anywhere.
-        bool operator<(const TimeoutEntry& o) const noexcept {
-            return expiry
-                > o.expiry; // reversed: earlier expiry = higher priority
-        }
-    };
-
-    // Push a new TimeoutEntry for 'fd' onto the heap.
-    // Called on accept (initial entry) and on every touchClient() call.
-    // Older entries for the same fd stay in the heap; they are lazily
-    // identified as stale inside sweepTimeouts() at no extra cost here.
-    void pushTimeoutEntry(uintptr_t fd, SteadyClock::time_point activity) {
-        // Append to the back of the vector (O(1) amortised).
-        timeout_heap_.push_back({activity + keepAliveTimeout_, activity, fd});
-        // Bubble the new element up to restore the heap invariant.
-        // Uses operator< above, so the min-expiry element ends up at front.
-        std::push_heap(timeout_heap_.begin(), timeout_heap_.end());
-    }
-
-    // Drain all expired entries from the front of the timeout_heap_ and
-    // close the corresponding connections.
-    //
-    // Called from the main event loop (throttled to once per 100ms under
-    // heavy load ≥1000 clients).  The fast-path (nothing expired) costs
-    // one time comparison against the heap front and then returns -- O(1).
-    void sweepTimeouts(PollEventLoop& loop) {
-        if (keepAliveTimeout_.count() == 0 || timeout_heap_.empty()) return;
-
-        const auto now = SteadyClock::now();
-
-        // Fast-path: the soonest-expiring entry in the whole heap hasn't
-        // fired yet, so nothing else can have fired either.  Return now.
-        if (timeout_heap_.front().expiry > now) {
-
-            return;
-        }
-
-        size_t closedCount = 0;
-
-        // Pop entries one by one until we reach an unexpired one or exhaust
-        // the heap.  Each iteration is O(log n) for the re-heapify.
-        while (!timeout_heap_.empty() && timeout_heap_.front().expiry <= now) {
-            // Copy the front entry out before popping.
-            // (pop_heap moves front to back, then re-heapifies [begin,
-            // end-1)
-            //  so we must read it *before* calling pop_heap.)
-            TimeoutEntry entry = timeout_heap_.front();
-            std::pop_heap(timeout_heap_.begin(), timeout_heap_.end());
-            timeout_heap_.pop_back(); // remove the element now sitting at back
-
-            // ---- Stale-entry check 1
-            // ---------------------------------------- The client was
-            // already removed via a non-timeout path (e.g. a read error, or
-            // the remote half closed).  The heap entry is a dangling
-            // reference -- discard it.
-            ClientEntry* ce = findClient(entry.fd);
-            if (!ce) continue;
-
-            // ---- Stale-entry check 2
-            // ---------------------------------------- touchClient() was
-            // called after this entry was pushed, updating lastActivity in
-            // the ClientEntry and pushing a newer heap entry. Our snapshot
-            // no longer matches — a more recent expiry entry exists further
-            // back in the heap.  Discard this stale entry.
-            if (ce->lastActivity != entry.lastActivitySnap) continue;
-
-            // ---- Genuine timeout: close the idle connection.
-            // ----------------
-            onDisconnect(ce->data);
-            ce->socket->shutdown(ShutdownHow::Both);
-            (void)loop.remove(*ce->socket);
-            eraseClient(entry.fd);
-            ++closedCount;
-        }
-
-        if (closedCount > 0) onClientsTimedOut(closedCount);
-    }
-
     std::atomic<bool> stop_{false};
 #ifdef SERVER_STATS
     size_t max_clients_{0};
@@ -748,15 +596,7 @@ template <typename ClientData> class ServerBase {
     // clientFds_:   dense list of live fds for fast iteration and count.
     std::vector<std::unique_ptr<ClientEntry>> clientSlots_;
     std::vector<uintptr_t> clientFds_;
-    // Throttle: record when sweepTimeouts last ran.
-    SteadyClock::time_point lastSweepTime_{};
-    // Vector maintained as a min-heap (by expiry).  Pre-reserved to avoid
-    // reallocations during high-frequency touchClient() churn.  The heap
-    // may contain stale entries (lazily removed during sweepTimeouts()).
-    std::vector<TimeoutEntry> timeout_heap_;
-    std::chrono::milliseconds keepAliveTimeout_{65'000};
-    std::chrono::milliseconds normalKeepAliveTimeout_{65'000};
-    bool inHighLoadMode_{false};
+    KeepAliveTimeoutManager timeouts_;
     size_t peak_clients_{0};
 
     // --- Flat client map helpers
@@ -829,9 +669,7 @@ template <typename ClientData> class ServerBase {
             if (clientFds_.size() > peak_clients_)
                 peak_clients_ = clientFds_.size();
 
-            // Push the first timeout entry for this new connection.
-            if (keepAliveTimeout_.count() > 0)
-                pushTimeoutEntry(key, ce.lastActivity);
+            timeouts_.onAccept(key, ce.lastActivity);
 
 #ifdef SERVER_STATS
             printf("[stats] clients: %zu  peak: %zu\n", clientFds_.size(),
