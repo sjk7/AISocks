@@ -397,6 +397,8 @@ static void test_bulk_throughput() {
         constexpr size_t DGRAM = 65507;
         constexpr int COUNT = 200; // 200  65507 B  12.5 MB
         constexpr size_t TOTAL = static_cast<size_t>(COUNT) * DGRAM;
+        constexpr double BYTES_PER_MB = 1024.0 * 1024.0;
+        constexpr double MS_PER_SEC = 1000.0;
 
         UdpSocket srv;
         REQUIRE(srv.setReuseAddress(true));
@@ -441,9 +443,9 @@ static void test_bulk_throughput() {
 
         double ms = std::chrono::duration<double, std::milli>(t1 - t0).count();
         size_t dropped = static_cast<size_t>(COUNT) - recvCount.load();
-        double mbRecv = static_cast<double>(recvTotal.load()) / (1024.0 * 1024.0);
-        double mbSend = static_cast<double>(TOTAL) / (1024.0 * 1024.0);
-        double mbps = mbSend / (ms / 1000.0); // throughput = sent / sender time
+        double mbRecv = static_cast<double>(recvTotal.load()) / BYTES_PER_MB;
+        double mbSend = static_cast<double>(TOTAL) / BYTES_PER_MB;
+        double mbps = mbSend / (ms / MS_PER_SEC); // throughput = sent / sender time
 
         printf("  datagrams: %d  size: %zu B  sent: %.1f MB  received: %.1f MB "
                " dropped: %zu\n",
@@ -463,6 +465,8 @@ static void test_bulk_throughput() {
         constexpr size_t CHUNK = 64 * 1024; // 64 KB chunks
         constexpr size_t TOTAL = 4 * 1024
             * 1024; // 4 MB -- enough for a throughput reading, fast on CI
+        constexpr double BYTES_PER_MB = 1024.0 * 1024.0;
+        constexpr double MS_PER_SEC = 1000.0;
 
         std::vector<char> sendBuf(CHUNK, static_cast<char>(0xCD));
         std::vector<char> recvBuf(CHUNK);
@@ -512,7 +516,7 @@ static void test_bulk_throughput() {
 
         double ms = std::chrono::duration<double, std::milli>(t1 - t0).count();
         double mbps
-            = (static_cast<double>(TOTAL) / (1024.0 * 1024.0)) / (ms / 1000.0);
+            = (static_cast<double>(TOTAL) / BYTES_PER_MB) / (ms / MS_PER_SEC);
 
         printf("  total: %zu MB  sent: %zu B  received: %zu B\n",
             TOTAL / (1024 * 1024), sent, recvTotal.load());
