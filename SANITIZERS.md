@@ -1,108 +1,134 @@
-# Memory and Address Sanitizer Setup
+# Sanitizer Builds
 
-This guide explains how to use MemorySanitizer (MSan) and AddressSanitizer (ASan) with aiSocks in Windsurf/VS Code.
+This guide covers MemorySanitizer (MSan), AddressSanitizer (ASan), and
+UndefinedBehaviorSanitizer (UBSan) builds for aiSocks.
 
-## Quick Start
+---
 
-### MemorySanitizer (MSan) - Debug Mode
+## MemorySanitizer (MSan) via Docker
 
-1. **Configure the build:**
-   ```bash
-   ./scripts/setup_msan.sh
-   ```
+MSan requires every library — including the C++ standard library — to be
+instrumented. On macOS this is done via a Docker image that uses Clang 14 +
+`libc++` on Linux arm64.
 
-2. **Build the project:**
-   ```bash
-   cmake --build build-msan --target aiSocksExample
-   ```
+### Prerequisites
 
-3. **Debug in Windsurf:**
-   - Press `F5` or go to Run and Debug
-   - Select "Debug aiSocksExample (MemorySanitizer)"
-   - The debugger will launch with MSan enabled
+- Docker installed and running
+- The `aisocks-msan-arm64` image built (see below)
 
-### AddressSanitizer (ASan) - Debug Mode
-
-1. **Configure the build:**
-   ```bash
-   mkdir -p build-asan
-   cmake -S . -B build-asan -DCMAKE_BUILD_TYPE=Debug -DENABLE_ASAN=ON -G Ninja
-   ```
-
-2. **Build the project:**
-   ```bash
-   cmake --build build-asan --target aiSocksExample
-   ```
-
-3. **Debug in Windsurf:**
-   - Press `F5` or go to Run and Debug
-   - Select "Debug aiSocksExample (AddressSanitizer)"
-   - The debugger will launch with ASan enabled
-
-## VS Code Tasks
-
-The following tasks are available in the VS Code task runner (`Ctrl+Shift+P` → "Tasks: Run Task"):
-
-- `configure-msan-debug`: Configure CMake for MemorySanitizer
-- `build-msan-debug`: Build with MemorySanitizer
-- `configure-asan-debug`: Configure CMake for AddressSanitizer  
-- `build-asan-debug`: Build with AddressSanitizer
-- `configure-debug`: Configure regular debug build
-- `build-debug`: Build regular debug version
-
-## Debug Configurations
-
-Three debug configurations are available:
-
-1. **Debug aiSocksExample (MemorySanitizer)**: Runs with MSan runtime options
-2. **Debug aiSocksExample (AddressSanitizer)**: Runs with ASan runtime options
-3. **Debug aiSocksExample (Debug)**: Regular debug build
-
-## MemorySanitizer Notes
-
-⚠️ **Important**: MemorySanitizer requires that **all** code, including system libraries, be built with MSan instrumentation. This means:
-
-- Use a MSan-instrumented C++ standard library
-- Use MSan-instrumented system libraries
-- Avoid linking against non-instrumented libraries
-
-On macOS, you may need to use a custom LLVM toolchain with MSan support:
+### 1. Build the Docker image
 
 ```bash
-# Example using Homebrew LLVM with MSan
-export CC=/usr/local/opt/llvm/bin/clang
-export CXX=/usr/local/opt/llvm/bin/clang++
+# VS Code task: "Docker: Build msan-arm64 image"
+docker build --platform linux/arm64 -t aisocks-msan-arm64 -f Dockerfile.msan-arm64 .
 ```
 
-## Runtime Options
+The Dockerfile configures and builds the entire project with MSan inside the
+image using the `msan-debug` CMake preset and Clang 14 + `libc++`.
 
-### MemorySanitizer (MSAN_OPTIONS)
-- `halt_on_error=1`: Stop on first error
-- `report_umrs=1`: Report uninitialized memory reads
-- `print_stats=1`: Print statistics at exit
+### 2. Extract MSan binaries to `build-msan/`
 
-### AddressSanitizer (ASAN_OPTIONS)
-- `halt_on_error=1`: Stop on first error
-- `detect_stack_use_after_return=1`: Detect stack use after return
-- `strict_string_checks=1`: Strict string operations
-- `detect_leaks=1`: Enable leak detection
+```bash
+# VS Code task: "Docker: Extract msan binaries"
+docker run --rm --platform linux/arm64 \
+  -v "${PWD}/build-msan:/out" \
+  aisocks-msan-arm64 \
+  cp -r /workspace/build-msan/. /out/
+```
+
+### 3. Debug in VS Code
+
+Two debug configurations are available (Run and Debug panel):
+
+| Configuration | Target binary |
+|---|---|
+| `Docker arm64 MSan: test_http_poll_server` | `build-msan/tests/test_http_poll_server` |
+| `Docker arm64 MSan: advanced_file_server` | `build-msan/advanced_file_server` |
+
+Each configuration automatically:
+1. Runs **"Docker: Extract msan binaries"** to ensure binaries are current
+2. Starts `lldb-server` inside the container on port 1234
+3. Attaches VS Code LLDB for remote debugging
+4. Tears down the container afterwards via **"Docker: Kill debug container"**
+
+### MSan runtime options
+
+The container runs with `MSAN_OPTIONS=halt_on_error=0` to avoid false positives
+from uninstrumented libc stdout buffers. Change to `halt_on_error=1` in
+`.vscode/tasks.json` to stop on the first real report.
+
+---
+
+## AddressSanitizer (ASan) — local build
+
+ASan works natively on macOS with the system Clang.
+
+### Configure and build
+
+```bash
+./scripts/setup_asan.sh          # creates build-asan/ with -DENABLE_ASAN=ON -DBUILD_EXAMPLES=ON
+cmake --build build-asan         # or add e.g. --target advanced_file_server
+```
+
+### Run
+
+```bash
+ASAN_OPTIONS=halt_on_error=1:detect_stack_use_after_return=1:detect_leaks=1 \
+  ./build-asan/advanced_file_server
+```
+
+---
+
+## UndefinedBehaviorSanitizer (UBSan) — local build
+
+```bash
+./scripts/setup_ubsan.sh         # creates build-ubsan/ with -DENABLE_UBSAN=ON (RelWithDebInfo)
+cmake --build build-ubsan
+```
+
+```bash
+UBSAN_OPTIONS=halt_on_error=1:print_stacktrace=1 \
+  ./build-ubsan/advanced_file_server
+```
+
+---
+
+## VS Code tasks
+
+All tasks are available via `Ctrl+Shift+P` → **Tasks: Run Task**:
+
+| Task label | What it does |
+|---|---|
+| `Build test_http_poll_server` | Native debug build of the poll-server test |
+| `Build advanced_file_server` | Native debug build of the file server |
+| `Docker: Build msan-arm64 image` | Builds the MSan Docker image |
+| `Docker: Extract msan binaries` | Copies MSan binaries out of the image into `build-msan/` |
+| `Docker: Start lldb-server for test_http_poll_server` | Starts a remote debug session for the poll-server |
+| `Docker: Start lldb-server for advanced_file_server` | Starts a remote debug session for the file server |
+| `Docker: Kill debug container` | Removes the running `aisocks-debug` container |
+
+---
+
+## Performance impact
+
+| Sanitizer | Slowdown | Memory overhead |
+|---|---|---|
+| MSan | 2–3× | High |
+| ASan | 1.5–2× | Moderate |
+| UBSan | ~1.1× | Minimal |
+
+Use sanitizer builds for debugging only, not performance testing.
+
+---
 
 ## Troubleshooting
 
-### MSan: "undefined symbol" errors
-This usually means you're linking against non-instrumented libraries. You need to either:
-1. Build those libraries with MSan, or
-2. Use a MSan-instrumented runtime environment
+**MSan "undefined symbol" errors** — a dependency was linked without MSan
+instrumentation. Rebuild it inside the Docker image or suppress it via
+`msan_ignorelist.txt`.
 
-### ASan: No output
-Check that your code actually has memory issues. ASan only reports on actual errors.
+**ASan / UBSan: no output** — the binary ran cleanly. Verify `ASAN_OPTIONS` /
+`UBSAN_OPTIONS` are set correctly if you expected a report.
 
-### Build failures
-Ensure you're using Clang/LLVM as the compiler, as sanitizers are GCC/Clang-specific.
-
-## Performance Impact
-
-- **MSan**: 2-3x slowdown, significant memory overhead
-- **ASan**: 1.5-2x slowdown, moderate memory overhead
-
-Use these tools primarily for debugging, not production performance testing.
+**Build failures** — ensure Clang is the active compiler (`CC=clang CXX=clang++`).
+Sanitizers are not supported by MSVC.
