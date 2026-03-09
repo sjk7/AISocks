@@ -49,20 +49,16 @@ std::vector<NetworkInterface> getLocalAddresses();
 template <typename T>
 bool setSocketOption(SocketHandle socketHandle, int level, int optname,
     const T& value, const char* errMsg) {
-    (void)errMsg; // Suppress unused parameter warning
     int result = setsockopt(socketHandle, level, optname,
         reinterpret_cast<const char*>(&value),
         static_cast<socklen_t>(sizeof(value)));
 
     if (result != 0) {
-        // Get the actual error instead of just asserting
 #ifdef _WIN32
         int errorCode = WSAGetLastError();
 #else
         int errorCode = errno;
 #endif
-
-        // Print detailed error information for debugging
 #ifdef _WIN32
         LPSTR errorText = nullptr;
         FormatMessageA(FORMAT_MESSAGE_ALLOCATE_BUFFER
@@ -99,11 +95,6 @@ bool setSocketOption(SocketHandle socketHandle, int level, int optname,
         fprintf(stderr, "  Error message: %s\n", strerror(errorCode));
 #endif
 
-        // In debug mode, we want to know about this failure
-        // but we shouldn't crash - just return false
-        // assert(false
-        //   && "setsockopt failed - see stderr for detailed error//
-        //   information");
     }
 
     return result == 0;

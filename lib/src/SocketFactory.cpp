@@ -166,30 +166,23 @@ Result<UdpSocket> SocketFactory::createUdpServer(
 
 Result<bool> SocketFactory::isPortAvailable(
     AddressFamily family, const std::string& address, Port port) {
-    // Try to create a TCP socket and bind to the port
     auto socket_result = createTcpSocketRaw(family);
     if (socket_result.isError()) {
         return Result<bool>::failure(
             socket_result.error(), socket_result.message().c_str(), 0, false);
     }
 
-    // Try to bind
-    ServerBind bind_config{
-        address, port, Backlog{1}, false}; // Minimal backlog, no reuse
+    ServerBind bind_config{address, port, Backlog{1}, false};
     auto bind_result
         = bindSocket(std::move(socket_result.value()), bind_config);
 
     if (bind_result.isSuccess()) {
-        // Successfully bound - port was available, but now it's occupied
-        // The socket will be closed when it goes out of scope
         return Result<bool>::success(true);
     } else {
-        // Failed to bind - check if it's because port is in use
         auto error = bind_result.error();
         if (error == SocketError::BindFailed) {
-            return Result<bool>::success(false); // Port is in use
+            return Result<bool>::success(false);
         } else {
-            // Some other error occurred
             return Result<bool>::failure(
                 bind_result.error(), bind_result.message().c_str(), 0, false);
         }

@@ -95,11 +95,9 @@ class Socket {
     // -----------------------------------------------------------------
 
     // Blocking mode.
-    // Sockets are non-blocking by default: every freshly created socket
-    // (via SocketFactory or direct construction) has O_NONBLOCK / FIONBIO
-    // set immediately after the underlying ::socket() call.  Sockets
-    // returned by accept() inherit the listening socket's blocking mode.
-    // Call setBlocking(true) to opt into blocking semantics where needed.
+    // Newly created sockets are blocking (OS default).
+    // Call setBlocking(false) to switch to non-blocking mode.
+    // Sockets returned by accept() inherit the listening socket's blocking mode.
     bool setBlocking(bool blocking);
     bool isBlocking() const noexcept;
 

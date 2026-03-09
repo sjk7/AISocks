@@ -131,9 +131,7 @@ class TcpSocket : public Socket {
     // Returns: bytes sent (>= 0), or < 0 on hard error.
     // Returns 0 with getLastError() == WouldBlock if the buffer is full.
     int sendChunked(const char* data, size_t size) {
-        constexpr size_t chunkSize = 64 * 1024; // 64 KB chunks
-
-        // Send in chunks to handle partial sends gracefully
+        constexpr size_t chunkSize = 64 * 1024;
         size_t sent = 0;
         while (sent < size) {
             const size_t remaining = size - sent;

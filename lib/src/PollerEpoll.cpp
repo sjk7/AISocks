@@ -50,9 +50,7 @@ static uint32_t interestToEpollEvents(PollEvent interest) {
 Poller::Poller() : pImpl_(std::make_unique<Impl>()) {
     pImpl_->epfd = ::epoll_create1(EPOLL_CLOEXEC);
     if (pImpl_->epfd == -1) {
-        // Don't throw - set to invalid state
-        // Users can check isValid() via the Poller methods
-        pImpl_->epfd = -1;
+        // epoll_create1() failed; wait() will return empty results.
     }
 }
 

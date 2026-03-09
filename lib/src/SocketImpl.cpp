@@ -60,9 +60,7 @@ bool SocketImpl::platformInit() {
     return true;
 }
 
-void SocketImpl::platformCleanup() {
-    // Unix systems don't need cleanup
-}
+void SocketImpl::platformCleanup() {}
 #endif
 
 SocketImpl::SocketImpl(SocketType type, AddressFamily family)
@@ -84,10 +82,6 @@ SocketImpl::SocketImpl(SocketType type, AddressFamily family)
         return;
     }
 
-    // Sockets default to blocking mode (OS standard behavior).
-    // Call setBlocking(false) explicitly if non-blocking is needed.
-    // blockingMode is initialized to true in the member-initializer list.
-
 #ifdef SO_NOSIGPIPE
     // macOS: prevent send/write to a half-closed socket from raising SIGPIPE.
     // Linux uses MSG_NOSIGNAL per-call instead; Windows has no SIGPIPE concept.
@@ -102,9 +96,7 @@ SocketImpl::SocketImpl()
     , socketType(SocketType::TCP)
     , addressFamily(AddressFamily::IPv4)
     , lastError(SocketError::InvalidSocket)
-    , blockingMode(true) {
-    // This creates an explicitly invalid socket for moved-from objects
-}
+    , blockingMode(true) {}
 
 SocketImpl::SocketImpl(
     SocketHandle handle, SocketType type, AddressFamily family)
@@ -248,6 +240,62 @@ std::unique_ptr<SocketImpl> SocketImpl::accept() {
         setError(SocketError::AcceptFailed, "Failed to accept connection");
         return nullptr;
     }
+}
+
+// ---------------------------------------------------------------------------
+// waitForWritableSlice_
+//
+// Waits at most sliceMs milliseconds for socketHandle to become writable,
+// using the platform-native event API (WSAPoll / kqueue / epoll).
+// evFd is the pre-opened kqueue/epoll fd on Apple/Linux; ignored on Windows.
+//
+// Returns:
+//   > 0  — socket is writable (caller should proceed)
+//     0  — slice expired without event (caller should recheck deadline)
+//    -1  — EINTR (caller should retry the slice, not count it as an error)
+//   -2   — hard error; errOut contains the diagnostic string
+// ---------------------------------------------------------------------------
+static int waitForWritableSlice_(
+    SocketHandle socketHandle, int evFd, long long sliceMs,
+    std::string& errOut) {
+#if defined(_WIN32)
+    WSAPOLLFD pfd{};
+    pfd.fd = socketHandle;
+    pfd.events = POLLWRNORM;
+    int n = ::WSAPoll(&pfd, 1, static_cast<int>(sliceMs));
+    if (n < 0) {
+        errOut = "WSAPoll() failed during connect";
+        return -2;
+    }
+    return n; // 0 = timeout, 1 = writable
+#elif defined(__APPLE__) || defined(__FreeBSD__)
+    struct kevent out{};
+    struct timespec ts{};
+    ts.tv_sec = static_cast<time_t>(sliceMs / 1000);
+    ts.tv_nsec = static_cast<long>((sliceMs % 1000) * 1'000'000L);
+    int n = ::kevent(evFd, nullptr, 0, &out, 1, &ts);
+    if (n < 0) {
+        if (errno == EINTR) return -1;
+        errOut = "kevent() failed during connect";
+        return -2;
+    }
+    return n;
+#elif defined(__linux__)
+    struct epoll_event outev{};
+    int n = ::epoll_wait(evFd, &outev, 1, static_cast<int>(sliceMs));
+    if (n < 0) {
+        if (errno == EINTR) return -1;
+        errOut = "epoll_wait() failed during connect";
+        return -2;
+    }
+    return n;
+#else
+    (void)socketHandle;
+    (void)evFd;
+    (void)sliceMs;
+    errOut = "connect wait: unsupported platform";
+    return -2;
+#endif
 }
 
 bool SocketImpl::connect(

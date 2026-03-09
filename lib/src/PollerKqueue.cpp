@@ -49,8 +49,7 @@ struct Poller::Impl {
 Poller::Poller() : pImpl_(std::make_unique<Impl>()) {
     pImpl_->kq = ::kqueue();
     if (pImpl_->kq == -1) {
-        // Don't throw - set to invalid state
-        pImpl_->kq = -1;
+        // kqueue() failed; wait() will return empty results.
     }
 }
 

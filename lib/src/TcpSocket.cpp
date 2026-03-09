@@ -68,11 +68,9 @@ int TcpSocket::sendfile(int fd, off_t offset, size_t count) {
     ssize_t sent = 0;
 #endif
 
-    // Use OS sendfile for zero-copy transfer
 #ifdef __linux__
     sent = ::sendfile(sockfd, fd, &offset, count);
 #elif __APPLE__
-    // macOS sendfile takes different parameters
     off_t len = static_cast<off_t>(count);
     sent = ::sendfile(fd, sockfd, offset, &len, nullptr, 0);
     if (sent == 0)
