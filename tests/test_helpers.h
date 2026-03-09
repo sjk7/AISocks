@@ -5,6 +5,7 @@
 // https://pvs-studio.com
 
 #pragma once
+#include <atomic>
 #include <cstdio>
 #include <string>
 #include <cstdint>
@@ -23,8 +24,8 @@
 // Simple test framework for aiSocks tests.
 // Each test binary returns 0 on full pass, 1 on any failure.
 
-static int g_failed = 0;
-static int g_passed = 0;
+static std::atomic<int> g_failed{0};
+static std::atomic<int> g_passed{0};
 static aiSocks::Stopwatch g_totalTimer;
 static aiSocks::Stopwatch g_testTimer;
 static std::string g_currentTest;
@@ -67,7 +68,7 @@ inline int test_summary() {
         printf("  [%.1f ms]\n", g_testTimer.elapsedMs());
     }
     printf("\n==============================\n");
-    printf("Results: %d passed, %d failed\n", g_passed, g_failed);
+    printf("Results: %d passed, %d failed\n", g_passed.load(), g_failed.load());
     printf("Total time: %.1f ms\n", g_totalTimer.elapsedMs());
     return (g_failed > 0) ? 1 : 0;
 }

@@ -27,7 +27,16 @@ class SimpleEchoServer : public ServerBase<SimpleEchoState> {
         : ServerBase<SimpleEchoState>(
               ServerBind{"127.0.0.1", port, Backlog{5}}) {}
 
+    std::atomic<size_t> atomicClientCount_{0};
+
     protected:
+    void onClientConnected(TcpSocket&) override {
+        atomicClientCount_.fetch_add(1, std::memory_order_relaxed);
+    }
+    void onClientDisconnected() override {
+        atomicClientCount_.fetch_sub(1, std::memory_order_relaxed);
+    }
+
     ServerResult onReadable(TcpSocket& sock, SimpleEchoState& s) override {
         char buf[256];
         int n = sock.receive(buf, sizeof(buf));
@@ -76,10 +85,10 @@ int main() {
         std::atomic<bool> ready{false};
 
         // Start server with limited clients
-        std::thread([&server, &ready]() {
+        std::thread serverThread([&server, &ready]() {
             ready = true;
             server.run(ClientLimit{2}, Milliseconds{10});
-        }).detach();
+        });
 
         // Wait for server to be ready
         while (!ready) //-V776 //-V1044
@@ -132,12 +141,13 @@ int main() {
                 }
             }
 
-            printf("Server client count: %zu\n", server.clientCount());
+            printf(
+                "Server client count: %zu\n", server.atomicClientCount_.load());
         }
 
         // Stop server
         server.requestStop();
-        std::this_thread::sleep_for(std::chrono::milliseconds{100});
+        serverThread.join();
 
         printf("Simple echo test completed\n");
     }

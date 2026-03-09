@@ -52,7 +52,16 @@ class MinimalServer : public ServerBase<MinimalState> {
     explicit MinimalServer(Port port)
         : ServerBase<MinimalState>(ServerBind{"127.0.0.1", port, Backlog{5}}) {}
 
+    std::atomic<size_t> atomicClientCount_{0};
+
     protected:
+    void onClientConnected(TcpSocket&) override {
+        atomicClientCount_.fetch_add(1, std::memory_order_relaxed);
+    }
+    void onClientDisconnected() override {
+        atomicClientCount_.fetch_sub(1, std::memory_order_relaxed);
+    }
+
     ServerResult onReadable(TcpSocket& sock, MinimalState& s) override {
         (void)sock;
         (void)s;
@@ -105,7 +114,7 @@ int main() {
 
         // Verify server accepted the client before requesting stop
         waitForCondition("server to accept client",
-            [&]() { return server.clientCount() == 1; });
+            [&]() { return server.atomicClientCount_.load() == 1; });
 
         printf("Stopping server...\n");
 

@@ -54,7 +54,16 @@ class NoTimeoutServer : public ServerBase<NoTimeoutState> {
         // Don't set keep-alive timeout
     }
 
+    std::atomic<size_t> atomicClientCount_{0};
+
     protected:
+    void onClientConnected(TcpSocket&) override {
+        atomicClientCount_.fetch_add(1, std::memory_order_relaxed);
+    }
+    void onClientDisconnected() override {
+        atomicClientCount_.fetch_sub(1, std::memory_order_relaxed);
+    }
+
     ServerResult onReadable(TcpSocket& sock, NoTimeoutState& s) override {
         (void)s;
         char buf[256];
@@ -115,13 +124,14 @@ int main() {
 
         // Verify server accepted the client BEFORE requesting stop
         waitForCondition("server to accept client",
-            [&]() { return server.clientCount() == 1; });
+            [&]() { return server.atomicClientCount_.load() == 1; });
 
         // Let server run briefly to verify no timeout disconnections
         waitForCondition(
             "server to run without timeout",
             [&]() {
-                return server.clientCount() == 1; // Should stay connected
+                return server.atomicClientCount_.load()
+                    == 1; // Should stay connected
             },
             std::chrono::milliseconds{100}); // Short wait to verify no timeout
 

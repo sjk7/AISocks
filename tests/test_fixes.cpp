@@ -68,6 +68,7 @@ class BaseServer : public ServerBase<TS> {
     std::atomic<int> errorCalls{0};
     ServerResult errorReturn{ServerResult::Disconnect};
     bool partialReadMode{false}; // For onIdle test: read only small chunks
+    std::atomic<size_t> atomicClientCount_{0};
 
     // Signals waitReady() callers the moment the server enters the poll loop.
     void waitReady() {
@@ -82,6 +83,13 @@ class BaseServer : public ServerBase<TS> {
             ready_ = true;
         }
         readyCv_.notify_all();
+    }
+
+    void onClientConnected(TcpSocket&) override {
+        atomicClientCount_.fetch_add(1, std::memory_order_relaxed);
+    }
+    void onClientDisconnected() override {
+        atomicClientCount_.fetch_sub(1, std::memory_order_relaxed);
     }
 
     private:
@@ -349,7 +357,7 @@ static void test_on_idle_only_on_timeout() {
         REQUIRE(res.isSuccess());
         auto client = std::make_unique<TcpSocket>(std::move(res.value()));
 
-        waitFor([&] { return server.clientCount() == 1; });
+        waitFor([&] { return server.atomicClientCount_.load() == 1; });
 
         int idleBeforeData = server.idleCalls.load();
         int readableBeforeData = server.readableCalls.load();

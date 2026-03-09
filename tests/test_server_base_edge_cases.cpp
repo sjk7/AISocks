@@ -59,6 +59,7 @@ class EdgeCaseServer : public ServerBase<EdgeCaseState> {
     std::atomic<size_t> timedOutClientsCount{0};
     std::atomic<int> disconnectCount{0};
     std::atomic<int> idleCallCount{0};
+    std::atomic<size_t> atomicClientCount_{0};
 
     std::atomic<bool> ready_{false};
     void waitReady() const {
@@ -76,6 +77,13 @@ class EdgeCaseServer : public ServerBase<EdgeCaseState> {
     }
 
     protected:
+    void onClientConnected(TcpSocket&) override {
+        atomicClientCount_.fetch_add(1, std::memory_order_relaxed);
+    }
+    void onClientDisconnected() override {
+        atomicClientCount_.fetch_sub(1, std::memory_order_relaxed);
+    }
+
     ServerResult onReadable(TcpSocket& sock, EdgeCaseState& s) override {
         char tmp[1024];
         for (;;) {
@@ -230,9 +238,9 @@ int main() {
         // Verify we're at capacity
         server.waitForMessages(1);
         printf("DEBUG: Client count = %zu (expected %zu)\n",
-            server.clientCount(), maxClients);
+            server.atomicClientCount_.load(), maxClients);
 
-        REQUIRE(server.clientCount() <= maxClients);
+        REQUIRE(server.atomicClientCount_.load() <= maxClients);
 
         server.requestStop();
         serverThread.join();
@@ -253,7 +261,7 @@ int main() {
         client1->setBlocking(true);
 
         // Verify client is connected
-        REQUIRE(server.clientCount() <= 1);
+        REQUIRE(server.atomicClientCount_.load() <= 1);
 
         // Send a message and wait for it to be processed
         const char* msg = "hello";

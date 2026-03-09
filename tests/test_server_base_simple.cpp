@@ -25,7 +25,16 @@ class SimpleServer : public ServerBase<SimpleState> {
     explicit SimpleServer(Port port)
         : ServerBase<SimpleState>(ServerBind{"127.0.0.1", port, Backlog{5}}) {}
 
+    std::atomic<size_t> atomicClientCount_{0};
+
     protected:
+    void onClientConnected(TcpSocket&) override {
+        atomicClientCount_.fetch_add(1, std::memory_order_relaxed);
+    }
+    void onClientDisconnected() override {
+        atomicClientCount_.fetch_sub(1, std::memory_order_relaxed);
+    }
+
     ServerResult onReadable(TcpSocket& sock, SimpleState& s) override {
         char buf[256];
         int n = sock.receive(buf, sizeof(buf));
@@ -61,10 +70,10 @@ int main() {
         std::atomic<bool> ready{false};
 
         // Start server with limited clients
-        std::thread([&server, &ready]() {
+        std::thread serverThread([&server, &ready]() {
             ready = true;
             server.run(ClientLimit{2}, Milliseconds{10});
-        }).detach();
+        });
 
         // Wait for server to be ready
         while (!ready) //-V776 //-V1044
@@ -82,7 +91,8 @@ int main() {
             // Give server time to process
             std::this_thread::sleep_for(std::chrono::milliseconds{200});
 
-            printf("Server client count: %zu\n", server.clientCount());
+            printf(
+                "Server client count: %zu\n", server.atomicClientCount_.load());
 
             // Disconnect client
             client.reset();
@@ -91,14 +101,14 @@ int main() {
             std::this_thread::sleep_for(std::chrono::milliseconds{200});
 
             printf("Server client count after disconnect: %zu\n",
-                server.clientCount());
+                server.atomicClientCount_.load());
         } else {
             printf("Client connection failed: %s\n", result.message().c_str());
         }
 
         // Stop server
         server.requestStop();
-        std::this_thread::sleep_for(std::chrono::milliseconds{100});
+        serverThread.join();
     }
 
     printf("Simple test completed\n");

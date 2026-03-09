@@ -450,6 +450,15 @@ template <typename ClientData> class ServerBase {
     // using a fixed sleep.
     virtual void onReady() {}
 
+    // Called on the server thread immediately after a new client has been
+    // accepted and registered. Override in subclasses that need a thread-safe
+    // client-count observable from outside threads.
+    virtual void onClientConnected(TcpSocket& /*sock*/) {}
+
+    // Called on the server thread immediately after a client has been removed
+    // from the active set (before the socket is closed).
+    virtual void onClientDisconnected() {}
+
     // Called when a poll error event fires on a client socket.
     // sock is still valid at this point.
     // Return KeepConnection to leave the client registered (e.g. the error
@@ -624,6 +633,7 @@ template <typename ClientData> class ServerBase {
                 clientSlots_[lastFd]->activeIdx = idx;
         }
         clientFds_.pop_back();
+        onClientDisconnected();
         clientSlots_[fd].reset();
     }
     // ---------------------------------------------------------------------------
@@ -654,6 +664,7 @@ template <typename ClientData> class ServerBase {
             }
 
             ClientEntry& ce = emplaceClient(key, std::move(client));
+            onClientConnected(*ce.socket);
             ++accepted;
             if (clientFds_.size() > peak_clients_)
                 peak_clients_ = clientFds_.size();

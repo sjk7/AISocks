@@ -26,8 +26,8 @@
 #include <thread>
 
 // Access global test counters from test_helpers.h
-extern int g_passed;
-extern int g_failed;
+extern std::atomic<int> g_passed;
+extern std::atomic<int> g_failed;
 
 using namespace aiSocks;
 
