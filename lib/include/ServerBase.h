@@ -113,18 +113,16 @@ template <typename ClientData> class ServerBase {
     // The detailed error information is moved into the result parameter.
     explicit ServerBase(const ServerBind& args,
         AddressFamily family = AddressFamily::IPv4,
-        Result<TcpSocket>* result = nullptr)
-        : listener_(std::make_unique<TcpSocket>(TcpSocket::createRaw(family))) {
+        Result<TcpSocket>* result = nullptr) {
         // Pre-size the sparse fd→client table to the process fd ceiling
         // here in the constructor, before any threading or accept() calls.
         // run() can then insert and erase clients in O(1) without ever
         // resizing clientSlots_ in the hot path.
         clientSlots_.resize(getFdCeiling());
-        // Use SocketFactory to create server without exceptions
         auto createResult = SocketFactory::createTcpServer(family, args);
         if (createResult.isSuccess()) {
-            printf("DEBUG: SocketFactory::createTcpServer() succeeded\n");
-            *listener_ = std::move(createResult.value());
+            listener_
+                = std::make_unique<TcpSocket>(std::move(createResult.value()));
             // CRITICAL: Server listening socket must be non-blocking so the
             // poller can check stop flags and handle timeouts properly.
             // Sockets default to blocking mode, so we must explicitly set
@@ -143,8 +141,7 @@ template <typename ClientData> class ServerBase {
             if (result) {
                 *result = std::move(createResult);
             }
-            // Reset the listener to make the server invalid
-            listener_.reset();
+            // listener_ is null (never assigned) — isValid() returns false.
             // Still print the error for backward compatibility
             fprintf(stderr,
                 "FATAL: SocketFactory::createTcpServer() failed with error "
@@ -319,11 +316,11 @@ template <typename ClientData> class ServerBase {
             const bool stoppedBySignal = handleSignals_
                 && g_serverSignalStop.load(std::memory_order_relaxed);
             const bool noMore = !accepting && clientFds_.empty();
-            const char* reason =
-                stoppedByFlag   ? "requestStop() was called"
-                : stoppedBySignal ? "shutdown signal received (Ctrl+C / SIGTERM)"
-                : noMore          ? "client limit reached and all clients disconnected"
-                                  : "unknown";
+            const char* reason = stoppedByFlag ? "requestStop() was called"
+                : stoppedBySignal
+                ? "shutdown signal received (Ctrl+C / SIGTERM)"
+                : noMore ? "client limit reached and all clients disconnected"
+                         : "unknown";
             printf("\nServer stopped gracefully: %s.\n", reason);
         }
 
