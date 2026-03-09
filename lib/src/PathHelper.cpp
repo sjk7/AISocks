@@ -165,11 +165,10 @@ time_t PathHelper::lastWriteTime(const std::string& path) {
 #endif
 }
 
-std::vector<PathHelper::DirEntry> PathHelper::listDirectory(
-    const std::string& path) {
-    std::vector<DirEntry> entries;
-
 #ifdef _WIN32
+static std::vector<PathHelper::DirEntry> listDirectoryWindows_(
+    const std::string& path) {
+    std::vector<PathHelper::DirEntry> entries;
     std::string searchPath = path;
     if (!searchPath.empty() && searchPath.back() != '/'
         && searchPath.back() != '\\') {
@@ -180,15 +179,13 @@ std::vector<PathHelper::DirEntry> PathHelper::listDirectory(
 
     WIN32_FIND_DATAA findData;
     HANDLE hFind = FindFirstFileA(searchPath.c_str(), &findData);
-
-    if (hFind == INVALID_HANDLE_VALUE) {
+    if (hFind == INVALID_HANDLE_VALUE)
         return entries;
-    }
 
     do {
         std::string name = findData.cFileName;
         if (name != "." && name != "..") {
-            DirEntry entry;
+            PathHelper::DirEntry entry;
             entry.name = name;
             entry.isDirectory
                 = (findData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0;
@@ -197,38 +194,45 @@ std::vector<PathHelper::DirEntry> PathHelper::listDirectory(
     } while (FindNextFileA(hFind, &findData));
 
     FindClose(hFind);
+    return entries;
+}
 #else
+static std::vector<PathHelper::DirEntry> listDirectoryUnix_(
+    const std::string& path) {
+    std::vector<PathHelper::DirEntry> entries;
     DIR* dir = opendir(path.c_str());
-    if (!dir) {
+    if (!dir)
         return entries;
-    }
 
     struct dirent* ent;
     while ((ent = readdir(dir)) != nullptr) {
         std::string name = ent->d_name;
         if (name != "." && name != "..") {
-            DirEntry entry;
+            PathHelper::DirEntry entry;
             entry.name = name;
-
             std::string fullPath = path;
-            if (!fullPath.empty() && fullPath.back() != '/') {
+            if (!fullPath.empty() && fullPath.back() != '/')
                 fullPath += '/';
-            }
             fullPath += name;
-
             struct stat st;
-            if (stat(fullPath.c_str(), &st) == 0) {
+            if (stat(fullPath.c_str(), &st) == 0)
                 entry.isDirectory = S_ISDIR(st.st_mode);
-            }
-
             entries.push_back(entry);
         }
     }
 
     closedir(dir);
+    return entries;
+}
 #endif
 
-    return entries;
+std::vector<PathHelper::DirEntry> PathHelper::listDirectory(
+    const std::string& path) {
+#ifdef _WIN32
+    return listDirectoryWindows_(path);
+#else
+    return listDirectoryUnix_(path);
+#endif
 }
 
 std::string PathHelper::normalizePath(const std::string& path) {
