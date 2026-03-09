@@ -31,51 +31,51 @@ namespace aiSocks {
 // ---------------------------------------------------------------------------
 namespace {
 
-// Append security headers (if enabled) and all custom headers, then the
-// blank line that terminates the HTTP header section.
-void appendConfigAndTrailingCRLF(StringBuilder& response,
-    bool enableSecurityHeaders,
-    const std::map<std::string, std::string>& customHeaders) {
-    if (enableSecurityHeaders)
-        response.append(FileServerUtils::securityHeadersBlock());
-    for (const auto& [name, value] : customHeaders) {
-        response.append(name);
-        response.append(": ");
-        response.append(value);
+    // Append security headers (if enabled) and all custom headers, then the
+    // blank line that terminates the HTTP header section.
+    void appendConfigAndTrailingCRLF(StringBuilder& response,
+        bool enableSecurityHeaders,
+        const std::map<std::string, std::string>& customHeaders) {
+        if (enableSecurityHeaders)
+            response.append(FileServerUtils::securityHeadersBlock());
+        for (const auto& [name, value] : customHeaders) {
+            response.append(name);
+            response.append(": ");
+            response.append(value);
+            response.append("\r\n");
+        }
         response.append("\r\n");
     }
-    response.append("\r\n");
-}
 
-// Append a complete HTTP/1.1 200 OK header block (including the final blank
-// line).  Content is NOT appended; the caller does that.
-// lastModified and etag are raw values from FileInfo; cfg drives which
-// optional headers to emit and which config-level headers to append.
-void appendOkHeaders(StringBuilder& response, const std::string& filePath,
-    size_t contentSize, time_t lastModified, const std::string& etag,
-    const HttpFileServer::Config& cfg) {
-    response.append("HTTP/1.1 200 OK\r\n");
-    response.append("Content-Type: ");
-    const std::string mime = MimeTypes::fromPath(filePath);
-    response.append(mime);
-    if (mime.find("text/") == 0 || mime == "application/javascript")
-        response.append("; charset=utf-8");
-    response.append("\r\nContent-Length: ");
-    response.appendFormat("%zu", contentSize);
-    response.append("\r\n");
-    if (cfg.enableLastModified) {
-        response.append("Last-Modified: ");
-        response.append(FileServerUtils::formatHttpDate(lastModified));
+    // Append a complete HTTP/1.1 200 OK header block (including the final blank
+    // line).  Content is NOT appended; the caller does that.
+    // lastModified and etag are raw values from FileInfo; cfg drives which
+    // optional headers to emit and which config-level headers to append.
+    void appendOkHeaders(StringBuilder& response, const std::string& filePath,
+        size_t contentSize, time_t lastModified, const std::string& etag,
+        const HttpFileServer::Config& cfg) {
+        response.append("HTTP/1.1 200 OK\r\n");
+        response.append("Content-Type: ");
+        const std::string mime = MimeTypes::fromPath(filePath);
+        response.append(mime);
+        if (mime.find("text/") == 0 || mime == "application/javascript")
+            response.append("; charset=utf-8");
+        response.append("\r\nContent-Length: ");
+        response.appendFormat("%zu", contentSize);
         response.append("\r\n");
+        if (cfg.enableLastModified) {
+            response.append("Last-Modified: ");
+            response.append(FileServerUtils::formatHttpDate(lastModified));
+            response.append("\r\n");
+        }
+        if (cfg.enableETag && !etag.empty()) {
+            response.append("ETag: ");
+            response.append(etag);
+            response.append("\r\n");
+        }
+        appendConfigAndTrailingCRLF(
+            response, cfg.enableSecurityHeaders, cfg.customHeaders);
     }
-    if (cfg.enableETag && !etag.empty()) {
-        response.append("ETag: ");
-        response.append(etag);
-        response.append("\r\n");
-    }
-    appendConfigAndTrailingCRLF(
-        response, cfg.enableSecurityHeaders, cfg.customHeaders);
-}
 
 } // anonymous namespace
 
@@ -397,8 +397,8 @@ void HttpFileServer::sendCachedFile(HttpClientState& state,
     (void)request;
 
     StringBuilder response(512 + cached.size);
-    appendOkHeaders(response, filePath, cached.size,
-        fileInfo.lastModified, fileInfo.etag, config_);
+    appendOkHeaders(response, filePath, cached.size, fileInfo.lastModified,
+        fileInfo.etag, config_);
 
     state.responseBuf = response.toString()
         + std::string(cached.content.begin(), cached.content.end());

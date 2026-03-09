@@ -247,18 +247,8 @@ template <typename ClientData> class ServerBase {
                     printf("[DEBUG] ServerBase disconnecting client fd=%llu\n",
                         (unsigned long long)cfd);
                     fflush(stdout);
-                    onDisconnect(ce->data);
-                    ce->socket->shutdown(ShutdownHow::Both);
-                    (void)loop_.remove(*ce->socket);
-                    eraseClient(cfd);
-
-                    if (!accepting && maxClients != ClientLimit::Unlimited
-                        && clientFds_.size()
-                            < static_cast<size_t>(maxClients)) {
-                        if (loop_.add(*listener_,
-                                PollEvent::Readable | PollEvent::Error))
-                            accepting = true;
-                    }
+                    disconnectClient_(cfd, *ce);
+                    resumeAcceptIfNeeded_(accepting, maxClients);
 #ifdef SERVER_STATS
                     printf("[stats] clients: %zu  peak: %zu\n",
                         clientFds_.size(), peak_clients_);
@@ -283,20 +273,11 @@ template <typename ClientData> class ServerBase {
                         },
                         [&](uintptr_t fd) {
                             if (!sweepCe) return;
-                            onDisconnect(sweepCe->data);
-                            sweepCe->socket->shutdown(ShutdownHow::Both);
-                            (void)loop_.remove(*sweepCe->socket);
-                            eraseClient(fd);
+                            disconnectClient_(fd, *sweepCe);
                         });
                     if (closed > 0) onClientsTimedOut(closed);
 
-                    if (!accepting && maxClients != ClientLimit::Unlimited
-                        && clientFds_.size()
-                            < static_cast<size_t>(maxClients)) {
-                        if (loop_.add(*listener_,
-                                PollEvent::Readable | PollEvent::Error))
-                            accepting = true;
-                    }
+                    resumeAcceptIfNeeded_(accepting, maxClients);
                 }
 
                 // onIdle() is called only on genuine timeouts (no events).
@@ -635,6 +616,26 @@ template <typename ClientData> class ServerBase {
         clientFds_.pop_back();
         onClientDisconnected();
         clientSlots_[fd].reset();
+    }
+
+    // Tear down one client: fire onDisconnect, shut down and deregister the
+    // socket, and erase the fd from the client map.  Called from both the
+    // EventHandler lambda (explicit disconnect) and the timeout sweep.
+    void disconnectClient_(uintptr_t fd, ClientEntry& ce) {
+        onDisconnect(ce.data);
+        ce.socket->shutdown(ShutdownHow::Both);
+        (void)loop_.remove(*ce.socket);
+        eraseClient(fd);
+    }
+
+    // Re-register the listener if we paused accepting due to client cap and
+    // are now below it again.  Called after any client removal.
+    void resumeAcceptIfNeeded_(bool& accepting, ClientLimit maxClients) {
+        if (!accepting && maxClients != ClientLimit::Unlimited
+            && clientFds_.size() < static_cast<size_t>(maxClients)) {
+            if (loop_.add(*listener_, PollEvent::Readable | PollEvent::Error))
+                accepting = true;
+        }
     }
     // ---------------------------------------------------------------------------
 

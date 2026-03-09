@@ -97,7 +97,8 @@ class Socket {
     // Blocking mode.
     // Newly created sockets are blocking (OS default).
     // Call setBlocking(false) to switch to non-blocking mode.
-    // Sockets returned by accept() inherit the listening socket's blocking mode.
+    // Sockets returned by accept() inherit the listening socket's blocking
+    // mode.
     bool setBlocking(bool blocking);
     bool isBlocking() const noexcept;
 

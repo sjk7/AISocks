@@ -94,7 +94,6 @@ bool setSocketOption(SocketHandle socketHandle, int level, int optname,
 #else
         fprintf(stderr, "  Error message: %s\n", strerror(errorCode));
 #endif
-
     }
 
     return result == 0;
