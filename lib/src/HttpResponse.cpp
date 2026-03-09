@@ -79,7 +79,8 @@ bool HttpResponseParser::tryParseHeaders_() {
     // Any bytes after \r\n\r\n belong to the body
     if (sepPos + 4 < inBuf_.size()) bodyBuf_ = inBuf_.substr(sepPos + 4);
     inBuf_.clear();
-    inBuf_.shrink_to_fit();
+    // Do NOT shrink_to_fit here: keeping the capacity avoids a reallocation
+    // on the next keep-alive request that feeds into inBuf_.
 
     const std::string_view hdr(headerBuf_);
 

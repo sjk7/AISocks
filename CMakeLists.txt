@@ -42,6 +42,7 @@ option(BUILD_EXAMPLES "Build all example programs" OFF)
 option(ENABLE_ASAN    "Enable AddressSanitizer"    OFF)
 option(ENABLE_MSAN    "Enable MemorySanitizer"     OFF)
 option(ENABLE_UBSAN   "Enable UndefinedBehaviorSanitizer" OFF)
+option(ENABLE_TSAN    "Enable ThreadSanitizer"     OFF)
 
 # Add AddressSanitizer if enabled
 if(ENABLE_ASAN AND MSVC)
@@ -62,6 +63,18 @@ if(ENABLE_UBSAN AND NOT MSVC)
     message(STATUS "UndefinedBehaviorSanitizer enabled")
 elseif(ENABLE_UBSAN AND MSVC)
     message(FATAL_ERROR "UndefinedBehaviorSanitizer is not supported on MSVC/Windows")
+endif()
+
+# Add ThreadSanitizer if enabled
+if(ENABLE_TSAN AND NOT MSVC)
+    if(ENABLE_ASAN OR ENABLE_MSAN)
+        message(FATAL_ERROR "ThreadSanitizer cannot be combined with ASan or MSan")
+    endif()
+    add_compile_options(-fsanitize=thread -fno-omit-frame-pointer)
+    add_link_options(-fsanitize=thread)
+    message(STATUS "ThreadSanitizer enabled")
+elseif(ENABLE_TSAN AND MSVC)
+    message(FATAL_ERROR "ThreadSanitizer is not supported on MSVC/Windows")
 endif()
 
 # Add MemorySanitizer if enabled

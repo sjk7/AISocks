@@ -32,7 +32,7 @@ namespace {
 bool Endpoint::isLoopback() const {
     if (family == AddressFamily::IPv4) {
         // Check for 127.x.x.x
-        return address.substr(0, 4) == "127.";
+        return address.compare(0, 4, "127.") == 0;
     } else {
         // IPv6: check for ::1
         return address == "::1" || address == "::"
@@ -43,14 +43,23 @@ bool Endpoint::isLoopback() const {
 bool Endpoint::isPrivateNetwork() const {
     if (family == AddressFamily::IPv4) {
         // 10.0.0.0/8
-        if (address.substr(0, 3) == "10.") return true;
+        if (address.compare(0, 3, "10.") == 0) return true;
         // 172.16.0.0/12
-        if (address.substr(0, 4) == "172.") {
-            int second = std::stoi(address.substr(4, address.find('.', 4) - 4));
-            if (second >= 16 && second <= 31) return true;
+        if (address.compare(0, 4, "172.") == 0) {
+            // Parse the second octet without allocating
+            const size_t dotPos = address.find('.', 4);
+            if (dotPos != std::string::npos) {
+                int second = 0;
+                for (size_t i = 4; i < dotPos; ++i) {
+                    const char c = address[i];
+                    if (c < '0' || c > '9') break;
+                    second = second * 10 + (c - '0');
+                }
+                if (second >= 16 && second <= 31) return true;
+            }
         }
         // 192.168.0.0/16
-        if (address.substr(0, 8) == "192.168.") return true;
+        if (address.compare(0, 8, "192.168.") == 0) return true;
         return false;
     } else {
         // IPv6 ULA: fc00::/7 or fd00::/8

@@ -65,6 +65,18 @@
             }
         },
         {
+            "name": "tsan-debug",
+            "inherits": "base",
+            "displayName": "ThreadSanitizer Debug",
+            "binaryDir": "${sourceDir}/build-tsan",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "BUILD_EXAMPLES": "OFF",
+                "BUILD_TESTS": "ON",
+                "ENABLE_TSAN": "ON"
+            }
+        },
+        {
             "name": "mac-release",
             "inherits": "base",
             "displayName": "macOS Release -O3 with symbols",
@@ -154,6 +166,12 @@
             "inherits": "base-build",
             "configurePreset": "ubsan-release",
             "displayName": "Build UBSan RelWithDebInfo"
+        },
+        {
+            "name": "tsan-debug",
+            "inherits": "base-build",
+            "configurePreset": "tsan-debug",
+            "displayName": "Build ThreadSanitizer Debug"
         },
         {
             "name": "mac-release",

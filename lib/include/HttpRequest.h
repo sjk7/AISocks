@@ -1,13 +1,15 @@
-// This is an independent project of an individual developer. Dear PVS-Studio, please check it.
+// This is an independent project of an individual developer. Dear PVS-Studio,
+// please check it.
 
-// PVS-Studio Static Code Analyzer for C, C++, C#, and Java: https://pvs-studio.com
-
+// PVS-Studio Static Code Analyzer for C, C++, C#, and Java:
+// https://pvs-studio.com
 
 #pragma once
 // ---------------------------------------------------------------------------
 // HttpRequest.h -- HTTP/1.x request parser
 // ---------------------------------------------------------------------------
 #include <string>
+#include <string_view>
 #include <unordered_map>
 
 namespace aiSocks {
@@ -46,11 +48,11 @@ struct HttpRequest {
 
     /// Returns a pointer to the header value (nullptr if absent).
     /// The name is lowercased before lookup so callers may pass any case.
-    const std::string* header(std::string name) const;
+    const std::string* header(std::string_view name) const;
 
     /// Convenience: returns an empty string if the header is absent.
     std::string headerOr(
-        const std::string& name, std::string fallback = {}) const;
+        std::string_view name, std::string fallback = {}) const;
 
     explicit operator bool() const noexcept { return valid; }
 

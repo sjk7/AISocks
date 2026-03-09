@@ -203,6 +203,73 @@ int main() {
         REQUIRE(cache.get("C:\\Windows\\file.txt", 300) != nullptr);
     }
 
+    // Test 11: put() with rvalue (move) - source vector should be emptied
+    BEGIN_TEST("FileCache: put() move overload empties source vector");
+    {
+        FileCache cache;
+        std::vector<char> content = {'M', 'o', 'v', 'e', 'd'};
+        const size_t originalSize = content.size();
+        cache.put("/moved.txt", std::move(content), 100);
+
+        // Source vector should have been moved-from (empty)
+        REQUIRE(content.empty());
+
+        // Cache should hold the data correctly
+        REQUIRE(cache.size() == 1);
+        REQUIRE(cache.totalBytes() == originalSize);
+        const FileCache::CachedFile* cached = cache.get("/moved.txt", 100);
+        REQUIRE(cached != nullptr);
+        REQUIRE(cached->size == originalSize);
+        REQUIRE(cached->content[0] == 'M');
+    }
+
+    // Test 12: LRU eviction order - least recently used is evicted first
+    BEGIN_TEST("FileCache: LRU eviction order");
+    {
+        FileCache::Config cfg;
+        cfg.maxEntries = 3;
+        cfg.maxTotalBytes = 1024 * 1024;
+        cfg.maxFileSize = 512 * 1024;
+        FileCache cache(cfg);
+
+        std::vector<char> c1 = {'A'};
+        std::vector<char> c2 = {'B'};
+        std::vector<char> c3 = {'C'};
+        std::vector<char> c4 = {'D'};
+
+        cache.put("/a.txt", c1, 1);
+        cache.put("/b.txt", c2, 2);
+        cache.put("/c.txt", c3, 3);
+        REQUIRE(cache.size() == 3);
+
+        // Access /a.txt to make it recently used (b is now LRU)
+        REQUIRE(cache.get("/a.txt", 1) != nullptr);
+
+        // Adding /d.txt should evict /b.txt (least recently used)
+        cache.put("/d.txt", c4, 4);
+        REQUIRE(cache.size() == 3);
+        REQUIRE(cache.get("/b.txt", 2) == nullptr); // evicted
+        REQUIRE(cache.get("/a.txt", 1) != nullptr); // still present
+        REQUIRE(cache.get("/c.txt", 3) != nullptr); // still present
+        REQUIRE(cache.get("/d.txt", 4) != nullptr); // newly added
+    }
+
+    // Test 13: LRU index stays consistent after invalidate + re-put
+    BEGIN_TEST("FileCache: LRU index consistent after invalidate + re-put");
+    {
+        FileCache cache;
+        std::vector<char> cv = {'X'};
+
+        cache.put("/f1.txt", cv, 1);
+        cache.put("/f2.txt", cv, 2);
+        cache.invalidate("/f1.txt");
+        cache.put("/f1.txt", cv, 3); // re-insert after removal
+
+        REQUIRE(cache.size() == 2);
+        REQUIRE(cache.get("/f1.txt", 3) != nullptr);
+        REQUIRE(cache.get("/f2.txt", 2) != nullptr);
+    }
+
     printf("\n=== All FileCache tests passed ===\n");
     return 0;
 }

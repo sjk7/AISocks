@@ -7,38 +7,58 @@
 
 #include <algorithm>
 #include <string>
+#include <string_view>
 
 namespace aiSocks {
 
-const std::string* HttpRequest::header(std::string name) const {
-    std::transform(name.begin(), name.end(), name.begin(),
-        [](unsigned char c) { return static_cast<char>(::tolower(c)); });
-    auto it = headers.find(name);
+const std::string* HttpRequest::header(std::string_view name) const {
+    // Lowercase into a stack buffer to avoid a heap allocation for the lookup.
+    char smallBuf[128];
+    std::string heapBuf;
+    const char* keyData = nullptr;
+
+    if (name.size() < sizeof(smallBuf)) {
+        for (size_t i = 0; i < name.size(); ++i)
+            smallBuf[i] = static_cast<char>(
+                ::tolower(static_cast<unsigned char>(name[i])));
+        smallBuf[name.size()] = '\0';
+        keyData = smallBuf;
+    } else {
+        heapBuf.resize(name.size());
+        for (size_t i = 0; i < name.size(); ++i)
+            heapBuf[i] = static_cast<char>(
+                ::tolower(static_cast<unsigned char>(name[i])));
+        keyData = heapBuf.c_str();
+    }
+
+    auto it = headers.find(std::string(keyData, name.size()));
     return it == headers.end() ? nullptr : &it->second;
 }
 
 std::string HttpRequest::headerOr(
-    const std::string& name, std::string fallback) const {
+    std::string_view name, std::string fallback) const {
     const std::string* v = header(name);
     return v ? *v : std::move(fallback);
 }
 
 HttpRequest HttpRequest::parse(const std::string& raw) {
     HttpRequest req;
+    const std::string_view sv(raw);
 
     // ------------------------------------------------------------------ //
     // 1. Find the header / body separator: first occurrence of \r\n\r\n  //
     // ------------------------------------------------------------------ //
-    const auto sep = raw.find("\r\n\r\n");
-    const std::string headerSection
-        = (sep == std::string::npos) ? raw : raw.substr(0, sep);
-    if (sep != std::string::npos) req.body = raw.substr(sep + 4);
+    const auto sep = sv.find("\r\n\r\n");
+    const std::string_view headerSection
+        = (sep == std::string_view::npos) ? sv : sv.substr(0, sep);
+    if (sep != std::string_view::npos)
+        req.body = std::string(sv.substr(sep + 4));
 
     // ------------------------------------------------------------------ //
     // 2. Split header section into lines                                  //
     // ------------------------------------------------------------------ //
     const auto firstCRLF = headerSection.find("\r\n");
-    const std::string requestLine = (firstCRLF == std::string::npos)
+    const std::string_view requestLine = (firstCRLF == std::string_view::npos)
         ? headerSection
         : headerSection.substr(0, firstCRLF);
 
@@ -47,21 +67,22 @@ HttpRequest HttpRequest::parse(const std::string& raw) {
     // ------------------------------------------------------------------ //
     {
         const auto sp1 = requestLine.find(' ');
-        if (sp1 == std::string::npos) return req;
+        if (sp1 == std::string_view::npos) return req;
 
         const auto sp2 = requestLine.find(' ', sp1 + 1);
-        if (sp2 == std::string::npos) return req;
+        if (sp2 == std::string_view::npos) return req;
 
-        req.method = requestLine.substr(0, sp1);
-        req.version = requestLine.substr(sp2 + 1);
+        req.method = std::string(requestLine.substr(0, sp1));
+        req.version = std::string(requestLine.substr(sp2 + 1));
 
-        const std::string target = requestLine.substr(sp1 + 1, sp2 - sp1 - 1);
+        const std::string_view target
+            = requestLine.substr(sp1 + 1, sp2 - sp1 - 1);
         const auto qmark = target.find('?');
-        if (qmark == std::string::npos) {
-            req.rawPath = target;
+        if (qmark == std::string_view::npos) {
+            req.rawPath = std::string(target);
         } else {
-            req.rawPath = target.substr(0, qmark);
-            req.queryString = target.substr(qmark + 1);
+            req.rawPath = std::string(target.substr(0, qmark));
+            req.queryString = std::string(target.substr(qmark + 1));
         }
         req.path = urlDecodePath(req.rawPath);
     }
@@ -69,42 +90,45 @@ HttpRequest HttpRequest::parse(const std::string& raw) {
     // ------------------------------------------------------------------ //
     // 4. Parse header fields                                              //
     // ------------------------------------------------------------------ //
-    if (firstCRLF != std::string::npos) {
+    if (firstCRLF != std::string_view::npos) {
         size_t pos = firstCRLF + 2;
         while (pos < headerSection.size()) {
             const auto lineEnd = headerSection.find("\r\n", pos);
-            const std::string line = (lineEnd == std::string::npos)
+            const std::string_view line = (lineEnd == std::string_view::npos)
                 ? headerSection.substr(pos)
                 : headerSection.substr(pos, lineEnd - pos);
 
             if (line.empty()) break;
 
             const auto colon = line.find(':');
-            if (colon != std::string::npos) {
-                std::string key = line.substr(0, colon);
-                std::string value = line.substr(colon + 1);
+            if (colon != std::string_view::npos) {
+                const std::string_view rawKey = line.substr(0, colon);
+                std::string_view rawVal = line.substr(colon + 1);
 
-                std::transform(
-                    key.begin(), key.end(), key.begin(), [](unsigned char c) {
-                        return static_cast<char>(::tolower(c));
-                    });
+                // Lowercase key directly into the map key string
+                std::string key;
+                key.resize(rawKey.size());
+                for (size_t i = 0; i < rawKey.size(); ++i)
+                    key[i] = static_cast<char>(
+                        ::tolower(static_cast<unsigned char>(rawKey[i])));
 
-                const auto valStart = value.find_first_not_of(" \t");
-                if (valStart == std::string::npos) {
-                    value.clear();
+                // Trim leading/trailing OWS from value view — zero allocs
+                const auto valStart = rawVal.find_first_not_of(" \t");
+                if (valStart == std::string_view::npos) {
+                    rawVal = {};
                 } else {
-                    value = value.substr(valStart);
-                    const auto valEnd = value.find_last_not_of(" \t\r");
-                    if (valEnd != std::string::npos)
-                        value = value.substr(0, valEnd + 1);
+                    rawVal = rawVal.substr(valStart);
+                    const auto valEnd = rawVal.find_last_not_of(" \t\r");
+                    if (valEnd != std::string_view::npos)
+                        rawVal = rawVal.substr(0, valEnd + 1);
                     else
-                        value.clear();
+                        rawVal = {};
                 }
 
-                req.headers[std::move(key)] = std::move(value);
+                req.headers[std::move(key)] = std::string(rawVal);
             }
 
-            if (lineEnd == std::string::npos) break;
+            if (lineEnd == std::string_view::npos) break;
             pos = lineEnd + 2;
         }
     }
@@ -114,24 +138,24 @@ HttpRequest HttpRequest::parse(const std::string& raw) {
     // ------------------------------------------------------------------ //
     if (!req.queryString.empty()) {
         size_t pos = 0;
-        const auto& qs = req.queryString;
+        const std::string_view qs(req.queryString);
         while (pos <= qs.size()) {
             const auto amp = qs.find('&', pos);
-            const std::string pair = (amp == std::string::npos)
+            const std::string_view pair = (amp == std::string_view::npos)
                 ? qs.substr(pos)
                 : qs.substr(pos, amp - pos);
 
             if (!pair.empty()) {
                 const auto eq = pair.find('=');
-                if (eq == std::string::npos) {
-                    req.queryParams[urlDecode(pair)] = {};
+                if (eq == std::string_view::npos) {
+                    req.queryParams[urlDecode(std::string(pair))] = {};
                 } else {
-                    req.queryParams[urlDecode(pair.substr(0, eq))]
-                        = urlDecode(pair.substr(eq + 1));
+                    req.queryParams[urlDecode(std::string(pair.substr(0, eq)))]
+                        = urlDecode(std::string(pair.substr(eq + 1)));
                 }
             }
 
-            if (amp == std::string::npos) break;
+            if (amp == std::string_view::npos) break;
             pos = amp + 1;
         }
     }

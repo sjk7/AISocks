@@ -1,15 +1,15 @@
-// This is an independent project of an individual developer. Dear PVS-Studio, please check it.
+// This is an independent project of an individual developer. Dear PVS-Studio,
+// please check it.
 
-// PVS-Studio Static Code Analyzer for C, C++, C#, and Java: https://pvs-studio.com
-
-
+// PVS-Studio Static Code Analyzer for C, C++, C#, and Java:
+// https://pvs-studio.com
 
 #pragma once
 
 #include <ctime>
 #include <list>
-#include <map>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 namespace aiSocks {
@@ -44,6 +44,8 @@ class FileCache {
 
     void put(const std::string& filePath, const std::vector<char>& content,
         time_t modTime);
+    void put(const std::string& filePath, std::vector<char>&& content,
+        time_t modTime);
 
     void invalidate(const std::string& filePath);
     void clear();
@@ -54,13 +56,16 @@ class FileCache {
 
     private:
     Config config_;
-    std::map<std::string, CachedFile> cache_;
+    std::unordered_map<std::string, CachedFile> cache_;
     std::list<std::string> lruList_;
+    std::unordered_map<std::string, std::list<std::string>::iterator> lruIndex_;
     size_t totalBytes_ = 0;
 
     void evictLRU();
     void updateLRU(const std::string& filePath);
     void removeLRUEntry(const std::string& filePath);
+    void putImpl(
+        const std::string& filePath, std::vector<char> content, time_t modTime);
 };
 
 } // namespace aiSocks

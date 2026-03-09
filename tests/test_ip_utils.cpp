@@ -122,5 +122,103 @@ int main() {
         REQUIRE(allMatch);
     }
 
+    // ---- Endpoint::isLoopback ----
+    BEGIN_TEST("Endpoint::isLoopback - IPv4 loopback range");
+    {
+        Endpoint ep;
+        ep.family = AddressFamily::IPv4;
+        ep.address = "127.0.0.1";
+        REQUIRE(ep.isLoopback());
+        ep.address = "127.255.255.255";
+        REQUIRE(ep.isLoopback());
+        ep.address = "127.0.0.0";
+        REQUIRE(ep.isLoopback());
+        ep.address = "128.0.0.1"; // NOT loopback
+        REQUIRE(!ep.isLoopback());
+        ep.address = "192.168.1.1";
+        REQUIRE(!ep.isLoopback());
+    }
+
+    BEGIN_TEST("Endpoint::isLoopback - IPv6 loopback");
+    {
+        Endpoint ep;
+        ep.family = AddressFamily::IPv6;
+        ep.address = "::1";
+        REQUIRE(ep.isLoopback());
+        ep.address = "::";
+        REQUIRE(ep.isLoopback());
+        ep.address = "fe80::1";
+        REQUIRE(!ep.isLoopback());
+        ep.address = "2001:db8::1";
+        REQUIRE(!ep.isLoopback());
+    }
+
+    // ---- Endpoint::isPrivateNetwork ----
+    BEGIN_TEST("Endpoint::isPrivateNetwork - 10.x.x.x");
+    {
+        Endpoint ep;
+        ep.family = AddressFamily::IPv4;
+        ep.address = "10.0.0.1";
+        REQUIRE(ep.isPrivateNetwork());
+        ep.address = "10.255.255.255";
+        REQUIRE(ep.isPrivateNetwork());
+        ep.address = "11.0.0.1";
+        REQUIRE(!ep.isPrivateNetwork());
+    }
+
+    BEGIN_TEST("Endpoint::isPrivateNetwork - 172.16-31.x.x");
+    {
+        Endpoint ep;
+        ep.family = AddressFamily::IPv4;
+        ep.address = "172.16.0.1";
+        REQUIRE(ep.isPrivateNetwork());
+        ep.address = "172.31.255.255";
+        REQUIRE(ep.isPrivateNetwork());
+        ep.address = "172.15.0.1"; // NOT in range
+        REQUIRE(!ep.isPrivateNetwork());
+        ep.address = "172.32.0.1"; // NOT in range
+        REQUIRE(!ep.isPrivateNetwork());
+    }
+
+    BEGIN_TEST("Endpoint::isPrivateNetwork - 192.168.x.x");
+    {
+        Endpoint ep;
+        ep.family = AddressFamily::IPv4;
+        ep.address = "192.168.0.1";
+        REQUIRE(ep.isPrivateNetwork());
+        ep.address = "192.168.255.255";
+        REQUIRE(ep.isPrivateNetwork());
+        ep.address = "192.169.0.1"; // NOT private
+        REQUIRE(!ep.isPrivateNetwork());
+        ep.address = "192.167.0.1"; // NOT private
+        REQUIRE(!ep.isPrivateNetwork());
+    }
+
+    BEGIN_TEST("Endpoint::isPrivateNetwork - public IPv4 addresses");
+    {
+        Endpoint ep;
+        ep.family = AddressFamily::IPv4;
+        ep.address = "8.8.8.8";
+        REQUIRE(!ep.isPrivateNetwork());
+        ep.address = "1.1.1.1";
+        REQUIRE(!ep.isPrivateNetwork());
+        ep.address = "203.0.113.1";
+        REQUIRE(!ep.isPrivateNetwork());
+    }
+
+    BEGIN_TEST("Endpoint::isPrivateNetwork - IPv6 ULA");
+    {
+        Endpoint ep;
+        ep.family = AddressFamily::IPv6;
+        ep.address = "fc00::1";
+        REQUIRE(ep.isPrivateNetwork());
+        ep.address = "fd12:3456:789a::1";
+        REQUIRE(ep.isPrivateNetwork());
+        ep.address = "2001:db8::1"; // NOT ULA
+        REQUIRE(!ep.isPrivateNetwork());
+        ep.address = "::1"; // loopback, not ULA
+        REQUIRE(!ep.isPrivateNetwork());
+    }
+
     return test_summary();
 }

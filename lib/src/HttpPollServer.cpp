@@ -5,6 +5,7 @@
 #include "HttpPollServer.h"
 
 #include "BuildInfo.h"
+#include "HttpRequest.h"
 #include <cstdio>
 #include <string>
 
@@ -18,13 +19,17 @@ void HttpPollServer::run(ClientLimit maxClients, Milliseconds timeout) {
         return;
     }
 
+#ifndef NDEBUG
     printf("[DEBUG] HttpPollServer::run() - Starting server\n");
     fflush(stdout);
+#endif
 
     ServerBase<HttpClientState>::run(maxClients, timeout);
 
+#ifndef NDEBUG
     printf("[DEBUG] HttpPollServer::run() - Server completed\n");
     fflush(stdout);
+#endif
 
     printf("\nServer stopped gracefully.\n");
 }
@@ -81,7 +86,9 @@ std::string HttpPollServer::makeResponse(const char* statusLine,
     r += "\r\nContent-Type: ";
     r += contentType;
     r += "\r\nContent-Length: ";
-    r += std::to_string(body.size());
+    char lenBuf[20];
+    snprintf(lenBuf, sizeof(lenBuf), "%zu", body.size());
+    r += lenBuf;
     r += keepAlive ? "\r\nConnection: keep-alive\r\n\r\n"
                    : "\r\nConnection: close\r\n\r\n";
     r += body;
@@ -90,7 +97,6 @@ std::string HttpPollServer::makeResponse(const char* statusLine,
 
 void HttpPollServer::dispatchBuildResponse(HttpClientState& s) {
     // Only allow GET and HEAD methods for security.
-    // We check the first few bytes of the request for basic method detection.
     if (s.request.compare(0, 4, "GET ") != 0
         && s.request.compare(0, 5, "HEAD ") != 0) {
         s.responseBuf = makeResponse("HTTP/1.1 405 Method Not Allowed",
@@ -102,14 +108,13 @@ void HttpPollServer::dispatchBuildResponse(HttpClientState& s) {
         return;
     }
 
-    bool http10 = s.request.find("HTTP/1.0") != std::string::npos;
-    bool hasKeepAlive
-        = s.request.find("Connection: keep-alive") != std::string::npos
-        || s.request.find("connection: keep-alive") != std::string::npos
-        || s.request.find("Connection: Keep-Alive") != std::string::npos;
-    bool hasClose = s.request.find("Connection: close") != std::string::npos
-        || s.request.find("connection: close") != std::string::npos
-        || s.request.find("Connection: Close") != std::string::npos;
+    // Parse once to determine connection semantics — avoids 7 serial
+    // full-buffer scans and is immune to false matches inside the body.
+    const auto req = HttpRequest::parse(s.request);
+    const bool http10 = req.version == "HTTP/1.0";
+    const std::string* conn = req.header("connection");
+    const bool hasKeepAlive = conn && (*conn == "keep-alive");
+    const bool hasClose = conn && (*conn == "close");
     s.closeAfterSend = http10 ? !hasKeepAlive : hasClose;
     buildResponse(s);
 }
@@ -127,8 +132,10 @@ ServerResult HttpPollServer::onReadable(TcpSocket& sock, HttpClientState& s) {
             // Only check timeout if we've received some data or if it's been
             // too long
             if (elapsed.count() > 5 && !s.request.empty()) {
+#ifndef NDEBUG
                 printf("[DEBUG] Header timeout - disconnecting\n");
                 fflush(stdout);
+#endif
                 return ServerResult::Disconnect;
             }
         }
@@ -155,15 +162,19 @@ ServerResult HttpPollServer::onReadable(TcpSocket& sock, HttpClientState& s) {
                 return onWritable(sock, s);
             }
         } else if (n == 0) {
+#ifndef NDEBUG
             printf("[DEBUG] Client disconnected - n=0, closing connection\n");
             fflush(stdout);
+#endif
             return ServerResult::Disconnect;
         } else {
             const auto err = sock.getLastError();
             if (err == SocketError::WouldBlock || err == SocketError::Timeout)
                 break;
+#ifndef NDEBUG
             printf("[DEBUG] Socket error - disconnecting\n");
             fflush(stdout);
+#endif
             return ServerResult::Disconnect;
         }
     }
@@ -195,8 +206,10 @@ ServerResult HttpPollServer::onWritable(TcpSocket& sock, HttpClientState& s) {
         onResponseSent(s);
         bool shouldClose = s.closeAfterSend;
         if (shouldClose) {
+#ifndef NDEBUG
             printf("[DEBUG] Response sent, closing connection\n");
             fflush(stdout);
+#endif
         }
         s.request.clear();
         s.responseView = {};

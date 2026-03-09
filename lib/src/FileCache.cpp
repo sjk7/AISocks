@@ -1,7 +1,6 @@
-// This is an independent project of an individual developer. Dear PVS-Studio, please check it.
-// PVS-Studio Static Code Analyzer for C, C++, C#, and Java: https://pvs-studio.com
-
-
+// This is an independent project of an individual developer. Dear PVS-Studio,
+// please check it. PVS-Studio Static Code Analyzer for C, C++, C#, and Java:
+// https://pvs-studio.com
 
 #include "FileCache.h"
 
@@ -29,6 +28,16 @@ const FileCache::CachedFile* FileCache::get(
 
 void FileCache::put(const std::string& filePath,
     const std::vector<char>& content, time_t modTime) {
+    putImpl(filePath, content, modTime);
+}
+
+void FileCache::put(
+    const std::string& filePath, std::vector<char>&& content, time_t modTime) {
+    putImpl(filePath, std::move(content), modTime);
+}
+
+void FileCache::putImpl(
+    const std::string& filePath, std::vector<char> content, time_t modTime) {
     if (content.size() > config_.maxFileSize) {
         return;
     }
@@ -46,15 +55,17 @@ void FileCache::put(const std::string& filePath,
         evictLRU();
     }
 
+    const size_t sz = content.size();
     CachedFile cached;
-    cached.content = content;
+    cached.content = std::move(content);
     cached.lastModified = modTime;
-    cached.size = content.size();
+    cached.size = sz;
 
-    cache_[filePath] = cached;
-    totalBytes_ += content.size();
+    cache_[filePath] = std::move(cached);
+    totalBytes_ += sz;
 
     lruList_.push_front(filePath);
+    lruIndex_[filePath] = lruList_.begin();
 }
 
 void FileCache::invalidate(const std::string& filePath) {
@@ -69,6 +80,7 @@ void FileCache::invalidate(const std::string& filePath) {
 void FileCache::clear() {
     cache_.clear();
     lruList_.clear();
+    lruIndex_.clear();
     totalBytes_ = 0;
 }
 
@@ -87,27 +99,29 @@ const FileCache::Config& FileCache::getConfig() const {
 void FileCache::evictLRU() {
     if (lruList_.empty()) return;
 
-    std::string lruPath = lruList_.back();
-    lruList_.pop_back();
+    const std::string& lruPath = lruList_.back();
+    lruIndex_.erase(lruPath);
 
     auto it = cache_.find(lruPath);
     if (it != cache_.end()) {
         totalBytes_ -= it->second.size;
         cache_.erase(it);
     }
+
+    lruList_.pop_back();
 }
 
 void FileCache::updateLRU(const std::string& filePath) {
     removeLRUEntry(filePath);
     lruList_.push_front(filePath);
+    lruIndex_[filePath] = lruList_.begin();
 }
 
 void FileCache::removeLRUEntry(const std::string& filePath) {
-    for (auto it = lruList_.begin(); it != lruList_.end(); ++it) {
-        if (*it == filePath) {
-            lruList_.erase(it);
-            break;
-        }
+    auto idxIt = lruIndex_.find(filePath);
+    if (idxIt != lruIndex_.end()) {
+        lruList_.erase(idxIt->second);
+        lruIndex_.erase(idxIt);
     }
 }
 
