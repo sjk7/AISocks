@@ -112,6 +112,11 @@ class HttpFileServer : public HttpPollServer {
     FileCache& getFileCache();
 
     private:
+    // Checks ETag and If-Modified-Since request headers against `fileInfo`.
+    // Sends a 304 response and returns true if the client's copy is current.
+    bool checkCacheConditions_(HttpClientState& state,
+        const HttpRequest& request, const FileInfo& fileInfo);
+
     Config config_;
     FileCache fileCache_;
 };

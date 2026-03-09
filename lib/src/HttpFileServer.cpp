@@ -209,9 +209,8 @@ static bool hasDotfileComponent_(const std::string& rel) {
         while (i < rel.size() && rel[i] == '/') ++i;
         if (i >= rel.size()) break;
         const size_t j = rel.find('/', i);
-        const std::string comp = (j == std::string::npos)
-            ? rel.substr(i)
-            : rel.substr(i, j - i);
+        const std::string comp
+            = (j == std::string::npos) ? rel.substr(i) : rel.substr(i, j - i);
         if (!comp.empty() && comp[0] == '.') {
             if (!(firstComponent && comp == ".well-known")) return true;
         }
@@ -252,6 +251,30 @@ void HttpFileServer::handleDirectoryRequest(HttpClientState& state,
     } else {
         sendError(state, 403, "Forbidden", "Directory listing not allowed");
     }
+}
+
+bool HttpFileServer::checkCacheConditions_(HttpClientState& state,
+    const HttpRequest& request, const FileInfo& fileInfo) {
+    if (config_.enableETag && !fileInfo.etag.empty()) {
+        auto it = request.headers.find("if-none-match");
+        if (it != request.headers.end() && it->second == fileInfo.etag) {
+            sendNotModified(state, fileInfo);
+            return true;
+        }
+    }
+    if (config_.enableLastModified) {
+        auto it = request.headers.find("if-modified-since");
+        if (it != request.headers.end()) {
+            StringBuilder lastModified(64);
+            lastModified.append(
+                FileServerUtils::formatHttpDate(fileInfo.lastModified));
+            if (it->second == lastModified.toString()) {
+                sendNotModified(state, fileInfo);
+                return true;
+            }
+        }
+    }
+    return false;
 }
 
 void HttpFileServer::handleFileRequest(HttpClientState& state,
@@ -303,27 +326,7 @@ void HttpFileServer::handleFileRequest(HttpClientState& state,
         return;
     }
 
-    if (config_.enableETag && !fileInfo.etag.empty()) {
-        auto ifNoneMatch = request.headers.find("if-none-match");
-        if (ifNoneMatch != request.headers.end()
-            && ifNoneMatch->second == fileInfo.etag) {
-            sendNotModified(state, fileInfo);
-            return;
-        }
-    }
-
-    if (config_.enableLastModified) {
-        auto ifModifiedSince = request.headers.find("if-modified-since");
-        if (ifModifiedSince != request.headers.end()) {
-            StringBuilder lastModified(64);
-            lastModified.append(
-                FileServerUtils::formatHttpDate(fileInfo.lastModified));
-            if (ifModifiedSince->second == lastModified.toString()) {
-                sendNotModified(state, fileInfo);
-                return;
-            }
-        }
-    }
+    if (checkCacheConditions_(state, request, fileInfo)) return;
 
     std::vector<char> fileContent = file.readAll();
     if (fileContent.empty() && fdInfo.size > 0) {
