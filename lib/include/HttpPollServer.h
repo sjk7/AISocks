@@ -174,6 +174,7 @@ class HttpPollServer : public ServerBase<HttpClientState> {
     ServerResult onReadable(TcpSocket& sock, HttpClientState& s) final;
     ServerResult onWritable(TcpSocket& sock, HttpClientState& s) final;
     ServerResult onIdle() override;
+    void resetAfterSend_(HttpClientState& s);
 
     CallIntervalTracker tracker_;
 };

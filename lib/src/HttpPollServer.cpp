@@ -211,18 +211,22 @@ ServerResult HttpPollServer::onWritable(TcpSocket& sock, HttpClientState& s) {
             fflush(stdout);
 #endif
         }
-        s.request.clear();
-        s.responseView = {};
-        s.responseBuf.clear();
-        s.sent = 0;
-        s.responseStarted = false;
-        s.closeAfterSend = false;
-        s.requestScanPos = 0;
+        resetAfterSend_(s);
         setClientWritable(sock, false);
         return shouldClose ? ServerResult::Disconnect
                            : ServerResult::KeepConnection;
     }
     return ServerResult::KeepConnection;
+}
+
+void HttpPollServer::resetAfterSend_(HttpClientState& s) {
+    s.request.clear();
+    s.responseView = {};
+    s.responseBuf.clear();
+    s.sent = 0;
+    s.responseStarted = false;
+    s.closeAfterSend = false;
+    s.requestScanPos = 0;
 }
 
 ServerResult HttpPollServer::onIdle() {
