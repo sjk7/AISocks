@@ -97,6 +97,20 @@ bool PathHelper::isSymlink(const std::string& path) {
 #endif
 }
 
+// Advances `i` past any leading '/' separators, extracts the next path
+// component, and advances `i` to just after it.  Returns an empty view when
+// the string is exhausted.
+static std::string_view nextPathComponent_(const std::string& rel, size_t& i) {
+    while (i < rel.size() && rel[i] == '/') ++i;
+    if (i >= rel.size()) return {};
+    const size_t j = rel.find('/', i);
+    const std::string_view comp = (j == std::string::npos)
+        ? std::string_view(rel).substr(i)
+        : std::string_view(rel).substr(i, j - i);
+    i = (j == std::string::npos) ? rel.size() : j + 1;
+    return comp;
+}
+
 bool PathHelper::hasSymlinkComponentWithin(
     const std::string& fullPath, const std::string& rootPath) {
     std::string root = normalizePath(rootPath);
@@ -115,27 +129,16 @@ bool PathHelper::hasSymlinkComponentWithin(
 
     const std::string rel = path.substr(root.size());
     size_t i = 0;
-    while (i < rel.size()) {
-        while (i < rel.size() && rel[i] == '/') ++i;
-        if (i >= rel.size()) break;
-        const size_t j = rel.find('/', i);
-        const std::string comp
-            = (j == std::string::npos) ? rel.substr(i) : rel.substr(i, j - i);
+    while (true) {
+        const std::string_view comp = nextPathComponent_(rel, i);
         if (comp.empty()) break;
 
         current += "/";
-        current += comp;
+        current.append(comp.data(), comp.size());
 
         // Only evaluate symlink status for components that actually exist.
-        if (!exists(current)) {
-            return false;
-        }
-        if (isSymlink(current)) {
-            return true;
-        }
-
-        if (j == std::string::npos) break;
-        i = j + 1;
+        if (!exists(current)) return false;
+        if (isSymlink(current)) return true;
     }
 
     return false;
@@ -179,8 +182,7 @@ static std::vector<PathHelper::DirEntry> listDirectoryWindows_(
 
     WIN32_FIND_DATAA findData;
     HANDLE hFind = FindFirstFileA(searchPath.c_str(), &findData);
-    if (hFind == INVALID_HANDLE_VALUE)
-        return entries;
+    if (hFind == INVALID_HANDLE_VALUE) return entries;
 
     do {
         std::string name = findData.cFileName;
@@ -201,8 +203,7 @@ static std::vector<PathHelper::DirEntry> listDirectoryUnix_(
     const std::string& path) {
     std::vector<PathHelper::DirEntry> entries;
     DIR* dir = opendir(path.c_str());
-    if (!dir)
-        return entries;
+    if (!dir) return entries;
 
     struct dirent* ent;
     while ((ent = readdir(dir)) != nullptr) {
@@ -211,8 +212,7 @@ static std::vector<PathHelper::DirEntry> listDirectoryUnix_(
             PathHelper::DirEntry entry;
             entry.name = name;
             std::string fullPath = path;
-            if (!fullPath.empty() && fullPath.back() != '/')
-                fullPath += '/';
+            if (!fullPath.empty() && fullPath.back() != '/') fullPath += '/';
             fullPath += name;
             struct stat st;
             if (stat(fullPath.c_str(), &st) == 0)
