@@ -25,6 +25,60 @@
 
 namespace aiSocks {
 
+// ---------------------------------------------------------------------------
+// Translation-unit helpers — avoid repeating the same header-assembly pattern
+// in every send* function.
+// ---------------------------------------------------------------------------
+namespace {
+
+// Append security headers (if enabled) and all custom headers, then the
+// blank line that terminates the HTTP header section.
+void appendConfigAndTrailingCRLF(StringBuilder& response,
+    bool enableSecurityHeaders,
+    const std::map<std::string, std::string>& customHeaders) {
+    if (enableSecurityHeaders)
+        response.append(FileServerUtils::securityHeadersBlock());
+    for (const auto& [name, value] : customHeaders) {
+        response.append(name);
+        response.append(": ");
+        response.append(value);
+        response.append("\r\n");
+    }
+    response.append("\r\n");
+}
+
+// Append a complete HTTP/1.1 200 OK header block (including the final blank
+// line).  Content is NOT appended; the caller does that.
+// lastModified and etag are raw values from FileInfo; cfg drives which
+// optional headers to emit and which config-level headers to append.
+void appendOkHeaders(StringBuilder& response, const std::string& filePath,
+    size_t contentSize, time_t lastModified, const std::string& etag,
+    const HttpFileServer::Config& cfg) {
+    response.append("HTTP/1.1 200 OK\r\n");
+    response.append("Content-Type: ");
+    const std::string mime = MimeTypes::fromPath(filePath);
+    response.append(mime);
+    if (mime.find("text/") == 0 || mime == "application/javascript")
+        response.append("; charset=utf-8");
+    response.append("\r\nContent-Length: ");
+    response.appendFormat("%zu", contentSize);
+    response.append("\r\n");
+    if (cfg.enableLastModified) {
+        response.append("Last-Modified: ");
+        response.append(FileServerUtils::formatHttpDate(lastModified));
+        response.append("\r\n");
+    }
+    if (cfg.enableETag && !etag.empty()) {
+        response.append("ETag: ");
+        response.append(etag);
+        response.append("\r\n");
+    }
+    appendConfigAndTrailingCRLF(
+        response, cfg.enableSecurityHeaders, cfg.customHeaders);
+}
+
+} // anonymous namespace
+
 HttpFileServer::HttpFileServer(
     const ServerBind& bind, const Config& config, Result<TcpSocket>* result)
     : HttpPollServer(bind, result) {
@@ -281,40 +335,8 @@ void HttpFileServer::handleFileRequest(HttpClientState& state,
     }
 
     StringBuilder response(512 + fileContent.size());
-    response.append("HTTP/1.1 200 OK\r\n");
-    response.append("Content-Type: ");
-    response.append(MimeTypes::fromPath(filePath));
-    if (MimeTypes::fromPath(filePath).find("text/") == 0
-        || MimeTypes::fromPath(filePath) == "application/javascript") {
-        response.append("; charset=utf-8");
-    }
-    response.append("\r\nContent-Length: ");
-    response.appendFormat("%zu", fileContent.size());
-    response.append("\r\n");
-
-    if (config_.enableLastModified) {
-        response.append("Last-Modified: ");
-        response.append(FileServerUtils::formatHttpDate(fileInfo.lastModified));
-        response.append("\r\n");
-    }
-
-    if (config_.enableETag && !fileInfo.etag.empty()) {
-        response.append("ETag: ");
-        response.append(fileInfo.etag);
-        response.append("\r\n");
-    }
-
-    if (config_.enableSecurityHeaders)
-        response.append(FileServerUtils::securityHeadersBlock());
-
-    for (const auto& [name, value] : config_.customHeaders) {
-        response.append(name);
-        response.append(": ");
-        response.append(value);
-        response.append("\r\n");
-    }
-
-    response.append("\r\n");
+    appendOkHeaders(response, filePath, fileContent.size(),
+        fileInfo.lastModified, fileInfo.etag, config_);
 
     state.responseBuf = response.toString()
         + std::string(fileContent.begin(), fileContent.end());
@@ -337,17 +359,8 @@ void HttpFileServer::sendError(HttpClientState& state, int code,
     response.appendFormat("%zu", htmlBody.size());
     response.append("\r\n");
 
-    if (config_.enableSecurityHeaders)
-        response.append(FileServerUtils::securityHeadersBlock());
-
-    for (const auto& [name, value] : config_.customHeaders) {
-        response.append(name);
-        response.append(": ");
-        response.append(value);
-        response.append("\r\n");
-    }
-
-    response.append("\r\n");
+    appendConfigAndTrailingCRLF(
+        response, config_.enableSecurityHeaders, config_.customHeaders);
     response.append(htmlBody);
 
     state.responseBuf = response.toString();
@@ -371,17 +384,8 @@ void HttpFileServer::sendNotModified(
         response.append("\r\n");
     }
 
-    if (config_.enableSecurityHeaders)
-        response.append(FileServerUtils::securityHeadersBlock());
-
-    for (const auto& [name, value] : config_.customHeaders) {
-        response.append(name);
-        response.append(": ");
-        response.append(value);
-        response.append("\r\n");
-    }
-
-    response.append("\r\n");
+    appendConfigAndTrailingCRLF(
+        response, config_.enableSecurityHeaders, config_.customHeaders);
 
     state.responseBuf = response.toString();
     state.responseView = state.responseBuf;
@@ -393,40 +397,8 @@ void HttpFileServer::sendCachedFile(HttpClientState& state,
     (void)request;
 
     StringBuilder response(512 + cached.size);
-    response.append("HTTP/1.1 200 OK\r\n");
-    response.append("Content-Type: ");
-    response.append(MimeTypes::fromPath(filePath));
-    if (MimeTypes::fromPath(filePath).find("text/") == 0
-        || MimeTypes::fromPath(filePath) == "application/javascript") {
-        response.append("; charset=utf-8");
-    }
-    response.append("\r\nContent-Length: ");
-    response.appendFormat("%zu", cached.size);
-    response.append("\r\n");
-
-    if (config_.enableLastModified) {
-        response.append("Last-Modified: ");
-        response.append(FileServerUtils::formatHttpDate(fileInfo.lastModified));
-        response.append("\r\n");
-    }
-
-    if (config_.enableETag && !fileInfo.etag.empty()) {
-        response.append("ETag: ");
-        response.append(fileInfo.etag);
-        response.append("\r\n");
-    }
-
-    if (config_.enableSecurityHeaders)
-        response.append(FileServerUtils::securityHeadersBlock());
-
-    for (const auto& [name, value] : config_.customHeaders) {
-        response.append(name);
-        response.append(": ");
-        response.append(value);
-        response.append("\r\n");
-    }
-
-    response.append("\r\n");
+    appendOkHeaders(response, filePath, cached.size,
+        fileInfo.lastModified, fileInfo.etag, config_);
 
     state.responseBuf = response.toString()
         + std::string(cached.content.begin(), cached.content.end());
@@ -444,17 +416,8 @@ void HttpFileServer::sendDirectoryListing(
     response.appendFormat("%zu", htmlBody.size());
     response.append("\r\n");
 
-    if (config_.enableSecurityHeaders)
-        response.append(FileServerUtils::securityHeadersBlock());
-
-    for (const auto& [name, value] : config_.customHeaders) {
-        response.append(name);
-        response.append(": ");
-        response.append(value);
-        response.append("\r\n");
-    }
-
-    response.append("\r\n");
+    appendConfigAndTrailingCRLF(
+        response, config_.enableSecurityHeaders, config_.customHeaders);
     response.append(htmlBody);
 
     state.responseBuf = response.toString();
