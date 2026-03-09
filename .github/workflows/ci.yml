@@ -65,6 +65,28 @@ jobs:
               CC: clang-cl
               CXX: clang-cl
 
+          # ---------------------------------------------------------------
+          # RelWithDebInfo legs (optimised + debug symbols)
+          # ---------------------------------------------------------------
+          - os: ubuntu-latest
+            compiler: gcc
+            cc: gcc
+            cxx: g++
+            cmake_generator: Ninja
+            build_type: RelWithDebInfo
+
+          - os: macos-latest
+            compiler: apple-clang
+            cc: clang
+            cxx: clang++
+            cmake_generator: Ninja
+            build_type: RelWithDebInfo
+
+          - os: windows-latest
+            compiler: msvc
+            cmake_generator: Ninja
+            build_type: RelWithDebInfo
+
     steps:
       # ------------------------------------------------------------------ #
       # 1. Checkout                                                         #
@@ -148,6 +170,6 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: ctest-results-${{ matrix.os }}-${{ matrix.compiler }}
+          name: ctest-results-${{ matrix.os }}-${{ matrix.compiler }}-${{ matrix.build_type }}
           path: build/Testing/
           retention-days: 7
