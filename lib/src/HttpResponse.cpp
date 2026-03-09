@@ -51,6 +51,27 @@ void HttpResponseParser::markError_() {
     state_ = State::Error;
 }
 
+// static
+bool HttpResponseParser::parseHexSize_(
+    std::string_view hexStr, size_t& out) noexcept {
+    if (hexStr.empty()) return false;
+    out = 0;
+    for (char c : hexStr) {
+        const auto uc = static_cast<unsigned char>(c);
+        size_t digit = 0;
+        if (uc >= '0' && uc <= '9')
+            digit = uc - '0';
+        else if (uc >= 'a' && uc <= 'f')
+            digit = uc - 'a' + 10;
+        else if (uc >= 'A' && uc <= 'F')
+            digit = uc - 'A' + 10;
+        else
+            return false;
+        out = out * 16 + digit;
+    }
+    return true;
+}
+
 void HttpResponseParser::markComplete_() {
     response_.valid = true;
     state_ = State::Complete;
@@ -169,24 +190,34 @@ bool HttpResponseParser::tryParseHeaders_() {
         }
     }
 
-    // Determine body mode from headers
+    determineBodyMode_();
+    headersParsed_ = true;
+    return true;
+}
+
+// ---------------------------------------------------------------------------
+// determineBodyMode_
+//
+// Sets bodyMode_ (and contentLength_ for Content-Length responses) by
+// inspecting Transfer-Encoding and Content-Length headers that are already
+// in response_.headers_.
+// Called once at the end of tryParseHeaders_().
+// ---------------------------------------------------------------------------
+void HttpResponseParser::determineBodyMode_() {
     const std::string_view* te = response_.header("transfer-encoding");
     if (te != nullptr) {
-        // Check for "chunked" as last token (RFC 7230 §3.3.1)
+        // RFC 7230 §3.3.1: "chunked" is the last transfer-coding token.
         std::string_view tev = *te;
-        // Find last comma-separated token
         const size_t lastComma = tev.rfind(',');
         std::string_view lastToken = (lastComma == std::string_view::npos)
             ? tev
             : tev.substr(lastComma + 1);
-        // trim
         const size_t ts = lastToken.find_first_not_of(" \t");
         if (ts != std::string_view::npos) lastToken = lastToken.substr(ts);
         const size_t te2 = lastToken.find_last_not_of(" \t");
         if (te2 != std::string_view::npos)
             lastToken = lastToken.substr(0, te2 + 1);
 
-        // Case-insensitive compare
         if (lastToken.size() == 7) {
             char low[7];
             for (size_t i = 0; i < 7; ++i)
@@ -206,9 +237,6 @@ bool HttpResponseParser::tryParseHeaders_() {
             bodyMode_ = BodyMode::ConnectionClose;
         }
     }
-
-    headersParsed_ = true;
-    return true;
 }
 
 // ---------------------------------------------------------------------------
@@ -265,27 +293,10 @@ HttpResponseParser::State HttpResponseParser::processChunked_() {
             ? sizeLine
             : sizeLine.substr(0, extPos);
 
-        if (hexStr.empty()) {
+        size_t chunkSize = 0;
+        if (!parseHexSize_(hexStr, chunkSize)) {
             markError_();
             return state_;
-        }
-
-        // Parse hex
-        size_t chunkSize = 0;
-        for (char c : hexStr) {
-            unsigned char uc = static_cast<unsigned char>(c);
-            int digit = 0;
-            if (uc >= '0' && uc <= '9')
-                digit = uc - '0';
-            else if (uc >= 'a' && uc <= 'f')
-                digit = uc - 'a' + 10;
-            else if (uc >= 'A' && uc <= 'F')
-                digit = uc - 'A' + 10;
-            else {
-                markError_();
-                return state_;
-            }
-            chunkSize = chunkSize * 16 + static_cast<size_t>(digit);
         }
 
         if (chunkSize == 0) {

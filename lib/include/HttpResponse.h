@@ -159,6 +159,8 @@ class HttpResponseParser {
     void markComplete_();
     void markError_();
     State advanceAfterHeaders_();
+    void determineBodyMode_();
+    static bool parseHexSize_(std::string_view hexStr, size_t& out) noexcept;
 
     // ---- buffers --------------------------------------------------------
     // inBuf_      — accumulates raw bytes until \r\n\r\n is found
