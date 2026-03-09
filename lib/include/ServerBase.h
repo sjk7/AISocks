@@ -213,79 +213,13 @@ template <typename ClientData> class ServerBase {
 
         loop_.run(
             timeout,
-
-            // --- EventHandler: dispatched once per ready socket --------------
-            [&](TcpSocket& sock, PollEvent ev) -> bool {
-                if (&sock == listener_.get()) {
-                    if (accepting)
-                        drainAccept(loop_, accepting, accepted, maxClients);
-                    return true;
-                }
-
-                uintptr_t cfd = sock.getNativeHandle();
-                ClientEntry* ce = findClient(cfd);
-                if (!ce) return true;
-
-                bool keep = !hasFlag(ev, PollEvent::Error);
-                if (!keep) {
-                    ServerResult r = onError(*ce->socket, ce->data);
-                    if (r == ServerResult::StopServer) return false;
-                    keep = (r == ServerResult::KeepConnection);
-                }
-                if (keep && hasFlag(ev, PollEvent::Readable)) {
-                    ServerResult r = onReadable(*ce->socket, ce->data);
-                    if (r == ServerResult::StopServer) return false;
-                    keep = (r == ServerResult::KeepConnection);
-                }
-                if (keep && hasFlag(ev, PollEvent::Writable)) {
-                    ServerResult r = onWritable(*ce->socket, ce->data);
-                    if (r == ServerResult::StopServer) return false;
-                    keep = (r == ServerResult::KeepConnection);
-                }
-
-                if (!keep) {
-                    printf("[DEBUG] ServerBase disconnecting client fd=%llu\n",
-                        (unsigned long long)cfd);
-                    fflush(stdout);
-                    disconnectClient_(cfd, *ce);
-                    resumeAcceptIfNeeded_(accepting, maxClients);
-#ifdef SERVER_STATS
-                    printf("[stats] clients: %zu  peak: %zu\n",
-                        clientFds_.size(), peak_clients_);
-#endif
-                }
-                return true;
+            [&](TcpSocket& sock, PollEvent ev) {
+                return handleSocketEvent_(sock, ev, accepting, maxClients,
+                    accepted);
             },
-
-            // --- AfterBatchFn: once per poller.wait() call -------------------
-            // `idle` is true when no events fired (genuine timeout).
-            [&](bool idle) -> bool {
-                timeouts_.adjustForLoad(clientFds_.size());
-
-                if (timeouts_.sweepDue(clientFds_.size())) {
-                    ClientEntry* sweepCe = nullptr;
-                    size_t closed = timeouts_.sweepRaw(
-                        [&](uintptr_t fd)
-                            -> std::pair<bool, SteadyClock::time_point> {
-                            sweepCe = findClient(fd);
-                            if (!sweepCe) return {false, {}};
-                            return {true, sweepCe->lastActivity};
-                        },
-                        [&](uintptr_t fd) {
-                            if (!sweepCe) return;
-                            disconnectClient_(fd, *sweepCe);
-                        });
-                    if (closed > 0) onClientsTimedOut(closed);
-
-                    resumeAcceptIfNeeded_(accepting, maxClients);
-                }
-
-                // onIdle() is called only on genuine timeouts (no events).
-                if (idle) return onIdle() != ServerResult::StopServer;
-                return true;
+            [&](bool idle) {
+                return handleAfterBatch_(idle, accepting, maxClients);
             },
-
-            // --- StopPredicate -----------------------------------------------
             [&]() -> bool {
                 return stop_.load(std::memory_order_relaxed)
                     || (!accepting && clientFds_.empty());
@@ -616,6 +550,74 @@ template <typename ClientData> class ServerBase {
         clientFds_.pop_back();
         onClientDisconnected();
         clientSlots_[fd].reset();
+    }
+
+    // Dispatched once per ready socket per poller.wait() call.
+    // Returns false to stop the loop immediately.
+    bool handleSocketEvent_(TcpSocket& sock, PollEvent ev, bool& accepting,
+        ClientLimit maxClients, size_t& accepted) {
+        if (&sock == listener_.get()) {
+            if (accepting)
+                drainAccept(loop_, accepting, accepted, maxClients);
+            return true;
+        }
+
+        const uintptr_t cfd = sock.getNativeHandle();
+        ClientEntry* ce = findClient(cfd);
+        if (!ce) return true;
+
+        bool keep = !hasFlag(ev, PollEvent::Error);
+        if (!keep) {
+            ServerResult r = onError(*ce->socket, ce->data);
+            if (r == ServerResult::StopServer) return false;
+            keep = (r == ServerResult::KeepConnection);
+        }
+        if (keep && hasFlag(ev, PollEvent::Readable)) {
+            ServerResult r = onReadable(*ce->socket, ce->data);
+            if (r == ServerResult::StopServer) return false;
+            keep = (r == ServerResult::KeepConnection);
+        }
+        if (keep && hasFlag(ev, PollEvent::Writable)) {
+            ServerResult r = onWritable(*ce->socket, ce->data);
+            if (r == ServerResult::StopServer) return false;
+            keep = (r == ServerResult::KeepConnection);
+        }
+
+        if (!keep) {
+            disconnectClient_(cfd, *ce);
+            resumeAcceptIfNeeded_(accepting, maxClients);
+#ifdef SERVER_STATS
+            printf("[stats] clients: %zu  peak: %zu\n",
+                clientFds_.size(), peak_clients_);
+#endif
+        }
+        return true;
+    }
+
+    // Called once per poller.wait() cycle, after all socket events have been
+    // dispatched.  `idle` is true when no events fired (genuine timeout).
+    // Returns false to stop the loop.
+    bool handleAfterBatch_(bool idle, bool& accepting, ClientLimit maxClients) {
+        timeouts_.adjustForLoad(clientFds_.size());
+
+        if (timeouts_.sweepDue(clientFds_.size())) {
+            ClientEntry* sweepCe = nullptr;
+            size_t closed = timeouts_.sweepRaw(
+                [&](uintptr_t fd) -> std::pair<bool, SteadyClock::time_point> {
+                    sweepCe = findClient(fd);
+                    if (!sweepCe) return {false, {}};
+                    return {true, sweepCe->lastActivity};
+                },
+                [&](uintptr_t fd) {
+                    if (!sweepCe) return;
+                    disconnectClient_(fd, *sweepCe);
+                });
+            if (closed > 0) onClientsTimedOut(closed);
+            resumeAcceptIfNeeded_(accepting, maxClients);
+        }
+
+        if (idle) return onIdle() != ServerResult::StopServer;
+        return true;
     }
 
     // Tear down one client: fire onDisconnect, shut down and deregister the
