@@ -95,6 +95,26 @@ std::string HttpPollServer::makeResponse(const char* statusLine,
     return r;
 }
 
+// HTTP/1.0 defaults to close; HTTP/1.1 defaults to keep-alive (RFC 7230 §6.3).
+// The Connection header can override either default.
+static bool resolveKeepAlive_(const HttpRequest& req) {
+    const bool http10 = req.version == "HTTP/1.0";
+    const std::string* conn = req.header("connection");
+    const bool hasKeepAlive = conn && (*conn == "keep-alive");
+    const bool hasClose = conn && (*conn == "close");
+    return http10 ? !hasKeepAlive : hasClose;
+}
+
+// Returns true when the slowloris deadline has expired: more than 5 seconds
+// have elapsed since the first byte arrived but headers are still incomplete.
+static bool isSlowlorisTimeout_(const HttpClientState& s) {
+    if (!s.responseView.empty()) return false; // already responding
+    if (s.request.empty()) return false;
+    const auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(
+        std::chrono::steady_clock::now() - s.startTime);
+    return elapsed.count() > 5;
+}
+
 void HttpPollServer::dispatchBuildResponse(HttpClientState& s) {
     // Only allow GET and HEAD methods for security.
     if (s.request.compare(0, 4, "GET ") != 0
@@ -111,34 +131,15 @@ void HttpPollServer::dispatchBuildResponse(HttpClientState& s) {
     // Parse once to determine connection semantics — avoids 7 serial
     // full-buffer scans and is immune to false matches inside the body.
     const auto req = HttpRequest::parse(s.request);
-    const bool http10 = req.version == "HTTP/1.0";
-    const std::string* conn = req.header("connection");
-    const bool hasKeepAlive = conn && (*conn == "keep-alive");
-    const bool hasClose = conn && (*conn == "close");
-    s.closeAfterSend = http10 ? !hasKeepAlive : hasClose;
+    s.closeAfterSend = resolveKeepAlive_(req);
     buildResponse(s);
 }
 
 ServerResult HttpPollServer::onReadable(TcpSocket& sock, HttpClientState& s) {
     char buf[RECV_BUF_SIZE];
     for (;;) {
-        // Security: Header timeout (Slowloris protection)
-        // If we haven't finished reading headers within 5 seconds, drop the
-        // connection.
-        if (s.responseView.empty()) {
-            auto now = std::chrono::steady_clock::now();
-            auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(
-                now - s.startTime);
-            // Only check timeout if we've received some data or if it's been
-            // too long
-            if (elapsed.count() > 5 && !s.request.empty()) {
-#ifndef NDEBUG
-                printf("[DEBUG] Header timeout - disconnecting\n");
-                fflush(stdout);
-#endif
-                return ServerResult::Disconnect;
-            }
-        }
+        // Slowloris protection: drop if headers not received within 5 seconds.
+        if (isSlowlorisTimeout_(s)) return ServerResult::Disconnect;
 
         int n = sock.receive(buf, sizeof(buf));
 
@@ -148,7 +149,8 @@ ServerResult HttpPollServer::onReadable(TcpSocket& sock, HttpClientState& s) {
 
             if (s.request.size() > MAX_REQUEST_BYTES) {
                 s.responseBuf = makeResponse("HTTP/1.1 413 Payload Too Large",
-                    "text/plain; charset=utf-8", "Request too large.\n", false);
+                    "text/plain; charset=utf-8", "Request too large.\n",
+                    false);
                 s.responseView = s.responseBuf;
                 s.closeAfterSend = true;
                 setClientWritable(sock, true);
@@ -162,19 +164,11 @@ ServerResult HttpPollServer::onReadable(TcpSocket& sock, HttpClientState& s) {
                 return onWritable(sock, s);
             }
         } else if (n == 0) {
-#ifndef NDEBUG
-            printf("[DEBUG] Client disconnected - n=0, closing connection\n");
-            fflush(stdout);
-#endif
             return ServerResult::Disconnect;
         } else {
             const auto err = sock.getLastError();
             if (err == SocketError::WouldBlock || err == SocketError::Timeout)
                 break;
-#ifndef NDEBUG
-            printf("[DEBUG] Socket error - disconnecting\n");
-            fflush(stdout);
-#endif
             return ServerResult::Disconnect;
         }
     }
@@ -204,13 +198,7 @@ ServerResult HttpPollServer::onWritable(TcpSocket& sock, HttpClientState& s) {
 
     if (s.sent >= s.responseView.size()) {
         onResponseSent(s);
-        bool shouldClose = s.closeAfterSend;
-        if (shouldClose) {
-#ifndef NDEBUG
-            printf("[DEBUG] Response sent, closing connection\n");
-            fflush(stdout);
-#endif
-        }
+        const bool shouldClose = s.closeAfterSend;
         resetAfterSend_(s);
         setClientWritable(sock, false);
         return shouldClose ? ServerResult::Disconnect
