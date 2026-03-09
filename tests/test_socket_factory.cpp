@@ -161,6 +161,88 @@ int main() {
         REQUIRE(second_result.error() != SocketError::None);
     }
 
+    // Test 9: createUdpServer binds correctly
+    BEGIN_TEST("SocketFactory::createUdpServer succeeds and is bound");
+    {
+        auto result = SocketFactory::createUdpServer(
+            ServerBind{"127.0.0.1", Port::any});
+        REQUIRE(result.isSuccess());
+        auto& sock = result.value();
+        REQUIRE(sock.isValid());
+        auto ep = sock.getLocalEndpoint();
+        REQUIRE(ep.isSuccess());
+        REQUIRE(ep.value().port.value() != 0);
+    }
+
+    // Test 10: createUdpServer + send/receive round-trip via factory
+    BEGIN_TEST("SocketFactory::createUdpServer: client sends, server receives");
+    {
+        auto srv_result = SocketFactory::createUdpServer(
+            ServerBind{"127.0.0.1", Port::any});
+        REQUIRE(srv_result.isSuccess());
+        auto& srv = srv_result.value();
+        REQUIRE(srv.setReceiveTimeout(Milliseconds{2000}));
+
+        auto ep = srv.getLocalEndpoint();
+        REQUIRE(ep.isSuccess());
+        Endpoint dest{"127.0.0.1", ep.value().port, AddressFamily::IPv4};
+
+        // Client created via factory (exercises the impl-injection path)
+        auto cli_result = SocketFactory::createUdpSocket();
+        REQUIRE(cli_result.isSuccess());
+        auto& cli = cli_result.value();
+
+        const char* msg = "hello-udp-factory";
+        int sent = cli.sendTo(msg, strlen(msg), dest);
+        REQUIRE(sent == static_cast<int>(strlen(msg)));
+
+        char buf[64] = {};
+        Endpoint from;
+        int received = srv.receiveFrom(buf, sizeof(buf), from);
+        REQUIRE(received == static_cast<int>(strlen(msg)));
+        REQUIRE(std::string(buf, static_cast<size_t>(received)) == msg);
+    }
+
+    // Test 11: createUdpServer bidirectional echo via factory
+    BEGIN_TEST("SocketFactory::createUdpServer: bidirectional echo");
+    {
+        auto srv_result = SocketFactory::createUdpServer(
+            ServerBind{"127.0.0.1", Port::any});
+        REQUIRE(srv_result.isSuccess());
+        auto& srv = srv_result.value();
+        REQUIRE(srv.setReceiveTimeout(Milliseconds{2000}));
+
+        auto ep = srv.getLocalEndpoint();
+        REQUIRE(ep.isSuccess());
+        Endpoint srvAddr{"127.0.0.1", ep.value().port, AddressFamily::IPv4};
+
+        auto cli_result = SocketFactory::createUdpSocket();
+        REQUIRE(cli_result.isSuccess());
+        auto& cli = cli_result.value();
+        REQUIRE(cli.setReceiveTimeout(Milliseconds{2000}));
+
+        for (int i = 0; i < 5; ++i) {
+            std::string out = "ping-" + std::to_string(i);
+
+            REQUIRE(cli.sendTo(out.data(), out.size(), srvAddr)
+                == static_cast<int>(out.size()));
+
+            char recvBuf[64] = {};
+            Endpoint from;
+            int r = srv.receiveFrom(recvBuf, sizeof(recvBuf), from);
+            REQUIRE(r == static_cast<int>(out.size()));
+
+            // Server echoes back
+            srv.sendTo(recvBuf, static_cast<size_t>(r), from);
+
+            char echoBuf[64] = {};
+            Endpoint ignored;
+            int er = cli.receiveFrom(echoBuf, sizeof(echoBuf), ignored);
+            REQUIRE(er == static_cast<int>(out.size()));
+            REQUIRE(std::string(echoBuf, static_cast<size_t>(er)) == out);
+        }
+    }
+
     printf("All SocketFactory tests passed!\n");
     return 0;
 }
