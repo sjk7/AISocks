@@ -47,6 +47,37 @@ static uint32_t interestToEpollEvents(PollEvent interest) {
     return ev;
 }
 
+// Returns the epoll_wait() timeout in milliseconds.
+//   INT64_MAX → -1 (block forever)
+//   <= 0      → 1ms minimum (avoid busy-spin)
+//   otherwise → value clamped to INT_MAX
+static int toEpollTimeout_(Milliseconds timeout) {
+    int64_t ms = timeout.count;
+    if (ms == std::numeric_limits<int64_t>::max())
+        return -1; // block forever
+    if (ms <= 0)
+        return 1;
+    return static_cast<int>(std::min(ms, static_cast<int64_t>(INT_MAX)));
+}
+
+// Translates raw epoll event flags into the platform-neutral PollEvent mask.
+static uint8_t translateEpollBits_(uint32_t ev) {
+    uint8_t bits = 0;
+    if ((ev & (EPOLLIN | EPOLLRDNORM | EPOLLRDHUP)) != 0)
+        bits |= static_cast<uint8_t>(PollEvent::Readable);
+    if ((ev & (EPOLLOUT | EPOLLWRNORM)) != 0)
+        bits |= static_cast<uint8_t>(PollEvent::Writable);
+    if ((ev & EPOLLERR) != 0) {
+        bits |= static_cast<uint8_t>(PollEvent::Error);
+        bits |= static_cast<uint8_t>(PollEvent::Readable); // let caller drain
+    }
+    if ((ev & EPOLLHUP) != 0)
+        // EPOLLHUP = remote closed (TCP FIN) -- treat as readable so the
+        // read path sees n==0 and disconnects cleanly.
+        bits |= static_cast<uint8_t>(PollEvent::Readable);
+    return bits;
+}
+
 Poller::Poller() : pImpl_(std::make_unique<Impl>()) {
     pImpl_->epfd = ::epoll_create1(EPOLL_CLOEXEC);
     if (pImpl_->epfd == -1) {
@@ -107,21 +138,7 @@ bool Poller::remove(const Socket& s) {
 }
 
 std::vector<PollResult> Poller::wait(Milliseconds timeout) {
-    // Timeout convention:
-    //   INT64_MAX  → pass -1 to epoll_wait (block until an event arrives).
-    //   <= 0       → clamp to 1ms minimum.
-    //   otherwise  → use as-is in milliseconds.
-    int64_t effectiveTimeout = timeout.count;
-    int timeoutMs;
-    if (effectiveTimeout == std::numeric_limits<int64_t>::max()) {
-        timeoutMs = -1; // block forever
-    } else if (effectiveTimeout <= 0) {
-        timeoutMs
-            = 1; // clamp: 0 = non-spinning minimum; negative = use minimum
-    } else {
-        timeoutMs = static_cast<int>(
-            std::min(effectiveTimeout, static_cast<int64_t>(INT_MAX)));
-    }
+    const int timeoutMs = toEpollTimeout_(timeout);
 
     const int maxEvents = static_cast<int>(pImpl_->socketArray.size()) + 1;
     std::vector<struct epoll_event> events(static_cast<size_t>(maxEvents));
@@ -145,22 +162,7 @@ std::vector<PollResult> Poller::wait(Milliseconds timeout) {
             if (fd < static_cast<int>(pImpl_->socketArray.size())
                 && pImpl_->socketValid[fd] && pImpl_->socketArray[fd]) {
 
-                uint8_t bits = 0;
-                if ((ev.events & (EPOLLIN | EPOLLRDNORM | EPOLLRDHUP)) != 0)
-                    bits |= static_cast<uint8_t>(PollEvent::Readable);
-                if ((ev.events & (EPOLLOUT | EPOLLWRNORM)) != 0)
-                    bits |= static_cast<uint8_t>(PollEvent::Writable);
-                if ((ev.events & EPOLLERR) != 0) {
-                    bits |= static_cast<uint8_t>(PollEvent::Error);
-                    // Let caller drain to detect the cause.
-                    bits |= static_cast<uint8_t>(PollEvent::Readable);
-                }
-                if ((ev.events & EPOLLHUP) != 0) {
-                    // EPOLLHUP = remote closed (TCP FIN) -- not a socket error,
-                    // treat as readable so the read path sees n==0 and
-                    // disconnects.
-                    bits |= static_cast<uint8_t>(PollEvent::Readable);
-                }
+                const uint8_t bits = translateEpollBits_(ev.events);
                 results.push_back(
                     {pImpl_->socketArray[fd], static_cast<PollEvent>(bits)});
             }

@@ -140,27 +140,25 @@ bool Poller::remove(const Socket& s) {
     return true;
 }
 
+// Converts a Milliseconds timeout into a struct timespec for kevent().
+// Fills `ts` in-place and returns a pointer to it, or nullptr for "block
+// forever".  Clamps to 1ms minimum: a true zero-timeout busy-spins and
+// starves the TCP stack under load.
+static struct timespec* toKqueueTimeout_(
+    Milliseconds timeout, struct timespec& ts) {
+    int64_t ms = timeout.count;
+    if (ms == std::numeric_limits<int64_t>::max())
+        return nullptr; // block forever
+    if (ms <= 0)
+        ms = 1;
+    ts.tv_sec = static_cast<time_t>(ms / 1000);
+    ts.tv_nsec = static_cast<long>((ms % 1000) * 1000000L);
+    return &ts;
+}
+
 std::vector<PollResult> Poller::wait(Milliseconds timeout) {
-    // Timeout convention:
-    //   INT64_MAX  → pass nullptr to kevent (block until an event arrives).
-    //   <= 0       → clamp to 1ms minimum.
-    //   otherwise  → use as-is in milliseconds.
     struct timespec ts{};
-    struct timespec* tsp;
-    int64_t effectiveTimeout = timeout.count;
-    if (effectiveTimeout == std::numeric_limits<int64_t>::max()) {
-        tsp = nullptr; // block forever
-    } else if (effectiveTimeout <= 0) {
-        // Clamp to 1ms: a true zero-timeout busy-spin burns a whole CPU core
-        // and starves the TCP stack under load; negative means "use minimum".
-        ts.tv_sec = 0;
-        ts.tv_nsec = 1000000L; // 1 ms
-        tsp = &ts;
-    } else {
-        ts.tv_sec = static_cast<time_t>(effectiveTimeout / 1000);
-        ts.tv_nsec = static_cast<long>((effectiveTimeout % 1000) * 1000000L);
-        tsp = &ts;
-    }
+    struct timespec* tsp = toKqueueTimeout_(timeout, ts);
 
     // keventBuf is pre-sized in ensureCapacity; guard against empty state.
     auto& keventBuf = pImpl_->keventBuf;
