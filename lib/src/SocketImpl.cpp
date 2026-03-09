@@ -258,6 +258,7 @@ std::unique_ptr<SocketImpl> SocketImpl::accept() {
 static int waitForWritableSlice_(SocketHandle socketHandle, int evFd,
     long long sliceMs, std::string& errOut) {
 #if defined(_WIN32)
+    (void)evFd; // WSAPoll uses the socket handle directly; no event fd needed
     WSAPOLLFD pfd{};
     pfd.fd = socketHandle;
     pfd.events = POLLWRNORM;
