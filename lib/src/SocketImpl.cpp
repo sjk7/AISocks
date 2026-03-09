@@ -255,9 +255,8 @@ std::unique_ptr<SocketImpl> SocketImpl::accept() {
 //    -1  — EINTR (caller should retry the slice, not count it as an error)
 //   -2   — hard error; errOut contains the diagnostic string
 // ---------------------------------------------------------------------------
-static int waitForWritableSlice_(
-    SocketHandle socketHandle, int evFd, long long sliceMs,
-    std::string& errOut) {
+static int waitForWritableSlice_(SocketHandle socketHandle, int evFd,
+    long long sliceMs, std::string& errOut) {
 #if defined(_WIN32)
     WSAPOLLFD pfd{};
     pfd.fd = socketHandle;
@@ -269,6 +268,7 @@ static int waitForWritableSlice_(
     }
     return n; // 0 = timeout, 1 = writable
 #elif defined(__APPLE__) || defined(__FreeBSD__)
+    (void)socketHandle; // registration already done; only evFd is used here
     struct kevent out{};
     struct timespec ts{};
     ts.tv_sec = static_cast<time_t>(sliceMs / 1000);
@@ -281,6 +281,7 @@ static int waitForWritableSlice_(
     }
     return n;
 #elif defined(__linux__)
+    (void)socketHandle; // registration already done; only evFd is used here
     struct epoll_event outev{};
     int n = ::epoll_wait(evFd, &outev, 1, static_cast<int>(sliceMs));
     if (n < 0) {
@@ -479,43 +480,17 @@ bool SocketImpl::connect(
         }
         const long long sliceMs = (remaining < 100) ? remaining : 100;
 
-        int nReady = 0;
-#if defined(_WIN32)
-        WSAPOLLFD pfd{};
-        pfd.fd = socketHandle;
-        pfd.events = POLLWRNORM;
-        nReady = ::WSAPoll(&pfd, 1, static_cast<int>(sliceMs));
+        std::string evErrMsg;
+        const int nReady
+            = waitForWritableSlice_(socketHandle, evFd, sliceMs, evErrMsg);
+        if (nReady == -1) continue; // EINTR — retry slice
         if (nReady < 0) {
-            setError(
-                SocketError::ConnectFailed, "WSAPoll() failed during connect");
+            setError(SocketError::ConnectFailed, std::move(evErrMsg));
             return false;
         }
-#elif defined(__APPLE__) || defined(__FreeBSD__)
-        struct kevent out{};
-        struct timespec ts{};
-        ts.tv_sec = static_cast<time_t>(sliceMs / 1000);
-        ts.tv_nsec = static_cast<long>((sliceMs % 1000) * 1'000'000L);
-        nReady = ::kevent(evFd, nullptr, 0, &out, 1, &ts);
-        if (nReady < 0) {
-            if (errno == EINTR) continue;
-            setError(
-                SocketError::ConnectFailed, "kevent() failed during connect");
-            return false;
-        }
-#elif defined(__linux__)
-        struct epoll_event outev{};
-        nReady = ::epoll_wait(evFd, &outev, 1, static_cast<int>(sliceMs));
-        if (nReady < 0) {
-            if (errno == EINTR) continue;
-            setError(SocketError::ConnectFailed,
-                "epoll_wait() failed during connect");
-            return false;
-        }
-#endif
-
         if (nReady == 0) continue; // slice elapsed; recheck deadline
 
-        // An event fired  confirm success via SO_ERROR.
+        // An event fired — confirm success via SO_ERROR.
         int sockErr = 0;
         socklen_t sockErrLen = static_cast<socklen_t>(sizeof(sockErr));
         getsockopt(socketHandle, SOL_SOCKET, SO_ERROR,
