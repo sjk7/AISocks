@@ -149,6 +149,7 @@ Result<UdpSocket> SocketFactory::createUdpSocketRaw(AddressFamily family) {
 
 Result<TcpSocket> SocketFactory::createTcpServer(
     AddressFamily family, const ServerBind& config) {
+
     auto impl = std::make_unique<SocketImpl>(SocketType::TCP, family);
     if (!impl->isValid()) {
         auto ctx = impl->getErrorContext();
