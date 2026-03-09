@@ -339,6 +339,7 @@ static bool openConnectEvFd_(
     return true;
 #else
     (void)socketHandle;
+    (void)errOut;
     evFdOut = -1; // WSAPoll: per-call, no persistent fd needed
     return true;
 #endif
