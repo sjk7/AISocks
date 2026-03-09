@@ -10,6 +10,7 @@ implement `AF_UNIX` (Unix domain socket) support in the AISocks library.
 Add `AF_UNIX` stream socket support. Approach agreed:
 - Store the socket path in the existing `Endpoint::address` string field
 - Add `AddressFamily::Unix` as the discriminator (no structural change to `Endpoint`)
+- Add `UnixPath` strong type (mirrors `Port`) — passing a plain `std::string` where a socket path is expected is a compile error
 - Add `UnixSocket` public type mirroring `TcpSocket` / `UdpSocket`
 - Add `SocketFactory::createUnixServer` / `createUnixClient` / `socketpair`
 - **macOS + Linux only** (no Windows in this chunk)
@@ -43,6 +44,24 @@ enum class AddressFamily { IPv4, IPv6 };
 New:
 ```cpp
 enum class AddressFamily { IPv4, IPv6, Unix };
+```
+
+Also add the `UnixPath` strong type **after** the `AddressFamily` enum and **before** `Endpoint` (same section as `Port`):
+
+```cpp
+// Strong Unix socket path type.  Explicit construction only — passing a plain
+// std::string where UnixPath is expected is a compile error.  Mirrors Port.
+// Usage:  UnixPath p{"/tmp/foo.sock"};  p.value() → const std::string&
+#ifndef _WIN32
+class UnixPath {
+    std::string path_;
+public:
+    explicit UnixPath(std::string path) : path_(std::move(path)) {}
+    const std::string& value() const noexcept { return path_; }
+    bool operator==(const UnixPath& o) const noexcept { return path_ == o.path_; }
+    bool operator!=(const UnixPath& o) const noexcept { return !(*this == o); }
+};
+#endif
 ```
 
 No other changes to `Endpoint` — the `address` field holds the socket path,
@@ -272,12 +291,12 @@ class UnixSocket : public Socket {
 
 public:
     // Server socket: socket() → SO_REUSEADDR → bind() → listen().
-    explicit UnixSocket(const std::string& path);
+    explicit UnixSocket(UnixPath path);
 
     // Client socket: socket() → connect().
     // (Use SocketFactory::createUnixClient for error-checked creation.)
     struct ConnectTag {};
-    UnixSocket(ConnectTag, const std::string& path);
+    UnixSocket(ConnectTag, UnixPath path);
 
     ~UnixSocket() = default;
     UnixSocket(UnixSocket&&) noexcept = default;
@@ -314,13 +333,13 @@ private:
 namespace aiSocks {
 
 // Server constructor: just create the socket; caller does bind+listen via factory.
-UnixSocket::UnixSocket(const std::string& /*path*/)
+UnixSocket::UnixSocket(UnixPath /*path*/)
     : Socket(SocketType::TCP, AddressFamily::Unix) {}
 
 // Client constructor
-UnixSocket::UnixSocket(ConnectTag, const std::string& path)
+UnixSocket::UnixSocket(ConnectTag, UnixPath path)
     : Socket(SocketType::TCP, AddressFamily::Unix) {
-    doConnect(path, Port{0}, Milliseconds{0}); // blocking connect, no timeout
+    doConnect(path.value(), Port{0}, Milliseconds{0}); // blocking connect, no timeout
 }
 
 // Accept constructor (wraps an accepted fd)
@@ -354,10 +373,10 @@ Add to the `SocketFactory` class (after the UDP section):
     // For simplicity in this first implementation, callers are responsible
     // for calling unlink() if they need to remove the path before the
     // socket is destroyed.
-    static Result<UnixSocket> createUnixServer(const std::string& path);
+    static Result<UnixSocket> createUnixServer(UnixPath path);
 
     // Create a connected Unix stream client.
-    static Result<UnixSocket> createUnixClient(const std::string& path);
+    static Result<UnixSocket> createUnixClient(UnixPath path);
 
     // Create a connected anonymous pair (no filesystem path needed).
     // Returns [server-side, client-side] as a pair.
@@ -373,12 +392,12 @@ Also add `#include "UnixSocket.h"` to the includes at the top of `SocketFactory.
 
 ```cpp
 #ifndef _WIN32
-Result<UnixSocket> SocketFactory::createUnixServer(const std::string& path) {
+Result<UnixSocket> SocketFactory::createUnixServer(UnixPath path) {
     auto impl = std::make_unique<SocketImpl>(SocketType::TCP, AddressFamily::Unix);
     if (!impl->isValid())
         return Result<UnixSocket>::failure(impl->getLastError(), impl->getLastErrorMessage());
 
-    if (!impl->bind(path, Port{0}))
+    if (!impl->bind(path.value(), Port{0}))
         return Result<UnixSocket>::failure(impl->getLastError(), impl->getLastErrorMessage());
 
     if (!impl->listen(128))
@@ -387,12 +406,12 @@ Result<UnixSocket> SocketFactory::createUnixServer(const std::string& path) {
     return Result<UnixSocket>::success(UnixSocket(std::move(impl)));
 }
 
-Result<UnixSocket> SocketFactory::createUnixClient(const std::string& path) {
+Result<UnixSocket> SocketFactory::createUnixClient(UnixPath path) {
     auto impl = std::make_unique<SocketImpl>(SocketType::TCP, AddressFamily::Unix);
     if (!impl->isValid())
         return Result<UnixSocket>::failure(impl->getLastError(), impl->getLastErrorMessage());
 
-    if (!impl->connect(path, Port{0}, defaultTimeout))
+    if (!impl->connect(path.value(), Port{0}, defaultTimeout))
         return Result<UnixSocket>::failure(impl->getLastError(), impl->getLastErrorMessage());
 
     return Result<UnixSocket>::success(UnixSocket(std::move(impl)));
@@ -440,26 +459,26 @@ Add `test_unix_socket` to the `TEST_SOURCES` list (before the closing `)`).
 using namespace aiSocks;
 using namespace std::chrono_literals;
 
-static const std::string kPath = "/tmp/aisocks_test_unix.sock";
+static const UnixPath kPath{"/tmp/aisocks_test_unix.sock"};
 
 int main() {
     printf("=== UnixSocket Tests ===\n");
 
     // Clean up any leftover socket from a previous failed run
-    ::unlink(kPath.c_str());
+    ::unlink(kPath.value().c_str());
 
     BEGIN_TEST("createUnixServer succeeds");
     {
-        ::unlink(kPath.c_str());
+        ::unlink(kPath.value().c_str());
         auto r = SocketFactory::createUnixServer(kPath);
         REQUIRE(r.isSuccess());
         REQUIRE(r.value().isValid());
-        ::unlink(kPath.c_str());
+        ::unlink(kPath.value().c_str());
     }
 
     BEGIN_TEST("createUnixClient connects to server");
     {
-        ::unlink(kPath.c_str());
+        ::unlink(kPath.value().c_str());
         auto srvResult = SocketFactory::createUnixServer(kPath);
         REQUIRE(srvResult.isSuccess());
         auto& srv = srvResult.value();
@@ -482,7 +501,7 @@ int main() {
         REQUIRE(std::string(buf, 5) == "hello");
 
         serverThread.join();
-        ::unlink(kPath.c_str());
+        ::unlink(kPath.value().c_str());
     }
 
     BEGIN_TEST("createUnixPair: bidirectional communication");
@@ -535,6 +554,13 @@ from it on macOS, so no change needed there.
 sockets ignore TCP options — `setsockopt` will return an error but it's
 silently swallowed. `UnixSocket` simply doesn't expose `setNoDelay()`.
 
+### `UnixPath` type safety
+`UnixPath` uses explicit construction only, exactly like `Port`. Passing a raw
+`std::string` or string literal where a `UnixPath` is expected is a compile
+error — so `createUnixServer("0.0.0.0")` (an IP string) will not compile.
+`UnixPath` is only defined on non-Windows (`#ifndef _WIN32`) because the whole
+Unix socket path is platform-guarded anyway.
+
 ### `Endpoint::toString()` for Unix
 Returns `"/tmp/foo.sock:0"` — ugly but harmless. Acceptable for now.
 
@@ -580,6 +606,7 @@ signatures differ slightly between them.
 ## Checklist for the new session
 
 - [ ] `AddressFamily::Unix` added to `SocketTypes.h`
+- [ ] `UnixPath` strong type added to `SocketTypes.h` (non-Windows block, after `AddressFamily` enum)
 - [ ] `#include <sys/un.h>` added to `SocketImpl.h` (non-Windows block)
 - [ ] `SocketImpl` constructor: `AF_UNIX` arm
 - [ ] `SocketImpl::accept()`: `AF_UNIX` arm for clientFamily deduction
