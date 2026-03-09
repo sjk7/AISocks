@@ -31,7 +31,7 @@ using namespace std::chrono_literals;
 
 // Minimal HTTP server: answers every request with "200 OK / body: OK".
 class DiscoveryTestServer : public HttpPollServer {
-public:
+    public:
     std::atomic<bool> ready_{false};
 
     void waitReady() const {
@@ -39,12 +39,11 @@ public:
             std::this_thread::sleep_for(1ms);
     }
 
-    explicit DiscoveryTestServer(const ServerBind& bind) : HttpPollServer(bind) {}
+    explicit DiscoveryTestServer(const ServerBind& bind)
+        : HttpPollServer(bind) {}
 
-protected:
-    void onReady() override {
-        ready_.store(true, std::memory_order_release);
-    }
+    protected:
+    void onReady() override { ready_.store(true, std::memory_order_release); }
 
     void buildResponse(HttpClientState& state) override {
         state.responseBuf = "HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nOK";
@@ -57,7 +56,8 @@ int main() {
     fflush(stdout);
 
     // Test 1: UDP query returns HTTP port, client connects and gets 200 OK
-    BEGIN_TEST("Discovery: UDP query returns HTTP port, TCP client gets 200 OK");
+    BEGIN_TEST(
+        "Discovery: UDP query returns HTTP port, TCP client gets 200 OK");
     {
         // --- HTTP server ---
         DiscoveryTestServer httpServer(ServerBind{"127.0.0.1", Port{0}});
@@ -103,7 +103,8 @@ int main() {
         auto& clientUdp = clientUdpResult.value();
         REQUIRE(clientUdp.setReceiveTimeout(Milliseconds{500}));
 
-        const Endpoint beaconEndpoint{"127.0.0.1", beaconPort, AddressFamily::IPv4};
+        const Endpoint beaconEndpoint{
+            "127.0.0.1", beaconPort, AddressFamily::IPv4};
         const char query[] = "discover";
         int sent = clientUdp.sendTo(query, sizeof(query) - 1, beaconEndpoint);
         REQUIRE(sent == static_cast<int>(sizeof(query) - 1));
@@ -111,13 +112,14 @@ int main() {
         // Receive the beacon's reply
         char replyBuf[64] = {};
         Endpoint replyFrom;
-        int rn = clientUdp.receiveFrom(replyBuf, sizeof(replyBuf) - 1, replyFrom);
+        int rn
+            = clientUdp.receiveFrom(replyBuf, sizeof(replyBuf) - 1, replyFrom);
         REQUIRE(rn > 0);
 
         beaconThread.join();
 
-        const Port discoveredPort{
-            static_cast<uint16_t>(std::stoi(std::string(replyBuf, static_cast<size_t>(rn))))};
+        const Port discoveredPort{static_cast<uint16_t>(
+            std::stoi(std::string(replyBuf, static_cast<size_t>(rn))))};
         REQUIRE(discoveredPort.value() == httpPort.value());
 
         // --- TCP: connect to discovered port, verify HTTP response ---
@@ -128,8 +130,8 @@ int main() {
         auto& tcp = tcpResult.value();
         REQUIRE(tcp.setReceiveTimeout(Milliseconds{1000}));
 
-        const std::string req =
-            "GET / HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n";
+        const std::string req
+            = "GET / HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n";
         REQUIRE(tcp.sendAll(req.data(), req.size()));
 
         // Read until EOF (Connection: close means server closes after response)
