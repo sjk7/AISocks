@@ -300,6 +300,50 @@ static int waitForWritableSlice_(SocketHandle socketHandle, int evFd,
 #endif
 }
 
+// ---------------------------------------------------------------------------
+// openConnectEvFd_
+//
+// Creates a kqueue/epoll fd and registers socketHandle for writable events.
+// On Windows, evFdOut is set to -1 (WSAPoll is per-call; no persistent fd).
+// Returns true on success; on failure fills errOut and returns false.
+// ---------------------------------------------------------------------------
+static bool openConnectEvFd_(SocketHandle socketHandle, int& evFdOut,
+    std::string& errOut) {
+#if defined(__APPLE__) || defined(__FreeBSD__)
+    evFdOut = ::kqueue();
+    if (evFdOut == -1) {
+        errOut = "kqueue() failed during connect";
+        return false;
+    }
+    struct kevent reg{};
+    EV_SET(&reg, static_cast<uintptr_t>(socketHandle), EVFILT_WRITE,
+        EV_ADD | EV_ENABLE, 0, 0, nullptr);
+    if (::kevent(evFdOut, &reg, 1, nullptr, 0, nullptr) == -1) {
+        errOut = "kevent() registration failed during connect";
+        return false;
+    }
+    return true;
+#elif defined(__linux__)
+    evFdOut = ::epoll_create1(EPOLL_CLOEXEC);
+    if (evFdOut == -1) {
+        errOut = "epoll_create1() failed during connect";
+        return false;
+    }
+    struct epoll_event epev{};
+    epev.events = EPOLLOUT | EPOLLERR;
+    epev.data.fd = socketHandle;
+    if (::epoll_ctl(evFdOut, EPOLL_CTL_ADD, socketHandle, &epev) == -1) {
+        errOut = "epoll_ctl() failed during connect";
+        return false;
+    }
+    return true;
+#else
+    (void)socketHandle;
+    evFdOut = -1; // WSAPoll: per-call, no persistent fd needed
+    return true;
+#endif
+}
+
 bool SocketImpl::connect(
     const std::string& address, Port port, Milliseconds timeout) {
     if (!isValid()) {
@@ -429,40 +473,13 @@ bool SocketImpl::connect(
         }
     } evFdGuard{evFd};
 
-#if defined(__APPLE__) || defined(__FreeBSD__)
-    evFd = ::kqueue();
-    if (evFd == -1) {
-        setError(SocketError::ConnectFailed, "kqueue() failed during connect");
-        return false;
-    }
     {
-        struct kevent reg{};
-        EV_SET(&reg, static_cast<uintptr_t>(socketHandle), EVFILT_WRITE,
-            EV_ADD | EV_ENABLE, 0, 0, nullptr);
-        if (::kevent(evFd, &reg, 1, nullptr, 0, nullptr) == -1) {
-            setError(SocketError::ConnectFailed,
-                "kevent() registration failed during connect");
+        std::string evErrMsg;
+        if (!openConnectEvFd_(socketHandle, evFd, evErrMsg)) {
+            setError(SocketError::ConnectFailed, std::move(evErrMsg));
             return false;
         }
     }
-#elif defined(__linux__)
-    evFd = ::epoll_create1(EPOLL_CLOEXEC);
-    if (evFd == -1) {
-        setError(SocketError::ConnectFailed,
-            "epoll_create1() failed during connect");
-        return false;
-    }
-    {
-        struct epoll_event epev{};
-        epev.events = EPOLLOUT | EPOLLERR;
-        epev.data.fd = socketHandle;
-        if (::epoll_ctl(evFd, EPOLL_CTL_ADD, socketHandle, &epev) == -1) {
-            setError(SocketError::ConnectFailed,
-                "epoll_ctl() failed during connect");
-            return false;
-        }
-    }
-#endif
 
     // Deadline loop: each iteration waits at most 100 ms so the monotonic
     // clock check stays responsive; EINTR restarts with the remaining slice.

@@ -72,6 +72,19 @@ bool HttpResponseParser::parseHexSize_(
     return true;
 }
 
+// static — Strips chunk-extensions (everything after ';', per RFC 7230 §4.1.1)
+// then delegates to parseHexSize_.  Returns nullopt on malformed input.
+std::optional<size_t> HttpResponseParser::parseChunkSize_(
+    std::string_view sizeLine) noexcept {
+    const size_t extPos = sizeLine.find(';');
+    const std::string_view hexStr = (extPos == std::string_view::npos)
+        ? sizeLine
+        : sizeLine.substr(0, extPos);
+    size_t out = 0;
+    if (!parseHexSize_(hexStr, out)) return std::nullopt;
+    return out;
+}
+
 void HttpResponseParser::markComplete_() {
     response_.valid = true;
     state_ = State::Complete;
@@ -283,21 +296,15 @@ HttpResponseParser::State HttpResponseParser::processChunked_() {
         const size_t crlfPos = bodyBuf_.find("\r\n", chunkScanPos_);
         if (crlfPos == std::string::npos) break; // need more data
 
-        // Parse hex chunk size
+        // Parse hex chunk size (chunk-extensions stripped inside parseChunkSize_)
         const std::string_view sizeLine(
             bodyBuf_.data() + chunkScanPos_, crlfPos - chunkScanPos_);
-
-        // Strip any chunk-extensions (after ';')
-        const size_t extPos = sizeLine.find(';');
-        const std::string_view hexStr = (extPos == std::string_view::npos)
-            ? sizeLine
-            : sizeLine.substr(0, extPos);
-
-        size_t chunkSize = 0;
-        if (!parseHexSize_(hexStr, chunkSize)) {
+        const auto optSize = parseChunkSize_(sizeLine);
+        if (!optSize) {
             markError_();
             return state_;
         }
+        const size_t chunkSize = *optSize;
 
         if (chunkSize == 0) {
             // Terminal chunk — skip "0\r\n" + optional trailers + "\r\n"

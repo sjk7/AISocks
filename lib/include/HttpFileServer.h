@@ -116,6 +116,9 @@ class HttpFileServer : public HttpPollServer {
     // Sends a 304 response and returns true if the client's copy is current.
     bool checkCacheConditions_(HttpClientState& state,
         const HttpRequest& request, const FileInfo& fileInfo);
+    // Validates filePath against path-traversal and symlink rules.
+    // Sends the appropriate 403 error and returns false on violation.
+    bool validateFilePath_(HttpClientState& state, const std::string& filePath);
 
     Config config_;
     FileCache fileCache_;

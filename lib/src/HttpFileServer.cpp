@@ -104,6 +104,20 @@ HttpFileServer::HttpFileServer(
     }
 }
 
+bool HttpFileServer::validateFilePath_(
+    HttpClientState& state, const std::string& filePath) {
+    if (!PathHelper::isPathWithin(filePath, config_.documentRoot)
+        && filePath != config_.documentRoot) {
+        sendError(state, 403, "Forbidden", "Access denied");
+        return false;
+    }
+    if (PathHelper::hasSymlinkComponentWithin(filePath, config_.documentRoot)) {
+        sendError(state, 403, "Forbidden", "Symlinks are not allowed");
+        return false;
+    }
+    return true;
+}
+
 void HttpFileServer::buildResponse(HttpClientState& state) {
     auto request = HttpRequest::parse(state.request);
 
@@ -120,16 +134,7 @@ void HttpFileServer::buildResponse(HttpClientState& state) {
 
     std::string filePath = resolveFilePath(request.path);
 
-    if (!PathHelper::isPathWithin(filePath, config_.documentRoot)
-        && filePath != config_.documentRoot) {
-        sendError(state, 403, "Forbidden", "Access denied");
-        return;
-    }
-
-    if (PathHelper::hasSymlinkComponentWithin(filePath, config_.documentRoot)) {
-        sendError(state, 403, "Forbidden", "Symlinks are not allowed");
-        return;
-    }
+    if (!validateFilePath_(state, filePath)) return;
 
     FileInfo fileInfo = getFileInfo(filePath);
 
