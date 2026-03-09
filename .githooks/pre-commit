@@ -1,0 +1,74 @@
+#!/bin/bash
+#
+# Pre-commit hook: Block commits that leak personal information.
+#
+# This file is tracked in .githooks/ so it applies on every machine.
+# Activate it once per clone with:
+#   git config core.hooksPath .githooks
+#
+
+# Current user's home directory and username (resolved at runtime, never hardcoded)
+USER_HOME="$HOME"
+USER_NAME="$(whoami)"
+
+# On Windows (Git Bash / MSYS2) also match the native Windows path form,
+# e.g. C:\Users\username or C:/Users/username
+WIN_HOME=""
+WIN_HOME_SLASH=""
+if command -v cygpath &>/dev/null; then
+    WIN_HOME="$(cygpath -w "$USER_HOME" 2>/dev/null)"       # C:\Users\username
+    WIN_HOME_SLASH="$(cygpath -m "$USER_HOME" 2>/dev/null)" # C:/Users/username
+fi
+
+# On Windows, whoami may return DOMAIN\username — strip the domain part
+WIN_USER_NAME="$(echo "$USER_NAME" | sed 's/.*\\\\//')"
+
+# Build the list of forbidden patterns (skip empty strings)
+FORBIDDEN_PATTERNS=()
+[[ -n "$USER_NAME" ]]       && FORBIDDEN_PATTERNS+=("$USER_NAME")
+[[ -n "$USER_HOME" ]]       && FORBIDDEN_PATTERNS+=("$USER_HOME")
+[[ -n "$WIN_HOME" ]]        && FORBIDDEN_PATTERNS+=("$WIN_HOME")
+[[ -n "$WIN_HOME_SLASH" ]]  && FORBIDDEN_PATTERNS+=("$WIN_HOME_SLASH")
+# Only add the Windows username if it differs from the POSIX one
+[[ -n "$WIN_USER_NAME" && "$WIN_USER_NAME" != "$USER_NAME" ]] && \
+    FORBIDDEN_PATTERNS+=("$WIN_USER_NAME")
+
+echo "Checking for personal information leaks..."
+
+STAGED_FILES=$(git diff --cached --name-only)
+if [[ -z "$STAGED_FILES" ]]; then
+    echo "No staged files. Proceeding with commit."
+    exit 0
+fi
+
+LEAKED_FILES=()
+for pattern in "${FORBIDDEN_PATTERNS[@]}"; do
+    while IFS= read -r file; do
+        [[ -n "$file" ]] && LEAKED_FILES+=("$file")
+    done < <(echo "$STAGED_FILES" | xargs -I {} grep -liF "$pattern" {} 2>/dev/null)
+done
+
+# Deduplicate
+if [[ ${#LEAKED_FILES[@]} -gt 0 ]]; then
+    mapfile -t LEAKED_FILES < <(printf '%s\n' "${LEAKED_FILES[@]}" | sort -u)
+fi
+
+if [[ ${#LEAKED_FILES[@]} -gt 0 ]]; then
+    echo ""
+    echo "COMMIT BLOCKED: Personal information detected!"
+    echo ""
+    echo "The following staged files contain forbidden patterns:"
+    for file in "${LEAKED_FILES[@]}"; do
+        echo "  - $file"
+        for pattern in "${FORBIDDEN_PATTERNS[@]}"; do
+            grep -nF "$pattern" "$file" 2>/dev/null | head -3 | sed 's/^/      /'
+        done
+    done
+    echo ""
+    echo "Please replace absolute paths with \$HOME or relative paths."
+    echo "To bypass this check (NOT RECOMMENDED): git commit --no-verify"
+    exit 1
+fi
+
+echo "No personal information detected. Proceeding with commit."
+exit 0
