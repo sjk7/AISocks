@@ -200,37 +200,38 @@ HttpFileServer::FileInfo HttpFileServer::getFileInfo(
     return info;
 }
 
+// Returns true if the relative path `rel` contains any dotfile component that
+// should be blocked.  The first component ".well-known" is exempt (RFC 8615).
+static bool hasDotfileComponent_(const std::string& rel) {
+    size_t i = 0;
+    bool firstComponent = true;
+    while (i < rel.size()) {
+        while (i < rel.size() && rel[i] == '/') ++i;
+        if (i >= rel.size()) break;
+        const size_t j = rel.find('/', i);
+        const std::string comp = (j == std::string::npos)
+            ? rel.substr(i)
+            : rel.substr(i, j - i);
+        if (!comp.empty() && comp[0] == '.') {
+            if (!(firstComponent && comp == ".well-known")) return true;
+        }
+        firstComponent = false;
+        if (j == std::string::npos) break;
+        i = j + 1;
+    }
+    return false;
+}
+
 bool HttpFileServer::isAccessAllowed(
     const std::string& filePath, const FileInfo& fileInfo) const {
     if (!fileInfo.exists) return false;
 
     // Block dotfiles/hidden dirs; allow /.well-known/
-    {
-        std::string root = PathHelper::normalizePath(config_.documentRoot);
-        std::string path = PathHelper::normalizePath(filePath);
-        if (!root.empty() && root.back() != '/') root.push_back('/');
-        if (path.size() >= root.size()
-            && path.compare(0, root.size(), root) == 0) {
-            const std::string rel = path.substr(root.size());
-            size_t i = 0;
-            bool firstComponent = true;
-            while (i < rel.size()) {
-                while (i < rel.size() && rel[i] == '/') ++i;
-                if (i >= rel.size()) break;
-                const size_t j = rel.find('/', i);
-                const std::string comp = (j == std::string::npos)
-                    ? rel.substr(i)
-                    : rel.substr(i, j - i);
-                if (!comp.empty() && comp[0] == '.') {
-                    if (!(firstComponent && comp == ".well-known")) {
-                        return false;
-                    }
-                }
-                firstComponent = false;
-                if (j == std::string::npos) break;
-                i = j + 1;
-            }
-        }
+    std::string root = PathHelper::normalizePath(config_.documentRoot);
+    std::string path = PathHelper::normalizePath(filePath);
+    if (!root.empty() && root.back() != '/') root.push_back('/');
+    if (path.size() >= root.size() && path.compare(0, root.size(), root) == 0) {
+        if (hasDotfileComponent_(path.substr(root.size()))) return false;
     }
 
     return true;
