@@ -29,11 +29,9 @@ int SocketFactory::captureLastError() {
 
 template <typename SocketType>
 Result<SocketType> SocketFactory::createSocketFromImpl(
-    std::unique_ptr<SocketImpl> impl, const char* operation,
-    AddressFamily family) {
+    std::unique_ptr<SocketImpl> impl, const char* operation) {
 
     if (!impl || !impl->isValid()) {
-        // Extract error information from the impl if available
         SocketError err = SocketError::CreateFailed;
         int sysCode = 0;
         const char* desc = operation;
@@ -48,25 +46,7 @@ Result<SocketType> SocketFactory::createSocketFromImpl(
         return Result<SocketType>::failure(err, desc, sysCode, false);
     }
 
-    // Create the appropriate socket type from the impl
-    if constexpr (std::is_same_v<SocketType, TcpSocket>) {
-        // For TcpSocket, we need to use the private constructor
-        // This requires SocketFactory to be a friend of TcpSocket
-        return Result<SocketType>::success(SocketType(std::move(impl)));
-    } else if constexpr (std::is_same_v<SocketType, UdpSocket>) {
-        // For UdpSocket, use the public constructor
-        // Note: We can't inject a custom impl, so we'll create a basic socket
-        // and check if it's valid
-        auto socket = SocketType(family);
-        if (!socket.isValid()) {
-            return Result<SocketType>::failure(socket.getLastError(), operation,
-                SocketFactory::captureLastError(), false);
-        }
-        return Result<SocketType>::success(std::move(socket));
-    } else {
-        return Result<SocketType>::failure(
-            SocketError::Unknown, "Unsupported socket type", 0, false);
-    }
+    return Result<SocketType>::success(SocketType(std::move(impl)));
 }
 
 Result<void> SocketFactory::checkSocketError(
@@ -108,31 +88,6 @@ Result<SocketType> SocketFactory::bindSocket(
     return Result<SocketType>::success(std::move(socket));
 }
 
-Result<TcpSocket> SocketFactory::connectSocket(
-    TcpSocket&& socket, const ConnectArgs& config) {
-    // Check socket validity first
-    auto valid_check = checkSocketError(socket, "connect()");
-    if (valid_check.isError()) {
-        return Result<TcpSocket>::failure(
-            valid_check.error(), valid_check.message().c_str(), 0, false);
-    }
-
-    // Attempt connection
-    if (!socket.connect(config.address, config.port, config.connectTimeout)) {
-        const char* desc = socket.getLastErrorIsDns() ? "DNS resolution failed"
-                                                      : "connect() failed";
-
-        // Get the correct system error code (DNS errors use gai code, not
-        // errno)
-        int sysCode = socket.getLastErrorSysCode();
-
-        return Result<TcpSocket>::failure(
-            socket.getLastError(), desc, sysCode, socket.getLastErrorIsDns());
-    }
-
-    return Result<TcpSocket>::success(std::move(socket));
-}
-
 // ---------------------------------------------------------------------------
 // Public method implementations
 // ---------------------------------------------------------------------------
@@ -144,7 +99,7 @@ Result<TcpSocket> SocketFactory::createTcpSocketRaw(AddressFamily family) {
 
 Result<UdpSocket> SocketFactory::createUdpSocketRaw(AddressFamily family) {
     auto impl = std::make_unique<SocketImpl>(SocketType::UDP, family);
-    return createSocketFromImpl<UdpSocket>(std::move(impl), "socket()", family);
+    return createSocketFromImpl<UdpSocket>(std::move(impl), "socket()");
 }
 
 Result<TcpSocket> SocketFactory::createTcpServer(
@@ -178,14 +133,23 @@ Result<TcpSocket> SocketFactory::createTcpServer(
 
 Result<TcpSocket> SocketFactory::createTcpClient(
     AddressFamily family, const ConnectArgs& config) {
-    // Create basic TCP socket
-    auto socket_result = createTcpSocketRaw(family);
-    if (socket_result.isError()) {
-        return socket_result;
+    auto impl = std::make_unique<SocketImpl>(SocketType::TCP, family);
+    if (!impl->isValid()) {
+        auto ctx = impl->getErrorContext();
+        return Result<TcpSocket>::failure(impl->getLastError(),
+            ctx.description ? ctx.description : "socket()", ctx.sysCode, false);
     }
 
-    // Connect the socket
-    return connectSocket(std::move(socket_result.value()), config);
+    TcpSocket socket(std::move(impl));
+
+    if (!socket.connect(config.address, config.port, config.connectTimeout)) {
+        const char* desc = socket.getLastErrorIsDns() ? "DNS resolution failed"
+                                                      : "connect() failed";
+        return Result<TcpSocket>::failure(socket.getLastError(), desc,
+            socket.getLastErrorSysCode(), socket.getLastErrorIsDns());
+    }
+
+    return Result<TcpSocket>::success(std::move(socket));
 }
 
 Result<UdpSocket> SocketFactory::createUdpServer(
@@ -260,12 +224,10 @@ Result<Port> SocketFactory::findAvailablePort(AddressFamily family,
 // ---------------------------------------------------------------------------
 
 template Result<TcpSocket> SocketFactory::createSocketFromImpl<TcpSocket>(
-    std::unique_ptr<SocketImpl> impl, const char* operation,
-    AddressFamily family);
+    std::unique_ptr<SocketImpl> impl, const char* operation);
 
 template Result<UdpSocket> SocketFactory::createSocketFromImpl<UdpSocket>(
-    std::unique_ptr<SocketImpl> impl, const char* operation,
-    AddressFamily family);
+    std::unique_ptr<SocketImpl> impl, const char* operation);
 
 template Result<TcpSocket> SocketFactory::bindSocket<TcpSocket>(
     TcpSocket&& socket, const ServerBind& config);

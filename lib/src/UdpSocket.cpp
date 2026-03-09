@@ -1,6 +1,6 @@
-// This is an independent project of an individual developer. Dear PVS-Studio, please check it.
-// PVS-Studio Static Code Analyzer for C, C++, C#, and Java: https://pvs-studio.com
-
+// This is an independent project of an individual developer. Dear PVS-Studio,
+// please check it. PVS-Studio Static Code Analyzer for C, C++, C#, and Java:
+// https://pvs-studio.com
 
 //
 // UdpSocket.cpp  does NOT include SocketImpl.h.  All operations are
@@ -10,9 +10,13 @@
 #include "pch.h"
 #endif
 #include "UdpSocket.h"
+#include "SocketImpl.h"
 
 namespace aiSocks {
 
 UdpSocket::UdpSocket(AddressFamily family) : Socket(SocketType::UDP, family) {}
+
+UdpSocket::UdpSocket(std::unique_ptr<SocketImpl> impl)
+    : Socket(std::move(impl)) {}
 
 } // namespace aiSocks

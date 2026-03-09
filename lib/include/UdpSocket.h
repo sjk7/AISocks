@@ -1,7 +1,8 @@
-// This is an independent project of an individual developer. Dear PVS-Studio, please check it.
+// This is an independent project of an individual developer. Dear PVS-Studio,
+// please check it.
 
-// PVS-Studio Static Code Analyzer for C, C++, C#, and Java: https://pvs-studio.com
-
+// PVS-Studio Static Code Analyzer for C, C++, C#, and Java:
+// https://pvs-studio.com
 
 #ifndef AISOCKS_UDP_SOCKET_H
 #define AISOCKS_UDP_SOCKET_H
@@ -36,9 +37,12 @@ namespace aiSocks {
 // delete-through-Socket* is a compile-time error outside the hierarchy.
 // ---------------------------------------------------------------------------
 class UdpSocket : public Socket {
+    friend class SocketFactory;
+
     public:
     // Creates a UDP socket fd.
-    // On failure the socket is left invalid (isValid() == false); check getLastError().
+    // On failure the socket is left invalid (isValid() == false); check
+    // getLastError().
     explicit UdpSocket(AddressFamily family = AddressFamily::IPv4);
 
     // Public non-virtual destructor  chains to Socket::~Socket().
@@ -105,6 +109,11 @@ class UdpSocket : public Socket {
     // Limits how many hops (routers) a multicast packet can traverse.
     // Typical values: 1 (local network), 32 (local organization), 255 (global).
     bool setMulticastTTL(int ttl);
+
+    private:
+    // Used by SocketFactory to wrap a pre-constructed SocketImpl without
+    // opening a second OS socket fd.
+    explicit UdpSocket(std::unique_ptr<SocketImpl> impl);
 };
 
 } // namespace aiSocks

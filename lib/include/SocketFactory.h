@@ -100,8 +100,7 @@ class SocketFactory {
     // Helper methods for error handling
     template <typename SocketType>
     static Result<SocketType> createSocketFromImpl(
-        std::unique_ptr<SocketImpl> impl, const char* operation,
-        AddressFamily family = AddressFamily::IPv4);
+        std::unique_ptr<SocketImpl> impl, const char* operation);
 
     // Helper to extract error context from SocketImpl
     static Result<void> checkSocketError(
@@ -114,10 +113,6 @@ class SocketFactory {
     template <typename SocketType>
     static Result<SocketType> bindSocket(
         SocketType&& socket, const ServerBind& config);
-
-    // Helper for connect operations
-    static Result<TcpSocket> connectSocket(
-        TcpSocket&& socket, const ConnectArgs& config);
 };
 
 } // namespace aiSocks
