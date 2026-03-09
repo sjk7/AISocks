@@ -13,7 +13,7 @@ concurrency:
 
 jobs:
   build-and-test:
-    name: ${{ matrix.os }} / ${{ matrix.compiler }}
+    name: ${{ matrix.os }} / ${{ matrix.compiler }} / ${{ matrix.build_type }}
     runs-on: ${{ matrix.os }}
 
     strategy:
@@ -87,6 +87,34 @@ jobs:
             cmake_generator: Ninja
             build_type: RelWithDebInfo
 
+          # ---------------------------------------------------------------
+          # Sanitizer legs — Linux/Clang, Debug
+          # ASan and UBSan are incompatible with TSan; keep them separate.
+          # ---------------------------------------------------------------
+
+          # ASan + UBSan
+          - os: ubuntu-latest
+            compiler: clang (asan+ubsan)
+            cc: clang
+            cxx: clang++
+            cmake_generator: Ninja
+            build_type: Debug
+            sanitizer_flags: "-fsanitize=address,undefined -fno-omit-frame-pointer"
+            asan_options: "detect_leaks=1:strict_string_checks=1:detect_stack_use_after_return=1"
+            ubsan_options: "print_stacktrace=1:halt_on_error=1"
+            ctest_timeout: 120
+
+          # TSan
+          - os: ubuntu-latest
+            compiler: clang (tsan)
+            cc: clang
+            cxx: clang++
+            cmake_generator: Ninja
+            build_type: Debug
+            sanitizer_flags: "-fsanitize=thread -fno-omit-frame-pointer"
+            tsan_options: "halt_on_error=1:second_deadlock_stack=1"
+            ctest_timeout: 180
+
     steps:
       # ------------------------------------------------------------------ #
       # 1. Checkout                                                         #
@@ -132,12 +160,23 @@ jobs:
         env:
           CC: ${{ matrix.cc }}
           CXX: ${{ matrix.cxx }}
+          SANITIZER_FLAGS: ${{ matrix.sanitizer_flags }}
         run: |
-          cmake -S . -B build \
-            -G "${{ matrix.cmake_generator }}" \
-            -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
-            -DBUILD_TESTS=ON \
+          CMAKE_ARGS=(
+            -S . -B build
+            -G "${{ matrix.cmake_generator }}"
+            -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
+            -DBUILD_TESTS=ON
             -DBUILD_EXAMPLES=OFF
+          )
+          if [[ -n "$SANITIZER_FLAGS" ]]; then
+            CMAKE_ARGS+=(
+              "-DCMAKE_C_FLAGS=$SANITIZER_FLAGS"
+              "-DCMAKE_CXX_FLAGS=$SANITIZER_FLAGS"
+              "-DCMAKE_EXE_LINKER_FLAGS=$SANITIZER_FLAGS"
+            )
+          fi
+          cmake "${CMAKE_ARGS[@]}"
 
       # ------------------------------------------------------------------ #
       # 4. Build                                                            #
@@ -157,10 +196,14 @@ jobs:
       - name: Run tests
         shell: bash
         working-directory: build
+        env:
+          ASAN_OPTIONS: ${{ matrix.asan_options }}
+          UBSAN_OPTIONS: ${{ matrix.ubsan_options }}
+          TSAN_OPTIONS: ${{ matrix.tsan_options }}
         run: |
           ctest --output-on-failure \
                 --no-compress-output \
-                --timeout 60 \
+                --timeout ${{ matrix.ctest_timeout || 60 }} \
                 --parallel 4
 
       # ------------------------------------------------------------------ #
