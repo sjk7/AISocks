@@ -1,7 +1,6 @@
-// This is an independent project of an individual developer. Dear PVS-Studio, please check it.
-// PVS-Studio Static Code Analyzer for C, C++, C#, and Java: https://pvs-studio.com
-
-
+// This is an independent project of an individual developer. Dear PVS-Studio,
+// please check it. PVS-Studio Static Code Analyzer for C, C++, C#, and Java:
+// https://pvs-studio.com
 
 // SocketImplHelpers.cpp - Helper functions for SocketImpl
 // Extracted for better code organization
@@ -126,7 +125,8 @@ SocketError resolveToSockaddr(const std::string& address, Port port,
     AddressFamily family, SocketType sockType, bool doDns,
     sockaddr_storage& out, socklen_t& outLen, int* gaiErr) {
     if (family == AddressFamily::IPv6)
-        return resolveIPv6_(address, port, sockType, doDns, out, outLen, gaiErr);
+        return resolveIPv6_(
+            address, port, sockType, doDns, out, outLen, gaiErr);
     return resolveIPv4_(address, port, sockType, doDns, out, outLen, gaiErr);
 }
 
@@ -171,14 +171,12 @@ std::string formatErrorContext(const ErrorContext& ctx) {
 static std::vector<NetworkInterface> getLocalAddressesWindows_() {
     std::vector<NetworkInterface> interfaces;
     WSADATA wsaData;
-    if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0)
-        return interfaces;
+    if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) return interfaces;
 
     ULONG bufferSize = 15000;
     PIP_ADAPTER_ADDRESSES addresses = nullptr;
     for (;;) {
-        addresses
-            = reinterpret_cast<PIP_ADAPTER_ADDRESSES>(malloc(bufferSize));
+        addresses = reinterpret_cast<PIP_ADAPTER_ADDRESSES>(malloc(bufferSize));
         if (!addresses) break;
 
         ULONG result = GetAdaptersAddresses(AF_UNSPEC, GAA_FLAG_INCLUDE_PREFIX,
@@ -203,7 +201,8 @@ static std::vector<NetworkInterface> getLocalAddressesWindows_() {
                     if (sa->sa_family == AF_INET) {
                         char buf[INET_ADDRSTRLEN];
                         sockaddr_in* sin = reinterpret_cast<sockaddr_in*>(sa);
-                        inet_ntop(AF_INET, &sin->sin_addr, buf, INET_ADDRSTRLEN);
+                        inet_ntop(
+                            AF_INET, &sin->sin_addr, buf, INET_ADDRSTRLEN);
                         iface.address = buf;
                         iface.family = AddressFamily::IPv4;
                     } else if (sa->sa_family == AF_INET6) {
@@ -230,8 +229,7 @@ static std::vector<NetworkInterface> getLocalAddressesWindows_() {
 static std::vector<NetworkInterface> getLocalAddressesUnix_() {
     std::vector<NetworkInterface> interfaces;
     struct ifaddrs* ifaddr = nullptr;
-    if (getifaddrs(&ifaddr) != 0)
-        return interfaces;
+    if (getifaddrs(&ifaddr) != 0) return interfaces;
 
     for (struct ifaddrs* ifa = ifaddr; ifa != nullptr; ifa = ifa->ifa_next) {
         if (!ifa->ifa_addr) continue;

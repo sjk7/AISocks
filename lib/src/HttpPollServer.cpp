@@ -149,8 +149,7 @@ ServerResult HttpPollServer::onReadable(TcpSocket& sock, HttpClientState& s) {
 
             if (s.request.size() > MAX_REQUEST_BYTES) {
                 s.responseBuf = makeResponse("HTTP/1.1 413 Payload Too Large",
-                    "text/plain; charset=utf-8", "Request too large.\n",
-                    false);
+                    "text/plain; charset=utf-8", "Request too large.\n", false);
                 s.responseView = s.responseBuf;
                 s.closeAfterSend = true;
                 setClientWritable(sock, true);

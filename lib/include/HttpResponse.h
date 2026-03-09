@@ -162,8 +162,10 @@ class HttpResponseParser {
     State advanceAfterHeaders_();
     void determineBodyMode_();
     static bool parseHexSize_(std::string_view hexStr, size_t& out) noexcept;
-    // Strips chunk-extensions (RFC 7230 §4.1.1) then delegates to parseHexSize_.
-    static std::optional<size_t> parseChunkSize_(std::string_view sizeLine) noexcept;
+    // Strips chunk-extensions (RFC 7230 §4.1.1) then delegates to
+    // parseHexSize_.
+    static std::optional<size_t> parseChunkSize_(
+        std::string_view sizeLine) noexcept;
 
     // ---- buffers --------------------------------------------------------
     // inBuf_      — accumulates raw bytes until \r\n\r\n is found

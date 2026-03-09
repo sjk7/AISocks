@@ -53,10 +53,8 @@ static uint32_t interestToEpollEvents(PollEvent interest) {
 //   otherwise → value clamped to INT_MAX
 static int toEpollTimeout_(Milliseconds timeout) {
     int64_t ms = timeout.count;
-    if (ms == std::numeric_limits<int64_t>::max())
-        return -1; // block forever
-    if (ms <= 0)
-        return 1;
+    if (ms == std::numeric_limits<int64_t>::max()) return -1; // block forever
+    if (ms <= 0) return 1;
     return static_cast<int>(std::min(ms, static_cast<int64_t>(INT_MAX)));
 }
 

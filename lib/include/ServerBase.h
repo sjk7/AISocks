@@ -214,8 +214,8 @@ template <typename ClientData> class ServerBase {
         loop_.run(
             timeout,
             [&](TcpSocket& sock, PollEvent ev) {
-                return handleSocketEvent_(sock, ev, accepting, maxClients,
-                    accepted);
+                return handleSocketEvent_(
+                    sock, ev, accepting, maxClients, accepted);
             },
             [&](bool idle) {
                 return handleAfterBatch_(idle, accepting, maxClients);
@@ -557,8 +557,7 @@ template <typename ClientData> class ServerBase {
     bool handleSocketEvent_(TcpSocket& sock, PollEvent ev, bool& accepting,
         ClientLimit maxClients, size_t& accepted) {
         if (&sock == listener_.get()) {
-            if (accepting)
-                drainAccept(loop_, accepting, accepted, maxClients);
+            if (accepting) drainAccept(loop_, accepting, accepted, maxClients);
             return true;
         }
 
@@ -587,8 +586,8 @@ template <typename ClientData> class ServerBase {
             disconnectClient_(cfd, *ce);
             resumeAcceptIfNeeded_(accepting, maxClients);
 #ifdef SERVER_STATS
-            printf("[stats] clients: %zu  peak: %zu\n",
-                clientFds_.size(), peak_clients_);
+            printf("[stats] clients: %zu  peak: %zu\n", clientFds_.size(),
+                peak_clients_);
 #endif
         }
         return true;

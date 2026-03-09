@@ -307,8 +307,8 @@ static int waitForWritableSlice_(SocketHandle socketHandle, int evFd,
 // On Windows, evFdOut is set to -1 (WSAPoll is per-call; no persistent fd).
 // Returns true on success; on failure fills errOut and returns false.
 // ---------------------------------------------------------------------------
-static bool openConnectEvFd_(SocketHandle socketHandle, int& evFdOut,
-    std::string& errOut) {
+static bool openConnectEvFd_(
+    SocketHandle socketHandle, int& evFdOut, std::string& errOut) {
 #if defined(__APPLE__) || defined(__FreeBSD__)
     evFdOut = ::kqueue();
     if (evFdOut == -1) {

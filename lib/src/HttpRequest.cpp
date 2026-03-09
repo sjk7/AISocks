@@ -67,8 +67,8 @@ static bool parseRequestLine_(std::string_view requestLine, HttpRequest& req) {
 // Parses HTTP header fields from `headerSection` starting after the first CRLF
 // (`firstCRLF`).  Keys are lowercased; values have leading/trailing OWS
 // trimmed.
-static void parseHeaderFields_(std::string_view headerSection, size_t firstCRLF,
-    HttpRequest& req) {
+static void parseHeaderFields_(
+    std::string_view headerSection, size_t firstCRLF, HttpRequest& req) {
     size_t pos = firstCRLF + 2;
     while (pos < headerSection.size()) {
         const auto lineEnd = headerSection.find("\r\n", pos);
@@ -158,8 +158,7 @@ HttpRequest HttpRequest::parse(const std::string& raw) {
     if (firstCRLF != std::string_view::npos)
         parseHeaderFields_(headerSection, firstCRLF, req);
 
-    if (!req.queryString.empty())
-        parseQueryParams_(req);
+    if (!req.queryString.empty()) parseQueryParams_(req);
 
     req.valid = true;
     return req;

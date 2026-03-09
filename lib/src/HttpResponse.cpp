@@ -296,7 +296,8 @@ HttpResponseParser::State HttpResponseParser::processChunked_() {
         const size_t crlfPos = bodyBuf_.find("\r\n", chunkScanPos_);
         if (crlfPos == std::string::npos) break; // need more data
 
-        // Parse hex chunk size (chunk-extensions stripped inside parseChunkSize_)
+        // Parse hex chunk size (chunk-extensions stripped inside
+        // parseChunkSize_)
         const std::string_view sizeLine(
             bodyBuf_.data() + chunkScanPos_, crlfPos - chunkScanPos_);
         const auto optSize = parseChunkSize_(sizeLine);

@@ -149,8 +149,7 @@ static struct timespec* toKqueueTimeout_(
     int64_t ms = timeout.count;
     if (ms == std::numeric_limits<int64_t>::max())
         return nullptr; // block forever
-    if (ms <= 0)
-        ms = 1;
+    if (ms <= 0) ms = 1;
     ts.tv_sec = static_cast<time_t>(ms / 1000);
     ts.tv_nsec = static_cast<long>((ms % 1000) * 1000000L);
     return &ts;

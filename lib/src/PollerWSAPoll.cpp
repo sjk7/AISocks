@@ -91,10 +91,8 @@ bool Poller::remove(const Socket& s) {
 // so WSAPoll must return frequently enough for the stop flag to be observed.
 static int toWSAPollTimeout_(Milliseconds timeout) {
     int64_t ms = timeout.count;
-    if (ms == std::numeric_limits<int64_t>::max())
-        return -1; // block forever
-    if (ms <= 0)
-        ms = 1;
+    if (ms == std::numeric_limits<int64_t>::max()) return -1; // block forever
+    if (ms <= 0) ms = 1;
     static constexpr int MAX_WAIT_MS = 100;
     return (ms > MAX_WAIT_MS) ? MAX_WAIT_MS : static_cast<int>(ms);
 }
@@ -109,16 +107,13 @@ static uint8_t translateWSAPollBits_(SHORT rev) {
         bits |= static_cast<uint8_t>(PollEvent::Writable);
     // POLLHUP = remote closed cleanly (TCP FIN) -- treat as readable so
     // the normal recv()==0 path handles the disconnect gracefully.
-    if ((rev & POLLHUP) != 0)
-        bits |= static_cast<uint8_t>(PollEvent::Readable);
+    if ((rev & POLLHUP) != 0) bits |= static_cast<uint8_t>(PollEvent::Readable);
     // POLLERR can fire with SO_ERROR==0 for connection resets on Windows --
     // treat as readable so recv() surfaces the actual condition rather than
     // triggering a spurious onError(code=0) log.
-    if ((rev & POLLERR) != 0)
-        bits |= static_cast<uint8_t>(PollEvent::Readable);
+    if ((rev & POLLERR) != 0) bits |= static_cast<uint8_t>(PollEvent::Readable);
     // POLLNVAL is a genuine programming error (invalid fd).
-    if ((rev & POLLNVAL) != 0)
-        bits |= static_cast<uint8_t>(PollEvent::Error);
+    if ((rev & POLLNVAL) != 0) bits |= static_cast<uint8_t>(PollEvent::Error);
     return bits;
 }
 
