@@ -1,7 +1,8 @@
-// This is an independent project of an individual developer. Dear PVS-Studio, please check it.
+// This is an independent project of an individual developer. Dear PVS-Studio,
+// please check it.
 
-// PVS-Studio Static Code Analyzer for C, C++, C#, and Java: https://pvs-studio.com
-
+// PVS-Studio Static Code Analyzer for C, C++, C#, and Java:
+// https://pvs-studio.com
 
 #ifndef AISOCKS_SOCKET_FACTORY_H
 #define AISOCKS_SOCKET_FACTORY_H
@@ -113,9 +114,6 @@ class SocketFactory {
     template <typename SocketType>
     static Result<SocketType> bindSocket(
         SocketType&& socket, const ServerBind& config);
-
-    // Helper for listen operations
-    static Result<TcpSocket> listenSocket(TcpSocket&& socket, int backlog);
 
     // Helper for connect operations
     static Result<TcpSocket> connectSocket(

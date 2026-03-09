@@ -1,6 +1,6 @@
-// This is an independent project of an individual developer. Dear PVS-Studio, please check it.
-// PVS-Studio Static Code Analyzer for C, C++, C#, and Java: https://pvs-studio.com
-
+// This is an independent project of an individual developer. Dear PVS-Studio,
+// please check it. PVS-Studio Static Code Analyzer for C, C++, C#, and Java:
+// https://pvs-studio.com
 
 #ifdef _WIN32
 #include "pch.h"
@@ -108,24 +108,6 @@ Result<SocketType> SocketFactory::bindSocket(
     return Result<SocketType>::success(std::move(socket));
 }
 
-Result<TcpSocket> SocketFactory::listenSocket(TcpSocket&& socket, int backlog) {
-    // Check socket validity first
-    auto valid_check = checkSocketError(socket, "listen()");
-    if (valid_check.isError()) {
-        return Result<TcpSocket>::failure(
-            valid_check.error(), valid_check.message().c_str(), 0, false);
-    }
-
-    // Start listening
-    if (!socket.listen(backlog)) {
-        return Result<TcpSocket>::failure(socket.getLastError(),
-            ("listen(backlog=" + std::to_string(backlog) + ")").c_str(),
-            SocketFactory::captureLastError(), false);
-    }
-
-    return Result<TcpSocket>::success(std::move(socket));
-}
-
 Result<TcpSocket> SocketFactory::connectSocket(
     TcpSocket&& socket, const ConnectArgs& config) {
     // Check socket validity first
@@ -167,20 +149,30 @@ Result<UdpSocket> SocketFactory::createUdpSocketRaw(AddressFamily family) {
 
 Result<TcpSocket> SocketFactory::createTcpServer(
     AddressFamily family, const ServerBind& config) {
-    // Create basic TCP socket
-    auto socket_result = createTcpSocketRaw(family);
-    if (socket_result.isError()) {
-        return socket_result;
+    auto impl = std::make_unique<SocketImpl>(SocketType::TCP, family);
+    if (!impl->isValid()) {
+        auto ctx = impl->getErrorContext();
+        return Result<TcpSocket>::failure(impl->getLastError(),
+            ctx.description ? ctx.description : "socket()", ctx.sysCode, false);
     }
 
-    // Bind the socket
-    auto bind_result = bindSocket(std::move(socket_result.value()), config);
-    if (bind_result.isError()) {
-        return bind_result; // NRVO will move the Result to preserve error info
-    }
+    TcpSocket socket(std::move(impl));
 
-    // Start listening
-    return listenSocket(std::move(bind_result.value()), config.backlog);
+    if (config.reuseAddr && !socket.setReuseAddress(true))
+        return Result<TcpSocket>::failure(socket.getLastError(),
+            "setsockopt(SO_REUSEADDR)", captureLastError(), false);
+
+    if (!socket.bind(config.address, config.port))
+        return Result<TcpSocket>::failure(socket.getLastError(),
+            "bind() failed - address already in use or invalid",
+            captureLastError(), false);
+
+    if (!socket.listen(config.backlog))
+        return Result<TcpSocket>::failure(socket.getLastError(),
+            ("listen(backlog=" + std::to_string(config.backlog) + ")").c_str(),
+            captureLastError(), false);
+
+    return Result<TcpSocket>::success(std::move(socket));
 }
 
 Result<TcpSocket> SocketFactory::createTcpClient(
