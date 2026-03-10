@@ -7,7 +7,9 @@
 #ifndef AISOCKS_UNIX_SOCKET_H
 #define AISOCKS_UNIX_SOCKET_H
 
-#ifndef _WIN32
+#include "AISocksConfig.h"
+
+#ifdef AISOCKS_HAVE_UNIX_SOCKETS
 
 #include "Socket.h"
 
@@ -39,5 +41,5 @@ private:
 
 } // namespace aiSocks
 
-#endif // !_WIN32
+#endif // AISOCKS_HAVE_UNIX_SOCKETS
 #endif // AISOCKS_UNIX_SOCKET_H

@@ -30,7 +30,7 @@ namespace {
 // ---------------------------------------------------------------------------
 
 bool Endpoint::isLoopback() const {
-#ifndef _WIN32
+#ifdef AISOCKS_HAVE_UNIX_SOCKETS
     if (family == AddressFamily::Unix) return true; // always local
 #endif
     if (family == AddressFamily::IPv4) {
@@ -44,7 +44,7 @@ bool Endpoint::isLoopback() const {
 }
 
 bool Endpoint::isPrivateNetwork() const {
-#ifndef _WIN32
+#ifdef AISOCKS_HAVE_UNIX_SOCKETS
     if (family == AddressFamily::Unix) return true; // always local
 #endif
     if (family == AddressFamily::IPv4) {

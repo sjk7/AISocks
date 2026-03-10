@@ -97,9 +97,9 @@ class SocketFactory {
         Port startPort = Port{49152}, // Start of ephemeral range
         Port endPort = Port{65535});
 
-#ifndef _WIN32
+#ifdef AISOCKS_HAVE_UNIX_SOCKETS
     // -----------------------------------------------------------------------
-    // Unix domain socket creation (Linux/macOS only)
+    // Unix domain socket creation
     // -----------------------------------------------------------------------
 
     // Create a Unix stream server (bound and listening).
@@ -108,9 +108,12 @@ class SocketFactory {
     // Create a connected Unix stream client.
     static Result<UnixSocket> createUnixClient(UnixPath path);
 
+#ifndef _WIN32
     // Create a connected anonymous pair (no filesystem path needed).
+    // Uses POSIX socketpair() — not available on Windows.
     static std::pair<Result<UnixSocket>, Result<UnixSocket>> createUnixPair();
-#endif
+#endif // !_WIN32
+#endif // AISOCKS_HAVE_UNIX_SOCKETS
 
     private:
     // Helper methods for error handling

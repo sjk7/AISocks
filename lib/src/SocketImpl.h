@@ -26,6 +26,9 @@
 using SocketHandle = SOCKET;
 #define INVALID_SOCKET_HANDLE INVALID_SOCKET
 #define SOCKET_ERROR_CODE SOCKET_ERROR
+#ifdef AISOCKS_HAVE_UNIX_SOCKETS
+#include <afunix.h>      // sockaddr_un for AF_UNIX (Windows 10 RS4+)
+#endif
 #else
 #include <sys/socket.h>
 #include <sys/types.h>
@@ -38,8 +41,10 @@ using SocketHandle = SOCKET;
 #include <ifaddrs.h>
 #include <net/if.h> // IFF_LOOPBACK
 #include <netinet/tcp.h>
-#include <sys/un.h>      // sockaddr_un for AF_UNIX
 using SocketHandle = int;
+#ifdef AISOCKS_HAVE_UNIX_SOCKETS
+#include <sys/un.h>      // sockaddr_un for AF_UNIX
+#endif
 #define INVALID_SOCKET_HANDLE -1
 #define SOCKET_ERROR_CODE -1
 #endif

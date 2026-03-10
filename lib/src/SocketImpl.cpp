@@ -71,7 +71,7 @@ SocketImpl::SocketImpl(SocketType type, AddressFamily family)
     , blockingMode(true) {
     platformInit();
 
-#ifndef _WIN32
+#ifdef AISOCKS_HAVE_UNIX_SOCKETS
     int af = (family == AddressFamily::Unix)  ? AF_UNIX
            : (family == AddressFamily::IPv6)  ? AF_INET6
                                               : AF_INET;
@@ -80,7 +80,7 @@ SocketImpl::SocketImpl(SocketType type, AddressFamily family)
 #endif
     int sockType = (type == SocketType::TCP) ? SOCK_STREAM : SOCK_DGRAM;
     int protocol =
-#ifndef _WIN32
+#ifdef AISOCKS_HAVE_UNIX_SOCKETS
         (family == AddressFamily::Unix) ? 0 :
 #endif
         (type == SocketType::TCP) ? IPPROTO_TCP : IPPROTO_UDP;
@@ -224,7 +224,7 @@ std::unique_ptr<SocketImpl> SocketImpl::accept() {
         if (clientSocket != INVALID_SOCKET_HANDLE) {
             int sa_fam = reinterpret_cast<sockaddr*>(&clientAddr)->sa_family;
             AddressFamily clientFamily =
-#ifndef _WIN32
+#ifdef AISOCKS_HAVE_UNIX_SOCKETS
                 (sa_fam == AF_UNIX)  ? AddressFamily::Unix  :
 #endif
                 (sa_fam == AF_INET6) ? AddressFamily::IPv6  :
@@ -1241,7 +1241,7 @@ bool SocketImpl::isBlocking() const noexcept {
 // -----------------------------------------------------------------------
 Endpoint SocketImpl::endpointFromSockaddr(const sockaddr_storage& addr) {
     Endpoint ep;
-#ifndef _WIN32
+#ifdef AISOCKS_HAVE_UNIX_SOCKETS
     if (addr.ss_family == AF_UNIX) {
         ep.family = AddressFamily::Unix;
         ep.port   = Port{0};
@@ -1249,7 +1249,7 @@ Endpoint SocketImpl::endpointFromSockaddr(const sockaddr_storage& addr) {
         ep.address = un->sun_path; // may be empty for anonymous sockets
         return ep;
     }
-#endif
+#endif // AISOCKS_HAVE_UNIX_SOCKETS
     if (addr.ss_family == AF_INET6) {
         ep.family = AddressFamily::IPv6;
         const auto* a6 = reinterpret_cast<const sockaddr_in6*>(&addr);

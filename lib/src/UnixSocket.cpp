@@ -4,9 +4,10 @@
 // PVS-Studio Static Code Analyzer for C, C++, C#, and Java:
 // https://pvs-studio.com
 
-#ifndef _WIN32
 #include "UnixSocket.h"
 #include "SocketImpl.h"
+
+#ifdef AISOCKS_HAVE_UNIX_SOCKETS
 
 namespace aiSocks {
 

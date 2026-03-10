@@ -21,7 +21,13 @@
 #include <netdb.h>
 #include <ifaddrs.h>
 #include <net/if.h>
+#endif
+#ifdef AISOCKS_HAVE_UNIX_SOCKETS
+#ifdef _WIN32
+#include <afunix.h>
+#else
 #include <sys/un.h>
+#endif
 #endif
 
 namespace aiSocks {
@@ -125,7 +131,7 @@ static SocketError resolveIPv4_(const std::string& address, Port port,
 SocketError resolveToSockaddr(const std::string& address, Port port,
     AddressFamily family, SocketType sockType, bool doDns,
     sockaddr_storage& out, socklen_t& outLen, int* gaiErr) {
-#ifndef _WIN32
+#ifdef AISOCKS_HAVE_UNIX_SOCKETS
     if (family == AddressFamily::Unix) {
         if (address.empty()) return SocketError::BindFailed;
         if (address.size() >= sizeof(sockaddr_un::sun_path))
@@ -139,7 +145,7 @@ SocketError resolveToSockaddr(const std::string& address, Port port,
             offsetof(sockaddr_un, sun_path) + address.size() + 1);
         return SocketError::None;
     }
-#endif
+#endif // AISOCKS_HAVE_UNIX_SOCKETS
     if (family == AddressFamily::IPv6)
         return resolveIPv6_(
             address, port, sockType, doDns, out, outLen, gaiErr);

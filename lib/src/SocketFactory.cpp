@@ -237,7 +237,7 @@ Result<UdpSocket> SocketFactory::createUdpSocket(AddressFamily family) {
     return createUdpSocketRaw(family);
 }
 
-#ifndef _WIN32
+#ifdef AISOCKS_HAVE_UNIX_SOCKETS
 Result<UnixSocket> SocketFactory::createUnixServer(UnixPath path) {
     auto impl = std::make_unique<SocketImpl>(SocketType::TCP, AddressFamily::Unix);
     if (!impl->isValid()) {
@@ -273,6 +273,7 @@ Result<UnixSocket> SocketFactory::createUnixClient(UnixPath path) {
     return Result<UnixSocket>::success(UnixSocket(std::move(impl)));
 }
 
+#ifndef _WIN32
 std::pair<Result<UnixSocket>, Result<UnixSocket>> SocketFactory::createUnixPair() {
     int fds[2];
     if (::socketpair(AF_UNIX, SOCK_STREAM, 0, fds) != 0) {
@@ -287,6 +288,7 @@ std::pair<Result<UnixSocket>, Result<UnixSocket>> SocketFactory::createUnixPair(
         Result<UnixSocket>::success(UnixSocket(std::move(implB)))
     };
 }
-#endif
+#endif // !_WIN32
+#endif // AISOCKS_HAVE_UNIX_SOCKETS
 
 } // namespace aiSocks

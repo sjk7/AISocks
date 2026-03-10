@@ -7,6 +7,7 @@
 #ifndef AISOCKS_SOCKET_TYPES_H
 #define AISOCKS_SOCKET_TYPES_H
 
+#include "AISocksConfig.h"
 #include <cstdint>
 #include <limits>
 #include <string>
@@ -231,7 +232,7 @@ inline const Port Port::any{};
 // Strong Unix socket path type.  Explicit construction only — passing a plain
 // std::string where UnixPath is expected is a compile error.  Mirrors Port.
 // Usage:  UnixPath p{"/tmp/foo.sock"};  p.value() → const std::string&
-#ifndef _WIN32
+#ifdef AISOCKS_HAVE_UNIX_SOCKETS
 class UnixPath {
     std::string path_;
 public:
@@ -240,7 +241,7 @@ public:
     bool operator==(const UnixPath& o) const noexcept { return path_ == o.path_; }
     bool operator!=(const UnixPath& o) const noexcept { return !(*this == o); }
 };
-#endif
+#endif // AISOCKS_HAVE_UNIX_SOCKETS
 
 // Network endpoint: an (address, port, family) triple returned by
 // getLocalEndpoint() and getPeerEndpoint(), and passed to sendTo().
