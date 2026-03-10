@@ -71,9 +71,19 @@ SocketImpl::SocketImpl(SocketType type, AddressFamily family)
     , blockingMode(true) {
     platformInit();
 
+#ifndef _WIN32
+    int af = (family == AddressFamily::Unix)  ? AF_UNIX
+           : (family == AddressFamily::IPv6)  ? AF_INET6
+                                              : AF_INET;
+#else
     int af = (family == AddressFamily::IPv6) ? AF_INET6 : AF_INET;
+#endif
     int sockType = (type == SocketType::TCP) ? SOCK_STREAM : SOCK_DGRAM;
-    int protocol = (type == SocketType::TCP) ? IPPROTO_TCP : IPPROTO_UDP;
+    int protocol =
+#ifndef _WIN32
+        (family == AddressFamily::Unix) ? 0 :
+#endif
+        (type == SocketType::TCP) ? IPPROTO_TCP : IPPROTO_UDP;
 
     socketHandle = socket(af, sockType, protocol);
 
@@ -212,11 +222,13 @@ std::unique_ptr<SocketImpl> SocketImpl::accept() {
             reinterpret_cast<sockaddr*>(&clientAddr), &clientAddrLen);
 
         if (clientSocket != INVALID_SOCKET_HANDLE) {
-            AddressFamily clientFamily
-                = (reinterpret_cast<sockaddr*>(&clientAddr)->sa_family
-                      == AF_INET6)
-                ? AddressFamily::IPv6
-                : AddressFamily::IPv4;
+            int sa_fam = reinterpret_cast<sockaddr*>(&clientAddr)->sa_family;
+            AddressFamily clientFamily =
+#ifndef _WIN32
+                (sa_fam == AF_UNIX)  ? AddressFamily::Unix  :
+#endif
+                (sa_fam == AF_INET6) ? AddressFamily::IPv6  :
+                                       AddressFamily::IPv4;
             auto child = std::make_unique<SocketImpl>(
                 clientSocket, socketType, clientFamily);
             propagateSocketProps(*child);
@@ -1229,6 +1241,15 @@ bool SocketImpl::isBlocking() const noexcept {
 // -----------------------------------------------------------------------
 Endpoint SocketImpl::endpointFromSockaddr(const sockaddr_storage& addr) {
     Endpoint ep;
+#ifndef _WIN32
+    if (addr.ss_family == AF_UNIX) {
+        ep.family = AddressFamily::Unix;
+        ep.port   = Port{0};
+        const auto* un = reinterpret_cast<const sockaddr_un*>(&addr);
+        ep.address = un->sun_path; // may be empty for anonymous sockets
+        return ep;
+    }
+#endif
     if (addr.ss_family == AF_INET6) {
         ep.family = AddressFamily::IPv6;
         const auto* a6 = reinterpret_cast<const sockaddr_in6*>(&addr);

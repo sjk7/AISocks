@@ -10,6 +10,7 @@ add_library(aiSocksLib STATIC
     src/SocketImpl.h
     src/SocketImplHelpers.cpp
     src/SocketFactory.cpp
+    src/UnixSocket.cpp
     src/Result.cpp
     src/ServerSignal.cpp
     src/PathHelper.cpp

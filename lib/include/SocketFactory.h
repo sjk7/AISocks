@@ -11,6 +11,7 @@
 #include "Socket.h"
 #include "TcpSocket.h"
 #include "UdpSocket.h"
+#include "UnixSocket.h"
 #include <memory>
 
 namespace aiSocks {
@@ -95,6 +96,21 @@ class SocketFactory {
         const std::string& address,
         Port startPort = Port{49152}, // Start of ephemeral range
         Port endPort = Port{65535});
+
+#ifndef _WIN32
+    // -----------------------------------------------------------------------
+    // Unix domain socket creation (Linux/macOS only)
+    // -----------------------------------------------------------------------
+
+    // Create a Unix stream server (bound and listening).
+    static Result<UnixSocket> createUnixServer(UnixPath path);
+
+    // Create a connected Unix stream client.
+    static Result<UnixSocket> createUnixClient(UnixPath path);
+
+    // Create a connected anonymous pair (no filesystem path needed).
+    static std::pair<Result<UnixSocket>, Result<UnixSocket>> createUnixPair();
+#endif
 
     private:
     // Helper methods for error handling

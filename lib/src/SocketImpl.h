@@ -38,6 +38,7 @@ using SocketHandle = SOCKET;
 #include <ifaddrs.h>
 #include <net/if.h> // IFF_LOOPBACK
 #include <netinet/tcp.h>
+#include <sys/un.h>      // sockaddr_un for AF_UNIX
 using SocketHandle = int;
 #define INVALID_SOCKET_HANDLE -1
 #define SOCKET_ERROR_CODE -1

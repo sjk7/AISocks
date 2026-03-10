@@ -36,6 +36,7 @@ set(TEST_SOURCES
     test_http_poll_server_simple
     test_security_malicious_clients
     test_udp_discovery
+    test_unix_socket
 )
 
 # Slow tests (disabled by default, enable with -DALLOW_SLOW_TESTS=ON)

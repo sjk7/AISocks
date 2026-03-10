@@ -30,6 +30,9 @@ namespace {
 // ---------------------------------------------------------------------------
 
 bool Endpoint::isLoopback() const {
+#ifndef _WIN32
+    if (family == AddressFamily::Unix) return true; // always local
+#endif
     if (family == AddressFamily::IPv4) {
         // Check for 127.x.x.x
         return address.compare(0, 4, "127.") == 0;
@@ -41,6 +44,9 @@ bool Endpoint::isLoopback() const {
 }
 
 bool Endpoint::isPrivateNetwork() const {
+#ifndef _WIN32
+    if (family == AddressFamily::Unix) return true; // always local
+#endif
     if (family == AddressFamily::IPv4) {
         // 10.0.0.0/8
         if (address.compare(0, 3, "10.") == 0) return true;

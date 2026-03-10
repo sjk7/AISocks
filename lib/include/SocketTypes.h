@@ -127,7 +127,7 @@ namespace Timeouts {
     inline constexpr Milliseconds Long{30000};
 } // namespace Timeouts
 
-enum class AddressFamily { IPv4, IPv6 };
+enum class AddressFamily { IPv4, IPv6, Unix };
 
 enum class SocketType { TCP, UDP };
 
@@ -227,6 +227,20 @@ class Port {
 
 // Port::any is defined here (after class body) because Port must be complete.
 inline const Port Port::any{};
+
+// Strong Unix socket path type.  Explicit construction only — passing a plain
+// std::string where UnixPath is expected is a compile error.  Mirrors Port.
+// Usage:  UnixPath p{"/tmp/foo.sock"};  p.value() → const std::string&
+#ifndef _WIN32
+class UnixPath {
+    std::string path_;
+public:
+    explicit UnixPath(std::string path) : path_(std::move(path)) {}
+    const std::string& value() const noexcept { return path_; }
+    bool operator==(const UnixPath& o) const noexcept { return path_ == o.path_; }
+    bool operator!=(const UnixPath& o) const noexcept { return !(*this == o); }
+};
+#endif
 
 // Network endpoint: an (address, port, family) triple returned by
 // getLocalEndpoint() and getPeerEndpoint(), and passed to sendTo().

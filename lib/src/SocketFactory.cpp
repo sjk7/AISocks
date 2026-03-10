@@ -8,6 +8,7 @@
 #include "SocketFactory.h"
 #include "SocketImpl.h"
 #include "SocketImplHelpers.h"
+#include "UnixSocket.h"
 #include <algorithm>
 
 namespace aiSocks {
@@ -235,5 +236,57 @@ Result<TcpSocket> SocketFactory::createTcpSocket(AddressFamily family) {
 Result<UdpSocket> SocketFactory::createUdpSocket(AddressFamily family) {
     return createUdpSocketRaw(family);
 }
+
+#ifndef _WIN32
+Result<UnixSocket> SocketFactory::createUnixServer(UnixPath path) {
+    auto impl = std::make_unique<SocketImpl>(SocketType::TCP, AddressFamily::Unix);
+    if (!impl->isValid()) {
+        auto ctx = impl->getErrorContext();
+        return Result<UnixSocket>::failure(impl->getLastError(),
+            ctx.description ? ctx.description : "socket()", ctx.sysCode, false);
+    }
+    if (!impl->bind(path.value(), Port{0})) {
+        auto ctx = impl->getErrorContext();
+        return Result<UnixSocket>::failure(impl->getLastError(),
+            ctx.description ? ctx.description : "bind() failed", ctx.sysCode, false);
+    }
+    if (!impl->listen(128)) {
+        auto ctx = impl->getErrorContext();
+        return Result<UnixSocket>::failure(impl->getLastError(),
+            ctx.description ? ctx.description : "listen() failed", ctx.sysCode, false);
+    }
+    return Result<UnixSocket>::success(UnixSocket(std::move(impl)));
+}
+
+Result<UnixSocket> SocketFactory::createUnixClient(UnixPath path) {
+    auto impl = std::make_unique<SocketImpl>(SocketType::TCP, AddressFamily::Unix);
+    if (!impl->isValid()) {
+        auto ctx = impl->getErrorContext();
+        return Result<UnixSocket>::failure(impl->getLastError(),
+            ctx.description ? ctx.description : "socket()", ctx.sysCode, false);
+    }
+    if (!impl->connect(path.value(), Port{0}, Milliseconds{0})) {
+        auto ctx = impl->getErrorContext();
+        return Result<UnixSocket>::failure(impl->getLastError(),
+            ctx.description ? ctx.description : "connect() failed", ctx.sysCode, false);
+    }
+    return Result<UnixSocket>::success(UnixSocket(std::move(impl)));
+}
+
+std::pair<Result<UnixSocket>, Result<UnixSocket>> SocketFactory::createUnixPair() {
+    int fds[2];
+    if (::socketpair(AF_UNIX, SOCK_STREAM, 0, fds) != 0) {
+        auto err = Result<UnixSocket>::failure(
+            SocketError::CreateFailed, "socketpair() failed", errno, false);
+        return {err, err};
+    }
+    auto implA = std::make_unique<SocketImpl>(fds[0], SocketType::TCP, AddressFamily::Unix);
+    auto implB = std::make_unique<SocketImpl>(fds[1], SocketType::TCP, AddressFamily::Unix);
+    return {
+        Result<UnixSocket>::success(UnixSocket(std::move(implA))),
+        Result<UnixSocket>::success(UnixSocket(std::move(implB)))
+    };
+}
+#endif
 
 } // namespace aiSocks
