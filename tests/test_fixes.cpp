@@ -211,7 +211,7 @@ static void test_signal_opt_out() {
 
     // The sensitive server should stop on its own.
     bool sensitiveStops
-        = waitFor([&] { return done1.load(); }, std::chrono::milliseconds{400});
+        = waitFor([&] { return done1.load(); }, std::chrono::milliseconds{150});
 
     // The immune server must still be running.
     bool immuneStillRunning = !done2.load();
@@ -272,7 +272,7 @@ static void test_on_error_returns_server_result() {
 
     // Connect then abruptly close with RST to trigger an error/hangup event.
     auto res = SocketFactory::createTcpClient(AddressFamily::IPv4,
-        ConnectArgs{"127.0.0.1", srvPort102, Milliseconds{200}});
+        ConnectArgs{"127.0.0.1", srvPort102, Milliseconds{50}});
 
     if (res.isSuccess()) {
         // SO_LINGER with l_onoff=1, l_linger=0 causes close() to send RST.
@@ -290,7 +290,7 @@ static void test_on_error_returns_server_result() {
     // simply detect the disconnect via a read of 0 and call onReadable first.
     // Either way, explicitly request stop to ensure the thread exits.
     bool stoppedByError
-        = waitFor([&] { return done.load(); }, std::chrono::milliseconds{400});
+        = waitFor([&] { return done.load(); }, std::chrono::milliseconds{150});
     if (!stoppedByError) {
         server.requestStop();
         waitFor([&] { return done.load(); });
@@ -322,12 +322,12 @@ static void test_on_idle_only_on_timeout() {
         std::thread t(
             [&] { server.run(ClientLimit::Unlimited, POLL_TIMEOUT); });
         server.waitReady();
-        std::this_thread::sleep_for(std::chrono::milliseconds{80});
+        std::this_thread::sleep_for(std::chrono::milliseconds{60});
         int idleNoClients = server.idleCalls.load();
         server.requestStop();
         t.join();
 
-        // With 10 ms poll timeout over 200 ms we expect ~20 idle calls.
+        // With 10 ms poll timeout over 60 ms we expect ~6 idle calls.
         // Use a conservative floor of 5 to be CI-friendly.
         REQUIRE_MSG(idleNoClients >= 5,
             "onIdle should fire many times when there are no clients (got "
@@ -353,7 +353,7 @@ static void test_on_idle_only_on_timeout() {
         server.waitReady();
 
         auto res = SocketFactory::createTcpClient(AddressFamily::IPv4,
-            ConnectArgs{"127.0.0.1", srvPort104, Milliseconds{200}});
+            ConnectArgs{"127.0.0.1", srvPort104, Milliseconds{50}});
         REQUIRE(res.isSuccess());
         auto client = std::make_unique<TcpSocket>(std::move(res.value()));
 
@@ -370,7 +370,7 @@ static void test_on_idle_only_on_timeout() {
         }
 
         // Give server time to process the data
-        std::this_thread::sleep_for(std::chrono::milliseconds{80});
+        std::this_thread::sleep_for(std::chrono::milliseconds{60});
 
         int idleAfterData = server.idleCalls.load();
         int readableAfterData = server.readableCalls.load();
