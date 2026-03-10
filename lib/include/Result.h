@@ -329,9 +329,10 @@ template <typename T> class [[nodiscard]] Result {
         int sysCode = 0, bool isDns = false) {
         return Result(error, description, sysCode, isDns);
     }
-    // Overload for when the full error message is already built as a string.
-    // Pre-seeds cachedMessage_ so description_ (a const char*) is not needed.
-    static Result failure(SocketError error, std::string message) {
+    // Cold-path only: use when the full message is already built as a string
+    // (e.g. forwarding getErrorMessage()). Named distinctly so it cannot be
+    // called accidentally in place of the zero-alloc const char* overload.
+    static Result failureOwned(SocketError error, std::string message) {
         Result r(error, nullptr, 0, false);
         r.cachedMessage_ = std::make_unique<std::string>(std::move(message));
         return r;
@@ -430,8 +431,10 @@ template <> class [[nodiscard]] Result<void> {
         int sysCode = 0, bool isDns = false) {
         return Result(error, description, sysCode, isDns);
     }
-    // Overload for when the full error message is already built as a string.
-    static Result failure(SocketError error, std::string message) {
+    // Cold-path only: use when the full message is already built as a string.
+    // Named distinctly so it cannot be called accidentally in place of the
+    // zero-alloc const char* overload.
+    static Result failureOwned(SocketError error, std::string message) {
         Result r(error, nullptr, 0, false);
         r.cachedMessage_ = std::make_unique<std::string>(std::move(message));
         return r;

@@ -144,7 +144,7 @@ Result<TcpSocket> SocketFactory::createTcpClient(
     TcpSocket socket(std::move(impl));
 
     if (!socket.connect(config.address, config.port, config.connectTimeout)) {
-        return Result<TcpSocket>::failure(socket.getLastError(),
+        return Result<TcpSocket>::failureOwned(socket.getLastError(),
             socket.getErrorMessage());
     }
 
