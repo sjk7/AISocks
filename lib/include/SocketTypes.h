@@ -65,15 +65,17 @@ constexpr Milliseconds operator/(Milliseconds a, int64_t b) noexcept {
 inline constexpr Milliseconds defaultTimeout{30000}; // 30 seconds
 inline constexpr Milliseconds defaultConnectTimeout{10000}; // 10 seconds
 
-// Pass as the poll timeout to Poller::wait() / ServerBase::run() to poll as
-// fast as possible (clamped to 1ms minimum to avoid busy-spinning).
+// Timeout semantics for Poller::wait() and ServerBase::run():
+//   Milliseconds{0}       — block until an event arrives (no periodic wake-up).
+//   Milliseconds < 0      — return after ~1 ms even if no events arrive
+//                           (fastest non-busy-spinning poll; use poll_min).
+//   Milliseconds > 0      — wait at most that many milliseconds.
+
+// Fast poll: return after 1 ms even if nothing is ready.
 inline constexpr Milliseconds poll_min{-1};
 
-// Pass as the poll timeout to Poller::wait() / ServerBase::run() to block
-// until an event arrives (no periodic wake-up).
-// NOTE: the pollers treat any value > 0 as an actual millisecond count, so
-// this uses INT64_MAX which is ~292 million years — effectively forever.
-inline constexpr Milliseconds wait_forever{std::numeric_limits<int64_t>::max()};
+// Block forever: do not return until at least one event arrives.
+inline constexpr Milliseconds wait_forever{0};
 
 // Platform listen() backlog constants.
 // All three OS values are always defined so the intent is readable everywhere.
@@ -319,20 +321,21 @@ struct ServerBind {
 // Returns invalid socket if connection fails - check isValid().
 //
 // connectTimeout controls how long to wait for the TCP handshake:
-//   defaultTimeout (30 s)  used when not specified.
-//   any positive duration  fails with SocketError::Timeout if not connected
-//                           within that duration.
-//   Milliseconds{0}        initiate the connect and return immediately with
-//                           getLastError() == WouldBlock (connect in progress).
-//                           The socket is left in whatever blocking mode it
-//                           was in before the call (BlockingGuard restores it).
-//                           For a Poller-driven async connect:
-//                             1. Call setBlocking(false) on the socket first.
-//                             2. Use connectTimeout = Milliseconds{0}.
-//                             3. Expect WouldBlock  that is not an error.
-//                             4. Register with a Poller (PollEvent::Writable).
-//                             5. Call getPeerEndpoint() after writable fires
-//                                to confirm success.
+//   defaultConnectTimeout (10 s)  used when not specified.
+//   any positive duration         fails with SocketError::Timeout if not
+//                                 connected within that duration.
+//   Milliseconds{0}               initiate the connect and return immediately
+//                                 with getLastError() == WouldBlock (connect
+//                                 in progress).  Note: this is a connect-
+//                                 specific meaning of 0 — it does NOT follow
+//                                 the Poller wait semantics.
+//                                 For a Poller-driven async connect:
+//                                   1. Call setBlocking(false) first.
+//                                   2. Use connectTimeout = Milliseconds{0}.
+//                                   3. Expect WouldBlock — that is not an error.
+//                                   4. Register with a Poller (PollEvent::Writable).
+//                                   5. Call getPeerEndpoint() after writable fires
+//                                      to confirm success.
 //
 // Note: DNS resolution is synchronous and not covered by this timeout.
 // Note: connect() is always issued on a non-blocking fd internally.

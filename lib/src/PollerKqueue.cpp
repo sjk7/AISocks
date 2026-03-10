@@ -142,14 +142,13 @@ bool Poller::remove(const Socket& s) {
 
 // Converts a Milliseconds timeout into a struct timespec for kevent().
 // Fills `ts` in-place and returns a pointer to it, or nullptr for "block
-// forever".  Clamps to 1ms minimum: a true zero-timeout busy-spins and
-// starves the TCP stack under load.
+// forever".  Clamps negative values to 1ms minimum to avoid busy-spinning.
 static struct timespec* toKqueueTimeout_(
     Milliseconds timeout, struct timespec& ts) {
     int64_t ms = timeout.count;
-    if (ms == std::numeric_limits<int64_t>::max())
-        return nullptr; // block forever
-    if (ms <= 0) ms = 1;
+    if (ms == 0)
+        return nullptr; // block forever: kevent with nullptr timeout waits indefinitely
+    if (ms < 0) ms = 1;
     ts.tv_sec = static_cast<time_t>(ms / 1000);
     ts.tv_nsec = static_cast<long>((ms % 1000) * 1000000L);
     return &ts;

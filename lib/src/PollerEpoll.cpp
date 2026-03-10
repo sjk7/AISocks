@@ -51,13 +51,13 @@ static uint32_t interestToEpollEvents(PollEvent interest) {
 }
 
 // Returns the epoll_wait() timeout in milliseconds.
-//   INT64_MAX → -1 (block forever)
-//   <= 0      → 1ms minimum (avoid busy-spin)
-//   otherwise → value clamped to INT_MAX
+//   == 0  → -1 (block forever: epoll_wait with -1 waits indefinitely)
+//   < 0   → 1ms minimum (avoid busy-spin)
+//   > 0   → value clamped to INT_MAX
 static int toEpollTimeout_(Milliseconds timeout) {
     int64_t ms = timeout.count;
-    if (ms == std::numeric_limits<int64_t>::max()) return -1; // block forever
-    if (ms <= 0) return 1;
+    if (ms == 0) return -1; // block forever
+    if (ms < 0) return 1;
     return static_cast<int>(std::min(ms, static_cast<int64_t>(INT_MAX)));
 }
 

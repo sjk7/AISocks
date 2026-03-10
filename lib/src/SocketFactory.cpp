@@ -265,7 +265,7 @@ Result<UnixSocket> SocketFactory::createUnixClient(UnixPath path) {
         return Result<UnixSocket>::failure(impl->getLastError(),
             ctx.description ? ctx.description : "socket()", ctx.sysCode, false);
     }
-    if (!impl->connect(path.value(), Port{0}, Milliseconds{0})) {
+    if (!impl->connect(path.value(), Port{0}, defaultConnectTimeout)) {
         auto ctx = impl->getErrorContext();
         return Result<UnixSocket>::failure(impl->getLastError(),
             ctx.description ? ctx.description : "connect() failed", ctx.sysCode, false);

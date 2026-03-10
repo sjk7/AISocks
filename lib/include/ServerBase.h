@@ -177,16 +177,18 @@ template <typename ClientData> class ServerBase {
     // maxClients: ClientLimit::Unlimited = unlimited; N > 0 = stop accepting
     // after N connections,
     //             but continue serving existing clients until all disconnect.
-    // timeout:    passed to Poller::wait(); INT64_MAX (wait_forever) blocks the
-    //             poller until an event arrives; any other value <= 0 is
-    //             clamped to 1ms (the minimum poll interval).
+    // timeout:    passed to Poller::wait().  Milliseconds{0} / wait_forever
+    //             blocks until an event arrives (most CPU-efficient).
+    //             Negative values (e.g. poll_min) return after ~1 ms even
+    //             with no events, driving periodic onIdle() callbacks.
+    //             Positive values wait at most that many milliseconds.
     //
     // Returns when there are no remaining connected clients (AND accepting is
     // stopped, either because maxClients was reached or you stopped
     // externally). Or via the thread-safe stop_ flag or if anything returns
     // ServerResult::StopServer from one of the, or if CTRL+C is detected.
     void run(ClientLimit maxClients = ClientLimit::Default,
-        Milliseconds timeout = Milliseconds{-1}) {
+        Milliseconds timeout = poll_min) {
         if (!isValid()) return;
 
         stop_.store(false, std::memory_order_relaxed);

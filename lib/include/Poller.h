@@ -70,13 +70,14 @@ class Poller {
     bool remove(const Socket& s);
 
     // Block until at least one registered socket becomes ready, or until
-    // `timeout` elapses.
+    // `timeout` elapses.  Semantics match the Milliseconds poll constants:
     //
-    //   timeout >= Milliseconds{0}  wait at most that long.
-    //   timeout == Milliseconds{-1}  wait forever (until an event arrives).
+    //   Milliseconds{0}   — block until an event arrives (default).
+    //   Milliseconds < 0  — return after ~1 ms (poll_min).
+    //   Milliseconds > 0  — wait at most that many milliseconds.
     //
     // Returns the ready set (may be empty on timeout or hard system error).
-    std::vector<PollResult> wait(Milliseconds timeout = Milliseconds{-1});
+    std::vector<PollResult> wait(Milliseconds timeout = wait_forever);
 
     struct Impl; // platform-specific; defined in Poller*.cpp
 
