@@ -302,7 +302,7 @@ or `SimpleServer`.
 
 ## Testing
 
-Comprehensive tests are included when building with `-DBUILD_TESTS=ON`. The suite covers **30 tests** across all major components:
+Comprehensive tests are included when building with `-DBUILD_TESTS=ON`. The suite covers **38 tests** across all major components:
 
 ### Test Categories
 - **Socket Basics** (1): Core socket functionality and validation
@@ -313,7 +313,7 @@ Comprehensive tests are included when building with `-DBUILD_TESTS=ON`. The suit
 - **HTTP Protocol** (3): Request parsing, response building, URL encoding
 - **File Operations** (4): File I/O, caching, directory operations, path utilities
 - **Error Handling** (3): Result types, error propagation, edge cases
-- **Integration Tests** (3): Simple server, advanced file server, HTTP poll server
+- **Integration Tests** (9): Simple server, advanced server, HTTP poll server, Unix sockets, UDP discovery, security, HTML utilities, extracted components
 
 ### Performance & Reliability
 - **Parallel Execution**: All tests run reliably in parallel (8 jobs: ~4.5s, sequential: ~29s)
@@ -332,5 +332,5 @@ For examples and usage patterns, see [README_EXAMPLES.md](README_EXAMPLES.md).
 
 ## License
 
-Personal academic project.
+This project is licensed under the GNU General Public License v3.0. See [LICENSE](LICENSE) for details.
 
