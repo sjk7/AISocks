@@ -277,9 +277,11 @@ Result<UnixSocket> SocketFactory::createUnixClient(UnixPath path) {
 std::pair<Result<UnixSocket>, Result<UnixSocket>> SocketFactory::createUnixPair() {
     int fds[2];
     if (::socketpair(AF_UNIX, SOCK_STREAM, 0, fds) != 0) {
-        auto err = Result<UnixSocket>::failure(
-            SocketError::CreateFailed, "socketpair() failed", errno, false);
-        return {err, err};
+        int e = errno;
+        return {
+            Result<UnixSocket>::failure(SocketError::CreateFailed, "socketpair() failed", e, false),
+            Result<UnixSocket>::failure(SocketError::CreateFailed, "socketpair() failed", e, false)
+        };
     }
     auto implA = std::make_unique<SocketImpl>(fds[0], SocketType::TCP, AddressFamily::Unix);
     auto implB = std::make_unique<SocketImpl>(fds[1], SocketType::TCP, AddressFamily::Unix);
