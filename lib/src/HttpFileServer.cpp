@@ -119,7 +119,12 @@ bool HttpFileServer::validateFilePath_(
 }
 
 void HttpFileServer::buildResponse(HttpClientState& state) {
-    auto request = HttpRequest::parse(state.request);
+    // Use the pre-parsed request stored by dispatchBuildResponse; fall back to
+    // parsing here only when buildResponse is called via a non-standard path.
+    HttpRequest request = state.parsedRequest
+        ? std::move(*state.parsedRequest)
+        : HttpRequest::parse(state.request);
+    state.parsedRequest.reset();
 
     if (!request.valid) {
         sendError(state, 400, "Bad Request", "Invalid HTTP request");
@@ -346,9 +351,9 @@ void HttpFileServer::handleFileRequest(HttpClientState& state,
     StringBuilder response(512 + fileContent.size());
     appendOkHeaders(response, filePath, fileContent.size(),
         fileInfo.lastModified, fileInfo.etag, config_);
+    response.append(fileContent.data(), fileContent.size());
 
-    state.responseBuf = response.toString()
-        + std::string(fileContent.begin(), fileContent.end());
+    state.responseBuf = response.toString();
     state.responseView = state.responseBuf;
 }
 
@@ -408,9 +413,9 @@ void HttpFileServer::sendCachedFile(HttpClientState& state,
     StringBuilder response(512 + cached.size);
     appendOkHeaders(response, filePath, cached.size, fileInfo.lastModified,
         fileInfo.etag, config_);
+    response.append(cached.content.data(), cached.content.size());
 
-    state.responseBuf = response.toString()
-        + std::string(cached.content.begin(), cached.content.end());
+    state.responseBuf = response.toString();
     state.responseView = state.responseBuf;
 }
 

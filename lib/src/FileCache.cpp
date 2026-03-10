@@ -22,7 +22,13 @@ const FileCache::CachedFile* FileCache::get(
         return nullptr;
     }
 
-    updateLRU(filePath);
+    // Only promote when the entry is not already the MRU (front of list).
+    // Skips 2 unordered_map ops + a list splice on every repeated hit to the
+    // same hot file, at the cost of one map lookup + pointer compare.
+    auto idxIt = lruIndex_.find(filePath);
+    if (idxIt == lruIndex_.end() || idxIt->second != lruList_.begin()) {
+        updateLRU(filePath);
+    }
     return &it->second;
 }
 

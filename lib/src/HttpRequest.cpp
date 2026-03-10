@@ -12,26 +12,17 @@
 namespace aiSocks {
 
 const std::string* HttpRequest::header(std::string_view name) const {
-    // Lowercase into a stack buffer to avoid a heap allocation for the lookup.
-    char smallBuf[128];
-    std::string heapBuf;
-    const char* keyData = nullptr;
-
-    if (name.size() < sizeof(smallBuf)) {
-        for (size_t i = 0; i < name.size(); ++i)
-            smallBuf[i] = static_cast<char>(
-                ::tolower(static_cast<unsigned char>(name[i])));
-        smallBuf[name.size()] = '\0';
-        keyData = smallBuf;
-    } else {
-        heapBuf.resize(name.size());
-        for (size_t i = 0; i < name.size(); ++i)
-            heapBuf[i] = static_cast<char>(
-                ::tolower(static_cast<unsigned char>(name[i])));
-        keyData = heapBuf.c_str();
-    }
-
-    auto it = headers.find(std::string(keyData, name.size()));
+    // Build the lowercase lookup key.  For names that fit within SSO (~15 chars
+    // on MSVC/GCC/Clang) this is heap-free; for longer names such as
+    // "if-modified-since" a single allocation is unavoidable in C++17.
+    // NOTE: full zero-copy heterogeneous lookup requires C++20
+    // (unordered_map with is_transparent Hash/KeyEqual); upgrade the standard
+    // when the project moves to C++20.
+    std::string key(name.size(), '\0');
+    for (size_t i = 0; i < name.size(); ++i)
+        key[i]
+            = static_cast<char>(::tolower(static_cast<unsigned char>(name[i])));
+    auto it = headers.find(key);
     return it == headers.end() ? nullptr : &it->second;
 }
 

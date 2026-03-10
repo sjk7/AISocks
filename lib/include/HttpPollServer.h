@@ -21,8 +21,10 @@
 // ---------------------------------------------------------------------------
 
 #include "CallIntervalTracker.h"
+#include "HttpRequest.h"
 #include "ServerBase.h"
 #include <chrono>
+#include <optional>
 #include <string>
 #include <string_view>
 
@@ -47,6 +49,10 @@ struct HttpClientState {
     // Tracks how far requestComplete() has already scanned so repeated
     // calls are O(n) total even when bytes arrive one at a time.
     size_t requestScanPos{0};
+    // Cached parse result set by dispatchBuildResponse so that buildResponse
+    // overrides in derived classes can skip a redundant HttpRequest::parse().
+    // Cleared by resetAfterSend_() after the response is fully sent.
+    std::optional<HttpRequest> parsedRequest;
 
     HttpClientState() : startTime(std::chrono::steady_clock::now()) {
         request.reserve(4096); // typical HTTP request fits in 4 KB
@@ -60,7 +66,8 @@ struct HttpClientState {
         , startTime(other.startTime)
         , responseStarted(other.responseStarted)
         , closeAfterSend(other.closeAfterSend)
-        , requestScanPos(other.requestScanPos) {
+        , requestScanPos(other.requestScanPos)
+        , parsedRequest(other.parsedRequest) {
         // If view pointed into the original's responseBuf, redirect into ours.
         if (!responseBuf.empty()
             && other.responseView.data() == other.responseBuf.data())
@@ -75,7 +82,8 @@ struct HttpClientState {
         , startTime(other.startTime)
         , responseStarted(other.responseStarted)
         , closeAfterSend(other.closeAfterSend)
-        , requestScanPos(other.requestScanPos) {
+        , requestScanPos(other.requestScanPos)
+        , parsedRequest(std::move(other.parsedRequest)) {
         // After the move, fix up view if it was backed by the (now moved) buf.
         if (!responseBuf.empty()) responseView = responseBuf;
         other.responseView = {};
@@ -91,6 +99,7 @@ struct HttpClientState {
         responseStarted = other.responseStarted;
         closeAfterSend = other.closeAfterSend;
         requestScanPos = other.requestScanPos;
+        parsedRequest = other.parsedRequest;
         // If view pointed into the original's responseBuf, redirect into ours.
         if (!responseBuf.empty()
             && other.responseView.data() == other.responseBuf.data())
@@ -108,6 +117,7 @@ struct HttpClientState {
         responseStarted = other.responseStarted;
         closeAfterSend = other.closeAfterSend;
         requestScanPos = other.requestScanPos;
+        parsedRequest = std::move(other.parsedRequest);
         // After the move, fix up view if it was backed by the (now moved) buf.
         if (!responseBuf.empty()) responseView = responseBuf;
         other.responseView = {};

@@ -128,10 +128,11 @@ void HttpPollServer::dispatchBuildResponse(HttpClientState& s) {
         return;
     }
 
-    // Parse once to determine connection semantics — avoids 7 serial
-    // full-buffer scans and is immune to false matches inside the body.
-    const auto req = HttpRequest::parse(s.request);
+    // Parse once to determine connection semantics and cache the result so
+    // buildResponse() overrides do not need to re-parse the same bytes.
+    auto req = HttpRequest::parse(s.request);
     s.closeAfterSend = resolveKeepAlive_(req);
+    s.parsedRequest = std::move(req);
     buildResponse(s);
 }
 
@@ -210,6 +211,7 @@ void HttpPollServer::resetAfterSend_(HttpClientState& s) {
     s.request.clear();
     s.responseView = {};
     s.responseBuf.clear();
+    s.parsedRequest.reset();
     s.sent = 0;
     s.responseStarted = false;
     s.closeAfterSend = false;

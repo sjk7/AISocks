@@ -29,6 +29,9 @@ struct Poller::Impl {
     std::vector<bool> socketValid;
     // Reusable result buffer to avoid per-call allocation in wait()
     std::vector<PollResult> resultBuffer;
+    // Reusable epoll_event inbox buffer — grown when the registered set grows,
+    // never shrunk, so epoll_wait() never allocates on the hot path.
+    std::vector<struct epoll_event> eventsBuffer;
 
     // Helper to ensure array is large enough for fd
     void ensureCapacity(int fd) {
@@ -139,7 +142,11 @@ std::vector<PollResult> Poller::wait(Milliseconds timeout) {
     const int timeoutMs = toEpollTimeout_(timeout);
 
     const int maxEvents = static_cast<int>(pImpl_->socketArray.size()) + 1;
-    std::vector<struct epoll_event> events(static_cast<size_t>(maxEvents));
+    // Grow the persistent buffer only when the registered fd set has grown;
+    // never shrink it so the common case (steady-state) is allocation-free.
+    if (static_cast<int>(pImpl_->eventsBuffer.size()) < maxEvents)
+        pImpl_->eventsBuffer.resize(static_cast<size_t>(maxEvents));
+    auto& events = pImpl_->eventsBuffer;
 
     for (;;) {
         int n = ::epoll_wait(pImpl_->epfd, events.data(), maxEvents, timeoutMs);

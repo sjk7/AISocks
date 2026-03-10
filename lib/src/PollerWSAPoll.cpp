@@ -14,8 +14,8 @@
 #include "SocketImpl.h"
 
 #include <winsock2.h>
+#include <unordered_map>
 #include <vector>
-#include <algorithm>
 
 namespace aiSocks {
 
@@ -23,6 +23,8 @@ struct Poller::Impl {
     // Parallel vectors: fds[i] and sockets[i] refer to the same entry.
     std::vector<WSAPOLLFD> fds;
     std::vector<const Socket*> sockets;
+    // O(1) SOCKET → vector-index map; kept in sync with fds/sockets.
+    std::unordered_map<SOCKET, size_t> index;
     // Reusable result buffer to avoid per-call allocation in wait()
     std::vector<PollResult> resultBuffer;
 };
@@ -36,13 +38,15 @@ Poller::~Poller() = default;
 bool Poller::add(const Socket& s, PollEvent interest) {
     auto handle = s.getNativeHandle();
     if (handle == static_cast<uintptr_t>(-1)) return false;
+    auto sock = static_cast<SOCKET>(handle);
 
     WSAPOLLFD pfd{};
-    pfd.fd = static_cast<SOCKET>(handle);
+    pfd.fd = sock;
     pfd.events = 0;
     if (hasFlag(interest, PollEvent::Readable)) pfd.events |= POLLRDNORM;
     if (hasFlag(interest, PollEvent::Writable)) pfd.events |= POLLWRNORM;
 
+    pImpl_->index[sock] = pImpl_->fds.size();
     pImpl_->fds.push_back(pfd);
     pImpl_->sockets.push_back(&s);
     return true;
@@ -53,17 +57,14 @@ bool Poller::modify(const Socket& s, PollEvent interest) {
     if (handle == static_cast<uintptr_t>(-1)) return false;
     auto sock = static_cast<SOCKET>(handle);
 
-    for (size_t i = 0; i < pImpl_->fds.size(); ++i) {
-        if (pImpl_->fds[i].fd == sock) {
-            pImpl_->fds[i].events = 0;
-            if (hasFlag(interest, PollEvent::Readable))
-                pImpl_->fds[i].events |= POLLRDNORM;
-            if (hasFlag(interest, PollEvent::Writable))
-                pImpl_->fds[i].events |= POLLWRNORM;
-            return true;
-        }
-    }
-    return false; // not found
+    auto it = pImpl_->index.find(sock);
+    if (it == pImpl_->index.end()) return false; // not found
+
+    WSAPOLLFD& pfd = pImpl_->fds[it->second];
+    pfd.events = 0;
+    if (hasFlag(interest, PollEvent::Readable)) pfd.events |= POLLRDNORM;
+    if (hasFlag(interest, PollEvent::Writable)) pfd.events |= POLLWRNORM;
+    return true;
 }
 
 bool Poller::remove(const Socket& s) {
@@ -71,15 +72,24 @@ bool Poller::remove(const Socket& s) {
     if (handle == static_cast<uintptr_t>(-1)) return false;
     auto sock = static_cast<SOCKET>(handle);
 
-    for (size_t i = 0; i < pImpl_->fds.size(); ++i) {
-        if (pImpl_->fds[i].fd == sock) {
-            pImpl_->fds.erase(pImpl_->fds.begin() + static_cast<ptrdiff_t>(i));
-            pImpl_->sockets.erase(
-                pImpl_->sockets.begin() + static_cast<ptrdiff_t>(i));
-            return true;
-        }
+    auto it = pImpl_->index.find(sock);
+    if (it == pImpl_->index.end()) return true; // not found — benign
+
+    const size_t i = it->second;
+    const size_t last = pImpl_->fds.size() - 1;
+
+    if (i != last) {
+        // Swap with the last entry so we can pop_back in O(1).
+        pImpl_->fds[i]    = pImpl_->fds[last];
+        pImpl_->sockets[i] = pImpl_->sockets[last];
+        // Update the index for the element that was moved.
+        pImpl_->index[pImpl_->fds[i].fd] = i;
     }
-    return true; // not found  benign
+
+    pImpl_->fds.pop_back();
+    pImpl_->sockets.pop_back();
+    pImpl_->index.erase(it);
+    return true;
 }
 
 // Returns the WSAPoll() timeout in milliseconds.
