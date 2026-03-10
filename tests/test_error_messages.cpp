@@ -135,10 +135,9 @@ static void test_dns_error_message() {
         std::string message = result.message();
         printf("  message(): %s\n", message.c_str());
         REQUIRE(!message.empty());
-        // On a DNS timeout the result message is just the description with no
-        // OS bracket; on an actual DNS failure it carries one.  Either way
-        // the error must be non-empty and indicate failure.
         REQUIRE(result.isError());
+        REQUIRE_MSG(hasOsBracket(message),
+            "DNS failure message() has '[code: text]' bracket");
 
         // Non-throwing path (connect())
         auto s = TcpSocket::createRaw();

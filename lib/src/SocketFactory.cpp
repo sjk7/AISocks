@@ -144,10 +144,8 @@ Result<TcpSocket> SocketFactory::createTcpClient(
     TcpSocket socket(std::move(impl));
 
     if (!socket.connect(config.address, config.port, config.connectTimeout)) {
-        const char* desc = socket.getLastErrorIsDns() ? "DNS resolution failed"
-                                                      : "connect() failed";
-        return Result<TcpSocket>::failure(socket.getLastError(), desc,
-            socket.getLastErrorSysCode(), socket.getLastErrorIsDns());
+        return Result<TcpSocket>::failure(socket.getLastError(),
+            socket.getErrorMessage());
     }
 
     return Result<TcpSocket>::success(std::move(socket));

@@ -400,6 +400,11 @@ bool SocketImpl::connect(
         int64_t dnsMs = (timeout.count > 0) ? timeout.count : kDefaultDnsTimeoutMs;
         if (dnsFut.wait_for(std::chrono::milliseconds(dnsMs))
                 == std::future_status::timeout) {
+#ifdef _WIN32
+            WSASetLastError(WSAETIMEDOUT);
+#else
+            errno = ETIMEDOUT;
+#endif
             setError(SocketError::Timeout,
                 "DNS resolution timed out for '" + address + "'");
             return false;
