@@ -42,6 +42,46 @@
       }
     },
     {
+      "label": "Build unix_throughput (Windows Debug)",
+      "type": "shell",
+      "command": "cmake",
+      "args": [
+        "--build",
+        "build",
+        "--target",
+        "unix_throughput",
+        "--config",
+        "Debug"
+      ],
+      "group": {
+        "kind": "build"
+      },
+      "presentation": {
+        "echo": true,
+        "reveal": "always"
+      }
+    },
+    {
+      "label": "Build unix_throughput (Windows RelWithDebInfo)",
+      "type": "shell",
+      "command": "cmake",
+      "args": [
+        "--build",
+        "build",
+        "--target",
+        "unix_throughput",
+        "--config",
+        "RelWithDebInfo"
+      ],
+      "group": {
+        "kind": "build"
+      },
+      "presentation": {
+        "echo": true,
+        "reveal": "always"
+      }
+    },
+    {
       "label": "Build advanced_file_server (RelWithDebInfo)",
       "type": "shell",
       "command": "cmake",

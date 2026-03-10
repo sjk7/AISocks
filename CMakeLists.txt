@@ -140,6 +140,7 @@ if(BUILD_EXAMPLES)
         simple_file_server      examples/simple_file_server.cpp
         advanced_file_server    examples/advanced_file_server.cpp
         throughput_client       examples/throughput_client.cpp
+        unix_throughput         examples/unix_throughput.cpp
     )
     list(LENGTH _EXAMPLES _len)
     math(EXPR _last "${_len} - 2")

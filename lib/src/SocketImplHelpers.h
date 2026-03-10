@@ -11,19 +11,20 @@
 #include <string>
 #include <cstddef>
 #include <cassert>
+#include <chrono>
 
-// Forward declaration for SocketHandle
+#ifdef _WIN32
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#else
+#include <sys/socket.h>
+#endif
+
+// Platform socket handle type
 #ifdef _WIN32
 using SocketHandle = SOCKET;
 #else
 using SocketHandle = int;
-#endif
-
-// Forward declarations for setsockopt
-#ifdef _WIN32
-#include <winsock2.h>
-#else
-#include <sys/socket.h>
 #endif
 
 namespace aiSocks {

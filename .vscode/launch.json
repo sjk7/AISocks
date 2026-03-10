@@ -28,6 +28,26 @@
       "preLaunchTask": "Build advanced_file_server"
     },
     {
+      "name": "Debug unix_throughput (Windows)",
+      "type": "cppvsdbg",
+      "request": "launch",
+      "program": "${workspaceFolder}/build/Debug/unix_throughput.exe",
+      "args": ["5"],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "preLaunchTask": "Build unix_throughput (Windows Debug)"
+    },
+    {
+      "name": "Debug unix_throughput (Windows RelWithDebInfo)",
+      "type": "cppvsdbg",
+      "request": "launch",
+      "program": "${workspaceFolder}/build/RelWithDebInfo/unix_throughput.exe",
+      "args": ["5"],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "preLaunchTask": "Build unix_throughput (Windows RelWithDebInfo)"
+    },
+    {
       "name": "Launch advanced_file_server (RelWithDebInfo)",
       "type": "cppvsdbg",
       "request": "launch",

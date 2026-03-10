@@ -99,6 +99,22 @@
             }
         },
         {
+            "name": "windows-debug",
+            "displayName": "Windows Debug (MSVC)",
+            "description": "Visual Studio 17 2022, Debug, examples and tests on Windows",
+            "generator": "Visual Studio 17 2022",
+            "binaryDir": "${sourceDir}/build",
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Windows"
+            },
+            "cacheVariables": {
+                "BUILD_EXAMPLES": "ON",
+                "BUILD_TESTS": "ON"
+            }
+        },
+        {
             "name": "mingw-release",
             "displayName": "MinGW-w64 Release (Wine)",
             "description": "Cross-compile for Windows x86-64 with MinGW-w64 in Release mode",
@@ -287,9 +303,44 @@
             "inherits": "base-build",
             "configurePreset": "mingw-release",
             "displayName": "Build MinGW-w64 Release"
+        },
+        {
+            "name": "windows-unix-throughput",
+            "inherits": "base-build",
+            "configurePreset": "windows-debug",
+            "displayName": "Build unix_throughput (Windows Debug)",
+            "configuration": "Debug",
+            "targets": [ "unix_throughput" ]
+        },
+        {
+            "name": "windows-relwithdebinfo",
+            "inherits": "base-build",
+            "configurePreset": "windows-debug",
+            "displayName": "Build All (Windows RelWithDebInfo)",
+            "configuration": "RelWithDebInfo"
+        },
+        {
+            "name": "windows-unix-throughput-relwithdebinfo",
+            "inherits": "base-build",
+            "configurePreset": "windows-debug",
+            "displayName": "Build unix_throughput (Windows RelWithDebInfo)",
+            "configuration": "RelWithDebInfo",
+            "targets": [ "unix_throughput" ]
         }
     ],
     "testPresets": [
+        {
+            "name": "windows-debug",
+            "configurePreset": "windows-debug",
+            "configuration": "Debug",
+            "displayName": "Windows Debug Tests"
+        },
+        {
+            "name": "windows-relwithdebinfo",
+            "configurePreset": "windows-debug",
+            "configuration": "RelWithDebInfo",
+            "displayName": "Windows RelWithDebInfo Tests"
+        },
         {
             "name": "build_mac_arm",
             "configurePreset": "build_mac_arm",
