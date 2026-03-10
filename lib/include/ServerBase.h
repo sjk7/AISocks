@@ -178,10 +178,12 @@ template <typename ClientData> class ServerBase {
     // after N connections,
     //             but continue serving existing clients until all disconnect.
     // timeout:    passed to Poller::wait().  Milliseconds{0} / wait_forever
-    //             blocks until an event arrives (most CPU-efficient).
-    //             Negative values (e.g. poll_min) return after ~1 ms even
-    //             with no events, driving periodic onIdle() callbacks.
-    //             Positive values wait at most that many milliseconds.
+    //             blocks until an event arrives (most CPU-efficient, but
+    //             onIdle() is never called — the loop only wakes on events).
+    //             Negative values (e.g. poll_min, the default) return after
+    //             ~1 ms even with no events, driving periodic onIdle()
+    //             callbacks.  Positive values wait at most that many
+    //             milliseconds (also enables onIdle on each timeout).
     //
     // Returns when there are no remaining connected clients (AND accepting is
     // stopped, either because maxClients was reached or you stopped

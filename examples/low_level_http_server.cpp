@@ -219,6 +219,6 @@ int main() {
         return 1;
     }
 
-    server.run(ClientLimit::Unlimited, Milliseconds{0});
+    server.run(ClientLimit::Unlimited);
     return 0;
 }

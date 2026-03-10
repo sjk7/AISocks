@@ -65,7 +65,7 @@ int main() {
     printf("Press Ctrl+C to stop the server\n\n");
 
     // Run the server (blocking call)
-    server.run(ClientLimit::Unlimited, Milliseconds{0});
+    server.run(ClientLimit::Unlimited);
 
     return 0;
 }

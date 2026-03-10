@@ -124,7 +124,9 @@ struct Backlog {
 
 // Named timeout constants for common use cases.
 namespace Timeouts {
-    inline constexpr Milliseconds Immediate{0};
+    // poll_min (-1): return after ~1ms even if nothing is ready.
+    // Use this instead of Immediate for non-blocking polls.
+    inline constexpr Milliseconds Immediate = poll_min;
     inline constexpr Milliseconds Short{1000};
     inline constexpr Milliseconds Medium{5000};
     inline constexpr Milliseconds Long{30000};

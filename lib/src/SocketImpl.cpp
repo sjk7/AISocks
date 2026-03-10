@@ -203,9 +203,11 @@ void SocketImpl::propagateSocketProps(SocketImpl& child) const {
     int sndBuf = getSendBufferSize();
     if (sndBuf > 0) child.setSendBufferSize(sndBuf);
 
-    if (socketType == SocketType::TCP) child.setNoDelay(getNoDelay());
-
-    child.setKeepAlive(getKeepAlive());
+    if (socketType == SocketType::TCP
+            && addressFamily != AddressFamily::Unix) {
+        child.setNoDelay(getNoDelay());
+        child.setKeepAlive(getKeepAlive());
+    }
 }
 
 std::unique_ptr<SocketImpl> SocketImpl::accept() {
