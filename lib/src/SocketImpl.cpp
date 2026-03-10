@@ -10,6 +10,8 @@
 #include "Result.h"
 #include <chrono>
 #include <cstring>
+#include <future>
+#include <thread>
 #ifndef _WIN32
 #include <signal.h>
 #endif
@@ -366,15 +368,44 @@ bool SocketImpl::connect(
         return false;
     }
 
-    // --- Phase 1: resolve address (synchronous; DNS is a known limitation
-    //     of this single-threaded library --- no timeout applies here) -------
+    // --- Phase 1: resolve address -------------------------------------------
+    // Run getaddrinfo on a detached thread so the caller's timeout applies
+    // to DNS as well.  The thread is detached because getaddrinfo cannot be
+    // cancelled; the shared_ptr keeps the result struct alive until the thread
+    // finishes regardless of whether the caller has already timed out.
     sockaddr_storage serverAddr{};
     socklen_t addrLen = 0;
     {
-        int gaiErr = 0;
-        auto r = resolveToSockaddr(address, port, addressFamily, socketType,
-            /*doDns=*/true, serverAddr, addrLen, &gaiErr);
-        if (r != SocketError::None) {
+        struct DnsResult {
+            sockaddr_storage addr{};
+            socklen_t        addrLen{0};
+            SocketError      error{SocketError::None};
+            int              gaiErr{0};
+        };
+        auto dnsRes = std::make_shared<DnsResult>();
+        std::promise<void> dnsProm;
+        auto dnsFut = dnsProm.get_future();
+
+        std::thread([addr = address, p = port, af = addressFamily,
+                     st = socketType, res = dnsRes,
+                     prom = std::move(dnsProm)]() mutable {
+            res->error = resolveToSockaddr(addr, p, af, st,
+                /*doDns=*/true, res->addr, res->addrLen, &res->gaiErr);
+            prom.set_value();
+        }).detach();
+
+        // If the caller supplied a positive timeout use it for DNS too;
+        // otherwise cap DNS at 5 s so a bad hostname never hangs forever.
+        static constexpr int64_t kDefaultDnsTimeoutMs = 5000;
+        int64_t dnsMs = (timeout.count > 0) ? timeout.count : kDefaultDnsTimeoutMs;
+        if (dnsFut.wait_for(std::chrono::milliseconds(dnsMs))
+                == std::future_status::timeout) {
+            setError(SocketError::Timeout,
+                "DNS resolution timed out for '" + address + "'");
+            return false;
+        }
+
+        if (dnsRes->error != SocketError::None) {
 #ifdef _WIN32
             setError(SocketError::ConnectFailed,
                 "Failed to resolve '" + address
@@ -383,10 +414,13 @@ bool SocketImpl::connect(
             setErrorDns(SocketError::ConnectFailed,
                 "Failed to resolve '" + address
                     + " port:" + std::to_string(port.value()) + "'",
-                gaiErr);
+                dnsRes->gaiErr);
 #endif
             return false;
         }
+
+        serverAddr = dnsRes->addr;
+        addrLen    = dnsRes->addrLen;
     }
 
     // --- Phase 2: connect

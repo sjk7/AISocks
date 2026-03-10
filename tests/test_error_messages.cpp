@@ -131,7 +131,7 @@ static void test_dns_error_message() {
 
         // Result<T> path (SocketFactory)
         auto result = SocketFactory::createTcpClient(AddressFamily::IPv4,
-            ConnectArgs{BAD_HOST, Port{BASE + 10}, Milliseconds{100}});
+            ConnectArgs{BAD_HOST, Port{BASE + 10}, Milliseconds{500}});
         std::string message = result.message();
         printf("  message(): %s\n", message.c_str());
         REQUIRE(!message.empty());
@@ -141,7 +141,7 @@ static void test_dns_error_message() {
 
         // Non-throwing path (connect())
         auto s = TcpSocket::createRaw();
-        (void)s.connect(BAD_HOST, Port{BASE + 10});
+        (void)s.connect(BAD_HOST, Port{BASE + 10}, Milliseconds{500});
         std::string msg = s.getErrorMessage();
         printf("  getErrorMessage(): %s\n", msg.c_str());
         REQUIRE_MSG(msg.find(BAD_HOST) != std::string::npos,
