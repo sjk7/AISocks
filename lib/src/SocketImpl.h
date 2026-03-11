@@ -27,7 +27,7 @@ using SocketHandle = SOCKET;
 #define INVALID_SOCKET_HANDLE INVALID_SOCKET
 #define SOCKET_ERROR_CODE SOCKET_ERROR
 #ifdef AISOCKS_HAVE_UNIX_SOCKETS
-#include <afunix.h>      // sockaddr_un for AF_UNIX (Windows 10 RS4+)
+#include <afunix.h> // sockaddr_un for AF_UNIX (Windows 10 RS4+)
 #endif
 #else
 #include <sys/socket.h>
@@ -43,7 +43,7 @@ using SocketHandle = SOCKET;
 #include <netinet/tcp.h>
 using SocketHandle = int;
 #ifdef AISOCKS_HAVE_UNIX_SOCKETS
-#include <sys/un.h>      // sockaddr_un for AF_UNIX
+#include <sys/un.h> // sockaddr_un for AF_UNIX
 #endif
 #define INVALID_SOCKET_HANDLE -1
 #define SOCKET_ERROR_CODE -1
@@ -142,6 +142,7 @@ class SocketImpl {
     SocketImpl(SocketHandle handle, SocketType type, AddressFamily family);
 
     private:
+    friend struct BlockingGuard; // internal RAII helper in SocketImpl.cpp
     SocketHandle socketHandle;
     SocketType socketType;
     AddressFamily addressFamily;
@@ -192,6 +193,11 @@ class SocketImpl {
     bool setBufSizeOpt(int optname, int bytes, const char* errMsg);
     bool waitReady(bool forRead, std::chrono::milliseconds timeout);
     static Endpoint endpointFromSockaddr(const sockaddr_storage& addr);
+
+    // connect() helpers
+    bool resolveAddress_(const std::string& address, Port port,
+        Milliseconds timeout, sockaddr_storage& out_addr, socklen_t& out_len);
+    bool waitForConnect_(Milliseconds timeout);
 
     // Propagate blocking mode, buffer sizes, TCP_NODELAY and SO_KEEPALIVE
     // from this (listener) socket onto an accepted SocketImpl.

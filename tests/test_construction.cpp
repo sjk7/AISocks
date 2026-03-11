@@ -23,6 +23,10 @@ using namespace aiSocks;
 
 static const uint16_t BASE = 19900;
 
+#ifdef SOMAXCONN
+#error("Socket compiler firewall breached: SOMAXCONN is defined, but should not be visible to code including SocketFactory.h");
+#endif
+
 // -----------------------------------------------------------------------
 // Happy paths  basic constructor
 // -----------------------------------------------------------------------

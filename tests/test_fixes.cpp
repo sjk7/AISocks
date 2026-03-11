@@ -20,6 +20,13 @@
 #include "TcpSocket.h"
 #include "test_helpers.h"
 
+#ifdef _WIN32
+#include <winsock2.h>
+#else
+#include <netinet/in.h>
+#include <sys/socket.h>
+#endif
+
 #include <atomic>
 #include <chrono>
 #include <condition_variable>

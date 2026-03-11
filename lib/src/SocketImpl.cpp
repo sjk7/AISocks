@@ -361,171 +361,145 @@ static bool openConnectEvFd_(
 #endif
 }
 
-bool SocketImpl::connect(
-    const std::string& address, Port port, Milliseconds timeout) {
-    if (!isValid()) {
-        setError(SocketError::InvalidSocket, "Socket is not valid");
-        return false;
-    }
-
-    // --- Phase 1: resolve address -------------------------------------------
-    // Run getaddrinfo on a detached thread so the caller's timeout applies
-    // to DNS as well.  The thread is detached because getaddrinfo cannot be
-    // cancelled; the shared_ptr keeps the result struct alive until the thread
-    // finishes regardless of whether the caller has already timed out.
-    sockaddr_storage serverAddr{};
-    socklen_t addrLen = 0;
-    {
-        struct DnsResult {
-            sockaddr_storage addr{};
-            socklen_t        addrLen{0};
-            SocketError      error{SocketError::None};
-            int              gaiErr{0};
-        };
-        auto dnsRes = std::make_shared<DnsResult>();
-        std::promise<void> dnsProm;
-        auto dnsFut = dnsProm.get_future();
-
-        std::thread([addr = address, p = port, af = addressFamily,
-                     st = socketType, res = dnsRes,
-                     prom = std::move(dnsProm)]() mutable {
-            res->error = resolveToSockaddr(addr, p, af, st,
-                /*doDns=*/true, res->addr, res->addrLen, &res->gaiErr);
-            prom.set_value();
-        }).detach();
-
-        // If the caller supplied a positive timeout use it for DNS too;
-        // otherwise cap DNS at 5 s so a bad hostname never hangs forever.
-        static constexpr int64_t kDefaultDnsTimeoutMs = 5000;
-        int64_t dnsMs = (timeout.count > 0) ? timeout.count : kDefaultDnsTimeoutMs;
-        if (dnsFut.wait_for(std::chrono::milliseconds(dnsMs))
-                == std::future_status::timeout) {
+// ---------------------------------------------------------------------------
+// BlockingGuard
+//
+// RAII: saves and restores the OS-level blocking flag on all exit paths.
+// Uses the platform API directly (not setBlocking()) so it never clobbers
+// lastError — setBlocking() writes lastError=None on success.
+// ---------------------------------------------------------------------------
+struct BlockingGuard {
+    SocketImpl& impl_;
 #ifdef _WIN32
-            WSASetLastError(WSAETIMEDOUT);
-#else
-            errno = ETIMEDOUT;
-#endif
-            setError(SocketError::Timeout,
-                "DNS resolution timed out for '" + address + "'");
-            return false;
-        }
-
-        if (dnsRes->error != SocketError::None) {
-#ifdef _WIN32
-            setError(SocketError::ConnectFailed,
-                "Failed to resolve '" + address
-                    + " port:" + std::to_string(port.value()) + "'");
-#else
-            setErrorDns(SocketError::ConnectFailed,
-                "Failed to resolve '" + address
-                    + " port:" + std::to_string(port.value()) + "'",
-                dnsRes->gaiErr);
-#endif
-            return false;
-        }
-
-        serverAddr = dnsRes->addr;
-        addrLen    = dnsRes->addrLen;
-    }
-
-    // --- Phase 2: connect
-    // ------------------------------------------------------- Always use the
-    // non-blocking + event-queue path regardless of the current socket mode.  A
-    // RAII guard captures the original blocking state and restores it on every
-    // exit (success, timeout, error, and exception). This means:
-    //    A blocking socket comes back blocking after a successful connect.
-    //    A non-blocking socket (caller set it before constructing) comes back
-    //     non-blocking  the guard is a no-op in that case.
-    //    timeout > 0   wait up to that long for the handshake.
-    //    timeout <= 0  initiate and return WouldBlock immediately so the
-    //     caller can drive completion via a Poller.
-
-    // RAII: saves and restores the OS-level blocking flag on all exit paths.
-    // Calls the platform API directly rather than setBlocking() to avoid
-    // clobbering lastError  setBlocking() sets lastError=None on success,
-    // which would erase whatever error connect() stored before returning false.
-    struct BlockingGuard {
-        SocketImpl& impl_;
-#ifdef _WIN32
-        bool wasBlocking_;
-        explicit BlockingGuard(SocketImpl& impl)
-            : impl_(impl), wasBlocking_(impl.isBlocking()) {
-            if (wasBlocking_) {
-                u_long nb = 1;
-                ioctlsocket(impl_.socketHandle, FIONBIO, &nb);
-                impl_.blockingMode = false;
-            }
-        }
-        ~BlockingGuard() {
-            if (wasBlocking_) {
-                u_long blk = 0;
-                ioctlsocket(impl_.socketHandle, FIONBIO, &blk);
-                impl_.blockingMode = true;
-            }
-        }
-#else
-        int savedFlags_;
-        explicit BlockingGuard(SocketImpl& impl)
-            : impl_(impl), savedFlags_(fcntl(impl.socketHandle, F_GETFL, 0)) {
-            // Set O_NONBLOCK if not already set.
-            if ((savedFlags_ & O_NONBLOCK) == 0)
-                fcntl(impl_.socketHandle, F_SETFL, savedFlags_ | O_NONBLOCK);
+    bool wasBlocking_;
+    explicit BlockingGuard(SocketImpl& impl)
+        : impl_(impl), wasBlocking_(impl.isBlocking()) {
+        if (wasBlocking_) {
+            u_long nb = 1;
+            ioctlsocket(impl_.socketHandle, FIONBIO, &nb);
             impl_.blockingMode = false;
         }
-        ~BlockingGuard() {
-            fcntl(impl_.socketHandle, F_SETFL, savedFlags_);
-            impl_.blockingMode = (savedFlags_ & O_NONBLOCK) == 0;
+    }
+    ~BlockingGuard() {
+        if (wasBlocking_) {
+            u_long blk = 0;
+            ioctlsocket(impl_.socketHandle, FIONBIO, &blk);
+            impl_.blockingMode = true;
+        }
+    }
+#else
+    int savedFlags_;
+    explicit BlockingGuard(SocketImpl& impl)
+        : impl_(impl), savedFlags_(fcntl(impl.socketHandle, F_GETFL, 0)) {
+        if ((savedFlags_ & O_NONBLOCK) == 0)
+            fcntl(impl_.socketHandle, F_SETFL, savedFlags_ | O_NONBLOCK);
+        impl_.blockingMode = false;
+    }
+    ~BlockingGuard() {
+        fcntl(impl_.socketHandle, F_SETFL, savedFlags_);
+        impl_.blockingMode = (savedFlags_ & O_NONBLOCK) == 0;
+    }
+#endif
+};
+
+// ---------------------------------------------------------------------------
+// EvFdGuard
+//
+// RAII: closes the kqueue/epoll fd opened for a timed connect().
+// On Windows evFd is always -1 (WSAPoll is per-call), so this is a no-op.
+// ---------------------------------------------------------------------------
+struct EvFdGuard {
+    int& fd_;
+    ~EvFdGuard() {
+#if !defined(_WIN32)
+        if (fd_ != -1) {
+            ::close(fd_);
+            fd_ = -1;
         }
 #endif
-    } blockingGuard(*this);
-
-    int rc = ::connect(
-        socketHandle, reinterpret_cast<sockaddr*>(&serverAddr), addrLen);
-    if (rc == 0) {
-        // Immediate success (common on loopback).
-        lastError = SocketError::None;
-        return true; // guard restores blocking mode
     }
+};
 
-    int sysErr = getLastSystemError();
-    bool inProgress =
+// Returns true when ::connect() returned an "in-progress" system error,
+// meaning the non-blocking handshake has started and we should wait.
+static bool isConnectInProgress_(int sysErr) noexcept {
 #ifdef _WIN32
-        (sysErr == WSAEWOULDBLOCK) || (sysErr == WSAEINPROGRESS);
+    return (sysErr == WSAEWOULDBLOCK) || (sysErr == WSAEINPROGRESS);
 #else
-        (sysErr == EINPROGRESS) || (sysErr == EAGAIN);
+    return (sysErr == EINPROGRESS) || (sysErr == EAGAIN);
 #endif
+}
 
-    if (!inProgress) {
-        setError(SocketError::ConnectFailed, "Failed to connect to server");
-        return false; // guard restores blocking mode
-    }
+// ---------------------------------------------------------------------------
+// SocketImpl::resolveAddress_
+//
+// Phase 1 of connect(): runs getaddrinfo on a detached thread so the
+// caller's timeout covers DNS as well.  The thread is detached because
+// getaddrinfo cannot be cancelled; the shared_ptr keeps the result alive.
+// ---------------------------------------------------------------------------
+bool SocketImpl::resolveAddress_(const std::string& address, Port port,
+    Milliseconds timeout, sockaddr_storage& out_addr, socklen_t& out_len) {
+    struct DnsResult {
+        sockaddr_storage addr{};
+        socklen_t        addrLen{0};
+        SocketError      error{SocketError::None};
+        int              gaiErr{0};
+    };
+    auto dnsRes = std::make_shared<DnsResult>();
+    std::promise<void> dnsProm;
+    auto dnsFut = dnsProm.get_future();
 
-    // timeout <= 0: caller wants non-blocking initiation  return WouldBlock.
-    // The guard restores the original blocking mode (which was already
-    // non-blocking if the caller set it, so this is a no-op in that case).
-    if (timeout.count <= 0) {
-        setError(SocketError::WouldBlock,
-            "connect() in progress (non-blocking socket)");
+    std::thread([addr = address, p = port, af = addressFamily,
+                 st = socketType, res = dnsRes,
+                 prom = std::move(dnsProm)]() mutable {
+        res->error = resolveToSockaddr(addr, p, af, st,
+            /*doDns=*/true, res->addr, res->addrLen, &res->gaiErr);
+        prom.set_value();
+    }).detach();
+
+    static constexpr int64_t kDefaultDnsTimeoutMs = 5000;
+    int64_t dnsMs = (timeout.count > 0) ? timeout.count : kDefaultDnsTimeoutMs;
+    if (dnsFut.wait_for(std::chrono::milliseconds(dnsMs))
+            == std::future_status::timeout) {
+#ifdef _WIN32
+        WSASetLastError(WSAETIMEDOUT);
+#else
+        errno = ETIMEDOUT;
+#endif
+        setError(SocketError::Timeout,
+            "DNS resolution timed out for '" + address + "'");
         return false;
     }
 
-    // Wait for the handshake using the platform-native event queue  the same
-    // backend as the Poller class.  No FD_SETSIZE limit; no select().
-    //
-    // kqueue / epoll need a queue fd; WSAPoll is per-call.
-    // EvFdGuard closes the queue fd on all exit paths.
-    int evFd = -1;
-    struct EvFdGuard {
-        int& fd_;
-        ~EvFdGuard() {
-#if !defined(_WIN32)
-            if (fd_ != -1) {
-                ::close(fd_);
-                fd_ = -1;
-            }
+    if (dnsRes->error != SocketError::None) {
+#ifdef _WIN32
+        setError(SocketError::ConnectFailed,
+            "Failed to resolve '" + address
+                + " port:" + std::to_string(port.value()) + "'");
+#else
+        setErrorDns(SocketError::ConnectFailed,
+            "Failed to resolve '" + address
+                + " port:" + std::to_string(port.value()) + "'",
+            dnsRes->gaiErr);
 #endif
-        }
-    } evFdGuard{evFd};
+        return false;
+    }
+
+    out_addr = dnsRes->addr;
+    out_len  = dnsRes->addrLen;
+    return true;
+}
+
+// ---------------------------------------------------------------------------
+// SocketImpl::waitForConnect_
+//
+// Phase 3 of connect(): opens a platform event fd (kqueue/epoll; no-op on
+// Windows), then loops in 100 ms slices until the handshake completes or
+// the deadline expires.  Confirms success via SO_ERROR.
+// ---------------------------------------------------------------------------
+bool SocketImpl::waitForConnect_(Milliseconds timeout) {
+    int evFd = -1;
+    EvFdGuard evFdGuard{evFd};
 
     {
         std::string evErrMsg;
@@ -535,19 +509,16 @@ bool SocketImpl::connect(
         }
     }
 
-    // Deadline loop: each iteration waits at most 100 ms so the monotonic
-    // clock check stays responsive; EINTR restarts with the remaining slice.
     auto deadline = std::chrono::steady_clock::now()
         + std::chrono::milliseconds(timeout.count);
 
     for (;;) {
         auto remaining = std::chrono::duration_cast<std::chrono::milliseconds>(
-            deadline - std::chrono::steady_clock::now())
-                             .count();
+            deadline - std::chrono::steady_clock::now()).count();
         if (remaining <= 0) {
             setError(SocketError::Timeout,
-                "connect() timed out after " + std::to_string(timeout.count)
-                    + " ms");
+                "connect() timed out after "
+                    + std::to_string(timeout.count) + " ms");
             return false;
         }
         const long long sliceMs = (remaining < 100) ? remaining : 100;
@@ -564,9 +535,9 @@ bool SocketImpl::connect(
 
         // An event fired — confirm success via SO_ERROR.
         int sockErr = 0;
-        socklen_t sockErrLen = static_cast<socklen_t>(sizeof(sockErr));
+        socklen_t len = static_cast<socklen_t>(sizeof(sockErr));
         getsockopt(socketHandle, SOL_SOCKET, SO_ERROR,
-            reinterpret_cast<char*>(&sockErr), &sockErrLen);
+            reinterpret_cast<char*>(&sockErr), &len);
         if (sockErr != 0) {
 #ifdef _WIN32
             WSASetLastError(sockErr);
@@ -578,8 +549,43 @@ bool SocketImpl::connect(
         }
 
         lastError = SocketError::None;
-        return true; // guard restores blocking mode
+        return true;
     }
+}
+
+bool SocketImpl::connect(
+    const std::string& address, Port port, Milliseconds timeout) {
+    if (!isValid()) {
+        setError(SocketError::InvalidSocket, "Socket is not valid");
+        return false;
+    }
+
+    sockaddr_storage serverAddr{};
+    socklen_t addrLen = 0;
+    if (!resolveAddress_(address, port, timeout, serverAddr, addrLen))
+        return false;
+
+    BlockingGuard blockingGuard(*this);
+
+    int rc = ::connect(
+        socketHandle, reinterpret_cast<sockaddr*>(&serverAddr), addrLen);
+    if (rc == 0) {
+        lastError = SocketError::None;
+        return true;
+    }
+
+    if (!isConnectInProgress_(getLastSystemError())) {
+        setError(SocketError::ConnectFailed, "Failed to connect to server");
+        return false;
+    }
+
+    if (timeout.count <= 0) {
+        setError(SocketError::WouldBlock,
+            "connect() in progress (non-blocking socket)");
+        return false;
+    }
+
+    return waitForConnect_(timeout);
 }
 
 int SocketImpl::send(const void* data, size_t length) {

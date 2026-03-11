@@ -12,15 +12,6 @@
 #include <stdexcept>
 #include "Stopwatch.h"
 
-#ifdef _WIN32
-#include <winsock2.h>
-#include <ws2tcpip.h>
-#else
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <unistd.h>
-#endif
-
 // Simple test framework for aiSocks tests.
 // Each test binary returns 0 on full pass, 1 on any failure.
 
