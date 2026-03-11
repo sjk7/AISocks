@@ -170,9 +170,9 @@ std::string HttpFileServer::resolveFilePath(const std::string& target) const {
     // Strip trailing slash so stat() works uniformly; root "/" becomes "".
     if (!path.empty() && path.back() == '/' && path.size() > 1) path.pop_back();
 
-    // "/" maps to the document root directory itself.
+    // "/" or empty maps to the document root directory itself.
     // handleDirectoryRequest will try config_.indexFile first, then listing.
-    if (path == "/") return config_.documentRoot;
+    if (path.empty() || path == "/") return config_.documentRoot;
 
     return config_.documentRoot + path.substr(1);
 }
