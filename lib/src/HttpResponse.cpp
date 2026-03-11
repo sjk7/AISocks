@@ -5,6 +5,7 @@
 // https://pvs-studio.com
 
 #include "HttpResponse.h"
+#include "HttpParserUtils.h"
 
 #include <algorithm>
 #include <cctype>
@@ -23,6 +24,7 @@ const std::string_view* HttpResponse::header(std::string_view name) const {
     // buffer
     char smallBuf[128];
     std::string heapBuf;
+    heapBuf.reserve(16384); // Reserve space to prevent reallocation
     const char* keyData = nullptr;
 
     if (name.size() < sizeof(smallBuf)) {
@@ -32,6 +34,9 @@ const std::string_view* HttpResponse::header(std::string_view name) const {
         smallBuf[name.size()] = '\0';
         keyData = smallBuf;
     } else {
+        if (name.size() > 16384) {
+            return nullptr; // Fail if header name is too large
+        }
         heapBuf.resize(name.size());
         for (size_t i = 0; i < name.size(); ++i)
             heapBuf[i] = static_cast<char>(
@@ -99,10 +104,12 @@ void HttpResponseParser::markComplete_() {
 // Returns false if the status line is malformed (caller sets Error state).
 // ---------------------------------------------------------------------------
 bool HttpResponseParser::tryParseHeaders_() {
-    // Incremental scan for \r\n\r\n  ------------------------------------- //
+    // Incremental scan for separator (\r\n\r\n or bare \n\n, RFC 7230 §3.5) ---
+    // //
     const size_t start = headerScanPos_ >= 3 ? headerScanPos_ - 3 : 0;
-    const size_t sepPos = inBuf_.find("\r\n\r\n", start);
-    if (sepPos == std::string::npos) {
+    const auto [sepPos, sepLen]
+        = detail::findHeaderBodySep(std::string_view(inBuf_), start);
+    if (sepPos == std::string_view::npos) {
         // Not yet — advance scan frontier (keep 3 tail bytes for overlap)
         headerScanPos_ = inBuf_.size() >= 3 ? inBuf_.size() - 3 : 0;
         return false; // really means "not ready yet" — caller checks bool
@@ -110,19 +117,17 @@ bool HttpResponseParser::tryParseHeaders_() {
 
     // Freeze header section
     headerBuf_ = inBuf_.substr(0, sepPos);
-    // Any bytes after \r\n\r\n belong to the body
-    if (sepPos + 4 < inBuf_.size()) bodyBuf_ = inBuf_.substr(sepPos + 4);
+    // Any bytes after the separator belong to the body
+    if (sepPos + sepLen < inBuf_.size())
+        bodyBuf_ = inBuf_.substr(sepPos + sepLen);
     inBuf_.clear();
     // Do NOT shrink_to_fit here: keeping the capacity avoids a reallocation
     // on the next keep-alive request that feeds into inBuf_.
 
     const std::string_view hdr(headerBuf_);
 
-    // Parse status line: HTTP-version SP status-code SP reason-phrase CRLF
-    const size_t firstCRLF = hdr.find("\r\n");
-    const std::string_view statusLine = (firstCRLF == std::string_view::npos)
-        ? hdr
-        : hdr.substr(0, firstCRLF);
+    // Parse status line: HTTP-version SP status-code SP reason-phrase
+    const auto [statusLine, firstNL] = detail::extractFirstLine(hdr);
 
     const size_t sp1 = statusLine.find(' ');
     if (sp1 == std::string_view::npos) {
@@ -154,54 +159,14 @@ bool HttpResponseParser::tryParseHeaders_() {
     response_.version_ = hdr.substr(0, sp1); // view into frozen headerBuf_
     response_.statusText_ = (sp2 == std::string_view::npos)
         ? std::string_view{}
-        : hdr.substr(sp2 + 1,
-              firstCRLF != std::string_view::npos ? firstCRLF - (sp2 + 1)
-                                                  : std::string_view::npos);
+        : statusLine.substr(sp2 + 1);
 
     // Parse header fields
-    if (firstCRLF != std::string_view::npos) {
-        size_t pos = firstCRLF + 2;
-        while (pos < hdr.size()) {
-            const size_t lineEnd = hdr.find("\r\n", pos);
-            const std::string_view line = (lineEnd == std::string_view::npos)
-                ? hdr.substr(pos)
-                : hdr.substr(pos, lineEnd - pos);
-
-            if (line.empty()) break;
-
-            const size_t colon = line.find(':');
-            if (colon != std::string_view::npos) {
-                std::string_view rawKey = line.substr(0, colon);
-                std::string_view rawVal = line.substr(colon + 1);
-
-                // lowercase key — must be a std::string for map key
-                std::string key;
-                key.resize(rawKey.size());
-                for (size_t i = 0; i < rawKey.size(); ++i)
-                    key[i] = static_cast<char>(
-                        ::tolower(static_cast<unsigned char>(rawKey[i])));
-
-                // trim leading/trailing whitespace from value (view only)
-                const size_t valStart = rawVal.find_first_not_of(" \t");
-                if (valStart != std::string_view::npos) {
-                    rawVal = rawVal.substr(valStart);
-                    const size_t valEnd = rawVal.find_last_not_of(" \t\r");
-                    if (valEnd != std::string_view::npos)
-                        rawVal = rawVal.substr(0, valEnd + 1);
-                    else
-                        rawVal = {};
-                } else {
-                    rawVal = {};
-                }
-
-                // last value wins for duplicate header names
-                response_.headers_[std::move(key)] = rawVal;
-            }
-
-            if (lineEnd == std::string_view::npos) break;
-            pos = lineEnd + 2;
-        }
-    }
+    if (firstNL != std::string_view::npos)
+        detail::parseHeaderFields(
+            hdr, firstNL, [this](std::string key, std::string_view val) {
+                response_.headers_[std::move(key)] = val;
+            });
 
     determineBodyMode_();
     headersParsed_ = true;
@@ -365,6 +330,13 @@ void HttpResponseParser::reset() {
     headerBuf_.clear();
     bodyBuf_.clear();
     decodedBody_.clear();
+
+    // Reserve space to prevent reallocation during parsing
+    inBuf_.reserve(16384);
+    headerBuf_.reserve(16384);
+    bodyBuf_.reserve(16384);
+    decodedBody_.reserve(16384);
+
     state_ = State::Incomplete;
     headersParsed_ = false;
     headerScanPos_ = 0;
@@ -450,7 +422,7 @@ std::string_view HttpResponse::Builder::getReason_(int code) const {
 std::string HttpResponse::Builder::build() const {
     std::string r;
     r.reserve(512 + body_.size());
-    
+
     r += "HTTP/1.1 ";
     r += std::to_string(code_);
     r += " ";

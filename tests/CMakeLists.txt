@@ -39,6 +39,7 @@ set(TEST_SOURCES
     test_unix_socket
     test_http_stress
     test_http_response_builder
+    test_http_response_parser
 )
 
 # Slow tests (disabled by default, enable with -DALLOW_SLOW_TESTS=ON)

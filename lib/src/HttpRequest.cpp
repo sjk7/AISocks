@@ -3,6 +3,7 @@
 // https://pvs-studio.com
 
 #include "HttpRequest.h"
+#include "HttpParserUtils.h"
 #include "UrlCodec.h"
 
 #include <string>
@@ -61,52 +62,6 @@ static bool parseRequestLine_(std::string_view requestLine, HttpRequest& req) {
     return true;
 }
 
-// Parses HTTP header fields from `headerSection` starting after the first CRLF
-// (`firstCRLF`).  Keys are lowercased; values have leading/trailing OWS
-// trimmed.
-static void parseHeaderFields_(
-    std::string_view headerSection, size_t firstCRLF, HttpRequest& req) {
-    size_t pos = firstCRLF + 2;
-    while (pos < headerSection.size()) {
-        const auto lineEnd = headerSection.find("\r\n", pos);
-        const std::string_view line = (lineEnd == std::string_view::npos)
-            ? headerSection.substr(pos)
-            : headerSection.substr(pos, lineEnd - pos);
-
-        if (line.empty()) break;
-
-        const auto colon = line.find(':');
-        if (colon != std::string_view::npos) {
-            const std::string_view rawKey = line.substr(0, colon);
-            std::string_view rawVal = line.substr(colon + 1);
-
-            // Lowercase key directly into the map key string — no extra alloc.
-            std::string key;
-            key.resize(rawKey.size());
-            for (size_t i = 0; i < rawKey.size(); ++i)
-                key[i] = static_cast<char>(
-                    ::tolower(static_cast<unsigned char>(rawKey[i])));
-
-            // Trim leading/trailing OWS from value view — zero allocs.
-            const auto valStart = rawVal.find_first_not_of(" \t");
-            if (valStart == std::string_view::npos) {
-                rawVal = {};
-            } else {
-                rawVal = rawVal.substr(valStart);
-                const auto valEnd = rawVal.find_last_not_of(" \t\r");
-                rawVal = (valEnd != std::string_view::npos)
-                    ? rawVal.substr(0, valEnd + 1)
-                    : std::string_view{};
-            }
-
-            req.headers[std::move(key)] = rawVal;
-        }
-
-        if (lineEnd == std::string_view::npos) break;
-        pos = lineEnd + 2;
-    }
-}
-
 // Splits `req.queryString` into `req.queryParams` (URL-decoded key=value
 // pairs separated by '&').
 static void parseQueryParams_(HttpRequest& req) {
@@ -137,22 +92,22 @@ HttpRequest HttpRequest::parse(std::string_view raw) {
     HttpRequest req;
     const std::string_view sv(raw);
 
-    // Locate header/body separator.
-    const auto sep = sv.find("\r\n\r\n");
+    // Locate header/body separator (\r\n\r\n or bare \n\n — RFC 7230 §3.5).
+    const auto [sep, sepLen] = detail::findHeaderBodySep(sv);
     const std::string_view headerSection
         = (sep == std::string_view::npos) ? sv : sv.substr(0, sep);
-    if (sep != std::string_view::npos) req.body = sv.substr(sep + 4);
+    if (sep != std::string_view::npos) req.body = sv.substr(sep + sepLen);
 
     // Split off the request line.
-    const auto firstCRLF = headerSection.find("\r\n");
-    const std::string_view requestLine = (firstCRLF == std::string_view::npos)
-        ? headerSection
-        : headerSection.substr(0, firstCRLF);
+    const auto [requestLine, firstNL] = detail::extractFirstLine(headerSection);
 
     if (!parseRequestLine_(requestLine, req)) return req;
 
-    if (firstCRLF != std::string_view::npos)
-        parseHeaderFields_(headerSection, firstCRLF, req);
+    if (firstNL != std::string_view::npos)
+        detail::parseHeaderFields(headerSection, firstNL,
+            [&req](std::string key, std::string_view val) {
+                req.headers[std::move(key)] = val;
+            });
 
     if (!req.queryString.empty()) parseQueryParams_(req);
 

@@ -49,6 +49,8 @@
 // 38. Trailing whitespace on request line -- version gains trailing spaces (not
 // trimmed)
 // 39. Incomplete request (no \r\n\r\n terminator) -- parser accepts as valid
+// 40. Bare LF (\n\n) as header/body separator -- RFC 7230 §3.5
+// 41. Bare LF (\n) as line terminator in headers -- RFC 7230 §3.5
 
 #include "HttpRequest.h"
 #include "test_helpers.h"
@@ -567,6 +569,38 @@ static void test_incomplete_request() {
     REQUIRE(req.body.empty());
 }
 
+// 40. Bare \n\n as header/body separator (RFC 7230 §3.5)
+static void test_bare_lf_separator() {
+    BEGIN_TEST("bare LF separator (\\n\\n)");
+    // Some HTTP/1.0 proxies and test tools send \n\n instead of \r\n\r\n.
+    std::string raw
+        = "GET /index.html HTTP/1.1\r\nHost: example.com\r\n\nHello";
+    auto req = HttpRequest::parse(raw);
+    REQUIRE(req.valid);
+    CHECK_FIELD("method", req.method, "GET");
+    CHECK_FIELD("path", req.path, "/index.html");
+    CHECK_FIELD("body", req.body, "Hello");
+}
+
+// 41. Bare \n line endings throughout (RFC 7230 §3.5)
+static void test_bare_lf_line_endings() {
+    BEGIN_TEST("bare LF line endings");
+    // All \r\n replaced with bare \n.
+    std::string raw = "POST /submit HTTP/1.1\n"
+                      "Host: example.com\n"
+                      "Content-Type: application/x-www-form-urlencoded\n"
+                      "\n"
+                      "key=value";
+    auto req = HttpRequest::parse(raw);
+    REQUIRE(req.valid);
+    CHECK_FIELD("method", req.method, "POST");
+    CHECK_FIELD("path", req.path, "/submit");
+    CHECK_FIELD("host", req.headers.at("host"), "example.com");
+    CHECK_FIELD("content-type", req.headers.at("content-type"),
+        "application/x-www-form-urlencoded");
+    CHECK_FIELD("body", req.body, "key=value");
+}
+
 // 40. Typical browser-like request (integration)
 static void test_typical_browser_request() {
     BEGIN_TEST("typical browser request");
@@ -635,6 +669,8 @@ int main() {
     test_connect_form();
     test_trailing_whitespace_request_line();
     test_incomplete_request();
+    test_bare_lf_separator();
+    test_bare_lf_line_endings();
     test_typical_browser_request();
     return test_summary();
 }
