@@ -179,6 +179,45 @@ else()
 endif()
 
 # ---------------------------------------------------------------------------
+# libFuzzer targets (opt-in: -DENABLE_FUZZER=ON, requires Clang)
+# ---------------------------------------------------------------------------
+option(ENABLE_FUZZER "Build libFuzzer fuzz targets (requires Clang)" OFF)
+if(ENABLE_FUZZER)
+    if(MSVC)
+        message(FATAL_ERROR "libFuzzer is not supported with MSVC")
+    endif()
+    set(FUZZ_TARGETS
+        fuzz_http_request   # HttpRequest::parse()         — request parser
+        fuzz_http_response  # HttpResponseParser::feed()   — response/chunk parser
+        fuzz_url_codec      # urlDecode / urlDecodePath    — percent-decoding
+        fuzz_html_escape    # HtmlEscape::encode()         — XSS escaping
+        fuzz_resolve_path   # HttpFileServer::resolveFilePath() — path traversal
+    )
+    # libFuzzer provides its own main(), so these are NOT added to ctest.
+    foreach(FUZZ_TARGET ${FUZZ_TARGETS})
+        add_executable(${FUZZ_TARGET} ${FUZZ_TARGET}.cpp)
+        target_link_libraries(${FUZZ_TARGET} PRIVATE aiSocksLib)
+        target_include_directories(${FUZZ_TARGET} PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}
+            ${CMAKE_SOURCE_DIR}/lib/include
+        )
+        target_compile_options(${FUZZ_TARGET} PRIVATE
+            -fsanitize=fuzzer,address
+            -fno-omit-frame-pointer
+        )
+        target_link_options(${FUZZ_TARGET} PRIVATE
+            -fsanitize=fuzzer,address
+        )
+        if(DEFINED _LLVM_LIBCXX_DIR)
+            target_link_directories(${FUZZ_TARGET} PRIVATE "${_LLVM_LIBCXX_DIR}")
+            set_target_properties(${FUZZ_TARGET} PROPERTIES
+                BUILD_RPATH "${_LLVM_LIBCXX_DIR}")
+        endif()
+        message(STATUS "libFuzzer target enabled: ${FUZZ_TARGET}")
+    endforeach()
+endif()
+
+# ---------------------------------------------------------------------------
 # Post-build test runner
 # ---------------------------------------------------------------------------
 # Custom target to run all tests on demand (not automatically on every build).
