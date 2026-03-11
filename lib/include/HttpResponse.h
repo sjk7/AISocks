@@ -28,9 +28,8 @@
 // response.
 //
 // Lifetime:
-//   All string_views returned by HttpResponse are backed by buffers owned by
-//   the HttpResponseParser that produced them.  Do not use them after the
-//   parser is destroyed or reset().
+//   HttpResponse owns all its data (std::string fields).  Copies are
+//   independent and remain valid after the parser is reset() or destroyed.
 //
 // ---------------------------------------------------------------------------
 #include <cstdint>
@@ -215,7 +214,6 @@ class HttpResponseParser {
     // ---- buffers --------------------------------------------------------
     // inBuf_      — accumulates raw bytes until \r\n\r\n is found
     // headerBuf_  — frozen copy of the header section (including status line)
-    //               string_views in response_ point here; never appended to
     // bodyBuf_    — raw body bytes: Content-Length payload, or raw chunked data
     // decodedBody_ — TE:chunked only — assembled decoded body
     std::string inBuf_;

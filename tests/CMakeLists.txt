@@ -41,6 +41,7 @@ set(TEST_SOURCES
     test_http_response_builder
     test_http_response_parser
     test_client_http_request
+    test_bugfix_coverage
 )
 
 # Slow tests (disabled by default, enable with -DALLOW_SLOW_TESTS=ON)
