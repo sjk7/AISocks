@@ -291,13 +291,12 @@ int main() {
     BEGIN_TEST("Edge case: rapid connect/disconnect/reconnect cycling");
     {
         EdgeCaseServer server(Port::any);
+        server.setCustomKeepAliveTimeout(Milliseconds{5000});
         Port port = server.serverPort();
 
         auto serverThread
             = startServerInBackground(server, ClientLimit::Unlimited);
         waitForServerReady(server);
-
-        server.setCustomKeepAliveTimeout(Milliseconds{5000});
 
         // Connect/disconnect cycle
         int cycles = 10;

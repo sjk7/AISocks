@@ -14,9 +14,11 @@ namespace aiSocks {
 // ---------------------------------------------------------------------------
 // SimpleServer  convenience wrapper for TCP server polling loops.
 //
-// Privately inherits ServerBase<detail::NoClientState>, so it shares the O(1)
-// flat-array client table, keep-alive timeout heap, requestStop(), and
-// signal handling — without exposing the full ServerBase API surface.
+// Inherits ServerBase<detail::NoClientState> (protected), so it shares the
+// O(1) flat-array client table, keep-alive timeout heap, requestStop(), and
+// signal handling.  Subclasses may override onClientConnected() and
+// onClientDisconnected() to maintain a thread-safe atomic client count or
+// any other per-connect/disconnect logic.
 //
 // Usage — poll loop (read + write events):
 //   SimpleServer server(ServerBind{"0.0.0.0", Port{8080}});
@@ -62,7 +64,7 @@ namespace detail {
     };
 } // namespace detail
 
-class SimpleServer : private ServerBase<detail::NoClientState> {
+class SimpleServer : protected ServerBase<detail::NoClientState> {
     using Base = ServerBase<detail::NoClientState>;
 
     public:

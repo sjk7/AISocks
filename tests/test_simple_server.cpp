@@ -50,6 +50,26 @@ static Port serverPort(const SimpleServer& s) {
     return ep.isSuccess() ? ep.value().port : Port::any;
 }
 
+// SimpleServer subclass that maintains a thread-safe client count via the
+// onClientConnected / onClientDisconnected hooks (both called on the server
+// thread, but readable from any thread via the atomic).
+class TrackingServer : public SimpleServer {
+    public:
+    explicit TrackingServer(
+        const ServerBind& args, AddressFamily family = AddressFamily::IPv4)
+        : SimpleServer(args, family) {}
+
+    std::atomic<size_t> atomicClientCount_{0};
+
+    protected:
+    void onClientConnected(TcpSocket& /*sock*/) override {
+        atomicClientCount_.fetch_add(1, std::memory_order_relaxed);
+    }
+    void onClientDisconnected() override {
+        atomicClientCount_.fetch_sub(1, std::memory_order_relaxed);
+    }
+};
+
 // -----------------------------------------------------------------------
 // 1. Validity
 // -----------------------------------------------------------------------
@@ -138,7 +158,7 @@ static void test_poll_clients_disconnect_on_false() {
     std::atomic<bool> serverReady{false};
     std::atomic<bool> callbackFired{false};
 
-    SimpleServer server(ServerBind{"127.0.0.1", Port::any, Backlog{5}});
+    TrackingServer server(ServerBind{"127.0.0.1", Port::any, Backlog{5}});
     REQUIRE(server.isValid());
     Port port = serverPort(server);
     REQUIRE(port != Port::any);
@@ -169,17 +189,15 @@ static void test_poll_clients_disconnect_on_false() {
 
     client->send("trigger", 7);
 
-    // Wait for the callback to fire - this confirms the server received data
     REQUIRE(waitFor([&] { return callbackFired.load(); }));
-    // Wait for the server to process the disconnect (callback returned false)
-    REQUIRE(waitFor([&] { return server.clientCount() == 0; }));
+    // Wait for onClientDisconnected to fire — safe cross-thread via atomic.
+    REQUIRE(waitFor([&] { return server.atomicClientCount_.load() == 0; }));
 
     server.requestStop();
     client.reset();
     serverThread.join();
 
-    // After server stops, clientCount should be 0
-    REQUIRE(server.clientCount() == 0);
+    REQUIRE(server.atomicClientCount_.load() == 0);
 }
 
 // -----------------------------------------------------------------------
