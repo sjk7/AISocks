@@ -87,7 +87,7 @@ class HttpResponse {
     explicit operator bool() const noexcept { return valid; }
 
     class Builder {
-    public:
+        public:
         Builder& status(int code, std::string_view reason = "") {
             code_ = code;
             reason_ = reason;
@@ -115,7 +115,7 @@ class HttpResponse {
 
         std::string build() const;
 
-    private:
+        private:
         int code_{200};
         std::string_view reason_;
         std::vector<std::pair<std::string, std::string>> headers_;
@@ -149,7 +149,11 @@ class HttpResponseParser {
         Error ///< Parse error; call reset() before reuse
     };
 
-    HttpResponseParser() = default;
+    HttpResponseParser() {
+        // Reserve space to reduce reallocations during incremental feeding.
+        inBuf_.reserve(16384);
+        bodyBuf_.reserve(16384);
+    }
     ~HttpResponseParser() = default;
 
     // Non-copyable — buffers contain string_views into themselves

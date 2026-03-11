@@ -45,7 +45,10 @@
 // 34. Fragment -- '#' is NOT sent in HTTP requests (but graceful if present)
 // 35. Very long header value preserved intact
 // 36. Request with many headers
-// 37. Trailing whitespace on request line is handled gracefully
+// 37. CONNECT / authority-form request target
+// 38. Trailing whitespace on request line -- version gains trailing spaces (not
+// trimmed)
+// 39. Incomplete request (no \r\n\r\n terminator) -- parser accepts as valid
 
 #include "HttpRequest.h"
 #include "test_helpers.h"
@@ -76,10 +79,11 @@ using namespace aiSocks;
     return r;
 }
 
-static void CHECK_FIELD(const std::string& label, std::string_view got,
-    std::string_view expected) {
+static void CHECK_FIELD(
+    const std::string& label, std::string_view got, std::string_view expected) {
     REQUIRE_MSG(got == expected,
-        label + ": expected \"" + std::string(expected) + "\"  got \"" + std::string(got) + "\"");
+        label + ": expected \"" + std::string(expected) + "\"  got \""
+            + std::string(got) + "\"");
 }
 
 // -- test functions ---------------------------------------------------------
@@ -523,7 +527,47 @@ static void test_many_headers() {
     CHECK_FIELD("header 49", req.headers.at("x-h49"), "v49");
 }
 
-// 37. Typical browser-like request (integration)
+// 37. CONNECT / authority-form request target
+static void test_connect_form() {
+    BEGIN_TEST("CONNECT authority-form target");
+    std::string raw = "CONNECT host.example.com:443 HTTP/1.1\r\n"
+                      "Host: host.example.com:443\r\n\r\n";
+    auto req = HttpRequest::parse(raw);
+    REQUIRE(req.valid);
+    CHECK_FIELD("CONNECT method", req.method, "CONNECT");
+    CHECK_FIELD("CONNECT rawPath", req.rawPath, "host.example.com:443");
+    CHECK_FIELD("CONNECT path", req.path, "host.example.com:443");
+    REQUIRE(req.queryString.empty());
+}
+
+// 38. Trailing whitespace on request line -- version string is NOT trimmed
+static void test_trailing_whitespace_request_line() {
+    BEGIN_TEST("trailing whitespace on request line");
+    // The parser does not trim the version field; trailing spaces become part
+    // of req.version.  This documents the current behaviour.
+    std::string raw = "GET / HTTP/1.1   \r\n\r\n";
+    auto req = HttpRequest::parse(raw);
+    REQUIRE(req.valid);
+    CHECK_FIELD("method", req.method, "GET");
+    // Version includes the trailing spaces -- callers should trim if needed.
+    REQUIRE_MSG(req.version.substr(0, 8) == "HTTP/1.1",
+        "version starts with HTTP/1.1 even with trailing whitespace");
+}
+
+// 39. Incomplete request (no \r\n\r\n terminator)
+static void test_incomplete_request() {
+    BEGIN_TEST("incomplete request (no \\r\\n\\r\\n)");
+    // The parser treats the whole buffer as headers and returns valid=true
+    // with an empty body.  This documents the lenient current behaviour.
+    std::string raw = "GET /path HTTP/1.1\r\nHost: example.com\r\n";
+    auto req = HttpRequest::parse(raw);
+    REQUIRE(req.valid);
+    CHECK_FIELD("method", req.method, "GET");
+    CHECK_FIELD("path", req.path, "/path");
+    REQUIRE(req.body.empty());
+}
+
+// 40. Typical browser-like request (integration)
 static void test_typical_browser_request() {
     BEGIN_TEST("typical browser request");
     std::string raw = "GET /search?q=c%2B%2B+templates&safe=off HTTP/1.1\r\n"
@@ -588,6 +632,9 @@ int main() {
     test_fragment_not_sent();
     test_long_header_value();
     test_many_headers();
+    test_connect_form();
+    test_trailing_whitespace_request_line();
+    test_incomplete_request();
     test_typical_browser_request();
     return test_summary();
 }
