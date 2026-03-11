@@ -23,6 +23,29 @@ namespace {
         }
         return t;
     }();
+    // Shared decode implementation: plusIsSpace=true for query strings,
+    // false for URL paths (RFC 3986 — '+' is literal in a path).
+    static std::string urlDecodeImpl(std::string_view src, bool plusIsSpace) {
+        std::string out;
+        out.reserve(src.size());
+        for (size_t i = 0, n = src.size(); i < n; ++i) {
+            const unsigned char c = static_cast<unsigned char>(src[i]);
+            if (c == '%' && i + 2 < n) {
+                const uint8_t hi = kFromHex[static_cast<unsigned char>(src[i + 1])];
+                const uint8_t lo = kFromHex[static_cast<unsigned char>(src[i + 2])];
+                if (hi != 0xFF && lo != 0xFF) {
+                    out += static_cast<char>((hi << 4) | lo);
+                    i += 2;
+                    continue;
+                }
+            } else if (plusIsSpace && c == '+') {
+                out += ' ';
+                continue;
+            }
+            out += static_cast<char>(c);
+        }
+        return out;
+    }
 } // namespace
 
 std::string urlEncode(std::string_view src) {
@@ -59,44 +82,11 @@ std::string urlEncode(std::string_view src) {
 }
 
 std::string urlDecode(std::string_view src) {
-    std::string out;
-    out.reserve(src.size());
-    for (size_t i = 0, n = src.size(); i < n; ++i) {
-        const unsigned char c = static_cast<unsigned char>(src[i]);
-        if (c == '%' && i + 2 < n) {
-            const uint8_t hi = kFromHex[static_cast<unsigned char>(src[i + 1])];
-            const uint8_t lo = kFromHex[static_cast<unsigned char>(src[i + 2])];
-            if (hi != 0xFF && lo != 0xFF) {
-                out += static_cast<char>((hi << 4) | lo);
-                i += 2;
-                continue;
-            }
-        } else if (c == '+') {
-            out += ' ';
-            continue;
-        }
-        out += static_cast<char>(c);
-    }
-    return out;
+    return urlDecodeImpl(src, true);
 }
 
 std::string urlDecodePath(std::string_view src) {
-    std::string out;
-    out.reserve(src.size());
-    for (size_t i = 0, n = src.size(); i < n; ++i) {
-        const unsigned char c = static_cast<unsigned char>(src[i]);
-        if (c == '%' && i + 2 < n) {
-            const uint8_t hi = kFromHex[static_cast<unsigned char>(src[i + 1])];
-            const uint8_t lo = kFromHex[static_cast<unsigned char>(src[i + 2])];
-            if (hi != 0xFF && lo != 0xFF) {
-                out += static_cast<char>((hi << 4) | lo);
-                i += 2;
-                continue;
-            }
-        }
-        out += static_cast<char>(c);
-    }
-    return out;
+    return urlDecodeImpl(src, false);
 }
 
 } // namespace aiSocks

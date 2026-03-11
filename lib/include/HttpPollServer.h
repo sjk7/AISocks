@@ -133,7 +133,7 @@ struct HttpClientState {
 class HttpPollServer : public ServerBase<HttpClientState> {
     public:
     static constexpr size_t MAX_HEADER_SIZE = 8192;
-    static constexpr int SLOWLORIS_TIMEOUT_MS = 200;
+    static constexpr int SLOWLORIS_TIMEOUT_MS = 5000;  // 5 s
 
     explicit HttpPollServer(
         const ServerBind& bind, Result<TcpSocket>* result = nullptr)

@@ -17,17 +17,14 @@ const FileCache::CachedFile* FileCache::get(
 
     if (it->second.lastModified != currentModTime) {
         totalBytes_ -= it->second.size;
+        lruList_.erase(it->second.lruIt);
         cache_.erase(it);
-        removeLRUEntry(filePath);
         return nullptr;
     }
 
-    // Only promote when the entry is not already the MRU (front of list).
-    // Skips 2 unordered_map ops + a list splice on every repeated hit to the
-    // same hot file, at the cost of one map lookup + pointer compare.
-    auto idxIt = lruIndex_.find(filePath);
-    if (idxIt == lruIndex_.end() || idxIt->second != lruList_.begin()) {
-        updateLRU(filePath);
+    // Promote to MRU only when not already at the front.
+    if (it->second.lruIt != lruList_.begin()) {
+        updateLRU(it);
     }
     return &it->second;
 }
@@ -51,8 +48,8 @@ void FileCache::putImpl(
     auto it = cache_.find(filePath);
     if (it != cache_.end()) {
         totalBytes_ -= it->second.size;
+        lruList_.erase(it->second.lruIt);
         cache_.erase(it);
-        removeLRUEntry(filePath);
     }
 
     while (!lruList_.empty()
@@ -62,31 +59,29 @@ void FileCache::putImpl(
     }
 
     const size_t sz = content.size();
+    lruList_.push_front(filePath);
     CachedFile cached;
     cached.content = std::move(content);
     cached.lastModified = modTime;
     cached.size = sz;
+    cached.lruIt = lruList_.begin();
 
     cache_[filePath] = std::move(cached);
     totalBytes_ += sz;
-
-    lruList_.push_front(filePath);
-    lruIndex_[filePath] = lruList_.begin();
 }
 
 void FileCache::invalidate(const std::string& filePath) {
     auto it = cache_.find(filePath);
     if (it != cache_.end()) {
         totalBytes_ -= it->second.size;
+        lruList_.erase(it->second.lruIt);
         cache_.erase(it);
-        removeLRUEntry(filePath);
     }
 }
 
 void FileCache::clear() {
     cache_.clear();
     lruList_.clear();
-    lruIndex_.clear();
     totalBytes_ = 0;
 }
 
@@ -106,7 +101,6 @@ void FileCache::evictLRU() {
     if (lruList_.empty()) return;
 
     const std::string& lruPath = lruList_.back();
-    lruIndex_.erase(lruPath);
 
     auto it = cache_.find(lruPath);
     if (it != cache_.end()) {
@@ -117,17 +111,14 @@ void FileCache::evictLRU() {
     lruList_.pop_back();
 }
 
-void FileCache::updateLRU(const std::string& filePath) {
-    removeLRUEntry(filePath);
-    lruList_.push_front(filePath);
-    lruIndex_[filePath] = lruList_.begin();
+void FileCache::updateLRU(std::unordered_map<std::string, CachedFile>::iterator it) {
+    lruList_.splice(lruList_.begin(), lruList_, it->second.lruIt);
 }
 
 void FileCache::removeLRUEntry(const std::string& filePath) {
-    auto idxIt = lruIndex_.find(filePath);
-    if (idxIt != lruIndex_.end()) {
-        lruList_.erase(idxIt->second);
-        lruIndex_.erase(idxIt);
+    auto it = cache_.find(filePath);
+    if (it != cache_.end()) {
+        lruList_.erase(it->second.lruIt);
     }
 }
 

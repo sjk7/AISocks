@@ -44,7 +44,7 @@ class MockHttpServer : public HttpPollServer {
 };
 
 static void test_slowloris_protection() {
-    BEGIN_TEST("slowloris protection (200ms timeout)");
+    BEGIN_TEST("slowloris protection (5s timeout)");
 
     MockHttpServer server(ServerBind{"127.0.0.1", Port{0}});
     REQUIRE(server.isValid());
@@ -65,8 +65,8 @@ static void test_slowloris_protection() {
     std::string partial = "GET / HTTP/1.1\r\nHost: localhost\r\n";
     client.send(partial.data(), partial.size());
 
-    // Wait for > 200ms
-    std::this_thread::sleep_for(std::chrono::milliseconds(400));
+    // Wait for > 5000ms (SLOWLORIS_TIMEOUT_MS)
+    std::this_thread::sleep_for(std::chrono::milliseconds(5200));
 
     // We need to trigger an event to wake up the server or rely on the poll
     // timeout. Since we used Milliseconds{10}, it should wake up frequently.
@@ -76,7 +76,7 @@ static void test_slowloris_protection() {
     client.send(&extra, 1);
 
     // Give it a moment to process
-    int retries = 20;
+    int retries = 40;
     while (!server.disconnected && retries-- > 0) {
         std::this_thread::sleep_for(std::chrono::milliseconds(50));
     }

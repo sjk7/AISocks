@@ -117,7 +117,7 @@ class HttpResponse {
 
         private:
         int code_{200};
-        std::string_view reason_;
+        std::string reason_;
         std::vector<std::pair<std::string, std::string>> headers_;
         std::string body_;
         bool keepAlive_{true};

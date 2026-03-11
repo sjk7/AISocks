@@ -23,6 +23,7 @@ class FileCache {
         std::vector<char> content;
         time_t lastModified = 0;
         size_t size = 0;
+        std::list<std::string>::iterator lruIt; // points into lruList_
     };
 
     struct Config {
@@ -58,11 +59,10 @@ class FileCache {
     Config config_;
     std::unordered_map<std::string, CachedFile> cache_;
     std::list<std::string> lruList_;
-    std::unordered_map<std::string, std::list<std::string>::iterator> lruIndex_;
     size_t totalBytes_ = 0;
 
     void evictLRU();
-    void updateLRU(const std::string& filePath);
+    void updateLRU(std::unordered_map<std::string, CachedFile>::iterator it);
     void removeLRUEntry(const std::string& filePath);
     void putImpl(
         const std::string& filePath, std::vector<char> content, time_t modTime);

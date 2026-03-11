@@ -12,25 +12,7 @@
 namespace aiSocks {
 
 const std::string_view* HttpRequest::header(std::string_view name) const {
-    // Fast path: lowercase into a stack buffer and search via string_view.
-    // std::map<std::string, std::string_view, std::less<>> supports
-    // heterogeneous find() in C++17, so no heap allocation occurs for names <
-    // 64 chars.
-    char sbuf[64];
-    if (name.size() < sizeof(sbuf)) {
-        for (size_t i = 0; i < name.size(); ++i)
-            sbuf[i] = static_cast<char>(
-                ::tolower(static_cast<unsigned char>(name[i])));
-        auto it = headers.find(std::string_view(sbuf, name.size()));
-        return it == headers.end() ? nullptr : &it->second;
-    }
-    // Fallback for pathologically long names (allocates once).
-    std::string key(name.size(), '\0');
-    for (size_t i = 0; i < name.size(); ++i)
-        key[i]
-            = static_cast<char>(::tolower(static_cast<unsigned char>(name[i])));
-    auto it = headers.find(key);
-    return it == headers.end() ? nullptr : &it->second;
+    return detail::lookupHeaderCI(headers, name);
 }
 
 std::string_view HttpRequest::headerOr(

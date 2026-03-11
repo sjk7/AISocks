@@ -2,6 +2,7 @@
 // HttpResponse.cpp. Not part of the public API.
 #pragma once
 
+#include <algorithm>
 #include <cctype>
 #include <string_view>
 #include <string>
@@ -55,11 +56,9 @@ void parseHeaderFields(std::string_view hdr, size_t firstNL, EmitFn&& emit) {
             const std::string_view rawKey = line.substr(0, colon);
             std::string_view rawVal = line.substr(colon + 1);
 
-            std::string key;
-            key.resize(rawKey.size());
-            for (size_t i = 0; i < rawKey.size(); ++i)
-                key[i] = static_cast<char>(
-                    ::tolower(static_cast<unsigned char>(rawKey[i])));
+            std::string key(rawKey.size(), '\0');
+            std::transform(rawKey.begin(), rawKey.end(), key.begin(),
+                [](unsigned char c){ return static_cast<char>(::tolower(c)); });
 
             const size_t valStart = rawVal.find_first_not_of(" \t");
             if (valStart == std::string_view::npos) {
@@ -78,6 +77,28 @@ void parseHeaderFields(std::string_view hdr, size_t firstNL, EmitFn&& emit) {
         if (nlPos == std::string_view::npos) break;
         pos = nlPos + 1;
     }
+}
+
+/// Case-insensitive header lookup shared by HttpRequest and HttpResponse.
+/// Lowercases `name` into a stack buffer (heap-fallback for long names) and
+/// performs a heterogeneous find() on any header map with std::less<> comparator.
+template <typename Map>
+const std::string_view* lookupHeaderCI(const Map& headers, std::string_view name) {
+    char sbuf[128];
+    std::string heap;
+    const char* data;
+    if (name.size() < sizeof(sbuf)) {
+        std::transform(name.begin(), name.end(), sbuf,
+            [](unsigned char c){ return static_cast<char>(::tolower(c)); });
+        data = sbuf;
+    } else {
+        heap.resize(name.size());
+        std::transform(name.begin(), name.end(), heap.begin(),
+            [](unsigned char c){ return static_cast<char>(::tolower(c)); });
+        data = heap.c_str();
+    }
+    auto it = headers.find(std::string_view(data, name.size()));
+    return it == headers.end() ? nullptr : &it->second;
 }
 
 } // namespace aiSocks::detail

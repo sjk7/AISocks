@@ -9,6 +9,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <charconv>
 #include <cstdlib>
 #include <string>
 #include <string_view>
@@ -20,30 +21,7 @@ namespace aiSocks {
 // ---------------------------------------------------------------------------
 
 const std::string_view* HttpResponse::header(std::string_view name) const {
-    // Lowercase the lookup key without allocating when it fits in a small
-    // buffer
-    char smallBuf[128];
-    std::string heapBuf;
-    const char* keyData = nullptr;
-
-    if (name.size() < sizeof(smallBuf)) {
-        for (size_t i = 0; i < name.size(); ++i)
-            smallBuf[i] = static_cast<char>(
-                ::tolower(static_cast<unsigned char>(name[i])));
-        keyData = smallBuf;
-    } else {
-        if (name.size() > 16384) {
-            return nullptr; // Fail if header name is too large
-        }
-        heapBuf.resize(name.size());
-        for (size_t i = 0; i < name.size(); ++i)
-            heapBuf[i] = static_cast<char>(
-                ::tolower(static_cast<unsigned char>(name[i])));
-        keyData = heapBuf.c_str();
-    }
-
-    auto it = headers_.find(std::string_view(keyData, name.size()));
-    return it == headers_.end() ? nullptr : &it->second;
+    return detail::lookupHeaderCI(headers_, name);
 }
 
 // ---------------------------------------------------------------------------
@@ -207,7 +185,10 @@ void HttpResponseParser::determineBodyMode_() {
     if (bodyMode_ == BodyMode::Unknown) {
         const std::string_view* cl = response_.header("content-length");
         if (cl != nullptr) {
-            contentLength_ = static_cast<int64_t>(std::atoll(cl->data()));
+            int64_t parsed = 0;
+            auto [ptr, ec] = std::from_chars(cl->data(), cl->data() + cl->size(), parsed);
+            if (ec == std::errc{}) contentLength_ = parsed;
+            else { markError_(); return; }
             bodyMode_ = BodyMode::ContentLength;
         } else {
             bodyMode_ = BodyMode::ConnectionClose;
@@ -252,6 +233,12 @@ HttpResponseParser::State HttpResponseParser::processChunked_() {
     // calls don't re-scan from zero.
 
     while (true) {
+        // Compact consumed prefix to avoid unbounded memory growth
+        if (chunkScanPos_ > 4096 && chunkScanPos_ > bodyBuf_.size() / 2) {
+            bodyBuf_.erase(0, chunkScanPos_);
+            chunkScanPos_ = 0;
+        }
+
         // Need at least "0\r\n\r\n" (5 bytes) to be able to terminate
         if (chunkScanPos_ >= bodyBuf_.size()) break;
 
@@ -271,9 +258,12 @@ HttpResponseParser::State HttpResponseParser::processChunked_() {
         const size_t chunkSize = *optSize;
 
         if (chunkSize == 0) {
-            // Terminal chunk — skip "0\r\n" + optional trailers + "\r\n"
-            // Find the final "\r\n" that closes the trailer section
-            const size_t trailerEnd = bodyBuf_.find("\r\n", crlfPos + 2);
+            // Terminal chunk — skip "0\r\n" + optional trailers + "\r\n\r\n"
+            // crlfPos is the position of the "\r\n" after "0".
+            // The trailer section ends at the next blank line ("\r\n\r\n").
+            // For no-trailer case: "0\r\n\r\n" — the \r\n at crlfPos IS the
+            // start of the \r\n\r\n terminator, so search from crlfPos.
+            const size_t trailerEnd = bodyBuf_.find("\r\n\r\n", crlfPos);
             if (trailerEnd == std::string::npos) break; // need more data
             // Terminal chunk consumed — body complete
             response_.body_ = std::string_view(decodedBody_);
@@ -433,7 +423,14 @@ std::string HttpResponse::Builder::build() const {
         r += ": ";
         r += h.second;
         r += "\r\n";
-        if (h.first == "Content-Length") hasContentLength = true;
+        // Case-insensitive comparison so "content-length" also suppresses duplicate
+        const auto& k = h.first;
+        if (k.size() == 14) {
+            std::string kl(k.size(), '\0');
+            for (size_t i = 0; i < k.size(); ++i)
+                kl[i] = static_cast<char>(::tolower(static_cast<unsigned char>(k[i])));
+            if (kl == "content-length") hasContentLength = true;
+        }
     }
 
     if (!hasContentLength) {

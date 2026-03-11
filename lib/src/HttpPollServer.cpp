@@ -100,12 +100,35 @@ std::string HttpPollServer::makeResponse(const char* statusLine,
 static bool resolveKeepAlive_(const HttpRequest& req) {
     const bool http10 = req.version == "HTTP/1.0";
     const std::string_view* conn = req.header("connection");
-    const bool hasKeepAlive = conn && (*conn == "keep-alive");
-    const bool hasClose = conn && (*conn == "close");
+    // RFC 7230: Connection header token comparison is case-insensitive.
+    // Also handle comma-separated token lists (e.g. "TE, keep-alive").
+    auto ciTokenPresent = [](std::string_view field, std::string_view token) {
+        const size_t tlen = token.size();
+        size_t pos = 0;
+        while (pos < field.size()) {
+            const size_t comma = field.find(',', pos);
+            const size_t end = (comma == std::string_view::npos) ? field.size() : comma;
+            std::string_view t = field.substr(pos, end - pos);
+            const size_t ts = t.find_first_not_of(" \t");
+            if (ts != std::string_view::npos) t = t.substr(ts);
+            const size_t te = t.find_last_not_of(" \t");
+            if (te != std::string_view::npos) t = t.substr(0, te + 1);
+            if (t.size() == tlen) {
+                bool match = true;
+                for (size_t i = 0; i < tlen; ++i)
+                    if (::tolower(static_cast<unsigned char>(t[i])) != static_cast<unsigned char>(token[i])) { match = false; break; }
+                if (match) return true;
+            }
+            pos = (comma == std::string_view::npos) ? field.size() : comma + 1;
+        }
+        return false;
+    };
+    const bool hasKeepAlive = conn && ciTokenPresent(*conn, "keep-alive");
+    const bool hasClose     = conn && ciTokenPresent(*conn, "close");
     return http10 ? !hasKeepAlive : hasClose;
 }
 
-// Returns true when the slowloris deadline has expired: more than 200 ms
+// Returns true when the slowloris deadline has expired: more than 5 seconds
 // have elapsed since the first byte arrived but headers are still incomplete.
 // `now` is passed in from the recv loop (already computed once per iteration).
 static bool isSlowlorisTimeout_(
