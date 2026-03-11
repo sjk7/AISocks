@@ -20,7 +20,7 @@ namespace aiSocks {
 // HttpResponse
 // ---------------------------------------------------------------------------
 
-const std::string_view* HttpResponse::header(std::string_view name) const {
+const std::string* HttpResponse::header(std::string_view name) const {
     return detail::lookupHeaderCI(headers_, name);
 }
 
@@ -48,6 +48,8 @@ bool HttpResponseParser::parseHexSize_(
             digit = uc - 'A' + 10;
         else
             return false;
+        if (out > (size_t{1} << 30))
+            return false; // reject malformed > 1 GB chunks
         out = out * 16 + digit;
     }
     return true;
@@ -132,16 +134,16 @@ bool HttpResponseParser::tryParseHeaders_() {
     }
 
     response_.statusCode = code;
-    response_.version_ = hdr.substr(0, sp1); // view into frozen headerBuf_
+    response_.version_ = std::string(hdr.substr(0, sp1));
     response_.statusText_ = (sp2 == std::string_view::npos)
-        ? std::string_view{}
-        : statusLine.substr(sp2 + 1);
+        ? std::string{}
+        : std::string(statusLine.substr(sp2 + 1));
 
     // Parse header fields
     if (firstNL != std::string_view::npos)
         detail::parseHeaderFields(
             hdr, firstNL, [this](std::string key, std::string_view val) {
-                response_.headers_[std::move(key)] = val;
+                response_.headers_[std::move(key)] = std::string(val);
             });
 
     determineBodyMode_();
@@ -158,7 +160,7 @@ bool HttpResponseParser::tryParseHeaders_() {
 // Called once at the end of tryParseHeaders_().
 // ---------------------------------------------------------------------------
 void HttpResponseParser::determineBodyMode_() {
-    const std::string_view* te = response_.header("transfer-encoding");
+    const std::string* te = response_.header("transfer-encoding");
     if (te != nullptr) {
         // RFC 7230 §3.3.1: "chunked" is the last transfer-coding token.
         std::string_view tev = *te;
@@ -183,12 +185,17 @@ void HttpResponseParser::determineBodyMode_() {
     }
 
     if (bodyMode_ == BodyMode::Unknown) {
-        const std::string_view* cl = response_.header("content-length");
+        const std::string* cl = response_.header("content-length");
         if (cl != nullptr) {
             int64_t parsed = 0;
-            auto [ptr, ec] = std::from_chars(cl->data(), cl->data() + cl->size(), parsed);
-            if (ec == std::errc{}) contentLength_ = parsed;
-            else { markError_(); return; }
+            auto [ptr, ec]
+                = std::from_chars(cl->data(), cl->data() + cl->size(), parsed);
+            if (ec == std::errc{})
+                contentLength_ = parsed;
+            else {
+                markError_();
+                return;
+            }
             bodyMode_ = BodyMode::ContentLength;
         } else {
             bodyMode_ = BodyMode::ConnectionClose;
@@ -202,12 +209,12 @@ void HttpResponseParser::determineBodyMode_() {
 HttpResponseParser::State HttpResponseParser::processBody_() {
     if (bodyMode_ == BodyMode::ContentLength) {
         if (contentLength_ == 0) {
-            response_.body_ = {};
+            response_.body_.clear();
             markComplete_();
             return state_;
         }
         if (static_cast<int64_t>(bodyBuf_.size()) >= contentLength_) {
-            response_.body_ = std::string_view(
+            response_.body_.assign(
                 bodyBuf_.data(), static_cast<size_t>(contentLength_));
             markComplete_();
         }
@@ -266,7 +273,7 @@ HttpResponseParser::State HttpResponseParser::processChunked_() {
             const size_t trailerEnd = bodyBuf_.find("\r\n\r\n", crlfPos);
             if (trailerEnd == std::string::npos) break; // need more data
             // Terminal chunk consumed — body complete
-            response_.body_ = std::string_view(decodedBody_);
+            response_.body_ = std::move(decodedBody_);
             markComplete_();
             return state_;
         }
@@ -368,7 +375,7 @@ HttpResponseParser::State HttpResponseParser::feedEof() {
     }
 
     if (bodyMode_ == BodyMode::ConnectionClose) {
-        response_.body_ = std::string_view(bodyBuf_);
+        response_.body_ = std::move(bodyBuf_);
         markComplete_();
     } else if (bodyMode_ == BodyMode::Chunked) {
         // Truncated chunked response
@@ -423,12 +430,14 @@ std::string HttpResponse::Builder::build() const {
         r += ": ";
         r += h.second;
         r += "\r\n";
-        // Case-insensitive comparison so "content-length" also suppresses duplicate
+        // Case-insensitive comparison so "content-length" also suppresses
+        // duplicate
         const auto& k = h.first;
         if (k.size() == 14) {
             std::string kl(k.size(), '\0');
             for (size_t i = 0; i < k.size(); ++i)
-                kl[i] = static_cast<char>(::tolower(static_cast<unsigned char>(k[i])));
+                kl[i] = static_cast<char>(
+                    ::tolower(static_cast<unsigned char>(k[i])));
             if (kl == "content-length") hasContentLength = true;
         }
     }

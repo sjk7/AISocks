@@ -57,8 +57,10 @@ void parseHeaderFields(std::string_view hdr, size_t firstNL, EmitFn&& emit) {
             std::string_view rawVal = line.substr(colon + 1);
 
             std::string key(rawKey.size(), '\0');
-            std::transform(rawKey.begin(), rawKey.end(), key.begin(),
-                [](unsigned char c){ return static_cast<char>(::tolower(c)); });
+            std::transform(
+                rawKey.begin(), rawKey.end(), key.begin(), [](unsigned char c) {
+                    return static_cast<char>(::tolower(c));
+                });
 
             const size_t valStart = rawVal.find_first_not_of(" \t");
             if (valStart == std::string_view::npos) {
@@ -81,20 +83,22 @@ void parseHeaderFields(std::string_view hdr, size_t firstNL, EmitFn&& emit) {
 
 /// Case-insensitive header lookup shared by HttpRequest and HttpResponse.
 /// Lowercases `name` into a stack buffer (heap-fallback for long names) and
-/// performs a heterogeneous find() on any header map with std::less<> comparator.
+/// performs a heterogeneous find() on any header map with std::less<>
+/// comparator.
 template <typename Map>
-const std::string_view* lookupHeaderCI(const Map& headers, std::string_view name) {
+const typename Map::mapped_type* lookupHeaderCI(
+    const Map& headers, std::string_view name) {
     char sbuf[128];
     std::string heap;
     const char* data;
     if (name.size() < sizeof(sbuf)) {
         std::transform(name.begin(), name.end(), sbuf,
-            [](unsigned char c){ return static_cast<char>(::tolower(c)); });
+            [](unsigned char c) { return static_cast<char>(::tolower(c)); });
         data = sbuf;
     } else {
         heap.resize(name.size());
         std::transform(name.begin(), name.end(), heap.begin(),
-            [](unsigned char c){ return static_cast<char>(::tolower(c)); });
+            [](unsigned char c) { return static_cast<char>(::tolower(c)); });
         data = heap.c_str();
     }
     auto it = headers.find(std::string_view(data, name.size()));

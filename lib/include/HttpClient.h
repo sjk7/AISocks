@@ -30,7 +30,7 @@ namespace aiSocks {
 // HttpClientResponse -- Wrapper around HttpResponse with redirect metadata
 // ---------------------------------------------------------------------------
 struct HttpClientResponse {
-    const HttpResponse& response; // Reference to parsed response
+    HttpResponse response; // Owned parsed response
     std::string finalUrl; // After following redirects
     std::vector<std::string> redirectChain; // URLs visited during redirects
 
@@ -41,13 +41,13 @@ struct HttpClientResponse {
     std::string_view body() const { return response.body(); }
 
     // Header access
-    const std::string_view* header(std::string_view name) const {
+    const std::string* header(std::string_view name) const {
         return response.header(name);
     }
     std::string_view headerOr(
         std::string_view name, std::string_view fallback = {}) const {
         const auto* h = header(name);
-        return h ? *h : fallback;
+        return h ? std::string_view(*h) : fallback;
     }
 
     // Convenience accessors
@@ -62,8 +62,7 @@ struct HttpClientResponse {
     }
 
     // Direct access to headers map
-    const std::map<std::string, std::string_view, std::less<>>&
-    headers() const {
+    const std::map<std::string, std::string, std::less<>>& headers() const {
         return response.headers();
     }
 };

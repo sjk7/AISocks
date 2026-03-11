@@ -11,14 +11,14 @@
 
 namespace aiSocks {
 
-const std::string_view* HttpRequest::header(std::string_view name) const {
+const std::string* HttpRequest::header(std::string_view name) const {
     return detail::lookupHeaderCI(headers, name);
 }
 
 std::string_view HttpRequest::headerOr(
     std::string_view name, std::string_view fallback) const {
-    const std::string_view* v = header(name);
-    return v ? *v : fallback;
+    const std::string* v = header(name);
+    return v ? std::string_view(*v) : fallback;
 }
 
 // Parses "METHOD SP request-target SP HTTP-version".
@@ -88,7 +88,7 @@ HttpRequest HttpRequest::parse(std::string_view raw) {
     if (firstNL != std::string_view::npos)
         detail::parseHeaderFields(headerSection, firstNL,
             [&req](std::string key, std::string_view val) {
-                req.headers[std::move(key)] = val;
+                req.headers[std::move(key)] = std::string(val);
             });
 
     if (!req.queryString.empty()) parseQueryParams_(req);

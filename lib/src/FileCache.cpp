@@ -111,15 +111,9 @@ void FileCache::evictLRU() {
     lruList_.pop_back();
 }
 
-void FileCache::updateLRU(std::unordered_map<std::string, CachedFile>::iterator it) {
+void FileCache::updateLRU(
+    std::unordered_map<std::string, CachedFile>::iterator it) {
     lruList_.splice(lruList_.begin(), lruList_, it->second.lruIt);
-}
-
-void FileCache::removeLRUEntry(const std::string& filePath) {
-    auto it = cache_.find(filePath);
-    if (it != cache_.end()) {
-        lruList_.erase(it->second.lruIt);
-    }
 }
 
 } // namespace aiSocks

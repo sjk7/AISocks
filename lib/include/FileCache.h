@@ -63,7 +63,6 @@ class FileCache {
 
     void evictLRU();
     void updateLRU(std::unordered_map<std::string, CachedFile>::iterator it);
-    void removeLRUEntry(const std::string& filePath);
     void putImpl(
         const std::string& filePath, std::vector<char> content, time_t modTime);
 };

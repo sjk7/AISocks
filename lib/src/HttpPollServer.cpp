@@ -58,10 +58,14 @@ ServerResult HttpPollServer::onError(TcpSocket& sock, HttpClientState& /*s*/) {
 }
 
 bool HttpPollServer::isHttpRequest(const std::string& req) {
-    return req.rfind("GET ", 0) == 0 || req.rfind("POST", 0) == 0
-        || req.rfind("PUT ", 0) == 0 || req.rfind("HEAD", 0) == 0
-        || req.rfind("DELE", 0) == 0 || req.rfind("OPTI", 0) == 0
-        || req.rfind("PATC", 0) == 0;
+    auto startsWith = [&](std::string_view method) noexcept {
+        return req.size() > method.size()
+            && req.compare(0, method.size(), method) == 0
+            && req[method.size()] == ' ';
+    };
+    return startsWith("GET") || startsWith("POST") || startsWith("PUT")
+        || startsWith("HEAD") || startsWith("DELETE") || startsWith("OPTIONS")
+        || startsWith("PATCH");
 }
 
 bool HttpPollServer::requestComplete(const std::string& req) {
@@ -99,7 +103,7 @@ std::string HttpPollServer::makeResponse(const char* statusLine,
 // The Connection header can override either default.
 static bool resolveKeepAlive_(const HttpRequest& req) {
     const bool http10 = req.version == "HTTP/1.0";
-    const std::string_view* conn = req.header("connection");
+    const std::string* conn = req.header("connection");
     // RFC 7230: Connection header token comparison is case-insensitive.
     // Also handle comma-separated token lists (e.g. "TE, keep-alive").
     auto ciTokenPresent = [](std::string_view field, std::string_view token) {
@@ -107,7 +111,8 @@ static bool resolveKeepAlive_(const HttpRequest& req) {
         size_t pos = 0;
         while (pos < field.size()) {
             const size_t comma = field.find(',', pos);
-            const size_t end = (comma == std::string_view::npos) ? field.size() : comma;
+            const size_t end
+                = (comma == std::string_view::npos) ? field.size() : comma;
             std::string_view t = field.substr(pos, end - pos);
             const size_t ts = t.find_first_not_of(" \t");
             if (ts != std::string_view::npos) t = t.substr(ts);
@@ -116,7 +121,11 @@ static bool resolveKeepAlive_(const HttpRequest& req) {
             if (t.size() == tlen) {
                 bool match = true;
                 for (size_t i = 0; i < tlen; ++i)
-                    if (::tolower(static_cast<unsigned char>(t[i])) != static_cast<unsigned char>(token[i])) { match = false; break; }
+                    if (::tolower(static_cast<unsigned char>(t[i]))
+                        != static_cast<unsigned char>(token[i])) {
+                        match = false;
+                        break;
+                    }
                 if (match) return true;
             }
             pos = (comma == std::string_view::npos) ? field.size() : comma + 1;
@@ -124,7 +133,7 @@ static bool resolveKeepAlive_(const HttpRequest& req) {
         return false;
     };
     const bool hasKeepAlive = conn && ciTokenPresent(*conn, "keep-alive");
-    const bool hasClose     = conn && ciTokenPresent(*conn, "close");
+    const bool hasClose = conn && ciTokenPresent(*conn, "close");
     return http10 ? !hasKeepAlive : hasClose;
 }
 
@@ -177,8 +186,10 @@ ServerResult HttpPollServer::onReadable(TcpSocket& sock, HttpClientState& s) {
             s.request.append(buf, static_cast<size_t>(n));
 
             if (s.request.size() > HttpPollServer::MAX_HEADER_SIZE) {
-                s.responseBuf = makeResponse("HTTP/1.1 431 Request Header Fields Too Large",
-                    "text/plain; charset=utf-8", "Header section too large.\n", false);
+                s.responseBuf = makeResponse(
+                    "HTTP/1.1 431 Request Header Fields Too Large",
+                    "text/plain; charset=utf-8", "Header section too large.\n",
+                    false);
                 s.responseView = s.responseBuf;
                 s.closeAfterSend = true;
                 setClientWritable(sock, true);

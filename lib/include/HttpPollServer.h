@@ -84,8 +84,12 @@ struct HttpClientState {
         , closeAfterSend(other.closeAfterSend)
         , requestScanPos(other.requestScanPos)
         , parsedRequest(std::move(other.parsedRequest)) {
-        // After the move, fix up view if it was backed by the (now moved) buf.
-        if (!responseBuf.empty()) responseView = responseBuf;
+        // Fix up the view only if it was pointing into the moved-from buf.
+        // After std::string move, responseBuf.data() == old
+        // other.responseBuf.data() for heap-allocated strings, so the pointer
+        // comparison is correct.
+        if (!responseBuf.empty() && responseView.data() == responseBuf.data())
+            responseView = responseBuf;
         other.responseView = {};
     }
 
@@ -118,8 +122,9 @@ struct HttpClientState {
         closeAfterSend = other.closeAfterSend;
         requestScanPos = other.requestScanPos;
         parsedRequest = std::move(other.parsedRequest);
-        // After the move, fix up view if it was backed by the (now moved) buf.
-        if (!responseBuf.empty()) responseView = responseBuf;
+        // Fix up the view only if it was pointing into the moved-from buf.
+        if (!responseBuf.empty() && responseView.data() == responseBuf.data())
+            responseView = responseBuf;
         other.responseView = {};
         return *this;
     }
@@ -133,7 +138,7 @@ struct HttpClientState {
 class HttpPollServer : public ServerBase<HttpClientState> {
     public:
     static constexpr size_t MAX_HEADER_SIZE = 8192;
-    static constexpr int SLOWLORIS_TIMEOUT_MS = 5000;  // 5 s
+    static constexpr int SLOWLORIS_TIMEOUT_MS = 5000; // 5 s
 
     explicit HttpPollServer(
         const ServerBind& bind, Result<TcpSocket>* result = nullptr)
@@ -181,7 +186,6 @@ class HttpPollServer : public ServerBase<HttpClientState> {
     void dispatchBuildResponse(HttpClientState& s);
 
     private:
-    static constexpr size_t MAX_REQUEST_BYTES = 64 * 1024;
     static constexpr size_t RECV_BUF_SIZE = 64 * 1024;
 
     ServerResult onReadable(TcpSocket& sock, HttpClientState& s) final;

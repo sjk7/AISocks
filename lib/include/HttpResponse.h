@@ -72,12 +72,11 @@ class HttpResponse {
     std::string_view body() const noexcept { return body_; }
 
     /// Case-insensitive header lookup.  Returns nullptr if absent.
-    const std::string_view* header(std::string_view name) const;
+    const std::string* header(std::string_view name) const;
 
     /// Direct access to the parsed header map.
-    /// Keys are lowercased; values are string_views into the parser's frozen
-    /// header buffer.
-    const std::map<std::string, std::string_view, std::less<>>&
+    /// Keys are lowercased; values are owned strings.
+    const std::map<std::string, std::string, std::less<>>&
     headers() const noexcept {
         return headers_;
     }
@@ -130,10 +129,10 @@ class HttpResponse {
     private:
     friend class HttpResponseParser;
 
-    std::string_view version_;
-    std::string_view statusText_;
-    std::string_view body_;
-    std::map<std::string, std::string_view, std::less<>> headers_;
+    std::string version_;
+    std::string statusText_;
+    std::string body_;
+    std::map<std::string, std::string, std::less<>> headers_;
 };
 
 // ---------------------------------------------------------------------------
@@ -156,7 +155,7 @@ class HttpResponseParser {
     }
     ~HttpResponseParser() = default;
 
-    // Non-copyable — buffers contain string_views into themselves
+    // Non-copyable — large internal buffers should not be accidentally copied
     HttpResponseParser(const HttpResponseParser&) = delete;
     HttpResponseParser& operator=(const HttpResponseParser&) = delete;
 
