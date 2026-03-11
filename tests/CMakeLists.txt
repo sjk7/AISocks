@@ -192,6 +192,7 @@ if(ENABLE_FUZZER)
         fuzz_url_codec      # urlDecode / urlDecodePath    — percent-decoding
         fuzz_html_escape    # HtmlEscape::encode()         — XSS escaping
         fuzz_resolve_path   # HttpFileServer::resolveFilePath() — path traversal
+        fuzz_pipeline       # parse → urlDecodePath → resolveFilePath end-to-end
     )
     # libFuzzer provides its own main(), so these are NOT added to ctest.
     foreach(FUZZ_TARGET ${FUZZ_TARGETS})
