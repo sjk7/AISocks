@@ -222,6 +222,26 @@ static void test_server_bind_failures() {
 
     std::this_thread::sleep_for(std::chrono::milliseconds(1));
 
+    BEGIN_TEST("setReuseAddress(true) still blocks concurrent bind on same port");
+    {
+        // First socket binds with reuse=true (the normal server default).
+        // On Unix SO_REUSEADDR is set; on Windows nothing is set (default is
+        // already exclusive).  Either way, a second simultaneous bind must
+        // fail — if it didn't, port hijacking would be possible.
+        auto first_result = SocketFactory::createTcpServer(
+            ServerBind{"127.0.0.1", Port{BASE + 12}, Backlog{5}, true});
+        REQUIRE(first_result.isSuccess());
+        auto& first = first_result.value();
+        (void)first; // Keep port bound
+
+        auto second_result = SocketFactory::createTcpServer(
+            ServerBind{"127.0.0.1", Port{BASE + 12}, Backlog{5}, true});
+        REQUIRE(second_result.isError());
+        REQUIRE(second_result.error() != SocketError::None);
+    }
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+
     BEGIN_TEST("ServerBind factory: returns error on invalid address");
     {
         auto result = SocketFactory::createTcpServer(
