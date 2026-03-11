@@ -42,14 +42,13 @@ static void test_chunked_size_overflow() {
     // with SIZE_MAX bytes, triggering std::bad_alloc / heap corruption.
     // The 1 GB cap must reject this as State::Error.
     HttpResponseParser p;
-    std::string raw =
-        "HTTP/1.1 200 OK\r\n"
-        "Transfer-Encoding: chunked\r\n"
-        "\r\n"
-        "FFFFFFFFFFFFFFFF\r\n"
-        "x\r\n"
-        "0\r\n"
-        "\r\n";
+    std::string raw = "HTTP/1.1 200 OK\r\n"
+                      "Transfer-Encoding: chunked\r\n"
+                      "\r\n"
+                      "FFFFFFFFFFFFFFFF\r\n"
+                      "x\r\n"
+                      "0\r\n"
+                      "\r\n";
     auto state = p.feed(raw.data(), raw.size());
     REQUIRE(state == HttpResponseParser::State::Error);
     REQUIRE(p.isError());
@@ -61,14 +60,13 @@ static void test_chunked_size_large_rejected() {
     // running total is 0xFFFFFFFF = 4,294,967,295, which exceeds the 1 GB
     // guard, so the guard fires on the 9th character → State::Error.
     HttpResponseParser p;
-    std::string raw =
-        "HTTP/1.1 200 OK\r\n"
-        "Transfer-Encoding: chunked\r\n"
-        "\r\n"
-        "FFFFFFFFF\r\n"
-        "x\r\n"
-        "0\r\n"
-        "\r\n";
+    std::string raw = "HTTP/1.1 200 OK\r\n"
+                      "Transfer-Encoding: chunked\r\n"
+                      "\r\n"
+                      "FFFFFFFFF\r\n"
+                      "x\r\n"
+                      "0\r\n"
+                      "\r\n";
     auto state = p.feed(raw.data(), raw.size());
     REQUIRE(state == HttpResponseParser::State::Error);
     REQUIRE(p.isError());
@@ -78,14 +76,13 @@ static void test_chunked_size_reasonable_accepted() {
     BEGIN_TEST("chunked: small chunk accepted (overflow guard not triggered)");
     // Sanity-check: a normal chunked response still parses correctly.
     HttpResponseParser p;
-    std::string raw =
-        "HTTP/1.1 200 OK\r\n"
-        "Transfer-Encoding: chunked\r\n"
-        "\r\n"
-        "5\r\n"
-        "Hello\r\n"
-        "0\r\n"
-        "\r\n";
+    std::string raw = "HTTP/1.1 200 OK\r\n"
+                      "Transfer-Encoding: chunked\r\n"
+                      "\r\n"
+                      "5\r\n"
+                      "Hello\r\n"
+                      "0\r\n"
+                      "\r\n";
     auto state = p.feed(raw.data(), raw.size());
     REQUIRE(state == HttpResponseParser::State::Complete);
     REQUIRE(p.response().body() == "Hello");
@@ -98,12 +95,11 @@ static void test_request_fields_outlive_source() {
     BEGIN_TEST("HttpRequest fields outlive source buffer (FG-1)");
     HttpRequest req;
     {
-        std::string raw =
-            "POST /submit HTTP/1.1\r\n"
-            "Host: example.com\r\n"
-            "Content-Type: application/json\r\n"
-            "\r\n"
-            "payload";
+        std::string raw = "POST /submit HTTP/1.1\r\n"
+                          "Host: example.com\r\n"
+                          "Content-Type: application/json\r\n"
+                          "\r\n"
+                          "payload";
         req = HttpRequest::parse(raw);
         REQUIRE(req.valid);
     }
@@ -138,12 +134,11 @@ static void test_request_query_params_outlive_source() {
 // ---------------------------------------------------------------------------
 static void test_response_copy_survives_reset() {
     BEGIN_TEST("HttpResponse copy survives parser reset() (FG-2)");
-    std::string raw =
-        "HTTP/1.1 200 OK\r\n"
-        "Content-Type: text/plain\r\n"
-        "Content-Length: 5\r\n"
-        "\r\n"
-        "Hello";
+    std::string raw = "HTTP/1.1 200 OK\r\n"
+                      "Content-Type: text/plain\r\n"
+                      "Content-Length: 5\r\n"
+                      "\r\n"
+                      "Hello";
     HttpResponseParser p;
     p.feed(raw.data(), raw.size());
     REQUIRE(p.isComplete());
@@ -170,11 +165,10 @@ static void test_response_copy_survives_parser_destruction() {
     BEGIN_TEST("HttpResponse copy survives parser destruction (FG-2)");
     HttpResponse resp;
     {
-        std::string raw =
-            "HTTP/1.1 404 Not Found\r\n"
-            "X-Custom: alive\r\n"
-            "Content-Length: 0\r\n"
-            "\r\n";
+        std::string raw = "HTTP/1.1 404 Not Found\r\n"
+                          "X-Custom: alive\r\n"
+                          "Content-Length: 0\r\n"
+                          "\r\n";
         HttpResponseParser p;
         p.feed(raw.data(), raw.size());
         REQUIRE(p.isComplete());
@@ -196,8 +190,8 @@ static void test_client_state_move_external_view() {
     BEGIN_TEST("HttpClientState move: external responseView preserved (FG-4)");
     // Simulate the zero-copy path: responseView points into server-owned
     // static storage, not into responseBuf.
-    static const std::string kServerResponse =
-        "HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n";
+    static const std::string kServerResponse
+        = "HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n";
 
     HttpClientState src;
     src.responseView = kServerResponse; // NOT pointing into responseBuf
@@ -280,16 +274,19 @@ static void test_client_state_copy_internal_view() {
 // 7. FG-5: isHttpRequest() rejects method-name superstrings
 // ---------------------------------------------------------------------------
 static void test_is_http_request_no_false_positives() {
-    BEGIN_TEST("isHttpRequest(): no false positives on method superstrings (FG-5)");
+    BEGIN_TEST(
+        "isHttpRequest(): no false positives on method superstrings (FG-5)");
     // Before the fix, rfind("POST", 0) would match "POSTAL", etc.
     // The fix requires the full method name followed by a space.
     REQUIRE(!HttpPollServerAccess::isHttpRequest("POSTAL / HTTP/1.1\r\n\r\n"));
-    REQUIRE(!HttpPollServerAccess::isHttpRequest("PATCHWORK / HTTP/1.1\r\n\r\n"));
+    REQUIRE(
+        !HttpPollServerAccess::isHttpRequest("PATCHWORK / HTTP/1.1\r\n\r\n"));
     REQUIRE(!HttpPollServerAccess::isHttpRequest("GETTER / HTTP/1.1\r\n\r\n"));
     REQUIRE(!HttpPollServerAccess::isHttpRequest("PUTAWAY / HTTP/1.1\r\n\r\n"));
     REQUIRE(!HttpPollServerAccess::isHttpRequest("HEADING / HTTP/1.1\r\n\r\n"));
     REQUIRE(!HttpPollServerAccess::isHttpRequest("DELETED / HTTP/1.1\r\n\r\n"));
-    REQUIRE(!HttpPollServerAccess::isHttpRequest("OPTIONSXYZ / HTTP/1.1\r\n\r\n"));
+    REQUIRE(
+        !HttpPollServerAccess::isHttpRequest("OPTIONSXYZ / HTTP/1.1\r\n\r\n"));
 }
 
 // ---------------------------------------------------------------------------

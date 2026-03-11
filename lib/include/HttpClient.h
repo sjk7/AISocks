@@ -19,6 +19,7 @@
 #include "ClientHttpRequest.h"
 #include "SocketFactory.h"
 #include "SocketTypes.h"
+#include <functional>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -91,6 +92,13 @@ class HttpClient {
             defaultHeaders[std::move(name)] = std::move(value);
             return *this;
         }
+
+        /// Called just before opening a new TCP connection for a redirect.
+        /// Arguments: fromUrl, toUrl, hop number (1-based).
+        /// The old socket has already been closed; a new one is about to open.
+        std::function<void(
+            const std::string& from, const std::string& to, int hop)>
+            onRedirect;
     };
 
     explicit HttpClient(Options options = Options{})
@@ -211,6 +219,7 @@ class HttpClient {
             // Parse response using existing HttpResponseParser
             HttpResponseParser parser;
             char buffer[8192];
+            bool redirectDetected = false;
 
             while (true) {
                 int n = socket.receive(buffer, sizeof(buffer));
@@ -218,7 +227,11 @@ class HttpClient {
                     return Result<HttpClientResponse>::failure(
                         SocketError::ReceiveFailed, "Receive error");
                 }
-                if (n == 0) break; // Connection closed
+                if (n == 0) {
+                    parser
+                        .feedEof(); // signal EOF for connection-close responses
+                    break;
+                }
 
                 auto state = parser.feed(buffer, n);
 
@@ -255,14 +268,35 @@ class HttpClient {
                             locationStr = std::move(absoluteUrl);
                         }
 
+                        std::string fromUrl
+                            = currentUrl; // URL whose response gave us this
+                                          // redirect
                         currentUrl = locationStr;
                         redirectChain.push_back(currentUrl);
-                        continue; // Follow redirect
+                        redirectDetected = true;
+                        if (options_.onRedirect) {
+                            // Inform the caller: old socket (fromUrl) is closed
+                            // after this break; next for-loop iteration opens a
+                            // fresh TCP connection to currentUrl.
+                            options_.onRedirect(fromUrl, currentUrl,
+                                static_cast<int>(redirectChain.size()));
+                        }
+                        break; // exit inner loop; outer for-loop makes the next
+                               // request
                     }
 
                     return Result<HttpClientResponse>::success(
                         std::move(response));
                 }
+            }
+
+            // Follow detected redirect in the next outer-loop iteration
+            if (redirectDetected) continue;
+
+            // Handle responses completed by feedEof() (Connection: close)
+            if (parser.isComplete()) {
+                return Result<HttpClientResponse>::success(HttpClientResponse{
+                    parser.response(), currentUrl, redirectChain});
             }
 
             // If we get here, connection closed before response was complete
