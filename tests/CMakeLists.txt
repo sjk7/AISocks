@@ -40,6 +40,7 @@ set(TEST_SOURCES
     test_http_stress
     test_http_response_builder
     test_http_response_parser
+    test_client_http_request
 )
 
 # Slow tests (disabled by default, enable with -DALLOW_SLOW_TESTS=ON)
