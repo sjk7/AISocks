@@ -154,6 +154,5 @@ int main() {
         serverThread.join();
     }
 
-    printf("No timeout test completed\n");
-    return 0;
+    return test_summary();
 }

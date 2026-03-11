@@ -12,13 +12,6 @@
 namespace aiSocks {
 
 void HttpPollServer::run(ClientLimit maxClients, Milliseconds timeout) {
-    if (!this->isValid()) {
-        printf("ERROR: Server failed to start - port %d is already in use "
-               "or invalid\n",
-            bind_.port.value());
-        return;
-    }
-
 #ifndef NDEBUG
     printf("[DEBUG] HttpPollServer::run() - Starting server\n");
     fflush(stdout);

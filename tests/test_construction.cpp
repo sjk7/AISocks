@@ -318,6 +318,5 @@ int main() {
     test_connect_to_failures();
     test_move_semantics();
 
-    printf("All construction tests passed!\n");
-    return 0;
+    return test_summary();
 }

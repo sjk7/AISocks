@@ -270,6 +270,5 @@ int main() {
         REQUIRE(cache.get("/f2.txt", 2) != nullptr);
     }
 
-    printf("\n=== All FileCache tests passed ===\n");
-    return 0;
+    return test_summary();
 }

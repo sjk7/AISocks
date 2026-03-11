@@ -427,6 +427,5 @@ int main() {
         serverThread2.join();
     }
 
-    printf("All ServerBase tests passed!\n");
-    return 0;
+    return test_summary();
 }

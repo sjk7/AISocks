@@ -12,6 +12,7 @@
 #include "HttpFileServer.h"
 #include "FileIO.h"
 #include "PathHelper.h"
+#include "Stopwatch.h"
 #include "test_string_literals.h"
 #include <string>
 #include <array>
@@ -1303,6 +1304,7 @@ void testConcurrencyBehavior() {
 /// Main test runner - focused on behavior, not implementation
 // Test comment to verify brittleness is fixed - strings are centralized
 int main() {
+    aiSocks::Stopwatch totalTimer;
     printf("[TEST] CustomFileServer Behavioral Test Suite\n");
     printf("=========================================\n");
     fputs(TestStringLiterals::TEST_SUITE_HEADER, stdout);
@@ -1327,6 +1329,7 @@ int main() {
         cleanupTestEnvironment();
 
         TestFramework::printSummary();
+        printf("Total time: %.1f ms\n", totalTimer.elapsedMs());
 
         return TestFramework::failedTests > 0 ? 1 : 0;
 

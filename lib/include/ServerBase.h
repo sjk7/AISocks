@@ -171,8 +171,14 @@ template <typename ClientData> class ServerBase {
     ServerBase(ServerBase&&) = default;
     ServerBase& operator=(ServerBase&&) = default;
 
-    // Check if the server is valid and ready for use
-    bool isValid() const { return listener_ && listener_->isValid(); }
+    // Returns false if socket construction failed OR if run() failed to
+    // initialise (e.g. the poller rejected the listener fd).  Safe to call
+    // from an onReady() override to distinguish a successful startup from a
+    // failed one — run() guarantees onReady() is called on both paths.
+    bool isValid() const {
+        return listener_ && listener_->isValid()
+            && !runFailed_.load(std::memory_order_relaxed);
+    }
 
     // Enter the poll loop.
     //
@@ -193,8 +199,16 @@ template <typename ClientData> class ServerBase {
     // ServerResult::StopServer from one of the, or if CTRL+C is detected.
     void run(ClientLimit maxClients = ClientLimit::Default,
         Milliseconds timeout = poll_min) {
-        if (!isValid()) return;
-        if (!initLoop_()) return;
+        runFailed_.store(false, std::memory_order_relaxed); // reset for re-use
+        if (!isValid()) {
+            onReady();
+            return;
+        } // socket bad at construction
+        if (!initLoop_()) {
+            runFailed_.store(true, std::memory_order_relaxed);
+            onReady();
+            return;
+        }
 
         reserveCapacity_(maxClients);
 
@@ -445,6 +459,7 @@ template <typename ClientData> class ServerBase {
     };
 
     std::atomic<bool> stop_{false};
+    std::atomic<bool> runFailed_{false};
 #ifdef SERVER_STATS
     size_t max_clients_{0};
 #endif

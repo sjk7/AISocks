@@ -183,6 +183,5 @@ int main() {
         }
     }
 
-    printf("All error handling tests passed!\n");
-    return 0;
+    return test_summary();
 }

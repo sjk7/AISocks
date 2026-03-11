@@ -111,6 +111,5 @@ int main() {
         serverThread.join();
     }
 
-    printf("Simple test completed\n");
-    return 0;
+    return test_summary();
 }

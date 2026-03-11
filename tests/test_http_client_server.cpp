@@ -19,6 +19,7 @@
 #include <atomic>
 #include <condition_variable>
 #include <mutex>
+#include <stdexcept>
 #include <string>
 #include <thread>
 
@@ -31,7 +32,10 @@ using namespace std::chrono_literals;
 class EchoServer : public HttpPollServer {
     public:
     explicit EchoServer() : HttpPollServer(ServerBind{"127.0.0.1", Port{0}}) {
-        setHandleSignals(false); // never stopped by global signal flag
+        setHandleSignals(false);
+    }
+    explicit EchoServer(ServerBind bind) : HttpPollServer(std::move(bind)) {
+        setHandleSignals(false);
     }
 
     // Block until onReady() has fired and the server is in its poll loop.
@@ -123,6 +127,11 @@ struct ServerGuard {
         thread = std::thread(
             [this] { server.run(ClientLimit::Unlimited, Milliseconds{1}); });
         server.waitReady();
+        // Startup should never fail with Port{0} — catch broken test setups.
+        if (!server.isValid()) {
+            thread.join();
+            throw std::runtime_error("ServerGuard: server failed to start");
+        }
     }
 
     ~ServerGuard() {
@@ -261,16 +270,55 @@ static void test_request_timeout_fails() {
     REQUIRE(!result.isSuccess());
 }
 
+static void test_server_init_failure_unblocks_waiter() {
+    BEGIN_TEST("waitReady() unblocks and isValid() returns false when server "
+               "fails to start");
+
+    // Occupy a port with a real server so a second bind to the same port fails.
+    EchoServer occupant;
+    std::thread occupantThread(
+        [&] { occupant.run(ClientLimit::Unlimited, Milliseconds{1}); });
+    occupant.waitReady();
+    REQUIRE(occupant.isValid());
+    const Port takenPort = occupant.serverPort();
+
+    // Construct a server targeting the already-bound port with reuseAddr=false
+    // so the bind fails at construction time — isValid() is false before run().
+    EchoServer failing{ServerBind{"127.0.0.1", takenPort, Backlog{}, false}};
+    REQUIRE(!failing.isValid());
+
+    // run() on a thread must call onReady() and exit immediately.
+    std::atomic<bool> done{false};
+    std::thread failThread([&] {
+        failing.run(ClientLimit::Unlimited, Milliseconds{1});
+        done.store(true, std::memory_order_release);
+    });
+
+    // waitReady() must return promptly — if it can hang, this test hangs.
+    failing.waitReady();
+    REQUIRE(!failing.isValid());
+
+    failThread.join(); // must not block
+    REQUIRE(done.load());
+
+    occupant.requestStop();
+    occupantThread.join();
+}
+
 // ---------------------------------------------------------------------------
 
 int main() {
     printf("=== HttpClient + HttpPollServer integration tests ===\n");
 
-    { ServerGuard sg; run_happy_path_tests(sg); }
+    {
+        ServerGuard sg;
+        run_happy_path_tests(sg);
+    }
     test_invalid_host_returns_failure();
     test_bad_dns_fails();
     test_connect_timeout_fails();
     test_request_timeout_fails();
+    test_server_init_failure_unblocks_waiter();
 
     return test_summary();
 }

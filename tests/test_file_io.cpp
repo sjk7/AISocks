@@ -165,6 +165,5 @@ int main() {
     remove("test_move2.txt");
     remove("test_lock.txt");
 
-    printf("\n=== All FileIO tests passed ===\n");
-    return 0;
+    return test_summary();
 }

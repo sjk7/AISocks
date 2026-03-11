@@ -135,6 +135,5 @@ int main() {
         serverThread.join();
     }
 
-    printf("Minimal test completed\n");
-    return 0;
+    return test_summary();
 }

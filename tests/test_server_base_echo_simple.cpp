@@ -152,6 +152,5 @@ int main() {
         printf("Simple echo test completed\n");
     }
 
-    printf("All tests passed!\n");
-    return 0;
+    return test_summary();
 }

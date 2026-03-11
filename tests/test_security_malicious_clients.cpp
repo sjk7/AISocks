@@ -11,6 +11,7 @@
 #include "FileIO.h"
 #include "PathHelper.h"
 #include "FileCache.h"
+#include "Stopwatch.h"
 #include <string>
 #include <cassert>
 #include <vector>
@@ -559,6 +560,7 @@ void testFileTypeRestrictions() {
 
 /// Main test runner
 int main() {
+    aiSocks::Stopwatch totalTimer;
     printf("\U0001F512 HttpFileServer Security Test Suite\n");
     printf("======================================\n");
     printf("Testing protection against malicious client attacks\n\n");
@@ -578,6 +580,7 @@ int main() {
         cleanupTestEnvironment();
 
         SecurityTestFramework::printSummary();
+        printf("Total time: %.1f ms\n", totalTimer.elapsedMs());
 
         return SecurityTestFramework::failedTests > 0 ? 1 : 0;
 

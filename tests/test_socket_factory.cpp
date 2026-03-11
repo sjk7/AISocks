@@ -243,6 +243,5 @@ int main() {
         }
     }
 
-    printf("All SocketFactory tests passed!\n");
-    return 0;
+    return test_summary();
 }
