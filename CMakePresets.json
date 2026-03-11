@@ -77,6 +77,21 @@
             }
         },
         {
+            "name": "tsan-ubsan",
+            "inherits": "base",
+            "displayName": "TSan + UBSan Debug (Homebrew LLVM)",
+            "binaryDir": "${sourceDir}/build-tsan-ubsan",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "BUILD_EXAMPLES": "OFF",
+                "BUILD_TESTS": "ON",
+                "ENABLE_TSAN": "ON",
+                "ENABLE_UBSAN": "ON",
+                "CMAKE_C_COMPILER": "/opt/homebrew/opt/llvm/bin/clang",
+                "CMAKE_CXX_COMPILER": "/opt/homebrew/opt/llvm/bin/clang++"
+            }
+        },
+        {
             "name": "mac-release",
             "inherits": "base",
             "displayName": "macOS Release -O3 with symbols",
@@ -188,6 +203,12 @@
             "inherits": "base-build",
             "configurePreset": "tsan-debug",
             "displayName": "Build ThreadSanitizer Debug"
+        },
+        {
+            "name": "tsan-ubsan",
+            "inherits": "base-build",
+            "configurePreset": "tsan-ubsan",
+            "displayName": "Build TSan + UBSan (Homebrew LLVM)"
         },
         {
             "name": "mac-release",
