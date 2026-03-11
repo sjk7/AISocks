@@ -5,19 +5,24 @@
 #include "HttpRequest.h"
 #include "UrlCodec.h"
 
-#include <algorithm>
 #include <string>
 #include <string_view>
 
 namespace aiSocks {
 
 const std::string* HttpRequest::header(std::string_view name) const {
-    // Build the lowercase lookup key.  For names that fit within SSO (~15 chars
-    // on MSVC/GCC/Clang) this is heap-free; for longer names such as
-    // "if-modified-since" a single allocation is unavoidable in C++17.
-    // NOTE: full zero-copy heterogeneous lookup requires C++20
-    // (unordered_map with is_transparent Hash/KeyEqual); upgrade the standard
-    // when the project moves to C++20.
+    // Fast path: lowercase into a stack buffer and search via string_view.
+    // std::map<std::string, std::string, std::less<>> supports heterogeneous
+    // find() in C++17, so no heap allocation occurs for names < 64 chars.
+    char sbuf[64];
+    if (name.size() < sizeof(sbuf)) {
+        for (size_t i = 0; i < name.size(); ++i)
+            sbuf[i] = static_cast<char>(
+                ::tolower(static_cast<unsigned char>(name[i])));
+        auto it = headers.find(std::string_view(sbuf, name.size()));
+        return it == headers.end() ? nullptr : &it->second;
+    }
+    // Fallback for pathologically long names (allocates once).
     std::string key(name.size(), '\0');
     for (size_t i = 0; i < name.size(); ++i)
         key[i]

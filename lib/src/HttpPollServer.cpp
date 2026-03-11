@@ -107,11 +107,13 @@ static bool resolveKeepAlive_(const HttpRequest& req) {
 
 // Returns true when the slowloris deadline has expired: more than 5 seconds
 // have elapsed since the first byte arrived but headers are still incomplete.
-static bool isSlowlorisTimeout_(const HttpClientState& s) {
+// `now` is passed in from the recv loop (already computed once per iteration).
+static bool isSlowlorisTimeout_(
+    const HttpClientState& s, std::chrono::steady_clock::time_point now) {
     if (!s.responseView.empty()) return false; // already responding
     if (s.request.empty()) return false;
-    const auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(
-        std::chrono::steady_clock::now() - s.startTime);
+    const auto elapsed
+        = std::chrono::duration_cast<std::chrono::seconds>(now - s.startTime);
     return elapsed.count() > 5;
 }
 
@@ -140,7 +142,10 @@ ServerResult HttpPollServer::onReadable(TcpSocket& sock, HttpClientState& s) {
     char buf[RECV_BUF_SIZE];
     for (;;) {
         // Slowloris protection: drop if headers not received within 5 seconds.
-        if (isSlowlorisTimeout_(s)) return ServerResult::Disconnect;
+        // Clock is read once per loop iteration and reused by the timeout
+        // check.
+        const auto now = std::chrono::steady_clock::now();
+        if (isSlowlorisTimeout_(s, now)) return ServerResult::Disconnect;
 
         int n = sock.receive(buf, sizeof(buf));
 

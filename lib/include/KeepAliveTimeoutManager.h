@@ -131,6 +131,7 @@ class KeepAliveTimeoutManager {
     // to warrant running a sweep.  Throttles to at most once per 100 ms
     // when client count >= 1000.
     bool sweepDue(size_t clientCount) {
+        if (timeout_.count() == 0 || heap_.empty()) return false;
         const auto now = Clock::now();
         if (clientCount < 1000
             || (now - lastSweep_) >= std::chrono::milliseconds{100}) {
