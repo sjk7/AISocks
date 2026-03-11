@@ -45,7 +45,7 @@ static std::string tempSockPath(const char* name) {
 }
 
 // Paths used by server-based tests.  Each test unlinks its own path.
-static const std::string kSockPath  = tempSockPath("aisocks_test_unix.sock");
+static const std::string kSockPath = tempSockPath("aisocks_test_unix.sock");
 static const std::string kSockPath2 = tempSockPath("aisocks_test_unix2.sock");
 
 static inline void sock_unlink(const char* p) {
@@ -59,7 +59,9 @@ static inline void sock_unlink(const char* p) {
 // RAII unlink: removes the path on construction and destruction.
 struct ScopedUnlink {
     std::string path;
-    explicit ScopedUnlink(const std::string& p) : path(p) { sock_unlink(p.c_str()); }
+    explicit ScopedUnlink(const std::string& p) : path(p) {
+        sock_unlink(p.c_str());
+    }
     ~ScopedUnlink() { sock_unlink(path.c_str()); }
 };
 
@@ -126,7 +128,8 @@ int main() {
         REQUIRE(ep.value().family == AddressFamily::Unix);
     }
 
-    BEGIN_TEST("Endpoint::isLoopback() and isPrivateNetwork() return true for Unix");
+    BEGIN_TEST(
+        "Endpoint::isLoopback() and isPrivateNetwork() return true for Unix");
     {
         ScopedUnlink guard(kSockPath);
         auto srvResult = SocketFactory::createUnixServer(UnixPath{kSockPath});
@@ -138,7 +141,8 @@ int main() {
         REQUIRE(ep.value().isPrivateNetwork());
     }
 
-    BEGIN_TEST("Large payload (1 MB) transferred exactly via sendAll/receiveAll");
+    BEGIN_TEST(
+        "Large payload (1 MB) transferred exactly via sendAll/receiveAll");
     {
         ScopedUnlink guard(kSockPath);
         auto srvResult = SocketFactory::createUnixServer(UnixPath{kSockPath});
@@ -150,8 +154,7 @@ int main() {
         std::thread serverThread([&]() {
             ready = true;
             auto client = srvResult.value().accept();
-            if (client)
-                client->sendAll(payload.data(), payload.size());
+            if (client) client->sendAll(payload.data(), payload.size());
         });
 
         waitReady(ready);
@@ -190,7 +193,8 @@ int main() {
         REQUIRE(cliResult.isSuccess());
         auto& cli = cliResult.value();
 
-        REQUIRE(cli.send(msg.data(), msg.size()) == static_cast<int>(msg.size()));
+        REQUIRE(
+            cli.send(msg.data(), msg.size()) == static_cast<int>(msg.size()));
 
         char replyBuf[64] = {};
         int got = cli.receive(replyBuf, sizeof(replyBuf) - 1);
@@ -216,15 +220,15 @@ int main() {
                 auto c = srvResult.value().accept();
                 if (c) {
                     char token[4] = {};
-                    if (c->receiveAll(token, 3))
-                        ++accepted;
+                    if (c->receiveAll(token, 3)) ++accepted;
                 }
             }
         });
 
         waitReady(ready);
         for (int i = 0; i < kClients; ++i) {
-            auto cliResult = SocketFactory::createUnixClient(UnixPath{kSockPath});
+            auto cliResult
+                = SocketFactory::createUnixClient(UnixPath{kSockPath});
             REQUIRE(cliResult.isSuccess());
             cliResult.value().sendAll("ok!", 3);
             // Close before next iteration so accept() unblocks for this client
@@ -250,7 +254,8 @@ int main() {
         REQUIRE(!moved.isValid());
     }
 
-    BEGIN_TEST("setBlocking(false): non-blocking accept returns nullptr immediately");
+    BEGIN_TEST(
+        "setBlocking(false): non-blocking accept returns nullptr immediately");
     {
         ScopedUnlink guard(kSockPath);
         auto srvResult = SocketFactory::createUnixServer(UnixPath{kSockPath});
@@ -322,7 +327,8 @@ int main() {
         REQUIRE(r.error() != SocketError::None);
     }
 
-    BEGIN_TEST("receiveAll returns false on premature EOF (server closes early)");
+    BEGIN_TEST(
+        "receiveAll returns false on premature EOF (server closes early)");
     {
         ScopedUnlink guard(kSockPath);
         auto srvResult = SocketFactory::createUnixServer(UnixPath{kSockPath});
@@ -414,7 +420,8 @@ int main() {
 #else // !AISOCKS_HAVE_UNIX_SOCKETS
 
 int main() {
-    printf("=== UnixSocket Tests: SKIPPED (platform has no AF_UNIX support) ===\n");
+    printf("=== UnixSocket Tests: SKIPPED (platform has no AF_UNIX support) "
+           "===\n");
     return 0;
 }
 
