@@ -27,9 +27,6 @@
 
 using namespace aiSocks;
 
-// Port block: 20000  20099 (no overlap with existing test suites)
-static constexpr int BASE = 20000;
-
 // -----------------------------------------------------------------------
 // 1. Endpoint / getLocalEndpoint / getPeerEndpoint
 // -----------------------------------------------------------------------
@@ -38,12 +35,12 @@ static void test_endpoints() {
     {
         auto s = TcpSocket::createRaw();
         REQUIRE(s.setReuseAddress(true));
-        REQUIRE(s.bind("127.0.0.1", Port{BASE}));
+        REQUIRE(s.bind("127.0.0.1", Port{0}));
         auto ep = s.getLocalEndpoint();
         REQUIRE(ep.isSuccess());
         if (!ep) return;
         const auto& e = ep.value();
-        REQUIRE(e.port == Port{BASE} && e.address == "127.0.0.1"
+        REQUIRE(e.port != Port{0} && e.address == "127.0.0.1"
             && e.family == AddressFamily::IPv4);
     }
 
@@ -64,8 +61,9 @@ static void test_endpoints() {
     {
         auto srv = TcpSocket::createRaw();
         REQUIRE(srv.setReuseAddress(true));
-        REQUIRE(srv.bind("127.0.0.1", Port{BASE + 1}));
+        REQUIRE(srv.bind("127.0.0.1", Port{0}));
         REQUIRE(srv.listen(1));
+        auto srvPort = srv.getLocalEndpoint().value().port;
 
         std::thread t([&]() {
             std::this_thread::sleep_for(std::chrono::milliseconds(10));
@@ -80,11 +78,11 @@ static void test_endpoints() {
 
         std::this_thread::sleep_for(std::chrono::milliseconds(20));
         auto c = TcpSocket::createRaw();
-        bool connected = c.connect("127.0.0.1", Port{BASE + 1});
+        bool connected = c.connect("127.0.0.1", srvPort);
         if (!connected) {
             // Retry connection once
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
-            connected = c.connect("127.0.0.1", Port{BASE + 1});
+            connected = c.connect("127.0.0.1", srvPort);
         }
         REQUIRE(connected);
         auto ep = c.getPeerEndpoint();
@@ -94,7 +92,7 @@ static void test_endpoints() {
             return;
         }
         const auto& e = ep.value();
-        REQUIRE(e.port == Port{BASE + 1} && e.address == "127.0.0.1");
+        REQUIRE(e.port == srvPort && e.address == "127.0.0.1");
         t.join();
     }
 
@@ -185,13 +183,15 @@ static void test_udp() {
     {
         UdpSocket receiver;
         REQUIRE(receiver.setReuseAddress(true));
-        REQUIRE(receiver.bind("127.0.0.1", Port{BASE + 10}));
+        REQUIRE(receiver.bind("127.0.0.1", Port{0}));
         REQUIRE(receiver.setReceiveTimeout(Milliseconds{2000}));
+        auto recvEp = receiver.getLocalEndpoint();
+        REQUIRE(recvEp.isSuccess());
 
         UdpSocket sender;
 
         const char msg[] = "hello udp";
-        Endpoint dest{"127.0.0.1", Port{BASE + 10}, AddressFamily::IPv4};
+        Endpoint dest{"127.0.0.1", recvEp.value().port, AddressFamily::IPv4};
         int sent = sender.sendTo(msg, sizeof(msg) - 1, dest);
         REQUIRE(sent == static_cast<int>(sizeof(msg) - 1));
 
@@ -210,11 +210,13 @@ static void test_udp() {
     {
         UdpSocket srv;
         REQUIRE(srv.setReuseAddress(true));
-        REQUIRE(srv.bind("127.0.0.1", Port{BASE + 11}));
+        REQUIRE(srv.bind("127.0.0.1", Port{0}));
         REQUIRE(srv.setReceiveTimeout(Milliseconds{2000}));
+        auto srvEp11 = srv.getLocalEndpoint();
+        REQUIRE(srvEp11.isSuccess());
 
         UdpSocket cli;
-        Endpoint dest{"127.0.0.1", Port{BASE + 11}, AddressFamily::IPv4};
+        Endpoint dest{"127.0.0.1", srvEp11.value().port, AddressFamily::IPv4};
 
         for (int i = 0; i < 3; ++i) {
             std::string payload = "pkt" + std::to_string(i);
@@ -242,17 +244,20 @@ static void test_udp_connected() {
     {
         UdpSocket server;
         REQUIRE(server.setReuseAddress(true));
-        REQUIRE(server.bind("127.0.0.1", Port{BASE + 30}));
+        REQUIRE(server.bind("127.0.0.1", Port{0}));
         REQUIRE(server.setReceiveTimeout(Milliseconds{2000}));
+        auto srvEp30 = server.getLocalEndpoint();
+        REQUIRE(srvEp30.isSuccess());
+        Port serverPort30 = srvEp30.value().port;
 
         UdpSocket client;
         // Connect the client to the server so send()/receive() need no
         // per-call endpoint.
-        REQUIRE(client.connect("127.0.0.1", Port{BASE + 30}));
+        REQUIRE(client.connect("127.0.0.1", serverPort30));
 
         // After connect(), getPeerEndpoint() is populated on UDP too.
         auto peer = client.getPeerEndpoint();
-        REQUIRE(peer.isSuccess() && peer.value().port == Port{BASE + 30});
+        REQUIRE(peer.isSuccess() && peer.value().port == serverPort30);
 
         // Send via the connected path (no Endpoint argument).
         const char msg[] = "connected-udp";
@@ -289,11 +294,13 @@ static void test_udp_transfer() {
     {
         UdpSocket srv;
         REQUIRE(srv.setReuseAddress(true));
-        REQUIRE(srv.bind("127.0.0.1", Port{BASE + 50}));
+        REQUIRE(srv.bind("127.0.0.1", Port{0}));
         REQUIRE(srv.setReceiveTimeout(Milliseconds{2000}));
+        auto srvEp50 = srv.getLocalEndpoint();
+        REQUIRE(srvEp50.isSuccess());
 
         UdpSocket cli;
-        Endpoint dest{"127.0.0.1", Port{BASE + 50}, AddressFamily::IPv4};
+        Endpoint dest{"127.0.0.1", srvEp50.value().port, AddressFamily::IPv4};
 
         for (int i = 0; i < 20; ++i) {
             // Build a payload with a recognisable sequence number embedded.
@@ -319,12 +326,15 @@ static void test_udp_transfer() {
     {
         UdpSocket srv;
         REQUIRE(srv.setReuseAddress(true));
-        REQUIRE(srv.bind("127.0.0.1", Port{BASE + 51}));
+        REQUIRE(srv.bind("127.0.0.1", Port{0}));
         REQUIRE(srv.setReceiveTimeout(Milliseconds{2000}));
+        auto srvEp51 = srv.getLocalEndpoint();
+        REQUIRE(srvEp51.isSuccess());
 
         UdpSocket cli;
         REQUIRE(cli.setReceiveTimeout(Milliseconds{2000}));
-        Endpoint srvAddr{"127.0.0.1", Port{BASE + 51}, AddressFamily::IPv4};
+        Endpoint srvAddr{
+            "127.0.0.1", srvEp51.value().port, AddressFamily::IPv4};
 
         for (int i = 0; i < 5; ++i) {
             std::string out = "echo-" + std::to_string(i);
@@ -353,11 +363,13 @@ static void test_udp_transfer() {
     {
         UdpSocket srv;
         REQUIRE(srv.setReuseAddress(true));
-        REQUIRE(srv.bind("127.0.0.1", Port{BASE + 52}));
+        REQUIRE(srv.bind("127.0.0.1", Port{0}));
         REQUIRE(srv.setReceiveTimeout(Milliseconds{2000}));
+        auto srvEp52 = srv.getLocalEndpoint();
+        REQUIRE(srvEp52.isSuccess());
 
         UdpSocket cli;
-        Endpoint dest{"127.0.0.1", Port{BASE + 52}, AddressFamily::IPv4};
+        Endpoint dest{"127.0.0.1", srvEp52.value().port, AddressFamily::IPv4};
 
         // Fill with a recognisable pattern.
         constexpr size_t SZ = 8192;
@@ -402,11 +414,13 @@ static void test_bulk_throughput() {
 
         UdpSocket srv;
         REQUIRE(srv.setReuseAddress(true));
-        REQUIRE(srv.bind("127.0.0.1", Port{BASE + 60}));
+        REQUIRE(srv.bind("127.0.0.1", Port{0}));
         // Ask the kernel for a large receive buffer (actual grant may differ).
         REQUIRE(srv.setReceiveBufferSize(8 * 1024 * 1024));
         // Short timeout: receiver exits quickly once sender is done.
         REQUIRE(srv.setReceiveTimeout(Milliseconds{200}));
+        auto srvEp60 = srv.getLocalEndpoint();
+        REQUIRE(srvEp60.isSuccess());
 
         std::atomic<size_t> recvTotal{0};
         std::atomic<size_t> recvCount{0};
@@ -430,7 +444,7 @@ static void test_bulk_throughput() {
 
         UdpSocket cli;
         REQUIRE(cli.setSendBufferSize(8 * 1024 * 1024));
-        Endpoint dest{"127.0.0.1", Port{BASE + 60}, AddressFamily::IPv4};
+        Endpoint dest{"127.0.0.1", srvEp60.value().port, AddressFamily::IPv4};
         std::vector<char> pkt(DGRAM, static_cast<char>(0xAB));
 
         auto t0 = std::chrono::steady_clock::now();
@@ -472,16 +486,22 @@ static void test_bulk_throughput() {
         std::vector<char> sendBuf(CHUNK, static_cast<char>(0xCD));
         std::vector<char> recvBuf(CHUNK);
         std::atomic<size_t> recvTotal{0};
-        std::atomic<bool> ready{false};
+
+        std::atomic<uint16_t> portOut{0};
 
         std::thread srvThread([&]() {
             auto srv = TcpSocket::createRaw();
             REQUIRE(srv.setReuseAddress(true));
-            if (!srv.bind("127.0.0.1", Port{BASE + 61}) || !srv.listen(1)) {
-                ready = true;
+            if (!srv.bind("127.0.0.1", Port{0}) || !srv.listen(1)) {
+                portOut = 1; // signal failure
                 return;
             }
-            ready = true;
+            auto ep = srv.getLocalEndpoint();
+            if (!ep.isSuccess()) {
+                portOut = 1;
+                return;
+            }
+            portOut = ep.value().port.value();
             auto peer = srv.accept();
             if (!peer) return;
             REQUIRE(peer->setNoDelay(true));
@@ -497,11 +517,12 @@ static void test_bulk_throughput() {
 
         auto deadline
             = std::chrono::steady_clock::now() + std::chrono::seconds(3);
-        while (!ready && std::chrono::steady_clock::now() < deadline)
+        while (
+            portOut.load() == 0 && std::chrono::steady_clock::now() < deadline)
             std::this_thread::sleep_for(std::chrono::milliseconds(5));
 
         auto c = TcpSocket::createRaw();
-        REQUIRE(c.connect("127.0.0.1", Port{BASE + 61}));
+        REQUIRE(c.connect("127.0.0.1", Port{portOut.load()}));
         REQUIRE(c.setNoDelay(true));
 
         auto t0 = std::chrono::steady_clock::now();
@@ -535,8 +556,9 @@ static void test_span_overloads() {
     {
         auto srv = TcpSocket::createRaw();
         REQUIRE(srv.setReuseAddress(true));
-        REQUIRE(srv.bind("127.0.0.1", Port{BASE + 40}));
+        REQUIRE(srv.bind("127.0.0.1", Port{0}));
         REQUIRE(srv.listen(1));
+        auto port40 = srv.getLocalEndpoint().value().port;
 
         std::thread t([&]() {
             auto conn = srv.accept();
@@ -553,7 +575,7 @@ static void test_span_overloads() {
 
         auto cli = TcpSocket::createRaw();
         REQUIRE(cli.setReceiveTimeout(Milliseconds{2000}));
-        REQUIRE(cli.connect("127.0.0.1", Port{BASE + 40}));
+        REQUIRE(cli.connect("127.0.0.1", port40));
 
         std::string payload = "span-hello";
         std::vector<std::byte> sendBuf(payload.size());
@@ -581,11 +603,13 @@ static void test_span_overloads() {
     {
         UdpSocket receiver;
         REQUIRE(receiver.setReuseAddress(true));
-        REQUIRE(receiver.bind("127.0.0.1", Port{BASE + 41}));
+        REQUIRE(receiver.bind("127.0.0.1", Port{0}));
         REQUIRE(receiver.setReceiveTimeout(Milliseconds{2000}));
+        auto recvEp41 = receiver.getLocalEndpoint();
+        REQUIRE(recvEp41.isSuccess());
 
         UdpSocket sender;
-        Endpoint dest{"127.0.0.1", Port{BASE + 41}, AddressFamily::IPv4};
+        Endpoint dest{"127.0.0.1", recvEp41.value().port, AddressFamily::IPv4};
 
         std::string msg = "span-udp";
         std::vector<std::byte> txBuf(msg.size());
@@ -658,8 +682,9 @@ static void test_shutdown() {
     {
         auto srv = TcpSocket::createRaw();
         REQUIRE(srv.setReuseAddress(true));
-        REQUIRE(srv.bind("127.0.0.1", Port{BASE + 20}));
+        REQUIRE(srv.bind("127.0.0.1", Port{0}));
         REQUIRE(srv.listen(1));
+        auto port20 = srv.getLocalEndpoint().value().port;
 
         std::atomic<int> peerRecv{-1};
         std::thread t([&]() {
@@ -672,7 +697,7 @@ static void test_shutdown() {
         });
 
         auto c = TcpSocket::createRaw();
-        REQUIRE(c.connect("127.0.0.1", Port{BASE + 20}));
+        REQUIRE(c.connect("127.0.0.1", port20));
         REQUIRE(c.shutdown(ShutdownHow::Write));
         t.join();
         // Peer should see 0 (clean EOF) or -1 (connection reset)  either way
@@ -685,8 +710,9 @@ static void test_shutdown() {
     {
         auto srv = TcpSocket::createRaw();
         REQUIRE(srv.setReuseAddress(true));
-        REQUIRE(srv.bind("127.0.0.1", Port{BASE + 21}));
+        REQUIRE(srv.bind("127.0.0.1", Port{0}));
         REQUIRE(srv.listen(1));
+        auto port21 = srv.getLocalEndpoint().value().port;
 
         // Signal so the client waits until accept() has been called; calling
         // shutdown(SHUT_RDWR) before the peer accepts can return ENOTCONN on
@@ -706,7 +732,7 @@ static void test_shutdown() {
         });
 
         auto c = TcpSocket::createRaw();
-        REQUIRE(c.connect("127.0.0.1", Port{BASE + 21}));
+        REQUIRE(c.connect("127.0.0.1", port21));
 
         // Busy-wait with a short timeout for the server to accept.
         auto deadline

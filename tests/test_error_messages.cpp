@@ -26,7 +26,6 @@
 #include "UdpSocket.h"
 #include "SocketFactory.h"
 #include "test_helpers.h"
-#include <atomic>
 #include <cstring>
 #include <string>
 #include <thread>
@@ -34,9 +33,6 @@
 using namespace std::chrono_literals;
 
 using namespace aiSocks;
-
-// Port block: 21000  21099 (no overlap with any other test suite)
-static constexpr uint16_t BASE = 21000;
 
 // -----------------------------------------------------------------------
 // Helpers
@@ -96,9 +92,12 @@ static void test_bind_exception_message() {
     BEGIN_TEST("ServerBind error: basic error handling");
     {
         TcpSocket occupant(AddressFamily::IPv4,
-            ServerBind{"127.0.0.1", Port{BASE}, Backlog{5}, false});
+            ServerBind{"127.0.0.1", Port{0}, Backlog{5}, false});
+        auto ep = occupant.getLocalEndpoint();
+        REQUIRE(ep.isSuccess());
+        Port occupiedPort = ep.value().port;
         auto result = SocketFactory::createTcpServer(AddressFamily::IPv4,
-            ServerBind{"127.0.0.1", Port{BASE}, Backlog{5}, false});
+            ServerBind{"127.0.0.1", occupiedPort, Backlog{5}, false});
         REQUIRE(result.isError());
         REQUIRE(result.error() != SocketError::None);
     }
@@ -106,9 +105,12 @@ static void test_bind_exception_message() {
     BEGIN_TEST("ServerBind error: error() == BindFailed");
     {
         TcpSocket occupant(AddressFamily::IPv4,
-            ServerBind{"127.0.0.1", Port{BASE + 1}, Backlog{5}, false});
+            ServerBind{"127.0.0.1", Port{0}, Backlog{5}, false});
+        auto ep = occupant.getLocalEndpoint();
+        REQUIRE(ep.isSuccess());
+        Port occupiedPort = ep.value().port;
         auto result = SocketFactory::createTcpServer(AddressFamily::IPv4,
-            ServerBind{"127.0.0.1", Port{BASE + 1}, Backlog{5}, false});
+            ServerBind{"127.0.0.1", occupiedPort, Backlog{5}, false});
         SocketError code = result.error();
         REQUIRE(code == SocketError::BindFailed);
     }
@@ -131,7 +133,7 @@ static void test_dns_error_message() {
 
         // Result<T> path (SocketFactory)
         auto result = SocketFactory::createTcpClient(AddressFamily::IPv4,
-            ConnectArgs{BAD_HOST, Port{BASE + 10}, Milliseconds{50}});
+            ConnectArgs{BAD_HOST, Port{80}, Milliseconds{50}});
         std::string message = result.message();
         printf("  message(): %s\n", message.c_str());
         REQUIRE(!message.empty());
@@ -141,7 +143,7 @@ static void test_dns_error_message() {
 
         // Non-throwing path (connect())
         auto s = TcpSocket::createRaw();
-        (void)s.connect(BAD_HOST, Port{BASE + 10}, Milliseconds{50});
+        (void)s.connect(BAD_HOST, Port{80}, Milliseconds{50});
         std::string msg = s.getErrorMessage();
         printf("  getErrorMessage(): %s\n", msg.c_str());
         REQUIRE_MSG(msg.find(BAD_HOST) != std::string::npos,
@@ -179,7 +181,7 @@ static void test_invalid_socket_code() {
     {
         auto s = TcpSocket::createRaw();
         s.close();
-        REQUIRE(!s.bind("127.0.0.1", Port{BASE + 20}));
+        REQUIRE(!s.bind("127.0.0.1", Port{1}));
         REQUIRE(s.getLastError() == SocketError::InvalidSocket);
     }
 
@@ -187,7 +189,7 @@ static void test_invalid_socket_code() {
     {
         auto s = TcpSocket::createRaw();
         s.close();
-        REQUIRE(!s.connect("127.0.0.1", Port{BASE + 20}));
+        REQUIRE(!s.connect("127.0.0.1", Port{1}));
         REQUIRE(s.getLastError() == SocketError::InvalidSocket);
     }
 
@@ -195,7 +197,7 @@ static void test_invalid_socket_code() {
     {
         UdpSocket s;
         s.close();
-        Endpoint dest{"127.0.0.1", Port{BASE + 20}, AddressFamily::IPv4};
+        Endpoint dest{"127.0.0.1", Port{1}, AddressFamily::IPv4};
         auto ret = s.sendTo("x", 1, dest);
         REQUIRE(ret == -1);
         REQUIRE(s.getLastError() == SocketError::InvalidSocket);
@@ -253,7 +255,7 @@ static void test_invalid_socket_message_content() {
     {
         UdpSocket s;
         s.close();
-        Endpoint dest{"127.0.0.1", Port{BASE + 30}, AddressFamily::IPv4};
+        Endpoint dest{"127.0.0.1", Port{1}, AddressFamily::IPv4};
         s.sendTo("x", 1, dest);
         REQUIRE(!s.getErrorMessage().empty());
     }
@@ -289,8 +291,9 @@ static void test_error_clears_on_success() {
     {
         auto srv = TcpSocket::createRaw();
         REQUIRE(srv.setReuseAddress(true));
-        REQUIRE(srv.bind("127.0.0.1", Port{BASE + 40}));
+        REQUIRE(srv.bind("127.0.0.1", Port{0}));
         REQUIRE(srv.listen(1));
+        auto port = srv.getLocalEndpoint().value().port;
 
         std::thread t([&]() {
             auto peer = srv.accept();
@@ -298,7 +301,8 @@ static void test_error_clears_on_success() {
         });
 
         auto c = TcpSocket::createRaw();
-        // Trigger a failure first (short timeout so we don't block on firewalled ports).
+        // Trigger a failure first (short timeout so we don't block on
+        // firewalled ports).
         (void)c.connect("127.0.0.1", Port{1}, Milliseconds{100}); // refused
         REQUIRE(c.getLastError() != SocketError::None);
         REQUIRE(!c.getErrorMessage().empty());
@@ -306,7 +310,7 @@ static void test_error_clears_on_success() {
         // Re-connect successfully (need a fresh socket since connect() on an
         // ECONNREFUSED socket is not retryable on all platforms).
         auto c2 = TcpSocket::createRaw();
-        REQUIRE(c2.connect("127.0.0.1", Port{BASE + 40}));
+        REQUIRE(c2.connect("127.0.0.1", port));
         REQUIRE(c2.getLastError() == SocketError::None);
         REQUIRE_MSG(c2.getErrorMessage().empty(),
             "getErrorMessage() is empty after a successful connect()");
@@ -323,13 +327,14 @@ static void test_post_shutdown_errors() {
     {
         auto srv = TcpSocket::createRaw();
         REQUIRE(srv.setReuseAddress(true));
-        REQUIRE(srv.bind("127.0.0.1", Port{BASE + 50}));
+        REQUIRE(srv.bind("127.0.0.1", Port{0}));
         REQUIRE(srv.listen(1));
+        auto port = srv.getLocalEndpoint().value().port;
 
         std::thread t([&]() { (void)srv.accept(); });
 
         auto c = TcpSocket::createRaw();
-        REQUIRE(c.connect("127.0.0.1", Port{BASE + 50}));
+        REQUIRE(c.connect("127.0.0.1", port));
         REQUIRE(c.shutdown(ShutdownHow::Write));
 
         // The write side is closed; send() must fail.

@@ -18,8 +18,6 @@
 
 using namespace aiSocks;
 
-static const uint16_t BASE_PORT = 19600;
-
 // ---------------------------------------------------------------------------
 // Test 1: Poller can be constructed and destroyed safely.
 // ---------------------------------------------------------------------------
@@ -40,7 +38,7 @@ static void test_poller_add_remove() {
     BEGIN_TEST("Poller: add/remove a server socket without error");
     auto srv = TcpSocket::createRaw();
     REQUIRE(srv.setReuseAddress(true));
-    REQUIRE(srv.bind("127.0.0.1", Port{BASE_PORT}));
+    REQUIRE(srv.bind("127.0.0.1", Port{0}));
     REQUIRE(srv.listen(5));
 
     Poller p;
@@ -55,7 +53,7 @@ static void test_poller_timeout() {
     BEGIN_TEST("Poller: wait() returns empty vector on timeout");
     auto srv = TcpSocket::createRaw();
     REQUIRE(srv.setReuseAddress(true));
-    REQUIRE(srv.bind("127.0.0.1", Port{BASE_PORT + 1}));
+    REQUIRE(srv.bind("127.0.0.1", Port{0}));
     REQUIRE(srv.listen(5));
 
     Poller p;
@@ -72,8 +70,9 @@ static void test_poller_readable_on_connect() {
     BEGIN_TEST("Poller: server socket fires Readable when client connects");
     auto srv = TcpSocket::createRaw();
     REQUIRE(srv.setReuseAddress(true));
-    REQUIRE(srv.bind("127.0.0.1", Port{BASE_PORT + 2}));
+    REQUIRE(srv.bind("127.0.0.1", Port{0}));
     REQUIRE(srv.listen(5));
+    auto port = srv.getLocalEndpoint().value().port;
 
     Poller p;
     REQUIRE(p.add(srv, PollEvent::Readable));
@@ -83,10 +82,10 @@ static void test_poller_readable_on_connect() {
     std::atomic<bool> clientDone{false};
 
     // Client thread: connect, receive one message, store it.
-    std::thread clientThread([&]() {
+    std::thread clientThread([&, port]() {
         std::this_thread::sleep_for(std::chrono::milliseconds(5));
         auto c = TcpSocket::createRaw();
-        if (!c.connect("127.0.0.1", Port{BASE_PORT + 2}, Milliseconds{500})) {
+        if (!c.connect("127.0.0.1", port, Milliseconds{500})) {
             return;
         }
         clientConnected = true;
@@ -126,18 +125,19 @@ static void test_poller_remove_stops_events() {
     BEGIN_TEST("Poller: removed socket no longer fires");
     auto srv = TcpSocket::createRaw();
     REQUIRE(srv.setReuseAddress(true));
-    REQUIRE(srv.bind("127.0.0.1", Port{BASE_PORT + 3}));
+    REQUIRE(srv.bind("127.0.0.1", Port{0}));
     REQUIRE(srv.listen(5));
+    auto port = srv.getLocalEndpoint().value().port;
 
     Poller p;
     REQUIRE(p.add(srv, PollEvent::Readable));
     REQUIRE(p.remove(srv));
 
     // Connect a client  the poller should NOT see it (srv was removed).
-    std::thread clientThread([&]() {
+    std::thread clientThread([&, port]() {
         std::this_thread::sleep_for(std::chrono::milliseconds(5));
         auto c = TcpSocket::createRaw();
-        (void)c.connect("127.0.0.1", Port{BASE_PORT + 3}, Milliseconds{200});
+        (void)c.connect("127.0.0.1", port, Milliseconds{200});
     });
 
     auto results = p.wait(Milliseconds{10}); // short wait  no events expected
@@ -155,16 +155,15 @@ static void test_send_all() {
     BEGIN_TEST("sendAll: transmits all bytes in a single call");
     auto srv = TcpSocket::createRaw();
     REQUIRE(srv.setReuseAddress(true));
-    REQUIRE(srv.bind("127.0.0.1", Port{BASE_PORT + 4})); //-V112
+    REQUIRE(srv.bind("127.0.0.1", Port{0}));
     REQUIRE(srv.listen(1));
+    auto port = srv.getLocalEndpoint().value().port;
 
     std::string received;
     std::atomic<bool> done{false};
-    std::thread clientThread([&]() {
+    std::thread clientThread([&, port]() {
         auto c = TcpSocket::createRaw();
-        if (!c.connect(
-                "127.0.0.1", Port{BASE_PORT + 4}, Milliseconds{500})) //-V112
-            return;
+        if (!c.connect("127.0.0.1", port, Milliseconds{500})) return;
         char buf[256]{};
         int n = c.receive(buf, sizeof(buf) - 1);
         if (n > 0) received.assign(buf, static_cast<size_t>(n));
@@ -189,13 +188,14 @@ static void test_wait_readable_writable() {
         "waitReadable/waitWritable: writable fires immediately on send buffer");
     auto srv = TcpSocket::createRaw();
     REQUIRE(srv.setReuseAddress(true));
-    REQUIRE(srv.bind("127.0.0.1", Port{BASE_PORT + 5}));
+    REQUIRE(srv.bind("127.0.0.1", Port{0}));
     REQUIRE(srv.listen(1));
+    auto port5 = srv.getLocalEndpoint().value().port;
 
-    std::thread clientThread([&]() {
+    std::thread clientThread([&, port5]() {
         std::this_thread::sleep_for(std::chrono::milliseconds(5));
         auto c = TcpSocket::createRaw();
-        (void)c.connect("127.0.0.1", Port{BASE_PORT + 5}, Milliseconds{500});
+        (void)c.connect("127.0.0.1", port5, Milliseconds{500});
         std::this_thread::sleep_for(std::chrono::milliseconds(5));
     });
 
@@ -210,7 +210,7 @@ static void test_wait_readable_writable() {
     // waitReadable should time out on a socket with no data pending.
     auto lonely = TcpSocket::createRaw();
     REQUIRE(lonely.setReuseAddress(true));
-    REQUIRE(lonely.bind("127.0.0.1", Port{BASE_PORT + 6}));
+    REQUIRE(lonely.bind("127.0.0.1", Port{0}));
     REQUIRE(lonely.listen(1));
     bool timedOut = !lonely.waitReadable(Milliseconds{10});
     REQUIRE(timedOut);
@@ -244,8 +244,9 @@ static void test_poller_async_connect() {
     // Server side  accept in main thread after poller fires.
     auto srv = TcpSocket::createRaw();
     REQUIRE(srv.setReuseAddress(true));
-    REQUIRE(srv.bind("127.0.0.1", Port{BASE_PORT + 7}));
+    REQUIRE(srv.bind("127.0.0.1", Port{0}));
     REQUIRE(srv.listen(5));
+    auto port = srv.getLocalEndpoint().value().port;
 
     // Client side  non-blocking connect.
     auto client = TcpSocket::createRaw();
@@ -253,7 +254,7 @@ static void test_poller_async_connect() {
 
     // connect() may return true immediately (loopback) or false + WouldBlock
     // (EINPROGRESS on a real network or slower path).
-    bool immediateSuccess = client.connect("127.0.0.1", Port{BASE_PORT + 7});
+    bool immediateSuccess = client.connect("127.0.0.1", port);
     if (!immediateSuccess) {
         // Must be in-progress, not a hard failure.
         REQUIRE(client.getLastError() == SocketError::WouldBlock);
