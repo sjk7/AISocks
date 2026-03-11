@@ -4,9 +4,25 @@
 # instead of spawning its own (~5s cold start).
 #
 # Usage:
-#   ./scripts/wine_test.sh [extra ctest args...]
+#   ./scripts/wine_test.sh [--build-dir <dir>] [extra ctest args...]
+#
+# --build-dir defaults to build-mingw (debug). Pass build-mingw-rel for release.
+# Example:
+#   ./scripts/wine_test.sh --build-dir build-mingw-rel
 
 set -euo pipefail
+
+# Parse --build-dir option
+BUILD_DIR="build-mingw"
+CTEST_ARGS=()
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --build-dir)
+            BUILD_DIR="$2"; shift 2 ;;
+        *)
+            CTEST_ARGS+=("$1"); shift ;;
+    esac
+done
 
 WINESERVER_REAL=$(realpath "$(which wineserver)" 2>/dev/null || which wineserver)
 
@@ -24,11 +40,11 @@ echo "Wineserver PID before prime: $(pgrep -f wineserver || echo NONE)"
 # Without this, all 8 parallel ctest workers race to initialize through the
 # same wineserver simultaneously, causing a deadlock hang.
 echo "Priming Wine prefix..."
-WINEDEBUG=-all wine build-mingw/tests/test_result.exe > /dev/null 2>&1 || true
+WINEDEBUG=-all wine "${BUILD_DIR}/tests/test_result.exe" > /dev/null 2>&1 || true
 
 echo "Wineserver PID after prime:  $(pgrep -f wineserver || echo NONE)"
 
-WINEDEBUG=-all ctest --preset mingw-debug "$@"
+WINEDEBUG=-all ctest --test-dir "${BUILD_DIR}" --parallel "$(sysctl -n hw.logicalcpu)" "${CTEST_ARGS[@]+"${CTEST_ARGS[@]}"}"
 STATUS=$?
 
 wineserver -k 2>/dev/null || true
