@@ -479,6 +479,8 @@ static void test_bulk_throughput() {
              " dropped: %zu\n",
             COUNT, DGRAM, mbSend, mbRecv, dropped);
         DLOG("  sender time: %.1f ms  send throughput: %.1f MB/s\n", ms, mbps);
+        (void)mbRecv;
+        (void)mbps;
 
         if (dropped > 0)
             DLOG("  NOTE: %zu datagrams dropped (kernel buffer overflow)\n",
@@ -555,6 +557,7 @@ static void test_bulk_throughput() {
         DLOG("  total: %zu MB  sent: %zu B  received: %zu B\n",
             TOTAL / (1024 * 1024), sent, recvTotal.load());
         DLOG("  time: %.1f ms  throughput: %.1f MB/s\n", ms, mbps);
+        (void)mbps;
 
         REQUIRE(recvTotal.load() == TOTAL);
     }

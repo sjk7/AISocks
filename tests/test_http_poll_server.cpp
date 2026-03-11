@@ -98,9 +98,13 @@ static std::string rxHttpResponse(TcpSocket& client) {
     std::string response;
     char buf[4096];
     int n;
+#ifdef TEST_VERBOSE
     int receiveCount = 0;
+#endif
     while ((n = client.receive(buf, sizeof(buf))) > 0) {
+#ifdef TEST_VERBOSE
         receiveCount++;
+#endif
         DLOG("[DEBUG] rxHttpResponse: Received chunk %d, size=%d bytes\n",
             receiveCount, n);
         response.append(buf, n);
@@ -116,8 +120,7 @@ static std::string rxHttpResponse(TcpSocket& client) {
                     contentLength, bodyStart, response.size());
                 if (response.size()
                     >= bodyStart + static_cast<size_t>(contentLength)) {
-                    printf(
-                        "[DEBUG] rxHttpResponse: Complete response received, "
+                    DLOG("[DEBUG] rxHttpResponse: Complete response received, "
                         "breaking\n");
                     break;
                 }
@@ -127,8 +130,7 @@ static std::string rxHttpResponse(TcpSocket& client) {
             }
         }
     }
-    printf(
-        "[DEBUG] rxHttpResponse: Receive loop ended, final response size=%zu\n",
+    DLOG("[DEBUG] rxHttpResponse: Receive loop ended, final response size=%zu\n",
         response.size());
     return response;
 }

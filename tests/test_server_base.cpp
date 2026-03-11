@@ -141,7 +141,7 @@ static std::thread startServerInBackground(
 
 // Helper: Wait for condition with timeout, reporting actual wait time
 template <typename Condition>
-static void waitForCondition(const std::string& description,
+static void waitForCondition([[maybe_unused]] const std::string& description,
     Condition&& condition,
     std::chrono::milliseconds maxWait = std::chrono::milliseconds{500},
     std::chrono::milliseconds interval = std::chrono::milliseconds{10}) {
@@ -154,6 +154,7 @@ static void waitForCondition(const std::string& description,
                     std::chrono::duration_cast<std::chrono::milliseconds>(
                         waitTime)
                         .count());
+            (void)waitTime;
             return;
         }
         std::this_thread::sleep_for(interval);
@@ -166,6 +167,7 @@ static void waitForCondition(const std::string& description,
         (long long)std::chrono::duration_cast<std::chrono::milliseconds>(
             waitTime)
             .count());
+    (void)waitTime;
 }
 
 // ---------------------------------------------------------------------------

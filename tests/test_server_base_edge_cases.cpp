@@ -342,6 +342,7 @@ int main() {
             // Connection may or may not still work depending on timing
             DLOG("DEBUG: After timeout, send %s\n",
                 (sent ? "succeeded" : "failed"));
+            (void)sent;
         }
 
         server.requestStop();
@@ -378,6 +379,7 @@ int main() {
                 bool sent = client->sendAll(largeMsg.data(), largeMsg.size());
                 DLOG("DEBUG: Client %d sent %d bytes: %s\n", i, messageSize,
                     (sent ? "true" : "false"));
+                (void)sent;
 
                 clients.push_back(std::move(client));
             }
