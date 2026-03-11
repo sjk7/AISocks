@@ -1,0 +1,276 @@
+// This is an independent project of an individual developer. Dear PVS-Studio,
+// please check it.
+
+// PVS-Studio Static Code Analyzer for C, C++, C#, and Java:
+// https://pvs-studio.com
+
+// Integration tests: HttpClient talking to a real HttpPollServer in-process.
+//
+// These tests exercise the full request/response path — TCP connect, HTTP
+// framing, response parsing, keep-alive — without any network mocking.
+// Each test spins up the server on a background thread, uses the server's
+// own requestStop() API for clean shutdown, and synchronises on a
+// condition_variable (via waitReady()) to eliminate startup races.
+
+#include "HttpClient.h"
+#include "HttpPollServer.h"
+#include "test_helpers.h"
+
+#include <atomic>
+#include <condition_variable>
+#include <mutex>
+#include <string>
+#include <thread>
+
+using namespace aiSocks;
+using namespace std::chrono_literals;
+
+// ---------------------------------------------------------------------------
+// EchoServer — responds with 200 OK and a body that mirrors the request path
+// ---------------------------------------------------------------------------
+class EchoServer : public HttpPollServer {
+    public:
+    explicit EchoServer() : HttpPollServer(ServerBind{"127.0.0.1", Port{0}}) {
+        setHandleSignals(false); // never stopped by global signal flag
+    }
+
+    // Block until onReady() has fired and the server is in its poll loop.
+    void waitReady() {
+        std::unique_lock<std::mutex> lk(readyMtx_);
+        readyCv_.wait(lk, [this] { return ready_.load(); });
+    }
+
+    std::atomic<int> requestsServed{0};
+
+    protected:
+    void onReady() override {
+        {
+            std::lock_guard<std::mutex> lk(readyMtx_);
+            ready_ = true;
+        }
+        readyCv_.notify_all();
+    }
+
+    void buildResponse(HttpClientState& s) override {
+        // Extract path from the stored request line (e.g. "GET /hello
+        // HTTP/1.1")
+        std::string_view req = s.request;
+        std::string path;
+        auto spaceAfterMethod = req.find(' ');
+        if (spaceAfterMethod != std::string_view::npos) {
+            auto pathStart = spaceAfterMethod + 1;
+            auto pathEnd = req.find(' ', pathStart);
+            path = std::string(req.substr(pathStart,
+                pathEnd == std::string_view::npos ? std::string_view::npos
+                                                  : pathEnd - pathStart));
+        }
+
+        s.responseBuf = makeResponse(
+            "HTTP/1.1 200 OK", "text/plain", path.empty() ? "/" : path);
+        s.responseView = s.responseBuf;
+        requestsServed.fetch_add(1, std::memory_order_relaxed);
+    }
+
+    private:
+    std::atomic<bool> ready_{false};
+    std::mutex readyMtx_;
+    std::condition_variable readyCv_;
+};
+
+// ---------------------------------------------------------------------------
+// SilentServer — accepts connections and drains input but never writes back.
+// Used to test request-timeout: client's receive deadline fires first.
+// ---------------------------------------------------------------------------
+class SilentServer : public HttpPollServer {
+    public:
+    explicit SilentServer() : HttpPollServer(ServerBind{"127.0.0.1", Port{0}}) {
+        setHandleSignals(false);
+    }
+
+    void waitReady() {
+        std::unique_lock<std::mutex> lk(readyMtx_);
+        readyCv_.wait(lk, [this] { return ready_.load(); });
+    }
+
+    protected:
+    void onReady() override {
+        {
+            std::lock_guard<std::mutex> lk(readyMtx_);
+            ready_ = true;
+        }
+        readyCv_.notify_all();
+    }
+
+    // Leave responseView empty: onWritable returns KeepConnection when
+    // responseView is empty, so the socket stays open indefinitely.
+    // The client's requestTimeout fires rather than waiting forever.
+    void buildResponse(HttpClientState& /*s*/) override {}
+
+    private:
+    std::atomic<bool> ready_{false};
+    std::mutex readyMtx_;
+    std::condition_variable readyCv_;
+};
+
+// ---------------------------------------------------------------------------
+// RAII helper: starts the server on construction, stops+joins on destruction
+// ---------------------------------------------------------------------------
+struct ServerGuard {
+    EchoServer server;
+    std::thread thread;
+
+    ServerGuard() {
+        thread = std::thread(
+            [this] { server.run(ClientLimit::Unlimited, Milliseconds{1}); });
+        server.waitReady();
+    }
+
+    ~ServerGuard() {
+        server.requestStop();
+        thread.join();
+    }
+
+    // Convenience: return an HttpClient pre-configured to talk to this server.
+    HttpClient makeClient() {
+        HttpClient::Options opts;
+        opts.connectTimeout = Milliseconds{500};
+        opts.requestTimeout = Milliseconds{500};
+        return HttpClient{opts};
+    }
+
+    std::string baseUrl() const {
+        return "http://127.0.0.1:"
+            + std::to_string(server.serverPort().value());
+    }
+};
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
+
+// All happy-path tests share one ServerGuard to pay the spin-up cost once.
+static void run_happy_path_tests(ServerGuard& sg) {
+    auto client = sg.makeClient();
+
+    BEGIN_TEST("HttpClient GET to HttpPollServer returns 200 OK");
+    {
+        auto r = client.get(sg.baseUrl() + "/hello");
+        REQUIRE(r.isSuccess());
+        if (!r.isSuccess()) return;
+        REQUIRE(r.value().statusCode() == 200);
+        REQUIRE(r.value().body().find("/hello") != std::string_view::npos);
+    }
+
+    BEGIN_TEST("HttpClient GET: echo server body contains request path");
+    {
+        auto r = client.get(sg.baseUrl() + "/ping");
+        REQUIRE(r.isSuccess());
+        if (!r.isSuccess()) return;
+        REQUIRE(r.value().body().find("/ping") != std::string_view::npos);
+    }
+
+    BEGIN_TEST("HttpClient: multiple sequential GETs to same server succeed");
+    {
+        for (int i = 0; i < 3; ++i) {
+            auto r = client.get(sg.baseUrl() + "/item/" + std::to_string(i));
+            REQUIRE(r.isSuccess());
+            if (!r.isSuccess()) return;
+            REQUIRE(r.value().statusCode() == 200);
+        }
+        REQUIRE(sg.server.requestsServed.load() >= 3);
+    }
+
+    BEGIN_TEST("HttpClient POST to HttpPollServer returns 405 (GET/HEAD only)");
+    {
+        auto r = client.post(sg.baseUrl() + "/submit", "key=value");
+        REQUIRE(r.isSuccess());
+        if (!r.isSuccess()) return;
+        REQUIRE(r.value().statusCode() == 405);
+    }
+}
+
+static void test_invalid_host_returns_failure() {
+    BEGIN_TEST("HttpClient GET to refused port returns failure");
+
+    HttpClient::Options opts;
+    opts.connectTimeout = Milliseconds{150};
+    opts.requestTimeout = Milliseconds{150};
+    HttpClient client{opts};
+
+    auto result = client.get("http://127.0.0.1:1"); // port 1 should refuse
+
+    REQUIRE(!result.isSuccess());
+}
+
+static void test_bad_dns_fails() {
+    BEGIN_TEST("HttpClient GET to unresolvable hostname returns failure");
+
+    // .invalid is reserved by RFC 2606 and guaranteed never to resolve.
+    HttpClient::Options opts;
+    opts.connectTimeout = Milliseconds{150};
+    HttpClient client{opts};
+
+    auto result = client.get("http://this.host.does.not.exist.invalid/");
+
+    REQUIRE(!result.isSuccess());
+}
+
+static void test_connect_timeout_fails() {
+    BEGIN_TEST("HttpClient GET with short connect timeout to black-hole "
+               "returns failure");
+
+    // 192.0.2.0/24 is TEST-NET-1 (RFC 5737): documentation-only block,
+    // guaranteed not to respond.  On some networks the OS may return
+    // ENETUNREACH immediately (instant failure); on others the SYN enters
+    // a black hole and we rely on the connect timeout.  requestTimeout is
+    // also kept short so that even in the unlikely case the TCP handshake
+    // "succeeds" and a request is sent, we do not block for the default
+    // 60 s receive timeout.
+    HttpClient::Options opts;
+    opts.connectTimeout = Milliseconds{150};
+    opts.requestTimeout = Milliseconds{150};
+    HttpClient client{opts};
+
+    auto result = client.get("http://192.0.2.1/");
+
+    REQUIRE(!result.isSuccess());
+}
+
+static void test_request_timeout_fails() {
+    BEGIN_TEST(
+        "HttpClient GET times out when server accepts but never responds");
+
+    // SilentServer drains the HTTP request but never writes a response
+    // (onReadable returns KeepConnection, no dispatchBuildResponse call).
+    // The client's 200 ms requestTimeout fires first → receive returns an
+    // error and performRequest returns failure.
+    SilentServer server;
+    std::thread serverThread(
+        [&] { server.run(ClientLimit::Unlimited, Milliseconds{1}); });
+    server.waitReady();
+
+    HttpClient::Options opts;
+    opts.connectTimeout = Milliseconds{500};
+    opts.requestTimeout = Milliseconds{150};
+    auto result = HttpClient{opts}.get("http://127.0.0.1:"
+        + std::to_string(server.serverPort().value()) + "/");
+
+    server.requestStop();
+    serverThread.join();
+
+    REQUIRE(!result.isSuccess());
+}
+
+// ---------------------------------------------------------------------------
+
+int main() {
+    printf("=== HttpClient + HttpPollServer integration tests ===\n");
+
+    { ServerGuard sg; run_happy_path_tests(sg); }
+    test_invalid_host_returns_failure();
+    test_bad_dns_fails();
+    test_connect_timeout_fails();
+    test_request_timeout_fails();
+
+    return test_summary();
+}

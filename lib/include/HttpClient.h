@@ -258,7 +258,12 @@ class HttpClient {
 
             TcpSocket socket = std::move(socketResult.value());
 
-            // Build HTTP request using ClientHttpRequest
+            // Apply the per-request receive timeout so that a server that
+            // accepts the connection but never sends a response does not
+            // block the caller indefinitely.
+            if (options_.requestTimeout.count > 0)
+                socket.setReceiveTimeout(options_.requestTimeout);
+
             auto requestBuilder = ClientHttpRequest::builder()
                                       .method(method)
                                       .url(currentUrl)
@@ -317,6 +322,11 @@ class HttpClient {
             while (true) {
                 int n = socket.receive(buffer, sizeof(buffer));
                 if (n < 0) {
+                    const auto err = socket.getLastError();
+                    if (err == SocketError::Timeout
+                        || err == SocketError::WouldBlock)
+                        return Result<HttpClientResponse>::failure(
+                            SocketError::Timeout, "Request timed out");
                     return Result<HttpClientResponse>::failure(
                         SocketError::ReceiveFailed, "Receive error");
                 }

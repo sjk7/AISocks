@@ -1,7 +1,8 @@
-// This is an independent project of an individual developer. Dear PVS-Studio, please check it.
+// This is an independent project of an individual developer. Dear PVS-Studio,
+// please check it.
 
-// PVS-Studio Static Code Analyzer for C, C++, C#, and Java: https://pvs-studio.com
-
+// PVS-Studio Static Code Analyzer for C, C++, C#, and Java:
+// https://pvs-studio.com
 
 #ifndef AISOCKS_SIMPLE_SERVER_H
 #define AISOCKS_SIMPLE_SERVER_H
@@ -54,7 +55,9 @@ namespace detail {
         void* obj{nullptr};
         bool (*invoke)(void*, TcpSocket&, PollEvent){nullptr};
 
-        bool operator()(TcpSocket& s, PollEvent e) const { return invoke(obj, s, e); }
+        bool operator()(TcpSocket& s, PollEvent e) const {
+            return invoke(obj, s, e);
+        }
         explicit operator bool() const { return invoke != nullptr; }
     };
 } // namespace detail
@@ -102,12 +105,10 @@ class SimpleServer : private ServerBase<detail::NoClientState> {
         ClientLimit maxClients = ClientLimit::Default,
         Milliseconds timeout = Milliseconds{-1}) {
         using RawType = std::remove_reference_t<Callback>;
-        callback_ = {
-            static_cast<void*>(&cb),
+        callback_ = {static_cast<void*>(&cb),
             [](void* p, TcpSocket& s, PollEvent e) -> bool {
                 return (*static_cast<RawType*>(p))(s, e);
-            }
-        };
+            }};
         Base::run(maxClients, timeout);
         callback_ = {};
     }
