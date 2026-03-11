@@ -104,7 +104,8 @@ static void test_methods() {
     BEGIN_TEST("HTTP methods");
     for (const char* m :
         {"POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS", "TRACE"}) {
-        auto req = HttpRequest::parse(std::string(m) + " / HTTP/1.1\r\n\r\n");
+        std::string raw = std::string(m) + " / HTTP/1.1\r\n\r\n";
+        auto req = HttpRequest::parse(raw);
         REQUIRE_MSG(req.valid, std::string("valid for method ") + m);
         REQUIRE_MSG(req.method == m, std::string("method field == ") + m);
     }
