@@ -15,13 +15,10 @@
 #include "test_helpers.h"
 #include <thread>
 #include <chrono>
-#include <atomic>
 #include <string>
 #include <cstring>
 
 using namespace aiSocks;
-
-static const uint16_t BASE = 19900;
 
 #ifdef SOMAXCONN
 #error("Socket compiler firewall breached: SOMAXCONN is defined, but should not be visible to code including SocketFactory.h");
@@ -64,8 +61,8 @@ static void test_basic_constructor() {
 static void test_server_bind_happy() {
     BEGIN_TEST("ServerBind factory: socket is valid and ready to accept");
     {
-        auto result = SocketFactory::createTcpServer(
-            ServerBind{"127.0.0.1", Port{BASE}});
+        auto result
+            = SocketFactory::createTcpServer(ServerBind{"127.0.0.1", Port{0}});
         REQUIRE(result.isSuccess());
         auto& s = result.value();
         REQUIRE(s.isValid());
@@ -75,18 +72,21 @@ static void test_server_bind_happy() {
 
     BEGIN_TEST("ServerBind factory: can immediately accept a connection");
     {
-        auto srv_result = SocketFactory::createTcpServer(
-            ServerBind{"127.0.0.1", Port{BASE + 1}});
+        auto srv_result
+            = SocketFactory::createTcpServer(ServerBind{"127.0.0.1", Port{0}});
         REQUIRE(srv_result.isSuccess());
         auto& srv = srv_result.value();
         REQUIRE(srv.isValid());
+        auto epResult = srv.getLocalEndpoint();
+        REQUIRE(epResult.isSuccess());
+        Port srvPort = epResult.value().port;
 
         std::string cltError;
         std::thread clt([&]() {
             std::this_thread::sleep_for(std::chrono::milliseconds(50));
-            auto clt_result = SocketFactory::createTcpClient(
-                AddressFamily::IPv4,
-                ConnectArgs{"127.0.0.1", Port{BASE + 1}, Milliseconds{2000}});
+            auto clt_result
+                = SocketFactory::createTcpClient(AddressFamily::IPv4,
+                    ConnectArgs{"127.0.0.1", srvPort, Milliseconds{2000}});
             if (clt_result.isError()) {
                 cltError = clt_result.message();
             }
@@ -109,7 +109,7 @@ static void test_server_bind_happy() {
         "ServerBind factory: reuseAddr=false still works on a fresh port");
     {
         auto result = SocketFactory::createTcpServer(
-            ServerBind{"127.0.0.1", Port{BASE + 2}, Backlog{5}, false});
+            ServerBind{"127.0.0.1", Port{0}, Backlog{5}, false});
         REQUIRE(result.isSuccess());
         auto& s = result.value();
         REQUIRE(s.isValid());
@@ -124,29 +124,23 @@ static void test_connect_to_happy() {
 
     BEGIN_TEST("ConnectArgs factory: creates a connected socket");
     {
-        std::atomic<bool> ready{false};
+        // Bind in the main thread so the port is known before spawning.
+        auto srv_result
+            = SocketFactory::createTcpServer(ServerBind{"127.0.0.1", Port{0}});
+        REQUIRE(srv_result.isSuccess());
+        auto& srv = srv_result.value();
+        auto epResult = srv.getLocalEndpoint();
+        REQUIRE(epResult.isSuccess());
+        Port srvPort = epResult.value().port;
 
         std::thread srvThread([&]() {
-            auto srv_result = SocketFactory::createTcpServer(
-                ServerBind{"127.0.0.1", Port{BASE + 3}});
-            if (srv_result.isError()) {
-                return;
-            }
-            auto& srv = srv_result.value();
-            ready = true;
             auto peer_result = srv.accept();
             // peer closes on scope exit; isValid() on the client side
             // checks the fd, not the liveness of the peer
         });
 
-        // Wait for server
-        auto deadline
-            = std::chrono::steady_clock::now() + std::chrono::seconds(2);
-        while (!ready && std::chrono::steady_clock::now() < deadline)
-            std::this_thread::sleep_for(std::chrono::milliseconds(5));
-
         auto clt_result = SocketFactory::createTcpClient(AddressFamily::IPv4,
-            ConnectArgs{"127.0.0.1", Port{BASE + 3}, Milliseconds{1000}});
+            ConnectArgs{"127.0.0.1", srvPort, Milliseconds{1000}});
         srvThread.join();
         REQUIRE(clt_result.isSuccess());
         REQUIRE(clt_result.value().isValid());
@@ -158,18 +152,17 @@ static void test_connect_to_happy() {
                "construction");
     {
         const std::string payload = "hello-from-constructor";
-        std::atomic<bool> ready{false};
         std::string received;
 
+        auto srv_result
+            = SocketFactory::createTcpServer(ServerBind{"127.0.0.1", Port{0}});
+        REQUIRE(srv_result.isSuccess());
+        auto& srv = srv_result.value();
+        auto epResult = srv.getLocalEndpoint();
+        REQUIRE(epResult.isSuccess());
+        Port srvPort = epResult.value().port;
+
         std::thread srvThread([&]() {
-            auto srv_result = SocketFactory::createTcpServer(
-                ServerBind{"127.0.0.1", Port{BASE + 4}});
-            if (srv_result.isError()) {
-                ready = true;
-                return;
-            }
-            auto& srv = srv_result.value();
-            ready = true;
             auto peer_result = srv.accept();
             if (peer_result != nullptr) {
                 auto peer = std::move(peer_result);
@@ -180,13 +173,8 @@ static void test_connect_to_happy() {
             }
         });
 
-        auto deadline
-            = std::chrono::steady_clock::now() + std::chrono::seconds(2);
-        while (!ready && std::chrono::steady_clock::now() < deadline)
-            std::this_thread::sleep_for(std::chrono::milliseconds(5));
-
         auto clt_result = SocketFactory::createTcpClient(AddressFamily::IPv4,
-            ConnectArgs{"127.0.0.1", Port{BASE + 4}, Milliseconds{1000}});
+            ConnectArgs{"127.0.0.1", srvPort, Milliseconds{1000}});
         REQUIRE(clt_result.isSuccess());
         auto& c = clt_result.value();
         bool sent = c.send(payload.data(), payload.size());
@@ -205,16 +193,18 @@ static void test_server_bind_failures() {
     BEGIN_TEST("ServerBind factory: returns error on port-in-use (same port, "
                "no reuseAddr)");
     {
-        // First socket holds the port
+        // Let the OS assign a free port, then try to bind it again.
         auto first_result = SocketFactory::createTcpServer(
-            ServerBind{"127.0.0.1", Port{BASE + 10}, Backlog{5}, false});
+            ServerBind{"127.0.0.1", Port{0}, Backlog{5}, false});
         REQUIRE(first_result.isSuccess());
         auto& first = first_result.value();
-        (void)first; // Keep port bound
+        auto ep = first.getLocalEndpoint();
+        REQUIRE(ep.isSuccess());
+        Port boundPort = ep.value().port;
 
-        // Second socket tries same port without reuseAddr
+        // Second socket tries the same OS-assigned port — must fail.
         auto second_result = SocketFactory::createTcpServer(
-            ServerBind{"127.0.0.1", Port{BASE + 10}, Backlog{5}, false});
+            ServerBind{"127.0.0.1", boundPort, Backlog{5}, false});
         REQUIRE(second_result.isError());
         REQUIRE(second_result.error() != SocketError::None);
         REQUIRE(!second_result.message().empty());
@@ -222,20 +212,22 @@ static void test_server_bind_failures() {
 
     std::this_thread::sleep_for(std::chrono::milliseconds(1));
 
-    BEGIN_TEST("setReuseAddress(true) still blocks concurrent bind on same port");
+    BEGIN_TEST(
+        "setReuseAddress(true) still blocks concurrent bind on same port");
     {
-        // First socket binds with reuse=true (the normal server default).
         // On Unix SO_REUSEADDR is set; on Windows nothing is set (default is
         // already exclusive).  Either way, a second simultaneous bind must
         // fail — if it didn't, port hijacking would be possible.
         auto first_result = SocketFactory::createTcpServer(
-            ServerBind{"127.0.0.1", Port{BASE + 12}, Backlog{5}, true});
+            ServerBind{"127.0.0.1", Port{0}, Backlog{5}, true});
         REQUIRE(first_result.isSuccess());
         auto& first = first_result.value();
-        (void)first; // Keep port bound
+        auto ep = first.getLocalEndpoint();
+        REQUIRE(ep.isSuccess());
+        Port boundPort = ep.value().port;
 
         auto second_result = SocketFactory::createTcpServer(
-            ServerBind{"127.0.0.1", Port{BASE + 12}, Backlog{5}, true});
+            ServerBind{"127.0.0.1", boundPort, Backlog{5}, true});
         REQUIRE(second_result.isError());
         REQUIRE(second_result.error() != SocketError::None);
     }
@@ -245,7 +237,7 @@ static void test_server_bind_failures() {
     BEGIN_TEST("ServerBind factory: returns error on invalid address");
     {
         auto result = SocketFactory::createTcpServer(
-            ServerBind{"invalid.address.that.does.not.exist", Port{BASE + 11}});
+            ServerBind{"invalid.address.that.does.not.exist", Port{0}});
         REQUIRE(result.isError());
         REQUIRE(result.error() != SocketError::None);
         REQUIRE(!result.message().empty());
