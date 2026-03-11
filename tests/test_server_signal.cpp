@@ -154,7 +154,7 @@ int main() {
 
         // Run server in thread, set flag after a moment
         std::thread serverThread([&server]() {
-            server.run(ClientLimit::Unlimited, Milliseconds{50});
+            server.run(ClientLimit::Unlimited, Milliseconds{1});
         });
 
         // Give server time to start

@@ -25,7 +25,7 @@
 using namespace aiSocks;
 
 // Testing constants for edge case scenarios
-static constexpr Milliseconds QUICK_POLL_TIMEOUT{5};
+static constexpr Milliseconds QUICK_POLL_TIMEOUT{1};
 static constexpr Milliseconds SHORT_KEEP_ALIVE{
     1000}; // 1 second - more reasonable for testing
 

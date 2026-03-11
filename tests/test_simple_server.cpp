@@ -105,7 +105,7 @@ static void test_poll_clients_echo() {
                 }
                 return true;
             },
-            ClientLimit{1}, Milliseconds{10});
+            ClientLimit{1}, Milliseconds{1});
     });
 
     REQUIRE(waitFor([&] { return serverReady.load(); }));
@@ -159,7 +159,7 @@ static void test_poll_clients_disconnect_on_false() {
                 }
                 return true;
             },
-            ClientLimit::Unlimited, Milliseconds{10});
+            ClientLimit::Unlimited, Milliseconds{1});
     });
 
     REQUIRE(waitFor([&] { return serverReady.load(); }));

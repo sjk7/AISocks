@@ -292,7 +292,7 @@ int main() {
         std::thread serverThread([&server]() {
             printf("[DEBUG] Test 3 - Server thread: starting run()\n");
             fflush(stdout);
-            server.run(ClientLimit{1}, Milliseconds{20});
+            server.run(ClientLimit{1}, Milliseconds{1});
             printf("[DEBUG] Test 3 - Server thread: run() completed\n");
             fflush(stdout);
         });
@@ -330,7 +330,7 @@ int main() {
         REQUIRE(server.isValid());
 
         std::thread serverThread([&server]() {
-            server.run(ClientLimit::Unlimited, Milliseconds{20});
+            server.run(ClientLimit::Unlimited, Milliseconds{1});
         });
 
         server.waitReady();
@@ -353,7 +353,7 @@ int main() {
         REQUIRE(server.isValid());
 
         std::thread serverThread([&server]() {
-            server.run(ClientLimit::Unlimited, Milliseconds{20});
+            server.run(ClientLimit::Unlimited, Milliseconds{1});
         });
 
         server.waitReady();
@@ -385,7 +385,7 @@ int main() {
         std::thread serverThread([&server]() {
             printf("[DEBUG] Test 6 - Server thread: starting run()\n");
             fflush(stdout);
-            server.run(ClientLimit{1}, Milliseconds{20});
+            server.run(ClientLimit{1}, Milliseconds{1});
             printf("[DEBUG] Test 6 - Server thread: run() completed\n");
             fflush(stdout);
         });
@@ -423,7 +423,7 @@ int main() {
         REQUIRE(server.isValid());
 
         std::thread serverThread(
-            [&server]() { server.run(ClientLimit{1}, Milliseconds{20}); });
+            [&server]() { server.run(ClientLimit{1}, Milliseconds{1}); });
 
         server.waitReady();
 
@@ -472,7 +472,7 @@ int main() {
         std::thread serverThread([&server]() {
             printf("[DEBUG] Test 8 - Server thread: starting run()\n");
             fflush(stdout);
-            server.run(ClientLimit{1}, Milliseconds{20});
+            server.run(ClientLimit{1}, Milliseconds{1});
             printf("[DEBUG] Test 8 - Server thread: run() completed\n");
             fflush(stdout);
         });
@@ -509,7 +509,7 @@ int main() {
         REQUIRE(server.isValid());
 
         std::thread serverThread(
-            [&server]() { server.run(ClientLimit{10}, Milliseconds{20}); });
+            [&server]() { server.run(ClientLimit{10}, Milliseconds{1}); });
 
         server.waitReady();
 
@@ -546,7 +546,7 @@ int main() {
         REQUIRE(server.isValid());
 
         std::thread serverThread(
-            [&server]() { server.run(ClientLimit{1}, Milliseconds{20}); });
+            [&server]() { server.run(ClientLimit{1}, Milliseconds{1}); });
 
         server.waitReady();
 
@@ -590,7 +590,7 @@ int main() {
 
         printf("DEBUG: Test 11 - Running server with ClientLimit{1}\n");
         std::thread serverThread(
-            [&server]() { server.run(ClientLimit{1}, Milliseconds{20}); });
+            [&server]() { server.run(ClientLimit{1}, Milliseconds{1}); });
 
         server.waitReady();
 
@@ -652,7 +652,7 @@ int main() {
         REQUIRE(server.isValid());
 
         std::thread serverThread(
-            [&server]() { server.run(ClientLimit{1}, Milliseconds{20}); });
+            [&server]() { server.run(ClientLimit{1}, Milliseconds{1}); });
 
         server.waitReady();
 
@@ -697,7 +697,7 @@ int main() {
         REQUIRE(server.isValid());
 
         std::thread serverThread(
-            [&server]() { server.run(ClientLimit{1}, Milliseconds{20}); });
+            [&server]() { server.run(ClientLimit{1}, Milliseconds{1}); });
 
         server.waitReady();
 
@@ -723,7 +723,7 @@ int main() {
         REQUIRE(server.isValid());
 
         std::thread serverThread([&server]() {
-            server.run(ClientLimit::Unlimited, Milliseconds{20});
+            server.run(ClientLimit::Unlimited, Milliseconds{1});
         });
 
         server.waitReady();
@@ -768,7 +768,7 @@ int main() {
         REQUIRE(server.isValid());
 
         std::thread serverThread(
-            [&server]() { server.run(ClientLimit{1}, Milliseconds{20}); });
+            [&server]() { server.run(ClientLimit{1}, Milliseconds{1}); });
 
         server.waitReady();
 

@@ -106,7 +106,7 @@ int main() {
         // Start server with limited clients
         std::thread serverThread([&server, &ready]() {
             ready = true;
-            server.run(ClientLimit{2}, Milliseconds{10});
+            server.run(ClientLimit{2}, Milliseconds{1});
         });
 
         // Wait for server to be ready AND actually accept a client

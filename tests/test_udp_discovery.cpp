@@ -64,7 +64,7 @@ int main() {
         REQUIRE(httpServer.isValid());
 
         std::thread httpThread([&httpServer]() {
-            httpServer.run(ClientLimit::Unlimited, Milliseconds{20});
+            httpServer.run(ClientLimit::Unlimited, Milliseconds{1});
         });
         httpServer.waitReady();
 

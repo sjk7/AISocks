@@ -25,7 +25,7 @@
 using namespace aiSocks;
 
 // Testing constants for fast, responsive server behavior
-static constexpr Milliseconds TEST_POLL_TIMEOUT{10};
+static constexpr Milliseconds TEST_POLL_TIMEOUT{1};
 
 // ---------------------------------------------------------------------------
 // Minimal echo server for tests

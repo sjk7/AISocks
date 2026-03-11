@@ -41,7 +41,7 @@ using namespace aiSocks;
 // Shared helpers
 // ---------------------------------------------------------------------------
 
-static constexpr Milliseconds POLL_TIMEOUT{10};
+static constexpr Milliseconds POLL_TIMEOUT{1};
 
 template <typename Cond>
 static bool waitFor(Cond&& cond,
@@ -297,7 +297,7 @@ static void test_on_error_returns_server_result() {
     // simply detect the disconnect via a read of 0 and call onReadable first.
     // Either way, explicitly request stop to ensure the thread exits.
     bool stoppedByError
-        = waitFor([&] { return done.load(); }, std::chrono::milliseconds{150});
+        = waitFor([&] { return done.load(); }, std::chrono::milliseconds{30});
     if (!stoppedByError) {
         server.requestStop();
         waitFor([&] { return done.load(); });
@@ -329,14 +329,14 @@ static void test_on_idle_only_on_timeout() {
         std::thread t(
             [&] { server.run(ClientLimit::Unlimited, POLL_TIMEOUT); });
         server.waitReady();
-        std::this_thread::sleep_for(std::chrono::milliseconds{60});
+        std::this_thread::sleep_for(std::chrono::milliseconds{20});
         int idleNoClients = server.idleCalls.load();
         server.requestStop();
         t.join();
 
-        // With 10 ms poll timeout over 60 ms we expect ~6 idle calls.
-        // Use a conservative floor of 5 to be CI-friendly.
-        REQUIRE_MSG(idleNoClients >= 5,
+        // With 1 ms poll timeout over 20 ms we expect ~20 idle calls.
+        // Use a conservative floor of 10 to be CI-friendly.
+        REQUIRE_MSG(idleNoClients >= 10,
             "onIdle should fire many times when there are no clients (got "
                 + std::to_string(idleNoClients) + ")");
     }
@@ -377,7 +377,7 @@ static void test_on_idle_only_on_timeout() {
         }
 
         // Give server time to process the data
-        std::this_thread::sleep_for(std::chrono::milliseconds{60});
+        std::this_thread::sleep_for(std::chrono::milliseconds{20});
 
         int idleAfterData = server.idleCalls.load();
         int readableAfterData = server.readableCalls.load();
