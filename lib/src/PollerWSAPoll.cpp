@@ -80,7 +80,7 @@ bool Poller::remove(const Socket& s) {
 
     if (i != last) {
         // Swap with the last entry so we can pop_back in O(1).
-        pImpl_->fds[i]    = pImpl_->fds[last];
+        pImpl_->fds[i] = pImpl_->fds[last];
         pImpl_->sockets[i] = pImpl_->sockets[last];
         // Update the index for the element that was moved.
         pImpl_->index[pImpl_->fds[i].fd] = i;
@@ -127,8 +127,9 @@ static uint8_t translateWSAPollBits_(SHORT rev) {
     return bits;
 }
 
-std::vector<PollResult> Poller::wait(Milliseconds timeout) {
-    if (pImpl_->fds.empty()) return {};
+const std::vector<PollResult>& Poller::wait(Milliseconds timeout) {
+    pImpl_->resultBuffer.clear();
+    if (pImpl_->fds.empty()) return pImpl_->resultBuffer;
 
     const int timeoutMs = toWSAPollTimeout_(timeout);
 
@@ -140,12 +141,10 @@ std::vector<PollResult> Poller::wait(Milliseconds timeout) {
     int rc = ::WSAPoll(
         pImpl_->fds.data(), static_cast<ULONG>(pImpl_->fds.size()), timeoutMs);
     if (rc == SOCKET_ERROR) {
-        // Don't throw - return empty result on error
-        // Users can check error via WSAGetLastError()
-        return {};
+        return pImpl_->resultBuffer; // already cleared above; users can check
+                                     // WSAGetLastError()
     }
 
-    pImpl_->resultBuffer.clear();
     pImpl_->resultBuffer.reserve(pImpl_->fds.size());
     auto& results = pImpl_->resultBuffer;
     for (size_t i = 0; i < pImpl_->fds.size(); ++i) {

@@ -138,7 +138,7 @@ bool Poller::remove(const Socket& s) {
     return true;
 }
 
-std::vector<PollResult> Poller::wait(Milliseconds timeout) {
+const std::vector<PollResult>& Poller::wait(Milliseconds timeout) {
     const int timeoutMs = toEpollTimeout_(timeout);
 
     const int maxEvents = static_cast<int>(pImpl_->socketArray.size()) + 1;
@@ -151,11 +151,9 @@ std::vector<PollResult> Poller::wait(Milliseconds timeout) {
     for (;;) {
         int n = ::epoll_wait(pImpl_->epfd, events.data(), maxEvents, timeoutMs);
         if (n < 0) {
-            if (errno == EINTR)
-                return {}; // signal received -- let caller check stop flag
-            // Don't throw - return empty result on error
-            // Users can check system error via errno
-            return {};
+            pImpl_->resultBuffer.clear();
+            return pImpl_->resultBuffer; // EINTR or hard error; let caller
+                                         // check stop flag
         }
 
         pImpl_->resultBuffer.clear();

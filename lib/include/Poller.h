@@ -1,7 +1,8 @@
-// This is an independent project of an individual developer. Dear PVS-Studio, please check it.
+// This is an independent project of an individual developer. Dear PVS-Studio,
+// please check it.
 
-// PVS-Studio Static Code Analyzer for C, C++, C#, and Java: https://pvs-studio.com
-
+// PVS-Studio Static Code Analyzer for C, C++, C#, and Java:
+// https://pvs-studio.com
 
 #ifndef AISOCKS_POLLER_H
 #define AISOCKS_POLLER_H
@@ -77,7 +78,8 @@ class Poller {
     //   Milliseconds > 0  — wait at most that many milliseconds.
     //
     // Returns the ready set (may be empty on timeout or hard system error).
-    std::vector<PollResult> wait(Milliseconds timeout = wait_forever);
+    // The returned reference is valid until the next call to wait().
+    const std::vector<PollResult>& wait(Milliseconds timeout = wait_forever);
 
     struct Impl; // platform-specific; defined in Poller*.cpp
 

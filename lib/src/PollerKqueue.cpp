@@ -147,14 +147,15 @@ static struct timespec* toKqueueTimeout_(
     Milliseconds timeout, struct timespec& ts) {
     int64_t ms = timeout.count;
     if (ms == 0)
-        return nullptr; // block forever: kevent with nullptr timeout waits indefinitely
+        return nullptr; // block forever: kevent with nullptr timeout waits
+                        // indefinitely
     if (ms < 0) ms = 1;
     ts.tv_sec = static_cast<time_t>(ms / 1000);
     ts.tv_nsec = static_cast<long>((ms % 1000) * 1000000L);
     return &ts;
 }
 
-std::vector<PollResult> Poller::wait(Milliseconds timeout) {
+const std::vector<PollResult>& Poller::wait(Milliseconds timeout) {
     struct timespec ts{};
     struct timespec* tsp = toKqueueTimeout_(timeout, ts);
 
@@ -167,9 +168,9 @@ std::vector<PollResult> Poller::wait(Milliseconds timeout) {
         int n = ::kevent(
             pImpl_->kq, nullptr, 0, keventBuf.data(), maxEvents, tsp);
         if (n < 0) {
-            if (errno == EINTR)
-                return {}; // signal received -- let caller check stop flag
-            return {};
+            pImpl_->resultBuffer.clear();
+            return pImpl_->resultBuffer; // EINTR or hard error; let caller
+                                         // check stop flag
         }
 
         // Merge per-filter events for the same fd into one PollResult.

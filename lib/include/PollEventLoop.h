@@ -134,7 +134,7 @@ class PollEventLoop {
                 break;
             if (shouldStop()) break;
 
-            auto ready = poller_.wait(timeout);
+            const auto& ready = poller_.wait(timeout);
 
             // Post-wait stop checks: handles requestStop() or a signal that
             // arrived while we were blocked inside poller_.wait().
