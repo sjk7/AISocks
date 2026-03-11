@@ -106,7 +106,13 @@ foreach(TEST_NAME ${TEST_SOURCES})
         target_precompile_headers(${TEST_NAME} REUSE_FROM test_pch_host)
     endif()
     add_test(NAME ${TEST_NAME} COMMAND ${TEST_NAME})
-    set_tests_properties(${TEST_NAME} PROPERTIES TIMEOUT 30)
+    # Under Wine (cross-compiling), each process incurs ~10s startup overhead;
+    # triple the default timeout so no test is falsely killed by ctest.
+    if(CMAKE_CROSSCOMPILING)
+        set_tests_properties(${TEST_NAME} PROPERTIES TIMEOUT 90)
+    else()
+        set_tests_properties(${TEST_NAME} PROPERTIES TIMEOUT 30)
+    endif()
     
     # Windows: prevent min/max macro conflicts (inherited from aiSocksLib PUBLIC)
     # Already defined as PUBLIC in aiSocksLib, but explicit here for clarity
@@ -151,14 +157,24 @@ endforeach()
 
 # test_timeout_heap sleeps for multiple keep-alive windows across 5 test cases
 if(ALLOW_SLOW_TESTS)
-    set_tests_properties(test_timeout_heap PROPERTIES TIMEOUT 60)
+    if(CMAKE_CROSSCOMPILING)
+        set_tests_properties(test_timeout_heap PROPERTIES TIMEOUT 180)
+    else()
+        set_tests_properties(test_timeout_heap PROPERTIES TIMEOUT 60)
+    endif()
 endif()
 
-# test_construction spins up server threads; give it more room
-set_tests_properties(test_construction PROPERTIES TIMEOUT 60)
-
-# test_tcp_socket includes timeout tests (connect to black-hole IP)
-set_tests_properties(test_tcp_socket PROPERTIES TIMEOUT 60)
+# Under Wine the per-process overhead is ~10s; these tests do real waiting
+# on top of that, so they need larger budgets when cross-compiling.
+if(CMAKE_CROSSCOMPILING)
+    set_tests_properties(test_construction PROPERTIES TIMEOUT 180)
+    set_tests_properties(test_tcp_socket   PROPERTIES TIMEOUT 180)
+else()
+    # test_construction spins up server threads; give it more room
+    set_tests_properties(test_construction PROPERTIES TIMEOUT 60)
+    # test_tcp_socket includes timeout tests (connect to black-hole IP)
+    set_tests_properties(test_tcp_socket   PROPERTIES TIMEOUT 60)
+endif()
 
 # ---------------------------------------------------------------------------
 # Post-build test runner
@@ -172,6 +188,8 @@ set_tests_properties(test_tcp_socket PROPERTIES TIMEOUT 60)
 # ---------------------------------------------------------------------------
 # Only add test runner when building natively; skip when cross-compiling
 # (the .exe binaries can't execute on a non-Windows host).
+# Only add test runner when building natively; skip when cross-compiling
+# (the .exe binaries can't execute on a non-Windows host).
 if(NOT CMAKE_CROSSCOMPILING)
     add_custom_target(run_all_tests
         COMMAND ${CMAKE_CTEST_COMMAND}
@@ -182,6 +200,16 @@ if(NOT CMAKE_CROSSCOMPILING)
             -j 11
         WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
         COMMENT "========== Running aiSocks tests =========="
+        DEPENDS ${TEST_SOURCES}
+        VERBATIM
+    )
+else()
+    # Cross-compiling (MinGW/Wine): use wine_test.sh which sets up a RAM-disk
+    # WINEPREFIX and a persistent wineserver before handing off to ctest -j8.
+    add_custom_target(run_wine_tests
+        COMMAND "${CMAKE_SOURCE_DIR}/scripts/wine_test.sh"
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+        COMMENT "========== Running aiSocks Wine tests (RAM disk + persistent wineserver) =========="
         DEPENDS ${TEST_SOURCES}
         VERBATIM
     )
