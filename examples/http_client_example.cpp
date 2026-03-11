@@ -93,14 +93,32 @@ int main() {
 
     printf("\n");
 
-    // Example 4: Redirect following (manual, so each get() call visibly uses
-    // the Location URL returned by the previous socket).
+    // Example 4a: Redirect following — the easy way (default behaviour)
     //
-    // followRedirects = false means the 3xx response is returned as-is.
-    // We read the Location header, close the old connection, and pass that
-    // URL directly to the next get() call — showing the socket result drives
-    // the next request.
-    printf("4. Redirect following:\n");
+    // HttpClient follows redirects automatically.  You just call get() and
+    // get back the final response.  finalUrl and redirectChain are populated
+    // for free if you want to inspect the path taken.
+    printf("4a. Redirect following (automatic):\n");
+    auto rrAuto = client.get("http://httpbin.org/redirect/2");
+    if (rrAuto.isSuccess()) {
+        const auto& resp = rrAuto.value();
+        printf("   Final status: %d %s\n", resp.statusCode(),
+            resp.statusText().data());
+        printf("   Final URL:    %s\n", resp.finalUrl.c_str());
+        printf("   Hops taken:   %zu\n", resp.redirectChain.size());
+    } else {
+        printf("   Error: %s\n", rrAuto.message().c_str());
+    }
+
+    printf("\n");
+
+    // Example 4b: Redirect following — manual (advanced / diagnostic use only)
+    //
+    // Most users should NOT need this.  It is here to show what HttpClient
+    // does internally when followRedirects = true.  Set followRedirects = false
+    // only if you need to inspect or modify each hop yourself (e.g. rewriting
+    // URLs, logging, auth token injection per-domain, etc.).
+    printf("4b. Redirect following (manual, for illustration):\n");
 
     aiSocks::HttpClient::Options redirectOpts;
     redirectOpts.followRedirects = false;
@@ -108,13 +126,10 @@ int main() {
 
     std::string nextUrl = "http://httpbin.org/redirect/2";
     int hop = 0;
-    aiSocks::Result<aiSocks::HttpClientResponse> redirectResponse
-        = aiSocks::Result<aiSocks::HttpClientResponse>::failure(
-            aiSocks::SocketError::Unknown, "not started");
 
     while (true) {
         printf("   [hop %d] GET %s\n", ++hop, nextUrl.c_str());
-        redirectResponse = redirectClient.get(nextUrl);
+        auto redirectResponse = redirectClient.get(nextUrl);
 
         if (!redirectResponse.isSuccess()) {
             printf("   Error: %s\n", redirectResponse.message().c_str());
@@ -131,19 +146,17 @@ int main() {
             printf("   <- %d %s  (socket closed)\n", resp.statusCode(),
                 resp.statusText().data());
             printf("      Location: %s\n", loc->c_str());
-            nextUrl = *loc; // URL from the socket result drives the next get()
+            // resolveUrl() turns relative paths into absolute URLs — the same
+            // helper HttpClient uses internally when followRedirects = true.
+            nextUrl = aiSocks::HttpClient::resolveUrl(nextUrl, *loc);
             continue;
         }
 
         // Non-redirect: we're done.
-        break;
-    }
-
-    if (redirectResponse.isSuccess() && redirectResponse.value().isSuccess()) {
-        const auto& resp = redirectResponse.value();
         printf("   Final status: %d %s\n", resp.statusCode(),
             resp.statusText().data());
         printf("   Final URL: %s\n", nextUrl.c_str());
+        break;
     }
 
     printf("\n=== HTTP Client Example Complete ===\n");

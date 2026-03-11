@@ -7,7 +7,6 @@
 #define AISOCKS_SIMPLE_SERVER_H
 
 #include "ServerBase.h"
-#include <functional>
 
 namespace aiSocks {
 
@@ -47,6 +46,17 @@ namespace detail {
     // per-client state — all logic lives in the user's callback.  This tag
     // satisfies the template parameter without exposing implementation noise.
     struct NoClientState {};
+
+    // Non-owning type-erased reference to any bool(TcpSocket&, PollEvent)
+    // callable.  The pointed-to object must outlive all operator() calls.
+    // Used instead of std::function to avoid heap allocation and <functional>.
+    struct CallbackRef {
+        void* obj{nullptr};
+        bool (*invoke)(void*, TcpSocket&, PollEvent){nullptr};
+
+        bool operator()(TcpSocket& s, PollEvent e) const { return invoke(obj, s, e); }
+        explicit operator bool() const { return invoke != nullptr; }
+    };
 } // namespace detail
 
 class SimpleServer : private ServerBase<detail::NoClientState> {
@@ -91,9 +101,15 @@ class SimpleServer : private ServerBase<detail::NoClientState> {
     void pollClients(Callback&& cb,
         ClientLimit maxClients = ClientLimit::Default,
         Milliseconds timeout = Milliseconds{-1}) {
-        callback_ = std::forward<Callback>(cb);
+        using RawType = std::remove_reference_t<Callback>;
+        callback_ = {
+            static_cast<void*>(&cb),
+            [](void* p, TcpSocket& s, PollEvent e) -> bool {
+                return (*static_cast<RawType*>(p))(s, e);
+            }
+        };
         Base::run(maxClients, timeout);
-        callback_ = nullptr;
+        callback_ = {};
     }
 
     // -------------------------------------------------------------------------
@@ -149,11 +165,9 @@ class SimpleServer : private ServerBase<detail::NoClientState> {
     }
 
     private:
-    // Type-erased callback; set for the duration of pollClients(), null
-    // outside of it.  std::function is appropriate here: SimpleServer is a
-    // prototyping class and the indirection cost is negligible compared to the
-    // poll()/kqueue syscall it wraps.
-    std::function<bool(TcpSocket&, PollEvent)> callback_;
+    // Non-owning type-erased ref to the callback passed to pollClients().
+    // Valid only during Base::run(); reset to {} immediately after.
+    detail::CallbackRef callback_{};
 };
 
 } // namespace aiSocks

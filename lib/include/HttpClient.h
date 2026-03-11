@@ -19,13 +19,38 @@
 #include "ClientHttpRequest.h"
 #include "SocketFactory.h"
 #include "SocketTypes.h"
-#include <functional>
 #include <string>
 #include <string_view>
 #include <unordered_map>
 #include <vector>
 
 namespace aiSocks {
+
+// ---------------------------------------------------------------------------
+// IRedirectListener -- optional callback interface for redirect notifications
+//
+// Implement this interface and assign a pointer to Options::redirectListener
+// to be notified before each new TCP connection is opened for a redirect.
+//
+// The listener pointer is non-owning and must outlive the HttpClient.
+// Leave Options::redirectListener as nullptr (the default) to opt out.
+//
+// Example:
+//   struct MyListener : aiSocks::IRedirectListener {
+//       void onRedirect(const std::string& from,
+//                       const std::string& to, int hop) noexcept override {
+//           printf("hop %d: %s -> %s\n", hop, from.c_str(), to.c_str());
+//       }
+//   } listener;
+//   aiSocks::HttpClient::Options opts;
+//   opts.redirectListener = &listener;
+// ---------------------------------------------------------------------------
+struct IRedirectListener {
+    virtual void onRedirect(
+        const std::string& from, const std::string& to, int hop) noexcept
+        = 0;
+    virtual ~IRedirectListener() = default;
+};
 
 // ---------------------------------------------------------------------------
 // HttpClientResponse -- Wrapper around HttpResponse with redirect metadata
@@ -74,11 +99,34 @@ struct HttpClientResponse {
 class HttpClient {
     public:
     struct Options {
+        /// TCP connect timeout in milliseconds.
+        /// 0 = no timeout (block until connected or OS-level error).
+        /// Default: 30 000 ms (30 s).
         Milliseconds connectTimeout;
+
+        /// Time allowed to receive the complete response, in milliseconds.
+        /// 0 = no timeout.  Default: 60 000 ms (60 s).
         Milliseconds requestTimeout;
+
+        /// Maximum number of redirects to follow before giving up.
+        /// Must be >= 0.  0 = do not follow any redirects (same as
+        /// followRedirects = false).  Default: 10.
         int maxRedirects;
+
+        /// When true (default), 3xx responses are followed automatically and
+        /// the final non-redirect response is returned to the caller.
+        /// Set to false to receive 3xx responses directly (e.g. for manual
+        /// redirect handling or diagnostic purposes).
         bool followRedirects;
+
+        /// Value sent in the User-Agent request header.
+        /// Empty string omits the header entirely.
+        /// Default: "AISocks-HttpClient/1.0".
         std::string userAgent;
+
+        /// Headers added to every request made by this client instance.
+        /// Per-request headers (passed to post(), request(), etc.) take
+        /// precedence over these defaults when names collide.
         std::unordered_map<std::string, std::string> defaultHeaders;
 
         Options()
@@ -88,17 +136,17 @@ class HttpClient {
             , followRedirects{true}
             , userAgent{"AISocks-HttpClient/1.0"} {}
 
+        /// Convenience fluent setter for defaultHeaders.
         Options& setHeader(std::string name, std::string value) {
             defaultHeaders[std::move(name)] = std::move(value);
             return *this;
         }
 
-        /// Called just before opening a new TCP connection for a redirect.
-        /// Arguments: fromUrl, toUrl, hop number (1-based).
-        /// The old socket has already been closed; a new one is about to open.
-        std::function<void(
-            const std::string& from, const std::string& to, int hop)>
-            onRedirect;
+        /// Optional redirect notification interface.
+        /// Points to a caller-owned IRedirectListener; must outlive this
+        /// HttpClient.  Called after the old socket closes and before the new
+        /// TCP connection opens.  nullptr (default) = no notifications.
+        IRedirectListener* redirectListener{nullptr};
     };
 
     explicit HttpClient(Options options = Options{})
@@ -139,6 +187,25 @@ class HttpClient {
     // Configuration
     void setOptions(Options options) { options_ = std::move(options); }
     const Options& getOptions() const noexcept { return options_; }
+
+    /// Resolve a Location header value against the base URL that produced it.
+    /// If location is already absolute (contains "://") it is returned as-is.
+    /// If it starts with '/' it is resolved against the scheme+host of base.
+    static std::string resolveUrl(
+        const std::string& base, const std::string& location) {
+        if (location.find("://") != std::string::npos) return location;
+        if (!location.empty() && location[0] == '/') {
+            size_t schemeEnd = base.find("://");
+            size_t hostEnd = (schemeEnd != std::string::npos)
+                ? base.find('/', schemeEnd + 3)
+                : std::string::npos;
+            std::string origin = (hostEnd != std::string::npos)
+                ? base.substr(0, hostEnd)
+                : base;
+            return origin + location;
+        }
+        return location;
+    }
 
     private:
     Options options_;
@@ -221,6 +288,32 @@ class HttpClient {
             char buffer[8192];
             bool redirectDetected = false;
 
+            // Shared handler for a fully-parsed response: either records a
+            // redirect and returns nullopt (caller should continue the outer
+            // loop), or returns the final Result to hand back to the caller.
+            auto handleComplete
+                = [&]() -> std::optional<Result<HttpClientResponse>> {
+                HttpClientResponse resp{
+                    parser.response(), currentUrl, redirectChain};
+                if (options_.followRedirects && resp.isRedirect()) {
+                    auto location = resp.header("location");
+                    if (!location) {
+                        return Result<HttpClientResponse>::failure(
+                            SocketError::Unknown,
+                            "Redirect without Location header");
+                    }
+                    std::string fromUrl = currentUrl;
+                    currentUrl = resolveUrl(currentUrl, *location);
+                    redirectChain.push_back(currentUrl);
+                    redirectDetected = true;
+                    if (options_.redirectListener)
+                        options_.redirectListener->onRedirect(fromUrl,
+                            currentUrl, static_cast<int>(redirectChain.size()));
+                    return std::nullopt; // follow redirect in the outer loop
+                }
+                return Result<HttpClientResponse>::success(std::move(resp));
+            };
+
             while (true) {
                 int n = socket.receive(buffer, sizeof(buffer));
                 if (n < 0) {
@@ -241,67 +334,29 @@ class HttpClient {
                 }
 
                 if (state == HttpResponseParser::State::Complete) {
-                    // Create response wrapper
-                    HttpClientResponse response{
-                        parser.response(), currentUrl, redirectChain};
-
-                    // Handle redirects
-                    if (options_.followRedirects && response.isRedirect()) {
-                        auto location = response.header("location");
-                        if (!location) {
-                            return Result<HttpClientResponse>::failure(
-                                SocketError::Unknown,
-                                "Redirect without Location header");
-                        }
-
-                        std::string locationStr(*location);
-
-                        // Handle relative URLs
-                        if (!locationStr.empty() && locationStr[0] == '/') {
-                            std::string absoluteUrl = "http://" + hostPort;
-                            int portValue = 80;
-                            if (port != Port{80}) {
-                                portValue = static_cast<int>(port.value());
-                                absoluteUrl += ":" + std::to_string(portValue);
-                            }
-                            absoluteUrl += locationStr;
-                            locationStr = std::move(absoluteUrl);
-                        }
-
-                        std::string fromUrl
-                            = currentUrl; // URL whose response gave us this
-                                          // redirect
-                        currentUrl = locationStr;
-                        redirectChain.push_back(currentUrl);
-                        redirectDetected = true;
-                        if (options_.onRedirect) {
-                            // Inform the caller: old socket (fromUrl) is closed
-                            // after this break; next for-loop iteration opens a
-                            // fresh TCP connection to currentUrl.
-                            options_.onRedirect(fromUrl, currentUrl,
-                                static_cast<int>(redirectChain.size()));
-                        }
-                        break; // exit inner loop; outer for-loop makes the next
-                               // request
-                    }
-
-                    return Result<HttpClientResponse>::success(
-                        std::move(response));
+                    auto result = handleComplete();
+                    if (result) return std::move(*result);
+                    break; // redirect detected; outer loop opens next
+                           // connection
                 }
             }
 
-            // Follow detected redirect in the next outer-loop iteration
+            // Follow detected redirect in the next outer-loop iteration.
             if (redirectDetected) continue;
 
-            // Handle responses completed by feedEof() (Connection: close)
+            // Handle responses completed by feedEof() (Connection: close),
+            // including the (rare) case of a connection-close redirect.
             if (parser.isComplete()) {
-                return Result<HttpClientResponse>::success(HttpClientResponse{
-                    parser.response(), currentUrl, redirectChain});
+                auto result = handleComplete();
+                if (result) return std::move(*result);
+                if (redirectDetected) continue;
             }
 
-            // If we get here, connection closed before response was complete
-            return Result<HttpClientResponse>::failure(
-                SocketError::ConnectionReset, "Incomplete response");
+            // Connection closed before response was complete.
+            if (!redirectDetected) {
+                return Result<HttpClientResponse>::failure(
+                    SocketError::ConnectionReset, "Incomplete response");
+            }
         }
 
         return Result<HttpClientResponse>::failure(

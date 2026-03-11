@@ -19,7 +19,6 @@
 #include <cstdint>
 #include <cstring>
 #include <exception>
-#include <functional>
 #include <limits>
 #include <memory>
 #include <optional>
