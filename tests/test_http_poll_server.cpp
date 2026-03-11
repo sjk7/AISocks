@@ -19,11 +19,16 @@
 
 // Enable diagnostic output by compiling with -DTEST_VERBOSE.
 #ifdef TEST_VERBOSE
-#  define DLOG(...) do { printf(__VA_ARGS__); fflush(stdout); } while(0)
+#define DLOG(...)                                                              \
+    do {                                                                       \
+        printf(__VA_ARGS__);                                                   \
+        fflush(stdout);                                                        \
+    } while (0)
 #else
-#  define DLOG(...) do {} while(0)
+#define DLOG(...)                                                              \
+    do {                                                                       \
+    } while (0)
 #endif
-
 
 using namespace aiSocks;
 using namespace std::chrono_literals;
@@ -116,12 +121,12 @@ static std::string rxHttpResponse(TcpSocket& client) {
                 int contentLength = std::atoi(response.c_str() + clPos + 15);
                 size_t bodyStart = response.find("\r\n\r\n") + 4;
                 DLOG("[DEBUG] rxHttpResponse: Content-Length=%d, "
-                       "bodyStart=%zu, currentSize=%zu\n",
+                     "bodyStart=%zu, currentSize=%zu\n",
                     contentLength, bodyStart, response.size());
                 if (response.size()
                     >= bodyStart + static_cast<size_t>(contentLength)) {
                     DLOG("[DEBUG] rxHttpResponse: Complete response received, "
-                        "breaking\n");
+                         "breaking\n");
                     break;
                 }
             } else {
@@ -130,7 +135,8 @@ static std::string rxHttpResponse(TcpSocket& client) {
             }
         }
     }
-    DLOG("[DEBUG] rxHttpResponse: Receive loop ended, final response size=%zu\n",
+    DLOG(
+        "[DEBUG] rxHttpResponse: Receive loop ended, final response size=%zu\n",
         response.size());
     return response;
 }
@@ -148,7 +154,7 @@ static std::string sendHttpRequest(Port port, const std::string& request) {
 
     if (!clientResult.isSuccess()) {
         DLOG("[DEBUG] sendHttpRequest: Returning empty string due to client "
-               "creation failure\n");
+             "creation failure\n");
         return "";
     }
 
@@ -161,7 +167,7 @@ static std::string sendHttpRequest(Port port, const std::string& request) {
         request.size());
     if (!client.sendAll(request.data(), request.size())) {
         DLOG("[DEBUG] sendHttpRequest: sendAll failed, returning empty "
-               "string\n");
+             "string\n");
         return "";
     }
     DLOG("[DEBUG] sendHttpRequest: Request sent successfully\n");

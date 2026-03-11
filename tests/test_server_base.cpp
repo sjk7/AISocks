@@ -24,11 +24,16 @@
 
 // Enable diagnostic output by compiling with -DTEST_VERBOSE.
 #ifdef TEST_VERBOSE
-#  define DLOG(...) do { printf(__VA_ARGS__); fflush(stdout); } while(0)
+#define DLOG(...)                                                              \
+    do {                                                                       \
+        printf(__VA_ARGS__);                                                   \
+        fflush(stdout);                                                        \
+    } while (0)
 #else
-#  define DLOG(...) do {} while(0)
+#define DLOG(...)                                                              \
+    do {                                                                       \
+    } while (0)
 #endif
-
 
 using namespace aiSocks;
 
