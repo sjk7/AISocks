@@ -71,24 +71,25 @@ class CustomFileServer : public HttpFileServer {
         if (request.path == "/" || request.path == "/index.html") {
             std::string instructions = generateTestingInstructions();
 
-            StringBuilder response;
-            response.append("HTTP/1.1 200 OK\r\n");
-            response.append(
-                "Content-Type: text/html; charset=utf-8\r\nContent-Length: ");
-            response.appendFormat("%zu", instructions.size());
-            response.append("\r\n");
+            std::string response;
+            response.reserve(256 + instructions.size());
+            response += "HTTP/1.1 200 OK\r\n";
+            response
+                += "Content-Type: text/html; charset=utf-8\r\nContent-Length: ";
+            response += std::to_string(instructions.size());
+            response += "\r\n";
 
             for (const auto& [name, value] : getConfig().customHeaders) {
-                response.append(name);
-                response.append(": ");
-                response.append(value);
-                response.append("\r\n");
+                response += name;
+                response += ": ";
+                response += value;
+                response += "\r\n";
             }
 
-            response.append("\r\n");
-            response.append(instructions);
+            response += "\r\n";
+            response += instructions;
 
-            state.responseBuf = response.toString();
+            state.responseBuf = std::move(response);
             state.responseView = state.responseBuf;
             return;
         }
@@ -114,27 +115,31 @@ class CustomFileServer : public HttpFileServer {
 
     std::string generateErrorHtml(int code, const std::string& status,
         const std::string& message) const override {
-        StringBuilder html;
-        html.append("<!DOCTYPE html>\n<html><head><title>");
-        html.appendFormat("%d %s", code, status.c_str());
-        html.append("</title><style>");
-        html.append(TestStringLiterals::ERROR_HTML_BODY_STYLE);
-        html.append(TestStringLiterals::ERROR_HTML_CONTAINER_STYLE);
-        html.append("h1 { color: #e74c3c; margin-bottom: 20px; }");
-        html.append("p { color: #555; line-height: 1.6; }");
-        html.append(TestStringLiterals::ERROR_HTML_LINK_STYLE);
-        html.append(".back-link:hover { background: #2980b9; }");
-        html.append("</style></head><body>");
-        html.append("<div class=\"error-container\">");
-        html.append("<h1>");
-        html.appendFormat("%d %s", code, status.c_str());
-        html.append("</h1>");
-        html.append("<p>");
-        html.append(message);
-        html.append("</p>");
-        html.append("<a href=\"/\" class=\"back-link\">← Back to Home</a>");
-        html.append("</div></body></html>");
-        return html.toString();
+        std::string html;
+        html += "<!DOCTYPE html>\n<html><head><title>";
+        html += std::to_string(code);
+        html += ' ';
+        html += status;
+        html += "</title><style>";
+        html += TestStringLiterals::ERROR_HTML_BODY_STYLE;
+        html += TestStringLiterals::ERROR_HTML_CONTAINER_STYLE;
+        html += "h1 { color: #e74c3c; margin-bottom: 20px; }";
+        html += "p { color: #555; line-height: 1.6; }";
+        html += TestStringLiterals::ERROR_HTML_LINK_STYLE;
+        html += ".back-link:hover { background: #2980b9; }";
+        html += "</style></head><body>";
+        html += "<div class=\"error-container\">";
+        html += "<h1>";
+        html += std::to_string(code);
+        html += ' ';
+        html += status;
+        html += "</h1>";
+        html += "<p>";
+        html += message;
+        html += "</p>";
+        html += "<a href=\"/\" class=\"back-link\">\u2190 Back to Home</a>";
+        html += "</div></body></html>";
+        return html;
     }
 
     protected:
@@ -145,7 +150,8 @@ class CustomFileServer : public HttpFileServer {
         std::string_view authValue = authHeader->second;
         if (authValue.substr(0, 6) != "Basic ") return false;
 
-        std::string_view expectedAuth = "Basic YWRtaW46c2VjcmV0"; // admin:secret
+        std::string_view expectedAuth
+            = "Basic YWRtaW46c2VjcmV0"; // admin:secret
         return authValue == expectedAuth;
     }
 
@@ -153,16 +159,16 @@ class CustomFileServer : public HttpFileServer {
         std::string htmlBody = generateErrorHtml(
             401, "Unauthorized", TestStringLiterals::AUTH_REQUIRED_MESSAGE);
 
-        StringBuilder response;
-        response.append("HTTP/1.1 401 Unauthorized\r\n");
-        response.append(
-            "Content-Type: text/html; charset=utf-8\r\nContent-Length: ");
-        response.appendFormat("%zu", htmlBody.size());
-        response.append(
-            "\r\nWWW-Authenticate: Basic realm=\"Secure Area\"\r\n\r\n");
-        response.append(htmlBody);
+        std::string response;
+        response.reserve(256 + htmlBody.size());
+        response += "HTTP/1.1 401 Unauthorized\r\n";
+        response
+            += "Content-Type: text/html; charset=utf-8\r\nContent-Length: ";
+        response += std::to_string(htmlBody.size());
+        response += "\r\nWWW-Authenticate: Basic realm=\"Secure Area\"\r\n\r\n";
+        response += htmlBody;
 
-        state.responseBuf = response.toString();
+        state.responseBuf = std::move(response);
         state.responseView = state.responseBuf;
     }
 
@@ -181,8 +187,7 @@ class CustomFileServer : public HttpFileServer {
 #endif
 
         (void)state; // Suppress unused parameter warning
-        logFile_.printf(
-            "%s %.*s %.*s\n", buffer, 
+        logFile_.printf("%s %.*s %.*s\n", buffer,
             static_cast<int>(request.method.length()), request.method.data(),
             static_cast<int>(request.path.length()), request.path.data());
         logFile_.flush();
@@ -197,18 +202,18 @@ class CustomFileServer : public HttpFileServer {
     }
 
     std::string generateTestingInstructions() const {
-        StringBuilder html;
-        html.append(TestStringLiterals::TESTING_INSTRUCTIONS_TITLE);
-        html.append(TestStringLiterals::TESTING_INSTRUCTIONS_STYLE);
-        html.append(TestStringLiterals::TESTING_INSTRUCTIONS_HEADER);
-        html.append(TestStringLiterals::TESTING_INSTRUCTIONS_INTRO);
-        html.append(TestStringLiterals::TESTING_INSTRUCTIONS_AUTH);
-        html.append(TestStringLiterals::TESTING_INSTRUCTIONS_FILES);
-        html.append(TestStringLiterals::TESTING_INSTRUCTIONS_DIR);
-        html.append(TestStringLiterals::TESTING_INSTRUCTIONS_ACCESS);
-        html.append(TestStringLiterals::TESTING_INSTRUCTIONS_ERROR);
-        html.append("</body></html>");
-        return html.toString();
+        std::string html;
+        html += TestStringLiterals::TESTING_INSTRUCTIONS_TITLE;
+        html += TestStringLiterals::TESTING_INSTRUCTIONS_STYLE;
+        html += TestStringLiterals::TESTING_INSTRUCTIONS_HEADER;
+        html += TestStringLiterals::TESTING_INSTRUCTIONS_INTRO;
+        html += TestStringLiterals::TESTING_INSTRUCTIONS_AUTH;
+        html += TestStringLiterals::TESTING_INSTRUCTIONS_FILES;
+        html += TestStringLiterals::TESTING_INSTRUCTIONS_DIR;
+        html += TestStringLiterals::TESTING_INSTRUCTIONS_ACCESS;
+        html += TestStringLiterals::TESTING_INSTRUCTIONS_ERROR;
+        html += "</body></html>";
+        return html;
     }
 
     mutable File logFile_;
@@ -219,18 +224,19 @@ class BehavioralTestHelper {
     public:
     static std::string makeHttpRequest(const std::string& method,
         const std::string& path, const std::string& auth = "") {
-        StringBuilder request;
-        request.append(method);
-        request.append(" ");
-        request.append(path);
-        request.append(" HTTP/1.1\r\nHost: localhost\r\n");
+        std::string request;
+        request.reserve(128);
+        request += method;
+        request += ' ';
+        request += path;
+        request += " HTTP/1.1\r\nHost: localhost\r\n";
         if (!auth.empty()) {
-            request.append("Authorization: Basic ");
-            request.append(auth);
-            request.append("\r\n");
+            request += "Authorization: Basic ";
+            request += auth;
+            request += "\r\n";
         }
-        request.append("\r\n");
-        return request.toString();
+        request += "\r\n";
+        return request;
     }
 
     static std::string extractStatus(const std::string& response) {
@@ -693,14 +699,12 @@ void testInvalidMethodsBehavior() {
 
     // Unhappy Path: POST method not allowed
     {
-        StringBuilder request;
-        request.append("POST /index.html HTTP/1.1\r\n");
-        request.append("Host: localhost\r\n");
-        request.append("Authorization: Basic YWRtaW46c2VjcmV0\r\n");
-        request.append("\r\n");
+        std::string request = "POST /index.html HTTP/1.1\r\n"
+                              "Host: localhost\r\n"
+                              "Authorization: Basic YWRtaW46c2VjcmV0\r\n\r\n";
 
         HttpClientState state;
-        state.request = request.toString();
+        state.request = request;
 
         server.buildResponse(state);
         std::string status
@@ -715,14 +719,12 @@ void testInvalidMethodsBehavior() {
 
     // Unhappy Path: PUT method not allowed
     {
-        StringBuilder request;
-        request.append("PUT /index.html HTTP/1.1\r\n");
-        request.append("Host: localhost\r\n");
-        request.append("Authorization: Basic YWRtaW46c2VjcmV0\r\n");
-        request.append("\r\n");
+        std::string request = "PUT /index.html HTTP/1.1\r\n"
+                              "Host: localhost\r\n"
+                              "Authorization: Basic YWRtaW46c2VjcmV0\r\n\r\n";
 
         HttpClientState state;
-        state.request = request.toString();
+        state.request = request;
 
         server.buildResponse(state);
         std::string status
@@ -734,14 +736,12 @@ void testInvalidMethodsBehavior() {
 
     // Unhappy Path: DELETE method not allowed
     {
-        StringBuilder request;
-        request.append("DELETE /index.html HTTP/1.1\r\n");
-        request.append("Host: localhost\r\n");
-        request.append("Authorization: Basic YWRtaW46c2VjcmV0\r\n");
-        request.append("\r\n");
+        std::string request = "DELETE /index.html HTTP/1.1\r\n"
+                              "Host: localhost\r\n"
+                              "Authorization: Basic YWRtaW46c2VjcmV0\r\n\r\n";
 
         HttpClientState state;
-        state.request = request.toString();
+        state.request = request;
 
         server.buildResponse(state);
         std::string status
@@ -911,14 +911,12 @@ void testAuthenticationFailuresBehavior() {
 
     // Unhappy Path: Malformed auth header
     {
-        StringBuilder request;
-        request.append("GET /index.html HTTP/1.1\r\n");
-        request.append("Host: localhost\r\n");
-        request.append("Authorization: InvalidFormat\r\n");
-        request.append("\r\n");
+        std::string request = "GET /index.html HTTP/1.1\r\n"
+                              "Host: localhost\r\n"
+                              "Authorization: InvalidFormat\r\n\r\n";
 
         HttpClientState state;
-        state.request = request.toString();
+        state.request = request;
 
         server.buildResponse(state);
         std::string status
@@ -1039,15 +1037,13 @@ void testRangeRequestBehavior() {
 
     // Behavior: Range header requests partial content (206 response expected)
     {
-        StringBuilder request;
-        request.append("GET /script.js HTTP/1.1\r\n");
-        request.append("Host: localhost\r\n");
-        request.append("Authorization: Basic YWRtaW46c2VjcmV0\r\n");
-        request.append("Range: bytes=0-5\r\n");
-        request.append("\r\n");
+        std::string request = "GET /script.js HTTP/1.1\r\n"
+                              "Host: localhost\r\n"
+                              "Authorization: Basic YWRtaW46c2VjcmV0\r\n"
+                              "Range: bytes=0-5\r\n\r\n";
 
         HttpClientState state;
-        state.request = request.toString();
+        state.request = request;
 
         server.buildResponse(state);
         std::string status
@@ -1061,15 +1057,13 @@ void testRangeRequestBehavior() {
 
     // Behavior: Invalid range should not break server
     {
-        StringBuilder request;
-        request.append("GET /style.css HTTP/1.1\r\n");
-        request.append("Host: localhost\r\n");
-        request.append("Authorization: Basic YWRtaW46c2VjcmV0\r\n");
-        request.append("Range: bytes=99999-99999\r\n");
-        request.append("\r\n");
+        std::string request = "GET /style.css HTTP/1.1\r\n"
+                              "Host: localhost\r\n"
+                              "Authorization: Basic YWRtaW46c2VjcmV0\r\n"
+                              "Range: bytes=99999-99999\r\n\r\n";
 
         HttpClientState state;
-        state.request = request.toString();
+        state.request = request;
 
         server.buildResponse(state);
         std::string status
@@ -1109,15 +1103,14 @@ void testCachingHeadersBehavior() {
 
     // Behavior: If-Modified-Since for old date should return full content
     {
-        StringBuilder request;
-        request.append("GET /style.css HTTP/1.1\r\n");
-        request.append("Host: localhost\r\n");
-        request.append("Authorization: Basic YWRtaW46c2VjcmV0\r\n");
-        request.append("If-Modified-Since: Mon, 01 Jan 2020 00:00:00 GMT\r\n");
-        request.append("\r\n");
+        std::string request
+            = "GET /style.css HTTP/1.1\r\n"
+              "Host: localhost\r\n"
+              "Authorization: Basic YWRtaW46c2VjcmV0\r\n"
+              "If-Modified-Since: Mon, 01 Jan 2020 00:00:00 GMT\r\n\r\n";
 
         HttpClientState state;
-        state.request = request.toString();
+        state.request = request;
 
         server.buildResponse(state);
         std::string status

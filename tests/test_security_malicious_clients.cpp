@@ -95,12 +95,13 @@ int SecurityTestFramework::failedTests = 0;
 
 /// Helper to make HTTP requests
 std::string makeRequest(const std::string& method, const std::string& path) {
-    StringBuilder request;
-    request.append(method);
-    request.append(" ");
-    request.append(path);
-    request.append(" HTTP/1.1\r\nHost: localhost\r\n\r\n");
-    return request.toString();
+    std::string request;
+    request.reserve(128);
+    request += method;
+    request += ' ';
+    request += path;
+    request += " HTTP/1.1\r\nHost: localhost\r\n\r\n";
+    return request;
 }
 
 /// Extract status line from response
@@ -515,12 +516,12 @@ void testMethodValidation() {
         = {"POST", "PUT", "DELETE", "PATCH", "OPTIONS", "TRACE"};
 
     for (const char* method : methods) {
-        StringBuilder request;
-        request.append(method);
-        request.append(" /index.html HTTP/1.1\r\nHost: localhost\r\n\r\n");
+        std::string request;
+        request += method;
+        request += " /index.html HTTP/1.1\r\nHost: localhost\r\n\r\n";
 
         HttpClientState state;
-        state.request = request.toString();
+        state.request = request;
 
         server.testBuildResponse(state);
         std::string status = extractStatus(state.responseBuf);

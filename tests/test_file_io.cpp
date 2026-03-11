@@ -155,64 +155,8 @@ int main() {
         REQUIRE(info.lastModified > 0);
     }
 
-    // Test 9: StringBuilder basic operations
-    BEGIN_TEST("StringBuilder: append and toString");
-    {
-        StringBuilder sb;
-        REQUIRE(sb.empty());
-        REQUIRE(sb.size() == 0);
-
-        sb.append("Hello");
-        REQUIRE(!sb.empty());
-        REQUIRE(sb.size() == 5);
-
-        sb.append(" ");
-        sb.append("World");
-        REQUIRE(sb.size() == 11);
-
-        std::string result = sb.toString();
-        REQUIRE(result == "Hello World");
-    }
-
-    // Test 10: StringBuilder appendFormat
-    BEGIN_TEST("StringBuilder: appendFormat");
-    {
-        StringBuilder sb;
-        sb.append("Count: ");
-        REQUIRE(sb.appendFormat("%d", 42));
-        sb.append(", Name: ");
-        REQUIRE(sb.appendFormat("%s", "Test"));
-
-        std::string result = sb.toString();
-        REQUIRE(result == "Count: 42, Name: Test");
-    }
-
-    // Test 11: StringBuilder reserve and capacity
-    BEGIN_TEST("StringBuilder: reserve capacity");
-    {
-        StringBuilder sb(100);
-        sb.append("Small text");
-        REQUIRE(sb.size() == 10);
-
-        // Should not reallocate for small appends
-        sb.append(" more text");
-        REQUIRE(sb.toString() == "Small text more text");
-    }
-
-    // Test 12: StringBuilder clear
-    BEGIN_TEST("StringBuilder: clear");
-    {
-        StringBuilder sb;
-        sb.append("Some content");
-        REQUIRE(!sb.empty());
-
-        sb.clear();
-        REQUIRE(sb.empty());
-        REQUIRE(sb.size() == 0);
-
-        sb.append("New content");
-        REQUIRE(sb.toString() == "New content");
-    }
+    // Tests 9-12 (StringBuilder) removed — StringBuilder replaced by
+    // std::string.
 
     // Cleanup
     remove("test_file_io.txt");

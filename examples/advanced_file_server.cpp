@@ -144,10 +144,11 @@ class CustomFileServer : public HttpFileServer {
     /// Override to customize error pages
     std::string generateErrorHtml(int code, const std::string& status,
         const std::string& message) const override {
-        StringBuilder html(1024); // Reserve for custom error page HTML
+        std::string html;
+        html.reserve(1024);
         html.append("<!DOCTYPE html>\n");
         html.append("<html><head><title>");
-        html.appendFormat("%d", code);
+        html += std::to_string(code);
         html.append(" ");
         html.append(HtmlEscape::encode(status));
         html.append("</title>\n");
@@ -166,16 +167,17 @@ class CustomFileServer : public HttpFileServer {
         html.append("</style></head>\n");
         html.append("<body><div class=\"error-container\">\n");
         html.append("<h1>");
-        html.appendFormat("%d", code);
+        html += std::to_string(code);
         html.append(" ");
         html.append(HtmlEscape::encode(status));
         html.append("</h1>\n");
         html.append("<p>");
         html.append(HtmlEscape::encode(message));
         html.append("</p>\n");
-        html.append("<a href=\"/\" class=\"back-link\">← Back to Home</a>\n");
+        html.append(
+            "<a href=\"/\" class=\"back-link\">&larr; Back to Home</a>\n");
         html.append("</div></body></html>");
-        return html.toString();
+        return html;
     }
 
     /// Override to customize directory request handling
@@ -186,7 +188,8 @@ class CustomFileServer : public HttpFileServer {
     }
 
     std::string generateTestingInstructions() const {
-        StringBuilder html(8192); // Reserve for large testing instructions page
+        std::string html;
+        html.reserve(8192);
         html.append("<!DOCTYPE html>\n");
         html.append("<html><head>\n");
         html.append("<title>HttpFileServer - Testing Guide</title>\n");
@@ -394,12 +397,11 @@ class CustomFileServer : public HttpFileServer {
         html.append(
             CustomFileServerHtmlHelpers::generateDirectoryListingFooter());
 
-        return html.toString();
+        return html;
     }
-
-    /// Generate demo page that executes test.js
     std::string generateDemoPage() const {
-        StringBuilder html(2048);
+        std::string html;
+        html.reserve(2048);
         html.append(CustomFileServerHtmlHelpers::generateDemoPageStart());
         html.append(".container { max-width: 800px; margin: 0 auto; "
                     "background: white; border-radius: 12px; box-shadow: 0 "
@@ -447,19 +449,22 @@ class CustomFileServer : public HttpFileServer {
         html.append("</script>\n");
         html.append("</body></html>\n");
 
-        return html.toString();
+        return html;
     }
 
     /// Generate 500MB test file on-the-fly
     void generateLargeFile(HttpClientState& state, const HttpRequest& request) {
         const size_t fileSize = 500 * 1024 * 1024; // 500 MB
 
-        StringBuilder response(256);
+        std::string response;
+        response.reserve(256);
         response.append("HTTP/1.1 200 OK\r\n");
         response.append("Content-Type: application/octet-stream\r\n");
         response.append(
             "Content-Disposition: attachment; filename=\"large500MB.bin\"\r\n");
-        response.appendFormat("Content-Length: %zu\r\n", fileSize);
+        response += "Content-Length: ";
+        response += std::to_string(fileSize);
+        response += "\r\n";
 
         // Add custom headers
         for (const auto& [name, value] : getConfig().customHeaders) {
@@ -473,13 +478,13 @@ class CustomFileServer : public HttpFileServer {
 
         // For HEAD requests, just send headers
         if (request.method == "HEAD") {
-            state.responseBuf = response.toString();
+            state.responseBuf = response;
             state.responseView = state.responseBuf;
             return;
         }
 
         // For GET requests, generate the file content
-        std::string headers = response.toString();
+        std::string headers = std::move(response);
         state.responseBuf.reserve(headers.size() + fileSize);
         state.responseBuf = headers;
 
@@ -501,7 +506,8 @@ class CustomFileServer : public HttpFileServer {
     /// Override to customize directory listing
     std::string generateDirectoryListing(
         const std::string& dirPath) const override {
-        StringBuilder html(4096); // Reserve for enhanced directory listing HTML
+        std::string html;
+        html.reserve(4096);
         html.append("<!DOCTYPE html>\n");
         html.append("<html><head>\n");
         html.append("<title>Directory: ");
@@ -619,7 +625,7 @@ class CustomFileServer : public HttpFileServer {
         html.append(getCurrentTime());
         html.append("</small></p>\n");
         html.append("</body></html>");
-        return html.toString();
+        return html;
     }
 
     private:
@@ -693,16 +699,16 @@ class CustomFileServer : public HttpFileServer {
             "This server requires authentication. Please provide valid "
             "credentials.");
 
-        StringBuilder response(
-            256 + htmlBody.size()); // Reserve for headers + body
+        std::string response;
+        response.reserve(256 + htmlBody.size());
         response.append("HTTP/1.1 401 Unauthorized\r\n");
         response.append("Content-Type: text/html\r\nContent-Length: ");
-        response.appendFormat("%zu", htmlBody.size());
+        response += std::to_string(htmlBody.size());
         response.append(
             "\r\nWWW-Authenticate: Basic realm=\"Secure Area\"\r\n\r\n");
         response.append(htmlBody);
 
-        state.responseBuf = response.toString();
+        state.responseBuf = std::move(response);
         state.responseView = state.responseBuf;
     }
 

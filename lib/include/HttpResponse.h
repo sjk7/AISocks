@@ -34,10 +34,10 @@
 //
 // ---------------------------------------------------------------------------
 #include <cstdint>
+#include <map>
 #include <optional>
 #include <string>
 #include <string_view>
-#include <unordered_map>
 #include <vector>
 
 namespace aiSocks {
@@ -77,7 +77,7 @@ class HttpResponse {
     /// Direct access to the parsed header map.
     /// Keys are lowercased; values are string_views into the parser's frozen
     /// header buffer.
-    const std::unordered_map<std::string, std::string_view>&
+    const std::map<std::string, std::string_view, std::less<>>&
     headers() const noexcept {
         return headers_;
     }
@@ -133,7 +133,7 @@ class HttpResponse {
     std::string_view version_;
     std::string_view statusText_;
     std::string_view body_;
-    std::unordered_map<std::string, std::string_view> headers_;
+    std::map<std::string, std::string_view, std::less<>> headers_;
 };
 
 // ---------------------------------------------------------------------------

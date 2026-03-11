@@ -24,14 +24,12 @@ const std::string_view* HttpResponse::header(std::string_view name) const {
     // buffer
     char smallBuf[128];
     std::string heapBuf;
-    heapBuf.reserve(16384); // Reserve space to prevent reallocation
     const char* keyData = nullptr;
 
     if (name.size() < sizeof(smallBuf)) {
         for (size_t i = 0; i < name.size(); ++i)
             smallBuf[i] = static_cast<char>(
                 ::tolower(static_cast<unsigned char>(name[i])));
-        smallBuf[name.size()] = '\0';
         keyData = smallBuf;
     } else {
         if (name.size() > 16384) {
@@ -44,7 +42,7 @@ const std::string_view* HttpResponse::header(std::string_view name) const {
         keyData = heapBuf.c_str();
     }
 
-    auto it = headers_.find(std::string(keyData, name.size()));
+    auto it = headers_.find(std::string_view(keyData, name.size()));
     return it == headers_.end() ? nullptr : &it->second;
 }
 

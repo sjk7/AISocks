@@ -30,33 +30,40 @@ namespace aiSocks {
 // HttpClientResponse -- Wrapper around HttpResponse with redirect metadata
 // ---------------------------------------------------------------------------
 struct HttpClientResponse {
-    const HttpResponse& response;           // Reference to parsed response
-    std::string finalUrl;                  // After following redirects
+    const HttpResponse& response; // Reference to parsed response
+    std::string finalUrl; // After following redirects
     std::vector<std::string> redirectChain; // URLs visited during redirects
-    
+
     // Forward common accessors to underlying HttpResponse
     int statusCode() const { return response.statusCode; }
     std::string_view version() const { return response.version(); }
     std::string_view statusText() const { return response.statusText(); }
     std::string_view body() const { return response.body(); }
-    
+
     // Header access
     const std::string_view* header(std::string_view name) const {
         return response.header(name);
     }
-    std::string_view headerOr(std::string_view name, std::string_view fallback = {}) const {
+    std::string_view headerOr(
+        std::string_view name, std::string_view fallback = {}) const {
         const auto* h = header(name);
         return h ? *h : fallback;
     }
-    
+
     // Convenience accessors
     std::string_view contentType() const { return headerOr("content-type"); }
-    std::string_view contentLength() const { return headerOr("content-length"); }
+    std::string_view contentLength() const {
+        return headerOr("content-length");
+    }
     bool isSuccess() const { return statusCode() >= 200 && statusCode() < 300; }
-    bool isRedirect() const { return statusCode() == 301 || statusCode() == 302 || statusCode() == 307 || statusCode() == 308; }
-    
+    bool isRedirect() const {
+        return statusCode() == 301 || statusCode() == 302 || statusCode() == 307
+            || statusCode() == 308;
+    }
+
     // Direct access to headers map
-    const std::unordered_map<std::string, std::string_view>& headers() const {
+    const std::map<std::string, std::string_view, std::less<>>&
+    headers() const {
         return response.headers();
     }
 };
@@ -73,83 +80,84 @@ class HttpClient {
         bool followRedirects;
         std::string userAgent;
         std::unordered_map<std::string, std::string> defaultHeaders;
-        
-        Options() 
+
+        Options()
             : connectTimeout{30000}
             , requestTimeout{60000}
             , maxRedirects{10}
             , followRedirects{true}
             , userAgent{"AISocks-HttpClient/1.0"} {}
-        
+
         Options& setHeader(std::string name, std::string value) {
             defaultHeaders[std::move(name)] = std::move(value);
             return *this;
         }
     };
-    
-    explicit HttpClient(Options options = Options{}) : options_(std::move(options)) {}
-    
+
+    explicit HttpClient(Options options = Options{})
+        : options_(std::move(options)) {}
+
     // HTTP methods
     Result<HttpClientResponse> get(const std::string& url) {
         return performRequest("GET", url, {}, {});
     }
-    
-    Result<HttpClientResponse> post(const std::string& url, 
-                                   const std::string& body = {},
-                                   const std::string& contentType = "application/x-www-form-urlencoded") {
+
+    Result<HttpClientResponse> post(const std::string& url,
+        const std::string& body = {},
+        const std::string& contentType = "application/x-www-form-urlencoded") {
         std::unordered_map<std::string, std::string> headers;
         headers["Content-Type"] = contentType;
         return performRequest("POST", url, body, headers);
     }
-    
+
     Result<HttpClientResponse> put(const std::string& url,
-                                  const std::string& body = {},
-                                  const std::string& contentType = "application/x-www-form-urlencoded") {
+        const std::string& body = {},
+        const std::string& contentType = "application/x-www-form-urlencoded") {
         std::unordered_map<std::string, std::string> headers;
         headers["Content-Type"] = contentType;
         return performRequest("PUT", url, body, headers);
     }
-    
+
     Result<HttpClientResponse> del(const std::string& url) {
         return performRequest("DELETE", url, {}, {});
     }
-    
+
     // Generic request method
     Result<HttpClientResponse> request(const std::string& method,
-                                     const std::string& url,
-                                     const std::string& body = {},
-                                     const std::unordered_map<std::string, std::string>& headers = {}) {
+        const std::string& url, const std::string& body = {},
+        const std::unordered_map<std::string, std::string>& headers = {}) {
         return performRequest(method, url, body, headers);
     }
-    
+
     // Configuration
     void setOptions(Options options) { options_ = std::move(options); }
     const Options& getOptions() const noexcept { return options_; }
-    
+
     private:
     Options options_;
-    
+
     // Core request implementation
     Result<HttpClientResponse> performRequest(const std::string& method,
-                                              const std::string& url,
-                                              const std::string& body,
-                                              const std::unordered_map<std::string, std::string>& headers) {
+        const std::string& url, const std::string& body,
+        const std::unordered_map<std::string, std::string>& headers) {
         std::vector<std::string> redirectChain;
         std::string currentUrl = url;
-        
-        for (int redirectCount = 0; redirectCount <= options_.maxRedirects; ++redirectCount) {
+
+        for (int redirectCount = 0; redirectCount <= options_.maxRedirects;
+            ++redirectCount) {
             // Extract host and port from URL for ConnectArgs
             size_t schemeEnd = currentUrl.find("://");
             if (schemeEnd == std::string::npos) {
-                return Result<HttpClientResponse>::failure(SocketError::Unknown, "Invalid URL format");
+                return Result<HttpClientResponse>::failure(
+                    SocketError::Unknown, "Invalid URL format");
             }
-            
+
             std::string remaining = currentUrl.substr(schemeEnd + 3);
             size_t pathStart = remaining.find('/');
             if (pathStart == std::string::npos) pathStart = remaining.size();
-            
+
             std::string hostPort = remaining.substr(0, pathStart);
-            
+
             // Extract port from host if specified
             Port port{80};
             size_t portPos = hostPort.find(':');
@@ -165,22 +173,23 @@ class HttpClient {
                     port = Port{80};
                 }
             }
-            
+
             // Connect using existing SocketFactory
             ConnectArgs args{hostPort, port, options_.connectTimeout};
             auto socketResult = SocketFactory::createTcpClient(args);
             if (!socketResult.isSuccess()) {
-                return Result<HttpClientResponse>::failure(SocketError::ConnectFailed, "Connection failed");
+                return Result<HttpClientResponse>::failure(
+                    SocketError::ConnectFailed, "Connection failed");
             }
-            
+
             TcpSocket socket = std::move(socketResult.value());
-            
+
             // Build HTTP request using ClientHttpRequest
             auto requestBuilder = ClientHttpRequest::builder()
-                .method(method)
-                .url(currentUrl)
-                .userAgent(options_.userAgent);
-            
+                                      .method(method)
+                                      .url(currentUrl)
+                                      .userAgent(options_.userAgent);
+
             // Add headers
             for (const auto& header : options_.defaultHeaders) {
                 requestBuilder.header(header.first, header.second);
@@ -188,47 +197,53 @@ class HttpClient {
             for (const auto& header : headers) {
                 requestBuilder.header(header.first, header.second);
             }
-            
+
             // Add body for POST/PUT
             if (!body.empty()) {
                 requestBuilder.body(body);
             }
-            
+
             std::string request = requestBuilder.build();
             if (!socket.sendAll(request.data(), request.size())) {
-                return Result<HttpClientResponse>::failure(SocketError::SendFailed, "Failed to send request");
+                return Result<HttpClientResponse>::failure(
+                    SocketError::SendFailed, "Failed to send request");
             }
-            
+
             // Parse response using existing HttpResponseParser
             HttpResponseParser parser;
             char buffer[8192];
-            
+
             while (true) {
                 int n = socket.receive(buffer, sizeof(buffer));
                 if (n < 0) {
-                    return Result<HttpClientResponse>::failure(SocketError::ReceiveFailed, "Receive error");
+                    return Result<HttpClientResponse>::failure(
+                        SocketError::ReceiveFailed, "Receive error");
                 }
                 if (n == 0) break; // Connection closed
-                
+
                 auto state = parser.feed(buffer, n);
-                
+
                 if (state == HttpResponseParser::State::Error) {
-                    return Result<HttpClientResponse>::failure(SocketError::Unknown, "Response parse error");
+                    return Result<HttpClientResponse>::failure(
+                        SocketError::Unknown, "Response parse error");
                 }
-                
+
                 if (state == HttpResponseParser::State::Complete) {
                     // Create response wrapper
-                    HttpClientResponse response{parser.response(), currentUrl, redirectChain};
-                    
+                    HttpClientResponse response{
+                        parser.response(), currentUrl, redirectChain};
+
                     // Handle redirects
                     if (options_.followRedirects && response.isRedirect()) {
                         auto location = response.header("location");
                         if (!location) {
-                            return Result<HttpClientResponse>::failure(SocketError::Unknown, "Redirect without Location header");
+                            return Result<HttpClientResponse>::failure(
+                                SocketError::Unknown,
+                                "Redirect without Location header");
                         }
-                        
+
                         std::string locationStr(*location);
-                        
+
                         // Handle relative URLs
                         if (!locationStr.empty() && locationStr[0] == '/') {
                             std::string absoluteUrl = "http://" + hostPort;
@@ -240,21 +255,24 @@ class HttpClient {
                             absoluteUrl += locationStr;
                             locationStr = std::move(absoluteUrl);
                         }
-                        
+
                         currentUrl = locationStr;
                         redirectChain.push_back(currentUrl);
                         continue; // Follow redirect
                     }
-                    
-                    return Result<HttpClientResponse>::success(std::move(response));
+
+                    return Result<HttpClientResponse>::success(
+                        std::move(response));
                 }
             }
-            
+
             // If we get here, connection closed before response was complete
-            return Result<HttpClientResponse>::failure(SocketError::ConnectionReset, "Incomplete response");
+            return Result<HttpClientResponse>::failure(
+                SocketError::ConnectionReset, "Incomplete response");
         }
-        
-        return Result<HttpClientResponse>::failure(SocketError::Unknown, "Too many redirects");
+
+        return Result<HttpClientResponse>::failure(
+            SocketError::Unknown, "Too many redirects");
     }
 };
 

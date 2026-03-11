@@ -9,6 +9,22 @@
 
 namespace aiSocks {
 
+namespace {
+    // Shared hex-digit lookup table for both urlDecode and urlDecodePath.
+    // 0xFF means «not a hex digit».
+    const std::array<uint8_t, 256> kFromHex = []() noexcept {
+        std::array<uint8_t, 256> t{};
+        t.fill(0xFF);
+        for (int i = 0; i < 10; ++i)
+            t[static_cast<unsigned>('0' + i)] = static_cast<uint8_t>(i);
+        for (int i = 0; i < 6; ++i) {
+            t[static_cast<unsigned>('A' + i)] = static_cast<uint8_t>(10 + i);
+            t[static_cast<unsigned>('a' + i)] = static_cast<uint8_t>(10 + i);
+        }
+        return t;
+    }();
+} // namespace
+
 std::string urlEncode(std::string_view src) {
     static constexpr char hex[] = "0123456789ABCDEF";
     static const auto safe = []() noexcept {
@@ -43,25 +59,13 @@ std::string urlEncode(std::string_view src) {
 }
 
 std::string urlDecode(std::string_view src) {
-    static const auto fromHex = []() noexcept {
-        std::array<uint8_t, 256> t{};
-        t.fill(0xFF);
-        for (int i = 0; i < 10; ++i)
-            t[static_cast<unsigned>('0' + i)] = static_cast<uint8_t>(i);
-        for (int i = 0; i < 6; ++i) {
-            t[static_cast<unsigned>('A' + i)] = static_cast<uint8_t>(10 + i);
-            t[static_cast<unsigned>('a' + i)] = static_cast<uint8_t>(10 + i);
-        }
-        return t;
-    }();
-
     std::string out;
     out.reserve(src.size());
     for (size_t i = 0, n = src.size(); i < n; ++i) {
         const unsigned char c = static_cast<unsigned char>(src[i]);
         if (c == '%' && i + 2 < n) {
-            const uint8_t hi = fromHex[static_cast<unsigned char>(src[i + 1])];
-            const uint8_t lo = fromHex[static_cast<unsigned char>(src[i + 2])];
+            const uint8_t hi = kFromHex[static_cast<unsigned char>(src[i + 1])];
+            const uint8_t lo = kFromHex[static_cast<unsigned char>(src[i + 2])];
             if (hi != 0xFF && lo != 0xFF) {
                 out += static_cast<char>((hi << 4) | lo);
                 i += 2;
@@ -77,25 +81,13 @@ std::string urlDecode(std::string_view src) {
 }
 
 std::string urlDecodePath(std::string_view src) {
-    static const auto fromHex = []() noexcept {
-        std::array<uint8_t, 256> t{};
-        t.fill(0xFF);
-        for (int i = 0; i < 10; ++i)
-            t[static_cast<unsigned>('0' + i)] = static_cast<uint8_t>(i);
-        for (int i = 0; i < 6; ++i) {
-            t[static_cast<unsigned>('A' + i)] = static_cast<uint8_t>(10 + i);
-            t[static_cast<unsigned>('a' + i)] = static_cast<uint8_t>(10 + i);
-        }
-        return t;
-    }();
-
     std::string out;
     out.reserve(src.size());
     for (size_t i = 0, n = src.size(); i < n; ++i) {
         const unsigned char c = static_cast<unsigned char>(src[i]);
         if (c == '%' && i + 2 < n) {
-            const uint8_t hi = fromHex[static_cast<unsigned char>(src[i + 1])];
-            const uint8_t lo = fromHex[static_cast<unsigned char>(src[i + 2])];
+            const uint8_t hi = kFromHex[static_cast<unsigned char>(src[i + 1])];
+            const uint8_t lo = kFromHex[static_cast<unsigned char>(src[i + 2])];
             if (hi != 0xFF && lo != 0xFF) {
                 out += static_cast<char>((hi << 4) | lo);
                 i += 2;

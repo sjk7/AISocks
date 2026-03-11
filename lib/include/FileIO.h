@@ -7,8 +7,6 @@
 #pragma once
 
 #include <cstdio>
-#include <cstdlib>
-#include <cstring>
 #include <ctime>
 #include <string>
 #include <vector>
@@ -83,66 +81,6 @@ class File {
 
     static LockMode determineLockMode(const char* mode);
     bool applyLock(LockMode mode);
-};
-
-/// Simple string builder using C-style allocation
-class StringBuilder {
-    public:
-    StringBuilder() = default;
-    explicit StringBuilder(size_t initialCapacity);
-    ~StringBuilder();
-
-    // Non-copyable but movable
-    StringBuilder(const StringBuilder&) = delete;
-    StringBuilder& operator=(const StringBuilder&) = delete;
-    StringBuilder(StringBuilder&& other) noexcept;
-    StringBuilder& operator=(StringBuilder&& other) noexcept;
-
-    void reserve(size_t newCapacity);
-    void append(const char* str);
-    void append(const char* str, size_t len);
-    void append(const std::string& str);
-    void append(char c);
-
-    // Template: must stay inline in header
-    template <typename... Args>
-    bool appendFormat(const char* format, Args... args) {
-        if (!format) return false;
-
-        char smallBuf[256];
-        int needed = snprintf(smallBuf, sizeof(smallBuf), format, args...);
-
-        if (needed < 0) return false;
-
-        if (needed < static_cast<int>(sizeof(smallBuf))) {
-            append(smallBuf, static_cast<size_t>(needed));
-            return true;
-        }
-
-        size_t requiredSize = static_cast<size_t>(needed) + 1;
-        reserve(size_ + requiredSize);
-
-        if (!buffer_) return false;
-
-        int result = snprintf(buffer_ + size_, requiredSize, format, args...);
-        if (result > 0) {
-            size_ += static_cast<size_t>(result);
-            return true;
-        }
-
-        return false;
-    }
-
-    void clear();
-    const char* data() const;
-    size_t size() const;
-    bool empty() const;
-    std::string toString() const;
-
-    private:
-    char* buffer_ = nullptr;
-    size_t size_ = 0;
-    size_t capacity_ = 0;
 };
 
 } // namespace aiSocks

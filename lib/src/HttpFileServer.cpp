@@ -33,45 +33,45 @@ namespace {
 
     // Append security headers (if enabled) and all custom headers, then the
     // blank line that terminates the HTTP header section.
-    void appendConfigAndTrailingCRLF(StringBuilder& response,
+    void appendConfigAndTrailingCRLF(std::string& response,
         bool enableSecurityHeaders,
         const std::map<std::string, std::string>& customHeaders) {
         if (enableSecurityHeaders)
-            response.append(FileServerUtils::securityHeadersBlock());
+            response += FileServerUtils::securityHeadersBlock();
         for (const auto& [name, value] : customHeaders) {
-            response.append(name);
-            response.append(": ");
-            response.append(value);
-            response.append("\r\n");
+            response += name;
+            response += ": ";
+            response += value;
+            response += "\r\n";
         }
-        response.append("\r\n");
+        response += "\r\n";
     }
 
     // Append a complete HTTP/1.1 200 OK header block (including the final blank
     // line).  Content is NOT appended; the caller does that.
     // lastModified and etag are raw values from FileInfo; cfg drives which
     // optional headers to emit and which config-level headers to append.
-    void appendOkHeaders(StringBuilder& response, const std::string& filePath,
+    void appendOkHeaders(std::string& response, const std::string& filePath,
         size_t contentSize, time_t lastModified, const std::string& etag,
         const HttpFileServer::Config& cfg) {
-        response.append("HTTP/1.1 200 OK\r\n");
-        response.append("Content-Type: ");
+        response += "HTTP/1.1 200 OK\r\n";
+        response += "Content-Type: ";
         const std::string mime = MimeTypes::fromPath(filePath);
-        response.append(mime);
+        response += mime;
         if (mime.find("text/") == 0 || mime == "application/javascript")
-            response.append("; charset=utf-8");
-        response.append("\r\nContent-Length: ");
-        response.appendFormat("%zu", contentSize);
-        response.append("\r\n");
+            response += "; charset=utf-8";
+        response += "\r\nContent-Length: ";
+        response += std::to_string(contentSize);
+        response += "\r\n";
         if (cfg.enableLastModified) {
-            response.append("Last-Modified: ");
-            response.append(FileServerUtils::formatHttpDate(lastModified));
-            response.append("\r\n");
+            response += "Last-Modified: ";
+            response += FileServerUtils::formatHttpDate(lastModified);
+            response += "\r\n";
         }
         if (cfg.enableETag && !etag.empty()) {
-            response.append("ETag: ");
-            response.append(etag);
-            response.append("\r\n");
+            response += "ETag: ";
+            response += etag;
+            response += "\r\n";
         }
         appendConfigAndTrailingCRLF(
             response, cfg.enableSecurityHeaders, cfg.customHeaders);
@@ -158,15 +158,6 @@ void HttpFileServer::buildResponse(HttpClientState& state) {
 std::string HttpFileServer::resolveFilePath(const std::string& target) const {
     std::string path = target;
 
-    size_t queryPos = path.find('?');
-    if (queryPos != std::string::npos) {
-        path = path.substr(0, queryPos);
-    }
-    size_t fragmentPos = path.find('#');
-    if (fragmentPos != std::string::npos) {
-        path = path.substr(0, fragmentPos);
-    }
-
     // Strip trailing slash so stat() works uniformly; root "/" becomes "".
     if (!path.empty() && path.back() == '/' && path.size() > 1) path.pop_back();
 
@@ -200,10 +191,10 @@ HttpFileServer::FileInfo HttpFileServer::getFileInfo(
         info.lastModified = pathInfo.lastModified;
 
         if (config_.enableETag) {
-            StringBuilder etag(64);
-            etag.appendFormat(
-                "\"%zu-%ld\"", info.size, static_cast<long>(info.lastModified));
-            info.etag = etag.toString();
+            char etagBuf[64];
+            snprintf(etagBuf, sizeof(etagBuf), "\"%zu-%ld\"", info.size,
+                static_cast<long>(info.lastModified));
+            info.etag = etagBuf;
         }
     }
 
@@ -212,20 +203,21 @@ HttpFileServer::FileInfo HttpFileServer::getFileInfo(
 
 // Returns true if the relative path `rel` contains any dotfile component that
 // should be blocked.  The first component ".well-known" is exempt (RFC 8615).
-static bool hasDotfileComponent_(const std::string& rel) {
+static bool hasDotfileComponent_(std::string_view rel) {
     size_t i = 0;
     bool firstComponent = true;
     while (i < rel.size()) {
         while (i < rel.size() && rel[i] == '/') ++i;
         if (i >= rel.size()) break;
         const size_t j = rel.find('/', i);
-        const std::string comp
-            = (j == std::string::npos) ? rel.substr(i) : rel.substr(i, j - i);
+        const std::string_view comp = (j == std::string_view::npos)
+            ? rel.substr(i)
+            : rel.substr(i, j - i);
         if (!comp.empty() && comp[0] == '.') {
             if (!(firstComponent && comp == ".well-known")) return true;
         }
         firstComponent = false;
-        if (j == std::string::npos) break;
+        if (j == std::string_view::npos) break;
         i = j + 1;
     }
     return false;
@@ -275,10 +267,8 @@ bool HttpFileServer::checkCacheConditions_(HttpClientState& state,
     if (config_.enableLastModified) {
         auto it = request.headers.find("if-modified-since");
         if (it != request.headers.end()) {
-            StringBuilder lastModified(64);
-            lastModified.append(
-                FileServerUtils::formatHttpDate(fileInfo.lastModified));
-            if (it->second == lastModified.toString()) {
+            if (it->second
+                == FileServerUtils::formatHttpDate(fileInfo.lastModified)) {
                 sendNotModified(state, fileInfo);
                 return true;
             }
@@ -348,12 +338,13 @@ void HttpFileServer::handleFileRequest(HttpClientState& state,
         fileCache_.put(filePath, fileContent, fileInfo.lastModified);
     }
 
-    StringBuilder response(512 + fileContent.size());
+    std::string response;
+    response.reserve(512 + fileContent.size());
     appendOkHeaders(response, filePath, fileContent.size(),
         fileInfo.lastModified, fileInfo.etag, config_);
     response.append(fileContent.data(), fileContent.size());
 
-    state.responseBuf = response.toString();
+    state.responseBuf = std::move(response);
     state.responseView = state.responseBuf;
 }
 
@@ -363,45 +354,47 @@ void HttpFileServer::sendError(HttpClientState& state, int code,
     // include user input (e.g., request paths) in error messages
     std::string htmlBody = generateErrorHtml(code, status, message);
 
-    StringBuilder response(256 + htmlBody.size());
-    response.append("HTTP/1.1 ");
-    response.appendFormat("%d", code);
-    response.append(" ");
-    response.append(status);
-    response.append(
-        "\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: ");
-    response.appendFormat("%zu", htmlBody.size());
-    response.append("\r\n");
+    std::string response;
+    response.reserve(256 + htmlBody.size());
+    response += "HTTP/1.1 ";
+    response += std::to_string(code);
+    response += ' ';
+    response += status;
+    response
+        += "\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: ";
+    response += std::to_string(htmlBody.size());
+    response += "\r\n";
 
     appendConfigAndTrailingCRLF(
         response, config_.enableSecurityHeaders, config_.customHeaders);
-    response.append(htmlBody);
+    response += htmlBody;
 
-    state.responseBuf = response.toString();
+    state.responseBuf = std::move(response);
     state.responseView = state.responseBuf;
 }
 
 void HttpFileServer::sendNotModified(
     HttpClientState& state, const FileInfo& fileInfo) {
-    StringBuilder response(256);
-    response.append("HTTP/1.1 304 Not Modified\r\n");
+    std::string response;
+    response.reserve(256);
+    response += "HTTP/1.1 304 Not Modified\r\n";
 
     if (config_.enableLastModified) {
-        response.append("Last-Modified: ");
-        response.append(FileServerUtils::formatHttpDate(fileInfo.lastModified));
-        response.append("\r\n");
+        response += "Last-Modified: ";
+        response += FileServerUtils::formatHttpDate(fileInfo.lastModified);
+        response += "\r\n";
     }
 
     if (config_.enableETag && !fileInfo.etag.empty()) {
-        response.append("ETag: ");
-        response.append(fileInfo.etag);
-        response.append("\r\n");
+        response += "ETag: ";
+        response += fileInfo.etag;
+        response += "\r\n";
     }
 
     appendConfigAndTrailingCRLF(
         response, config_.enableSecurityHeaders, config_.customHeaders);
 
-    state.responseBuf = response.toString();
+    state.responseBuf = std::move(response);
     state.responseView = state.responseBuf;
 }
 
@@ -410,12 +403,13 @@ void HttpFileServer::sendCachedFile(HttpClientState& state,
     const FileInfo& fileInfo, const HttpRequest& request) {
     (void)request;
 
-    StringBuilder response(512 + cached.size);
+    std::string response;
+    response.reserve(512 + cached.size);
     appendOkHeaders(response, filePath, cached.size, fileInfo.lastModified,
         fileInfo.etag, config_);
     response.append(cached.content.data(), cached.content.size());
 
-    state.responseBuf = response.toString();
+    state.responseBuf = std::move(response);
     state.responseView = state.responseBuf;
 }
 
@@ -423,18 +417,18 @@ void HttpFileServer::sendDirectoryListing(
     HttpClientState& state, const std::string& dirPath) {
     std::string htmlBody = generateDirectoryListing(dirPath);
 
-    StringBuilder response(256 + htmlBody.size());
-    response.append("HTTP/1.1 200 OK\r\n");
-    response.append(
-        "Content-Type: text/html; charset=utf-8\r\nContent-Length: ");
-    response.appendFormat("%zu", htmlBody.size());
-    response.append("\r\n");
+    std::string response;
+    response.reserve(256 + htmlBody.size());
+    response += "HTTP/1.1 200 OK\r\n";
+    response += "Content-Type: text/html; charset=utf-8\r\nContent-Length: ";
+    response += std::to_string(htmlBody.size());
+    response += "\r\n";
 
     appendConfigAndTrailingCRLF(
         response, config_.enableSecurityHeaders, config_.customHeaders);
-    response.append(htmlBody);
+    response += htmlBody;
 
-    state.responseBuf = response.toString();
+    state.responseBuf = std::move(response);
     state.responseView = state.responseBuf;
 }
 

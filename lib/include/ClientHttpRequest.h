@@ -14,7 +14,6 @@
 // to use instead of manually building request strings.
 // ---------------------------------------------------------------------------
 
-#include "FileIO.h"
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -111,8 +110,9 @@ inline std::string ClientHttpRequest::Builder::build() const {
     // Parse URL components efficiently using string_views
     ParsedUrl parsed = parseUrl(url_);
 
-    // Build request using StringBuilder
-    StringBuilder request(512);
+    // Build request
+    std::string request;
+    request.reserve(512);
 
     // Request line
     request.append(method_.data(), method_.size());
@@ -167,7 +167,7 @@ inline std::string ClientHttpRequest::Builder::build() const {
         request.append(body_.data(), body_.size());
     }
 
-    return request.toString();
+    return request;
 }
 
 inline ClientHttpRequest::Builder::ParsedUrl
