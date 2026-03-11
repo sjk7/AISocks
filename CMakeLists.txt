@@ -141,6 +141,8 @@ if(BUILD_EXAMPLES)
         advanced_file_server    examples/advanced_file_server.cpp
         throughput_client       examples/throughput_client.cpp
         unix_throughput         examples/unix_throughput.cpp
+        http_client_example      examples/http_client_example.cpp
+        test_efficiency          test_efficiency.cpp
     )
     list(LENGTH _EXAMPLES _len)
     math(EXPR _last "${_len} - 2")

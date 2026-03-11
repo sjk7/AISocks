@@ -87,6 +87,42 @@
       ],
       "preLaunchTask": "Docker: Start lldb-server for advanced_file_server",
       "postDebugTask": "Docker: Kill debug container"
+    },
+    {
+      "name": "Debug http_client_example",
+      "type": "lldb",
+      "request": "launch",
+      "program": "${workspaceFolder}/build-relwithdebinfo/http_client_example",
+      "args": [],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "sourceMap": {
+        "${workspaceFolder}": "${workspaceFolder}"
+      },
+      "preLaunchTask": "Build http_client_example"
+    },
+    {
+      "name": "Run http_client_example (No Debug)",
+      "type": "lldb", 
+      "request": "launch",
+      "program": "${workspaceFolder}/build-relwithdebinfo/http_client_example",
+      "args": [],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "preLaunchTask": "Build http_client_example"
+    },
+    {
+      "name": "Debug test_efficiency",
+      "type": "lldb",
+      "request": "launch", 
+      "program": "${workspaceFolder}/build-relwithdebinfo/test_efficiency",
+      "args": [],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "sourceMap": {
+        "${workspaceFolder}": "${workspaceFolder}"
+      },
+      "preLaunchTask": "Build test_efficiency"
     }
   ]
 }
