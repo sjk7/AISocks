@@ -329,13 +329,16 @@ static void test_on_idle_only_on_timeout() {
         std::thread t(
             [&] { server.run(ClientLimit::Unlimited, POLL_TIMEOUT); });
         server.waitReady();
-        std::this_thread::sleep_for(std::chrono::milliseconds{20});
+        // Wait until at least 10 idle calls accumulate (generous 2s deadline).
+        // Using an active wait instead of a fixed sleep makes this robust
+        // under parallel test load where the server thread may be starved.
+        waitFor([&] { return server.idleCalls.load() >= 10; },
+            std::chrono::milliseconds{2000}, std::chrono::milliseconds{1});
         int idleNoClients = server.idleCalls.load();
         server.requestStop();
         t.join();
 
-        // With 1 ms poll timeout over 20 ms we expect ~20 idle calls.
-        // Use a conservative floor of 10 to be CI-friendly.
+        // With 1 ms poll timeout we expect many idle calls; floor of 10.
         REQUIRE_MSG(idleNoClients >= 10,
             "onIdle should fire many times when there are no clients (got "
                 + std::to_string(idleNoClients) + ")");
@@ -376,8 +379,14 @@ static void test_on_idle_only_on_timeout() {
             client->send(chunk, sizeof(chunk));
         }
 
-        // Give server time to process the data
-        std::this_thread::sleep_for(std::chrono::milliseconds{20});
+        // Wait until the server has processed the data (at least 100 readable
+        // events, generous 2s deadline) instead of a fixed sleep so the test
+        // is robust under parallel test load.
+        waitFor(
+            [&] {
+                return server.readableCalls.load() - readableBeforeData >= 100;
+            },
+            std::chrono::milliseconds{2000}, std::chrono::milliseconds{1});
 
         int idleAfterData = server.idleCalls.load();
         int readableAfterData = server.readableCalls.load();
