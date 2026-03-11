@@ -115,7 +115,7 @@ inline std::string ClientHttpRequest::Builder::build() const {
     StringBuilder request(512);
 
     // Request line
-    request.append(method_.data());
+    request.append(method_.data(), method_.size());
     request.append(" ");
     request.append(parsed.path.data(), parsed.path.size());
     request.append(" HTTP/1.1\r\n");
@@ -167,7 +167,7 @@ inline std::string ClientHttpRequest::Builder::build() const {
         request.append(body_.data(), body_.size());
     }
 
-    return std::string(request.data());
+    return request.toString();
 }
 
 inline ClientHttpRequest::Builder::ParsedUrl
