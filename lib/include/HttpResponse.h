@@ -33,11 +33,10 @@
 //
 // ---------------------------------------------------------------------------
 #include <cstdint>
-#include <map>
-#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
+#include "HeaderMap.h"
 
 namespace aiSocks {
 
@@ -75,10 +74,7 @@ class HttpResponse {
 
     /// Direct access to the parsed header map.
     /// Keys are lowercased; values are owned strings.
-    const std::map<std::string, std::string, std::less<>>&
-    headers() const noexcept {
-        return headers_;
-    }
+    const HeaderMap& headers() const noexcept { return headers_; }
 
     /// True once isComplete() — all headers and the full body are available.
     bool valid{false};
@@ -131,7 +127,7 @@ class HttpResponse {
     std::string version_;
     std::string statusText_;
     std::string body_;
-    std::map<std::string, std::string, std::less<>> headers_;
+    HeaderMap headers_;
 };
 
 // ---------------------------------------------------------------------------
@@ -208,8 +204,8 @@ class HttpResponseParser {
     static bool parseHexSize_(std::string_view hexStr, size_t& out) noexcept;
     // Strips chunk-extensions (RFC 7230 §4.1.1) then delegates to
     // parseHexSize_.
-    static std::optional<size_t> parseChunkSize_(
-        std::string_view sizeLine) noexcept;
+    static bool parseChunkSize_(
+        std::string_view sizeLine, size_t& out) noexcept;
 
     // ---- buffers --------------------------------------------------------
     // inBuf_      — accumulates raw bytes until \r\n\r\n is found

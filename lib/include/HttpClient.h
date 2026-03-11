@@ -21,7 +21,6 @@
 #include "SocketTypes.h"
 #include <string>
 #include <string_view>
-#include <unordered_map>
 #include <vector>
 
 namespace aiSocks {
@@ -88,9 +87,7 @@ struct HttpClientResponse {
     }
 
     // Direct access to headers map
-    const std::map<std::string, std::string, std::less<>>& headers() const {
-        return response.headers();
-    }
+    const HeaderMap& headers() const { return response.headers(); }
 };
 
 // ---------------------------------------------------------------------------
@@ -127,7 +124,7 @@ class HttpClient {
         /// Headers added to every request made by this client instance.
         /// Per-request headers (passed to post(), request(), etc.) take
         /// precedence over these defaults when names collide.
-        std::unordered_map<std::string, std::string> defaultHeaders;
+        HeaderMap defaultHeaders;
 
         Options()
             : connectTimeout{30000}
@@ -160,7 +157,7 @@ class HttpClient {
     Result<HttpClientResponse> post(const std::string& url,
         const std::string& body = {},
         const std::string& contentType = "application/x-www-form-urlencoded") {
-        std::unordered_map<std::string, std::string> headers;
+        HeaderMap headers;
         headers["Content-Type"] = contentType;
         return performRequest("POST", url, body, headers);
     }
@@ -168,7 +165,7 @@ class HttpClient {
     Result<HttpClientResponse> put(const std::string& url,
         const std::string& body = {},
         const std::string& contentType = "application/x-www-form-urlencoded") {
-        std::unordered_map<std::string, std::string> headers;
+        HeaderMap headers;
         headers["Content-Type"] = contentType;
         return performRequest("PUT", url, body, headers);
     }
@@ -180,7 +177,7 @@ class HttpClient {
     // Generic request method
     Result<HttpClientResponse> request(const std::string& method,
         const std::string& url, const std::string& body = {},
-        const std::unordered_map<std::string, std::string>& headers = {}) {
+        const HeaderMap& headers = {}) {
         return performRequest(method, url, body, headers);
     }
 
@@ -213,7 +210,7 @@ class HttpClient {
     // Core request implementation
     Result<HttpClientResponse> performRequest(const std::string& method,
         const std::string& url, const std::string& body,
-        const std::unordered_map<std::string, std::string>& headers) {
+        const HeaderMap& headers) {
         std::vector<std::string> redirectChain;
         std::string currentUrl = url;
 
@@ -293,19 +290,23 @@ class HttpClient {
             char buffer[8192];
             bool redirectDetected = false;
 
-            // Shared handler for a fully-parsed response: either records a
-            // redirect and returns nullopt (caller should continue the outer
-            // loop), or returns the final Result to hand back to the caller.
-            auto handleComplete
-                = [&]() -> std::optional<Result<HttpClientResponse>> {
+            // Shared handler for a fully-parsed response: sets finalResult
+            // when done, or sets redirectDetected and returns without a result
+            // when a redirect should be followed.
+            Result<HttpClientResponse> finalResult
+                = Result<HttpClientResponse>::failure(SocketError::Unknown, "");
+            bool haveResult = false;
+            auto handleComplete = [&]() {
                 HttpClientResponse resp{
                     parser.response(), currentUrl, redirectChain};
                 if (options_.followRedirects && resp.isRedirect()) {
                     auto location = resp.header("location");
                     if (!location) {
-                        return Result<HttpClientResponse>::failure(
+                        finalResult = Result<HttpClientResponse>::failure(
                             SocketError::Unknown,
                             "Redirect without Location header");
+                        haveResult = true;
+                        return;
                     }
                     std::string fromUrl = currentUrl;
                     currentUrl = resolveUrl(currentUrl, *location);
@@ -314,9 +315,11 @@ class HttpClient {
                     if (options_.redirectListener)
                         options_.redirectListener->onRedirect(fromUrl,
                             currentUrl, static_cast<int>(redirectChain.size()));
-                    return std::nullopt; // follow redirect in the outer loop
+                    return; // follow redirect in the outer loop
                 }
-                return Result<HttpClientResponse>::success(std::move(resp));
+                finalResult
+                    = Result<HttpClientResponse>::success(std::move(resp));
+                haveResult = true;
             };
 
             while (true) {
@@ -344,8 +347,8 @@ class HttpClient {
                 }
 
                 if (state == HttpResponseParser::State::Complete) {
-                    auto result = handleComplete();
-                    if (result) return std::move(*result);
+                    handleComplete();
+                    if (haveResult) return finalResult;
                     break; // redirect detected; outer loop opens next
                            // connection
                 }
@@ -357,8 +360,8 @@ class HttpClient {
             // Handle responses completed by feedEof() (Connection: close),
             // including the (rare) case of a connection-close redirect.
             if (parser.isComplete()) {
-                auto result = handleComplete();
-                if (result) return std::move(*result);
+                handleComplete();
+                if (haveResult) return finalResult;
                 if (redirectDetected) continue;
             }
 

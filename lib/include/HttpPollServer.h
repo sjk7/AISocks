@@ -24,7 +24,6 @@
 #include "HttpRequest.h"
 #include "ServerBase.h"
 #include <chrono>
-#include <optional>
 #include <string>
 #include <string_view>
 
@@ -52,7 +51,8 @@ struct HttpClientState {
     // Cached parse result set by dispatchBuildResponse so that buildResponse
     // overrides in derived classes can skip a redundant HttpRequest::parse().
     // Cleared by resetAfterSend_() after the response is fully sent.
-    std::optional<HttpRequest> parsedRequest;
+    // valid == false means no cached request yet.
+    HttpRequest parsedRequest;
 
     HttpClientState() : startTime(std::chrono::steady_clock::now()) {
         request.reserve(4096); // typical HTTP request fits in 4 KB

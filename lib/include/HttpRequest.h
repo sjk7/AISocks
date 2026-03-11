@@ -8,9 +8,9 @@
 // ---------------------------------------------------------------------------
 // HttpRequest.h -- HTTP/1.x request parser
 // ---------------------------------------------------------------------------
-#include <map>
 #include <string>
 #include <string_view>
+#include "HeaderMap.h"
 
 namespace aiSocks {
 
@@ -36,12 +36,10 @@ struct HttpRequest {
     std::string body; ///< request body (may be empty)
 
     /// Request headers -- keys are lowercased; values are owned strings.
-    /// Uses std::less<> (transparent comparator) so find() accepts string_view
-    /// and const char* directly without allocating a temporary std::string.
-    std::map<std::string, std::string, std::less<>> headers;
+    HeaderMap headers;
 
     /// Query parameters -- both keys and values are URL-decoded.
-    std::map<std::string, std::string, std::less<>> queryParams;
+    HeaderMap queryParams;
 
     /// True when the request line was successfully parsed.
     bool valid{false};

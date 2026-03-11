@@ -121,10 +121,10 @@ bool HttpFileServer::validateFilePath_(
 void HttpFileServer::buildResponse(HttpClientState& state) {
     // Use the pre-parsed request stored by dispatchBuildResponse; fall back to
     // parsing here only when buildResponse is called via a non-standard path.
-    HttpRequest request = state.parsedRequest
-        ? std::move(*state.parsedRequest)
+    HttpRequest request = state.parsedRequest.valid
+        ? std::move(state.parsedRequest)
         : HttpRequest::parse(state.request);
-    state.parsedRequest.reset();
+    state.parsedRequest = HttpRequest{};
 
     if (!request.valid) {
         sendError(state, 400, "Bad Request", "Invalid HTTP request");

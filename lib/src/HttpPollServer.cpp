@@ -245,7 +245,7 @@ void HttpPollServer::resetAfterSend_(HttpClientState& s) {
     s.request.clear();
     s.responseView = {};
     s.responseBuf.clear();
-    s.parsedRequest.reset();
+    s.parsedRequest = HttpRequest{};
     s.sent = 0;
     s.responseStarted = false;
     s.closeAfterSend = false;

@@ -92,6 +92,7 @@ int main() {
     }
 
     printf("\n");
+    printf("\n");
 
     // Example 4a: Redirect following — the easy way (default behaviour)
     //
