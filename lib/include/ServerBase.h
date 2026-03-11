@@ -192,23 +192,9 @@ template <typename ClientData> class ServerBase {
     void run(ClientLimit maxClients = ClientLimit::Default,
         Milliseconds timeout = poll_min) {
         if (!isValid()) return;
+        if (!initLoop_()) return;
 
-        stop_.store(false, std::memory_order_relaxed);
-        loop_.setHandleSignals(handleSignals_);
-
-        if (!loop_.add(*listener_, PollEvent::Readable | PollEvent::Error))
-            return;
-
-        // Pre-reserve containers so the first burst of connections never
-        // triggers reallocation in the hot path.
-        {
-            const size_t cap = (maxClients == ClientLimit::Unlimited)
-                ? defaultMaxClients
-                : static_cast<size_t>(maxClients);
-            if (clientSlots_.empty()) clientSlots_.resize(getFdCeiling());
-            clientFds_.reserve(cap);
-            timeouts_.reserve(cap);
-        }
+        reserveCapacity_(maxClients);
 
         bool accepting = true;
         size_t accepted = 0;
@@ -229,35 +215,8 @@ template <typename ClientData> class ServerBase {
                     || (!accepting && clientFds_.empty());
             });
 
-        // Exit-reason logging.
-        {
-            const bool stoppedByFlag = stop_.load(std::memory_order_relaxed);
-            const bool stoppedBySignal = handleSignals_
-                && g_serverSignalStop.load(std::memory_order_relaxed);
-            const bool noMore = !accepting && clientFds_.empty();
-            const char* reason = stoppedByFlag ? "requestStop() was called"
-                : stoppedBySignal
-                ? "shutdown signal received (Ctrl+C / SIGTERM)"
-                : noMore ? "client limit reached and all clients disconnected"
-                         : "unknown";
-            printf("\nServer stopped gracefully: %s.\n", reason);
-        }
-
-        if (timeoutLogCount_ > 0) {
-            printf("[keepalive] closed %zu idle connection%s total\n",
-                timeoutLogCount_, timeoutLogCount_ == 1 ? "" : "s");
-            timeoutLogCount_ = 0;
-        }
-
-        // Reset individual slots (not clear()) so the pre-allocation from
-        // the constructor is preserved across repeated run() calls.
-        for (auto fd : clientFds_) {
-            if (fd < clientSlots_.size() && clientSlots_[fd]) {
-                onDisconnect(clientSlots_[fd]->data);
-                clientSlots_[fd].reset();
-            }
-        }
-        clientFds_.clear();
+        logShutdownInfo_(accepting);
+        disconnectAllClients_();
     }
 
     // Access the underlying listening socket (e.g. to set socket options).
@@ -554,6 +513,57 @@ template <typename ClientData> class ServerBase {
         clientFds_.pop_back();
         onClientDisconnected();
         clientSlots_[fd].reset();
+    }
+
+    // Initialise the poller and signal state for a new run() session.
+    // Returns false if the listener cannot be registered (e.g. ENOMEM).
+    bool initLoop_() {
+        stop_.store(false, std::memory_order_relaxed);
+        loop_.setHandleSignals(handleSignals_);
+        return loop_.add(*listener_, PollEvent::Readable | PollEvent::Error);
+    }
+
+    // Pre-reserve containers so the first burst of connections never
+    // triggers reallocation in the hot path.
+    void reserveCapacity_(ClientLimit maxClients) {
+        const size_t cap = (maxClients == ClientLimit::Unlimited)
+            ? defaultMaxClients
+            : static_cast<size_t>(maxClients);
+        if (clientSlots_.empty()) clientSlots_.resize(getFdCeiling());
+        clientFds_.reserve(cap);
+        timeouts_.reserve(cap);
+    }
+
+    // Print the shutdown reason and accumulated keepalive stats.
+    void logShutdownInfo_(bool accepting) {
+        const bool stoppedByFlag = stop_.load(std::memory_order_relaxed);
+        const bool stoppedBySignal = handleSignals_
+            && g_serverSignalStop.load(std::memory_order_relaxed);
+        const bool noMore = !accepting && clientFds_.empty();
+        const char* reason = stoppedByFlag ? "requestStop() was called"
+            : stoppedBySignal ? "shutdown signal received (Ctrl+C / SIGTERM)"
+            : noMore ? "client limit reached and all clients disconnected"
+                     : "unknown";
+        printf("\nServer stopped gracefully: %s.\n", reason);
+        if (timeoutLogCount_ > 0) {
+            printf("[keepalive] closed %zu idle connection%s total\n",
+                timeoutLogCount_, timeoutLogCount_ == 1 ? "" : "s");
+            timeoutLogCount_ = 0;
+        }
+    }
+
+    // Disconnect every remaining client and clear the active-fd list.
+    // Called at the end of run() after the event loop exits.
+    // Resets individual slots (not clear()) so the pre-allocation from the
+    // constructor is preserved across repeated run() calls.
+    void disconnectAllClients_() {
+        for (auto fd : clientFds_) {
+            if (fd < clientSlots_.size() && clientSlots_[fd]) {
+                onDisconnect(clientSlots_[fd]->data);
+                clientSlots_[fd].reset();
+            }
+        }
+        clientFds_.clear();
     }
 
     // Dispatched once per ready socket per poller.wait() call.
