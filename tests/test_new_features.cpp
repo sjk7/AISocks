@@ -16,6 +16,19 @@
 #include "TcpSocket.h"
 #include "UdpSocket.h"
 #include "test_helpers.h"
+
+// Enable diagnostic output by compiling with -DTEST_VERBOSE.
+#ifdef TEST_VERBOSE
+#define DLOG(...)                                                              \
+    do {                                                                       \
+        printf(__VA_ARGS__);                                                   \
+        fflush(stdout);                                                        \
+    } while (0)
+#else
+#define DLOG(...)                                                              \
+    do {                                                                       \
+    } while (0)
+#endif
 #include <atomic>
 #include <chrono>
 #include <cstdio>
@@ -54,7 +67,7 @@ static void test_endpoints() {
         if (!ep) return;
         const auto& e = ep.value();
         REQUIRE(e.port.value() != 0);
-        printf("  assigned ephemeral port: %u\n", e.port.value());
+        DLOG("  assigned ephemeral port: %u\n", e.port.value());
     }
 
     BEGIN_TEST("getPeerEndpoint: populated after TCP connect");
@@ -202,7 +215,7 @@ static void test_udp() {
         REQUIRE(std::string(buf, static_cast<size_t>(recvd)) == "hello udp");
         REQUIRE(from.port.value() != 0);
         REQUIRE(from.address == "127.0.0.1");
-        printf("  sender seen as: %s:%u\n", from.address.c_str(),
+        DLOG("  sender seen as: %s:%u\n", from.address.c_str(),
             from.port.value());
     }
 
@@ -272,7 +285,7 @@ static void test_udp_connected() {
         REQUIRE(
             std::string(buf, static_cast<size_t>(recvd)) == "connected-udp");
         REQUIRE(from.address == "127.0.0.1");
-        printf("  datagram arrived from: %s:%u\n", from.address.c_str(),
+        DLOG("  datagram arrived from: %s:%u\n", from.address.c_str(),
             from.port.value());
     }
 }
@@ -462,14 +475,13 @@ static void test_bulk_throughput() {
         double mbps
             = mbSend / (ms / MS_PER_SEC); // throughput = sent / sender time
 
-        printf("  datagrams: %d  size: %zu B  sent: %.1f MB  received: %.1f MB "
-               " dropped: %zu\n",
+        DLOG("  datagrams: %d  size: %zu B  sent: %.1f MB  received: %.1f MB "
+             " dropped: %zu\n",
             COUNT, DGRAM, mbSend, mbRecv, dropped);
-        printf(
-            "  sender time: %.1f ms  send throughput: %.1f MB/s\n", ms, mbps);
+        DLOG("  sender time: %.1f ms  send throughput: %.1f MB/s\n", ms, mbps);
 
         if (dropped > 0)
-            printf("  NOTE: %zu datagrams dropped (kernel buffer overflow)\n",
+            DLOG("  NOTE: %zu datagrams dropped (kernel buffer overflow)\n",
                 dropped);
         REQUIRE(recvTotal.load() > 0);
     }
@@ -540,9 +552,9 @@ static void test_bulk_throughput() {
         double mbps
             = (static_cast<double>(TOTAL) / BYTES_PER_MB) / (ms / MS_PER_SEC);
 
-        printf("  total: %zu MB  sent: %zu B  received: %zu B\n",
+        DLOG("  total: %zu MB  sent: %zu B  received: %zu B\n",
             TOTAL / (1024 * 1024), sent, recvTotal.load());
-        printf("  time: %.1f ms  throughput: %.1f MB/s\n", ms, mbps);
+        DLOG("  time: %.1f ms  throughput: %.1f MB/s\n", ms, mbps);
 
         REQUIRE(recvTotal.load() == TOTAL);
     }

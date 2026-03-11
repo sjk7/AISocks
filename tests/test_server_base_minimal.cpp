@@ -15,11 +15,16 @@
 
 // Enable diagnostic output by compiling with -DTEST_VERBOSE.
 #ifdef TEST_VERBOSE
-#  define DLOG(...) do { printf(__VA_ARGS__); fflush(stdout); } while(0)
+#define DLOG(...)                                                              \
+    do {                                                                       \
+        printf(__VA_ARGS__);                                                   \
+        fflush(stdout);                                                        \
+    } while (0)
 #else
-#  define DLOG(...) do {} while(0)
+#define DLOG(...)                                                              \
+    do {                                                                       \
+    } while (0)
 #endif
-
 
 using namespace aiSocks;
 
@@ -124,7 +129,7 @@ int main() {
         waitForCondition("server to accept client",
             [&]() { return server.atomicClientCount_.load() == 1; });
 
-        printf("Stopping server...\n");
+        DLOG("Stopping server...\n");
 
         // Stop server AFTER it has actually started and accepted a client
         server.requestStop();
@@ -137,7 +142,7 @@ int main() {
             },
             std::chrono::milliseconds{100});
 
-        printf("Server stopped successfully\n");
+        DLOG("Server stopped successfully\n");
 
         // CRITICAL: Wait for server thread to finish before destructor
         serverThread.join();

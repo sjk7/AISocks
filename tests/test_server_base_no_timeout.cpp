@@ -15,11 +15,16 @@
 
 // Enable diagnostic output by compiling with -DTEST_VERBOSE.
 #ifdef TEST_VERBOSE
-#  define DLOG(...) do { printf(__VA_ARGS__); fflush(stdout); } while(0)
+#define DLOG(...)                                                              \
+    do {                                                                       \
+        printf(__VA_ARGS__);                                                   \
+        fflush(stdout);                                                        \
+    } while (0)
 #else
-#  define DLOG(...) do {} while(0)
+#define DLOG(...)                                                              \
+    do {                                                                       \
+    } while (0)
 #endif
-
 
 using namespace aiSocks;
 
@@ -121,7 +126,7 @@ int main() {
         while (!ready) //-V1044 //-V776
             std::this_thread::sleep_for(std::chrono::milliseconds{1});
 
-        printf("Server started successfully\n");
+        DLOG("Server started successfully\n");
 
         // Test that server works without keep-alive timeout
         // Connect a client and verify it stays connected
@@ -143,7 +148,7 @@ int main() {
             },
             std::chrono::milliseconds{100}); // Short wait to verify no timeout
 
-        printf("Stopping server...\n");
+        DLOG("Stopping server...\n");
 
         // Stop server AFTER it has actually started and accepted a client
         server.requestStop();
@@ -156,7 +161,7 @@ int main() {
             },
             std::chrono::milliseconds{100});
 
-        printf("Server stopped successfully\n");
+        DLOG("Server stopped successfully\n");
 
         // CRITICAL: Wait for server thread to finish before destructor
         serverThread.join();
