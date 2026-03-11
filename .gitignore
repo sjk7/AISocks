@@ -439,3 +439,13 @@ build-mingw/
 www/large*.bin
 www/*MB.bin
 compile_commands 2.json
+
+# libFuzzer output
+fuzz_corpus/
+crash-*
+leak-*
+timeout-*
+build-fuzz/
+
+# Fuzz corpus inputs
+fuzz_corpus/
