@@ -27,24 +27,24 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
 
     // Split on first NUL.
     const auto sep = input.find('\0');
-    const std::string_view urlPart  = input.substr(0, sep);
+    const std::string_view urlPart = input.substr(0, sep);
     const std::string_view bodyPart = (sep != std::string_view::npos)
         ? input.substr(sep + 1)
         : std::string_view{};
 
     // Build both a GET and a POST request from the fuzzed inputs.
-    const std::string getReq  = ClientHttpRequest::forUrl(urlPart);
+    const std::string getReq = ClientHttpRequest::forUrl(urlPart);
     const std::string postReq = ClientHttpRequest::forPost(urlPart, bodyPart);
 
     // The builder must always produce output the parser accepts (valid==true)
     // when the URL was at least minimally well-formed.  We don't assert on
     // malformed URLs — we just must not crash.
-    auto parsedGet  = HttpRequest::parse(getReq);
+    auto parsedGet = HttpRequest::parse(getReq);
     auto parsedPost = HttpRequest::parse(postReq);
 
     // If parsing succeeded, basic invariants must hold.
     if (parsedGet.valid) {
-        assert(parsedGet.method  == "GET");
+        assert(parsedGet.method == "GET");
         assert(!parsedGet.version.empty());
     }
     if (parsedPost.valid) {
