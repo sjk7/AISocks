@@ -10,10 +10,11 @@
 
 namespace aiSocks {
 
-const std::string* HttpRequest::header(std::string_view name) const {
+const std::string_view* HttpRequest::header(std::string_view name) const {
     // Fast path: lowercase into a stack buffer and search via string_view.
-    // std::map<std::string, std::string, std::less<>> supports heterogeneous
-    // find() in C++17, so no heap allocation occurs for names < 64 chars.
+    // std::map<std::string, std::string_view, std::less<>> supports
+    // heterogeneous find() in C++17, so no heap allocation occurs for names <
+    // 64 chars.
     char sbuf[64];
     if (name.size() < sizeof(sbuf)) {
         for (size_t i = 0; i < name.size(); ++i)
@@ -31,10 +32,10 @@ const std::string* HttpRequest::header(std::string_view name) const {
     return it == headers.end() ? nullptr : &it->second;
 }
 
-std::string HttpRequest::headerOr(
-    std::string_view name, std::string fallback) const {
-    const std::string* v = header(name);
-    return v ? *v : std::move(fallback);
+std::string_view HttpRequest::headerOr(
+    std::string_view name, std::string_view fallback) const {
+    const std::string_view* v = header(name);
+    return v ? *v : fallback;
 }
 
 // Parses "METHOD SP request-target SP HTTP-version".
@@ -45,16 +46,16 @@ static bool parseRequestLine_(std::string_view requestLine, HttpRequest& req) {
     const auto sp2 = requestLine.find(' ', sp1 + 1);
     if (sp2 == std::string_view::npos) return false;
 
-    req.method = std::string(requestLine.substr(0, sp1));
-    req.version = std::string(requestLine.substr(sp2 + 1));
+    req.method = requestLine.substr(0, sp1);
+    req.version = requestLine.substr(sp2 + 1);
 
     const std::string_view target = requestLine.substr(sp1 + 1, sp2 - sp1 - 1);
     const auto qmark = target.find('?');
     if (qmark == std::string_view::npos) {
-        req.rawPath = std::string(target);
+        req.rawPath = target;
     } else {
-        req.rawPath = std::string(target.substr(0, qmark));
-        req.queryString = std::string(target.substr(qmark + 1));
+        req.rawPath = target.substr(0, qmark);
+        req.queryString = target.substr(qmark + 1);
     }
     req.path = urlDecodePath(req.rawPath);
     return true;
@@ -98,7 +99,7 @@ static void parseHeaderFields_(
                     : std::string_view{};
             }
 
-            req.headers[std::move(key)] = std::string(rawVal);
+            req.headers[std::move(key)] = rawVal;
         }
 
         if (lineEnd == std::string_view::npos) break;
@@ -120,10 +121,10 @@ static void parseQueryParams_(HttpRequest& req) {
         if (!pair.empty()) {
             const auto eq = pair.find('=');
             if (eq == std::string_view::npos) {
-                req.queryParams[urlDecode(std::string(pair))] = {};
+                req.queryParams[urlDecode(pair)] = {};
             } else {
-                req.queryParams[urlDecode(std::string(pair.substr(0, eq)))]
-                    = urlDecode(std::string(pair.substr(eq + 1)));
+                req.queryParams[urlDecode(pair.substr(0, eq))]
+                    = urlDecode(pair.substr(eq + 1));
             }
         }
 
@@ -132,7 +133,7 @@ static void parseQueryParams_(HttpRequest& req) {
     }
 }
 
-HttpRequest HttpRequest::parse(const std::string& raw) {
+HttpRequest HttpRequest::parse(std::string_view raw) {
     HttpRequest req;
     const std::string_view sv(raw);
 
@@ -140,8 +141,7 @@ HttpRequest HttpRequest::parse(const std::string& raw) {
     const auto sep = sv.find("\r\n\r\n");
     const std::string_view headerSection
         = (sep == std::string_view::npos) ? sv : sv.substr(0, sep);
-    if (sep != std::string_view::npos)
-        req.body = std::string(sv.substr(sep + 4));
+    if (sep != std::string_view::npos) req.body = sv.substr(sep + 4);
 
     // Split off the request line.
     const auto firstCRLF = headerSection.find("\r\n");

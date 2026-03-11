@@ -99,22 +99,22 @@ std::string HttpPollServer::makeResponse(const char* statusLine,
 // The Connection header can override either default.
 static bool resolveKeepAlive_(const HttpRequest& req) {
     const bool http10 = req.version == "HTTP/1.0";
-    const std::string* conn = req.header("connection");
+    const std::string_view* conn = req.header("connection");
     const bool hasKeepAlive = conn && (*conn == "keep-alive");
     const bool hasClose = conn && (*conn == "close");
     return http10 ? !hasKeepAlive : hasClose;
 }
 
-// Returns true when the slowloris deadline has expired: more than 5 seconds
+// Returns true when the slowloris deadline has expired: more than 200 ms
 // have elapsed since the first byte arrived but headers are still incomplete.
 // `now` is passed in from the recv loop (already computed once per iteration).
 static bool isSlowlorisTimeout_(
     const HttpClientState& s, std::chrono::steady_clock::time_point now) {
     if (!s.responseView.empty()) return false; // already responding
     if (s.request.empty()) return false;
-    const auto elapsed
-        = std::chrono::duration_cast<std::chrono::seconds>(now - s.startTime);
-    return elapsed.count() > 5;
+    const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+        now - s.startTime);
+    return elapsed.count() > HttpPollServer::SLOWLORIS_TIMEOUT_MS;
 }
 
 void HttpPollServer::dispatchBuildResponse(HttpClientState& s) {
@@ -150,12 +150,12 @@ ServerResult HttpPollServer::onReadable(TcpSocket& sock, HttpClientState& s) {
         int n = sock.receive(buf, sizeof(buf));
 
         if (n > 0) {
-            touchClient(sock);
+            touchClient(sock, now);
             s.request.append(buf, static_cast<size_t>(n));
 
-            if (s.request.size() > MAX_REQUEST_BYTES) {
-                s.responseBuf = makeResponse("HTTP/1.1 413 Payload Too Large",
-                    "text/plain; charset=utf-8", "Request too large.\n", false);
+            if (s.request.size() > HttpPollServer::MAX_HEADER_SIZE) {
+                s.responseBuf = makeResponse("HTTP/1.1 431 Request Header Fields Too Large",
+                    "text/plain; charset=utf-8", "Header section too large.\n", false);
                 s.responseView = s.responseBuf;
                 s.closeAfterSend = true;
                 setClientWritable(sock, true);
@@ -192,7 +192,7 @@ ServerResult HttpPollServer::onWritable(TcpSocket& sock, HttpClientState& s) {
         s.responseView.data() + s.sent, s.responseView.size() - s.sent);
 
     if (sent > 0) {
-        touchClient(sock);
+        touchClient(sock, std::chrono::steady_clock::now());
         s.sent += static_cast<size_t>(sent);
     } else {
         const auto err = sock.getLastError();

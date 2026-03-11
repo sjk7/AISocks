@@ -81,9 +81,8 @@ class CustomFileServer : public HttpFileServer {
 
         // Root redirects to the public landing page (no auth required)
         if (request.path == "/") {
-            state.responseBuf
-                = "HTTP/1.1 302 Found\r\nLocation: "
-                  "/public.html\r\nContent-Length: 0\r\n\r\n";
+            state.responseBuf = "HTTP/1.1 302 Found\r\nLocation: "
+                                "/public.html\r\nContent-Length: 0\r\n\r\n";
             state.responseView = state.responseBuf;
             return;
         }
@@ -257,8 +256,10 @@ class CustomFileServer : public HttpFileServer {
                     "URL.</p>\n");
         html.append("<div class=\"success\">✓ All requests are logged to "
                     "<code>access.log</code></div>\n");
-        html.append("<p><strong>Public page</strong> (no login required):</p>\n");
-        html.append("<div class=\"url\"><a href=\"/public.html\">/public.html</a></div>\n");
+        html.append(
+            "<p><strong>Public page</strong> (no login required):</p>\n");
+        html.append("<div class=\"url\"><a "
+                    "href=\"/public.html\">/public.html</a></div>\n");
         html.append("</div>\n");
 
         // File Serving Section
@@ -652,7 +653,8 @@ class CustomFileServer : public HttpFileServer {
             static_cast<int>(timeinfo->tm_mday),
             static_cast<int>(timeinfo->tm_hour),
             static_cast<int>(timeinfo->tm_min),
-            static_cast<int>(timeinfo->tm_sec), request.method.c_str(),
+            static_cast<int>(timeinfo->tm_sec),
+            static_cast<int>(request.method.size()), request.method.data(),
             request.path.c_str());
 #endif
         logFile_.flush();
@@ -676,7 +678,7 @@ class CustomFileServer : public HttpFileServer {
             return false;
         }
 
-        const std::string& auth = authIt->second;
+        const std::string_view auth = authIt->second;
         if (auth.substr(0, 6) != "Basic ") {
             return false;
         }

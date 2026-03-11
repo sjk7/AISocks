@@ -26,6 +26,8 @@
 
 namespace aiSocks {
 
+using SteadyClock = std::chrono::steady_clock;
+
 // Number of client slots reserved at startup when no explicit limit is set.
 // Used as the floor for clients_ and timeout_heap_ pre-allocation so that the
 // first burst of connections never triggers a rehash or reallocation.
@@ -259,10 +261,14 @@ template <typename ClientData> class ServerBase {
     //   O(clients * 4) entries instead of O(clients * requests_per_second *
     //   keepAliveTimeout).  Worst-case timeout accuracy is +25%.
     void touchClient(const TcpSocket& sock) {
+        touchClient(sock, std::chrono::steady_clock::now());
+    }
+
+    void touchClient(
+        const TcpSocket& sock, std::chrono::steady_clock::time_point now) {
         const uintptr_t fd = sock.getNativeHandle();
         ClientEntry* ce = findClient(fd);
         if (!ce) return;
-        const auto now = SteadyClock::now();
         ce->lastActivity = now;
         timeouts_.touch(fd, now, ce->lastTimeoutPush);
     }
@@ -399,8 +405,6 @@ template <typename ClientData> class ServerBase {
     virtual ServerResult onIdle() { return ServerResult::KeepConnection; }
 
     private:
-    using SteadyClock = std::chrono::steady_clock;
-
     // Keepalive log throttle state — initialised to epoch so the first
     // sweep always prints immediately rather than waiting a full minute.
     SteadyClock::time_point timeoutLogLast_{};

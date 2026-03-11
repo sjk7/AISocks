@@ -38,6 +38,7 @@
 #include <string>
 #include <string_view>
 #include <unordered_map>
+#include <vector>
 
 namespace aiSocks {
 
@@ -84,6 +85,47 @@ class HttpResponse {
     /// True once isComplete() — all headers and the full body are available.
     bool valid{false};
     explicit operator bool() const noexcept { return valid; }
+
+    class Builder {
+    public:
+        Builder& status(int code, std::string_view reason = "") {
+            code_ = code;
+            reason_ = reason;
+            return *this;
+        }
+
+        Builder& header(std::string_view name, std::string_view value) {
+            headers_.emplace_back(std::string(name), std::string(value));
+            return *this;
+        }
+
+        Builder& contentType(std::string_view type) {
+            return header("Content-Type", type);
+        }
+
+        Builder& body(std::string body) {
+            body_ = std::move(body);
+            return *this;
+        }
+
+        Builder& keepAlive(bool keep) {
+            keepAlive_ = keep;
+            return *this;
+        }
+
+        std::string build() const;
+
+    private:
+        int code_{200};
+        std::string_view reason_;
+        std::vector<std::pair<std::string, std::string>> headers_;
+        std::string body_;
+        bool keepAlive_{true};
+
+        std::string_view getReason_(int code) const;
+    };
+
+    static Builder builder() { return Builder(); }
 
     private:
     friend class HttpResponseParser;

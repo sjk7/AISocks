@@ -420,4 +420,64 @@ HttpResponseParser::State HttpResponseParser::feedEof() {
     return state_;
 }
 
+// ---------------------------------------------------------------------------
+// HttpResponse::Builder
+// ---------------------------------------------------------------------------
+
+std::string_view HttpResponse::Builder::getReason_(int code) const {
+    if (!reason_.empty()) return reason_;
+    switch (code) {
+        case 200: return "OK";
+        case 201: return "Created";
+        case 204: return "No Content";
+        case 301: return "Moved Permanently";
+        case 302: return "Found";
+        case 304: return "Not Modified";
+        case 400: return "Bad Request";
+        case 401: return "Unauthorized";
+        case 403: return "Forbidden";
+        case 404: return "Not Found";
+        case 405: return "Method Not Allowed";
+        case 413: return "Payload Too Large";
+        case 431: return "Request Header Fields Too Large";
+        case 500: return "Internal Server Error";
+        case 501: return "Not Implemented";
+        case 503: return "Service Unavailable";
+        default: return "Unknown";
+    }
+}
+
+std::string HttpResponse::Builder::build() const {
+    std::string r;
+    r.reserve(512 + body_.size());
+    
+    r += "HTTP/1.1 ";
+    r += std::to_string(code_);
+    r += " ";
+    r += getReason_(code_);
+    r += "\r\n";
+
+    bool hasContentLength = false;
+    for (const auto& h : headers_) {
+        r += h.first;
+        r += ": ";
+        r += h.second;
+        r += "\r\n";
+        if (h.first == "Content-Length") hasContentLength = true;
+    }
+
+    if (!hasContentLength) {
+        r += "Content-Length: ";
+        r += std::to_string(body_.size());
+        r += "\r\n";
+    }
+
+    r += "Connection: ";
+    r += keepAlive_ ? "keep-alive" : "close";
+    r += "\r\n\r\n";
+    r += body_;
+
+    return r;
+}
+
 } // namespace aiSocks

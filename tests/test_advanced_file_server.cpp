@@ -142,10 +142,10 @@ class CustomFileServer : public HttpFileServer {
         auto authHeader = request.headers.find("authorization");
         if (authHeader == request.headers.end()) return false;
 
-        const std::string& authValue = authHeader->second;
+        std::string_view authValue = authHeader->second;
         if (authValue.substr(0, 6) != "Basic ") return false;
 
-        std::string expectedAuth = "Basic YWRtaW46c2VjcmV0"; // admin:secret
+        std::string_view expectedAuth = "Basic YWRtaW46c2VjcmV0"; // admin:secret
         return authValue == expectedAuth;
     }
 
@@ -182,7 +182,9 @@ class CustomFileServer : public HttpFileServer {
 
         (void)state; // Suppress unused parameter warning
         logFile_.printf(
-            "%s %s %s\n", buffer, request.method.c_str(), request.path.c_str());
+            "%s %.*s %.*s\n", buffer, 
+            static_cast<int>(request.method.length()), request.method.data(),
+            static_cast<int>(request.path.length()), request.path.data());
         logFile_.flush();
     }
 

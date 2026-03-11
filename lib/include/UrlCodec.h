@@ -25,15 +25,15 @@
 namespace aiSocks {
 
 // Percent-encode src.  Unreserved chars (A-Z a-z 0-9 - _ . ~) pass through.
-std::string urlEncode(const std::string& src);
+std::string urlEncode(std::string_view src);
 
 // Decode a percent-encoded string.  Invalid sequences are passed verbatim.
 // Treats '+' as space (form-encoding / query-string convention).
-std::string urlDecode(const std::string& src);
+std::string urlDecode(std::string_view src);
 
 // Decode a percent-encoded URL path.  Like urlDecode but '+' is kept as '+'.
 // Use this for RFC 3986 path components; use urlDecode for query strings.
-std::string urlDecodePath(const std::string& src);
+std::string urlDecodePath(std::string_view src);
 
 } // namespace aiSocks
 

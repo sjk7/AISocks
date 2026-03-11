@@ -239,10 +239,13 @@ inline const Port Port::any{};
 #ifdef AISOCKS_HAVE_UNIX_SOCKETS
 class UnixPath {
     std::string path_;
-public:
+
+    public:
     explicit UnixPath(std::string path) : path_(std::move(path)) {}
     const std::string& value() const noexcept { return path_; }
-    bool operator==(const UnixPath& o) const noexcept { return path_ == o.path_; }
+    bool operator==(const UnixPath& o) const noexcept {
+        return path_ == o.path_;
+    }
     bool operator!=(const UnixPath& o) const noexcept { return !(*this == o); }
 };
 #endif // AISOCKS_HAVE_UNIX_SOCKETS
@@ -334,10 +337,14 @@ struct ServerBind {
 //                                 For a Poller-driven async connect:
 //                                   1. Call setBlocking(false) first.
 //                                   2. Use connectTimeout = Milliseconds{0}.
-//                                   3. Expect WouldBlock — that is not an error.
-//                                   4. Register with a Poller (PollEvent::Writable).
-//                                   5. Call getPeerEndpoint() after writable fires
-//                                      to confirm success.
+//                                   3. Expect WouldBlock — that is not an
+//                                   error.
+//                                   4. Register with a Poller
+//                                   (PollEvent::Writable).
+//                                   5. After Writable fires, call
+//                                   getPeerEndpoint():
+//                                      isSuccess() means connected; an error
+//                                      Result carries the connect failure code.
 //
 // Note: DNS resolution is synchronous and not covered by this timeout.
 // Note: connect() is always issued on a non-blocking fd internally.

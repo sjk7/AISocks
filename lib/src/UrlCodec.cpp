@@ -9,7 +9,7 @@
 
 namespace aiSocks {
 
-std::string urlEncode(const std::string& src) {
+std::string urlEncode(std::string_view src) {
     static constexpr char hex[] = "0123456789ABCDEF";
     static const auto safe = []() noexcept {
         std::array<bool, 256> t{};
@@ -42,7 +42,7 @@ std::string urlEncode(const std::string& src) {
     return out;
 }
 
-std::string urlDecode(const std::string& src) {
+std::string urlDecode(std::string_view src) {
     static const auto fromHex = []() noexcept {
         std::array<uint8_t, 256> t{};
         t.fill(0xFF);
@@ -76,8 +76,7 @@ std::string urlDecode(const std::string& src) {
     return out;
 }
 
-std::string urlDecodePath(const std::string& src) {
-    // Identical to urlDecode but '+' is NOT converted to space.
+std::string urlDecodePath(std::string_view src) {
     static const auto fromHex = []() noexcept {
         std::array<uint8_t, 256> t{};
         t.fill(0xFF);

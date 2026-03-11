@@ -76,10 +76,10 @@ using namespace aiSocks;
     return r;
 }
 
-static void CHECK_FIELD(const std::string& label, const std::string& got,
-    const std::string& expected) {
+static void CHECK_FIELD(const std::string& label, std::string_view got,
+    std::string_view expected) {
     REQUIRE_MSG(got == expected,
-        label + ": expected \"" + expected + "\"  got \"" + got + "\"");
+        label + ": expected \"" + std::string(expected) + "\"  got \"" + std::string(got) + "\"");
 }
 
 // -- test functions ---------------------------------------------------------
