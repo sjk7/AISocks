@@ -22,6 +22,14 @@
 #include <thread>
 #include <vector>
 
+// Enable diagnostic output by compiling with -DTEST_VERBOSE.
+#ifdef TEST_VERBOSE
+#  define DLOG(...) do { printf(__VA_ARGS__); fflush(stdout); } while(0)
+#else
+#  define DLOG(...) do {} while(0)
+#endif
+
+
 using namespace aiSocks;
 
 // Testing constants for edge case scenarios
@@ -237,7 +245,7 @@ int main() {
 
         // Verify we're at capacity
         server.waitForMessages(1);
-        printf("DEBUG: Client count = %zu (expected %zu)\n",
+        DLOG("DEBUG: Client count = %zu (expected %zu)\n",
             server.atomicClientCount_.load(), maxClients);
 
         REQUIRE(server.atomicClientCount_.load() <= maxClients);
@@ -303,7 +311,7 @@ int main() {
         server.requestStop();
         serverThread.join();
 
-        printf("DEBUG: Completed %d cycles\n", cycles);
+        DLOG("DEBUG: Completed %d cycles\n", cycles);
         REQUIRE(server.totalMessagesReceived.load() >= cycles);
     }
 
@@ -332,14 +340,14 @@ int main() {
             // Try to send another message
             bool sent = client->sendAll(msg, strlen(msg));
             // Connection may or may not still work depending on timing
-            printf("DEBUG: After timeout, send %s\n",
+            DLOG("DEBUG: After timeout, send %s\n",
                 (sent ? "succeeded" : "failed"));
         }
 
         server.requestStop();
         serverThread.join();
 
-        printf("DEBUG: Timed-out clients detected: %zu\n",
+        DLOG("DEBUG: Timed-out clients detected: %zu\n",
             server.timedOutClientsCount.load());
     }
 
@@ -368,7 +376,7 @@ int main() {
                 // Send large message immediately after connecting
                 std::string largeMsg(messageSize, 'X');
                 bool sent = client->sendAll(largeMsg.data(), largeMsg.size());
-                printf("DEBUG: Client %d sent %d bytes: %s\n", i, messageSize,
+                DLOG("DEBUG: Client %d sent %d bytes: %s\n", i, messageSize,
                     (sent ? "true" : "false"));
 
                 clients.push_back(std::move(client));
@@ -380,7 +388,7 @@ int main() {
         server.requestStop();
         serverThread.join();
 
-        printf("DEBUG: Received %d messages\n",
+        DLOG("DEBUG: Received %d messages\n",
             server.totalMessagesReceived.load());
         REQUIRE(server.totalMessagesReceived.load() >= numClients - 1);
     }
@@ -480,7 +488,7 @@ int main() {
         // - Connection might be accepted but immediately closed
         // - Connection might succeed if one client disconnected
 
-        printf("DEBUG: Extra client %s\n",
+        DLOG("DEBUG: Extra client %s\n",
             (extraClient ? "connected" : "rejected"));
 
         server.requestStop();
@@ -515,7 +523,7 @@ int main() {
                 auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
                     elapsed)
                               .count();
-                printf("DEBUG: Round-trip took %lldms\n", (long long)ms);
+                DLOG("DEBUG: Round-trip took %lldms\n", (long long)ms);
                 REQUIRE(ms < 1000); // Should be quick
             }
         }

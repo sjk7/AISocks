@@ -13,6 +13,14 @@
 #include <thread>
 #include <chrono>
 
+// Enable diagnostic output by compiling with -DTEST_VERBOSE.
+#ifdef TEST_VERBOSE
+#  define DLOG(...) do { printf(__VA_ARGS__); fflush(stdout); } while(0)
+#else
+#  define DLOG(...) do {} while(0)
+#endif
+
+
 using namespace aiSocks;
 
 // Helper: Wait for condition with timeout, reporting actual wait time
@@ -25,7 +33,7 @@ static void waitForCondition(const std::string& description,
     while (std::chrono::steady_clock::now() - startTime < maxWait) {
         if (condition()) {
             auto waitTime = std::chrono::steady_clock::now() - startTime;
-            printf("DEBUG: %s - waited %lldms\n", description.c_str(),
+            DLOG("DEBUG: %s - waited %lldms\n", description.c_str(),
                 (long long)
                     std::chrono::duration_cast<std::chrono::milliseconds>(
                         waitTime)
@@ -35,7 +43,7 @@ static void waitForCondition(const std::string& description,
         std::this_thread::sleep_for(interval);
     }
     auto waitTime = std::chrono::steady_clock::now() - startTime;
-    printf("DEBUG: %s - timeout after %lldms (condition not met)\n",
+    DLOG("DEBUG: %s - timeout after %lldms (condition not met)\n",
         description.c_str(),
         (long long)std::chrono::duration_cast<std::chrono::milliseconds>(
             waitTime)

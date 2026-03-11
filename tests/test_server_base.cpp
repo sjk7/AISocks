@@ -22,6 +22,14 @@
 #include <string>
 #include <thread>
 
+// Enable diagnostic output by compiling with -DTEST_VERBOSE.
+#ifdef TEST_VERBOSE
+#  define DLOG(...) do { printf(__VA_ARGS__); fflush(stdout); } while(0)
+#else
+#  define DLOG(...) do {} while(0)
+#endif
+
+
 using namespace aiSocks;
 
 // Testing constants for fast, responsive server behavior
@@ -141,7 +149,7 @@ static void waitForCondition(const std::string& description,
     while (std::chrono::steady_clock::now() - startTime < maxWait) {
         if (condition()) {
             auto waitTime = std::chrono::steady_clock::now() - startTime;
-            printf("DEBUG: %s - waited %lldms\n", description.c_str(),
+            DLOG("DEBUG: %s - waited %lldms\n", description.c_str(),
                 (long long)
                     std::chrono::duration_cast<std::chrono::milliseconds>(
                         waitTime)
@@ -153,7 +161,7 @@ static void waitForCondition(const std::string& description,
     // Don't fail on timeout - just report it. Let the test check the actual
     // condition.
     auto waitTime = std::chrono::steady_clock::now() - startTime;
-    printf("DEBUG: %s - timeout after %lldms (condition not met)\n",
+    DLOG("DEBUG: %s - timeout after %lldms (condition not met)\n",
         description.c_str(),
         (long long)std::chrono::duration_cast<std::chrono::milliseconds>(
             waitTime)
@@ -213,7 +221,7 @@ int main() {
         });
 
         // Debug: Check actual client count
-        printf("DEBUG: Test 2 - Expected %d, actual %zu\n", maxClients,
+        DLOG("DEBUG: Test 2 - Expected %d, actual %zu\n", maxClients,
             server.atomicClientCount_.load());
 
         // Should have accepted the maximum number of clients
@@ -288,7 +296,7 @@ int main() {
             std::chrono::milliseconds{200});
 
         // Debug: Check actual client count
-        printf("DEBUG: Test 4 - Expected 0 or 1, actual %zu\n",
+        DLOG("DEBUG: Test 4 - Expected 0 or 1, actual %zu\n",
             server.atomicClientCount_.load());
 
         // Server should have 0 or 1 clients (may not immediately detect
@@ -303,35 +311,35 @@ int main() {
     BEGIN_TEST(
         "ServerBase: ClientLimit::Unlimited accepts unlimited connections");
     {
-        printf("DEBUG: Starting unlimited test\n");
+        DLOG("DEBUG: Starting unlimited test\n");
         EchoServer server(Port::any);
         Port port = server.serverPort();
         auto serverThread
             = startServerInBackground(server, ClientLimit::Unlimited);
         server.waitReady();
 
-        printf("DEBUG: About to connect clients\n");
+        DLOG("DEBUG: About to connect clients\n");
         // Connect many clients
         std::vector<std::unique_ptr<TcpSocket>> clients;
         const int manyClients = 5; // Reduced to prevent hanging
 
         for (int i = 0; i < manyClients; ++i) {
-            printf("DEBUG: Connecting client %d\n", i);
+            DLOG("DEBUG: Connecting client %d\n", i);
             auto result = SocketFactory::createTcpClient(AddressFamily::IPv4,
                 ConnectArgs{"127.0.0.1", Port{port},
                     Milliseconds{200}}); // Reduced timeout
             if (result.isSuccess()) {
                 clients.emplace_back(
                     std::make_unique<TcpSocket>(std::move(result.value())));
-                printf("DEBUG: Client %d connected\n", i);
+                DLOG("DEBUG: Client %d connected\n", i);
             } else {
-                printf("DEBUG: Client %d failed\n", i);
+                DLOG("DEBUG: Client %d failed\n", i);
                 // Connection failed - stop trying
                 break;
             }
         }
 
-        printf("DEBUG: Connected %zu clients\n", clients.size());
+        DLOG("DEBUG: Connected %zu clients\n", clients.size());
 
         // Wait for server to accept all connections
         waitForCondition("server to accept all connections", [&]() {
@@ -343,17 +351,17 @@ int main() {
         REQUIRE(server.atomicClientCount_.load()
             == static_cast<size_t>(manyClients));
 
-        printf("DEBUG: About to disconnect clients\n");
+        DLOG("DEBUG: About to disconnect clients\n");
         // Disconnect all clients
         clients.clear();
 
-        printf("DEBUG: About to call requestStop\n");
+        DLOG("DEBUG: About to call requestStop\n");
         server.requestStop();
-        printf("DEBUG: Called requestStop\n");
+        DLOG("DEBUG: Called requestStop\n");
 
         // CRITICAL: Wait for server thread to finish before destructor
         serverThread.join();
-        printf("DEBUG: Unlimited test completed\n");
+        DLOG("DEBUG: Unlimited test completed\n");
     }
 
     // Test 6: ClientLimit::Default works correctly
@@ -385,7 +393,7 @@ int main() {
 
         // Should have accepted up to the test limit (not necessarily the
         // default limit)
-        printf("DEBUG: Test 6 - Connected %zu clients, server has %zu\n",
+        DLOG("DEBUG: Test 6 - Connected %zu clients, server has %zu\n",
             clients.size(), server.atomicClientCount_.load());
         REQUIRE(server.atomicClientCount_.load()
             <= static_cast<size_t>(maxTestClients));
