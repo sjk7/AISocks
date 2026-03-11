@@ -77,34 +77,29 @@ int main() {
 
         // Wait for server to be ready
         while (!ready) //-V776 //-V1044
-            std::this_thread::sleep_for(std::chrono::milliseconds{10});
+            std::this_thread::sleep_for(std::chrono::milliseconds{1});
 
         // Connect one client
         auto result = SocketFactory::createTcpClient(AddressFamily::IPv4,
             ConnectArgs{"127.0.0.1", Port{port}, Milliseconds{1000}});
 
-        if (result.isSuccess()) {
-            printf("Client connected successfully\n");
-            auto client
-                = std::make_unique<TcpSocket>(std::move(result.value()));
+        REQUIRE(result.isSuccess());
+        auto client = std::make_unique<TcpSocket>(std::move(result.value()));
 
-            // Give server time to process
-            std::this_thread::sleep_for(std::chrono::milliseconds{200});
+        // Wait for server to register the connection
+        while (server.atomicClientCount_.load() != 1)
+            std::this_thread::sleep_for(std::chrono::milliseconds{1});
 
-            printf(
-                "Server client count: %zu\n", server.atomicClientCount_.load());
+        REQUIRE(server.atomicClientCount_.load() == 1);
 
-            // Disconnect client
-            client.reset();
+        // Disconnect client
+        client.reset();
 
-            // Give server time to process disconnection
-            std::this_thread::sleep_for(std::chrono::milliseconds{200});
+        // Wait for server to register the disconnection
+        while (server.atomicClientCount_.load() != 0)
+            std::this_thread::sleep_for(std::chrono::milliseconds{1});
 
-            printf("Server client count after disconnect: %zu\n",
-                server.atomicClientCount_.load());
-        } else {
-            printf("Client connection failed: %s\n", result.message().c_str());
-        }
+        REQUIRE(server.atomicClientCount_.load() == 0);
 
         // Stop server
         server.requestStop();

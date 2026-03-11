@@ -175,7 +175,7 @@ int main() {
 
         // Request stop from another thread
         std::thread stopper([&server]() {
-            std::this_thread::sleep_for(std::chrono::milliseconds{5});
+            std::this_thread::sleep_for(std::chrono::milliseconds{1});
             server.requestStop();
         });
 

@@ -13,6 +13,8 @@
 #include <thread>
 #include <atomic>
 #include <chrono>
+#include <condition_variable>
+#include <mutex>
 #include <vector>
 
 using namespace aiSocks;
@@ -25,7 +27,20 @@ class SignalTestServer : public ServerBase<int> {
 
     explicit SignalTestServer(const ServerBind& bind) : ServerBase(bind) {}
 
+    void waitReady() {
+        std::unique_lock<std::mutex> lk(readyMtx_);
+        readyCv_.wait(lk, [this] { return ready_.load(); });
+    }
+
     protected:
+    void onReady() override {
+        {
+            std::lock_guard<std::mutex> lk(readyMtx_);
+            ready_ = true;
+        }
+        readyCv_.notify_all();
+    }
+
     ServerResult onReadable(TcpSocket&, int&) override {
         readableCount++;
         return ServerResult::KeepConnection;
@@ -34,6 +49,11 @@ class SignalTestServer : public ServerBase<int> {
     ServerResult onWritable(TcpSocket&, int&) override {
         return ServerResult::KeepConnection;
     }
+
+    private:
+    std::mutex readyMtx_;
+    std::condition_variable readyCv_;
+    std::atomic<bool> ready_{false};
 };
 
 int main() {
@@ -157,8 +177,8 @@ int main() {
             server.run(ClientLimit::Unlimited, Milliseconds{1});
         });
 
-        // Give server time to start
-        std::this_thread::sleep_for(100ms);
+        // Wait until server is running
+        server.waitReady();
 
         // Set stop flag
         g_serverSignalStop.store(true);

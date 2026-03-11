@@ -44,41 +44,35 @@ class MockHttpServer : public HttpPollServer {
 };
 
 static void test_slowloris_protection() {
-    BEGIN_TEST("slowloris protection (5s timeout)");
+    BEGIN_TEST("slowloris protection");
 
     MockHttpServer server(ServerBind{"127.0.0.1", Port{0}});
     REQUIRE(server.isValid());
+    server.setSlowlorisTimeout(100); // 100ms for test speed
     Port port = server.serverPort();
 
     // Start server in background thread
-    std::thread serverThread([&]() {
-        // Use a short timeout to ensure onIdle and checks run frequently
-        server.run(ClientLimit::Default, Milliseconds{10});
-    });
+    std::thread serverThread(
+        [&]() { server.run(ClientLimit::Default, Milliseconds{10}); });
 
     server.waitReady();
 
-    // Connect and send partial header
+    // Connect and send partial header only — no terminating \r\n\r\n
     TcpSocket client(AddressFamily::IPv4, ConnectArgs{"127.0.0.1", port});
     REQUIRE(client.isValid());
 
     std::string partial = "GET / HTTP/1.1\r\nHost: localhost\r\n";
     client.send(partial.data(), partial.size());
 
-    // Wait for > 5000ms (SLOWLORIS_TIMEOUT_MS)
-    std::this_thread::sleep_for(std::chrono::milliseconds(5200));
-
-    // We need to trigger an event to wake up the server or rely on the poll
-    // timeout. Since we used Milliseconds{10}, it should wake up frequently.
-    // However, the check is inside onReadable.
-    // Let's send one more byte to trigger onReadable if it hasn't timed out.
-    char extra = 'X';
-    client.send(&extra, 1);
-
-    // Give it a moment to process
-    int retries = 40;
-    while (!server.disconnected && retries-- > 0) {
-        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    // Poll every 1ms until the server disconnects us (deadline: 2s)
+    const auto deadline
+        = std::chrono::steady_clock::now() + std::chrono::seconds{2};
+    while (!server.disconnected) {
+        if (std::chrono::steady_clock::now() >= deadline) break;
+        // Poke the server so onReadable fires and it can check the timeout
+        char extra = 'X';
+        client.send(&extra, 1);
+        std::this_thread::sleep_for(std::chrono::milliseconds{1});
     }
 
     REQUIRE(server.disconnected.load() == true);
@@ -144,7 +138,7 @@ static void test_oversized_header_parse() {
     BEGIN_TEST("oversized header parse (8KB benchmark)");
 
     // Verify HttpRequest::parse behavior with a 1MB input.
-    // We keep the large parsing test to ensure the parser itself isn't 
+    // We keep the large parsing test to ensure the parser itself isn't
     // artificially limited, even if the server is.
     std::string longHeader(1024 * 1024, 'a');
     std::string raw = "GET / HTTP/1.1\r\n"
@@ -163,9 +157,8 @@ static void test_server_enforces_header_limit() {
     REQUIRE(server.isValid());
     Port port = server.serverPort();
 
-    std::thread serverThread([&]() {
-        server.run(ClientLimit::Default, Milliseconds{10});
-    });
+    std::thread serverThread(
+        [&]() { server.run(ClientLimit::Default, Milliseconds{10}); });
 
     server.waitReady();
 
@@ -179,20 +172,21 @@ static void test_server_enforces_header_limit() {
     // Server should send 431 and closed the connection
     char response[1024];
     int n = client.receive(response, sizeof(response) - 1);
-    
+
     if (n > 0) {
         response[n] = '\0';
         std::string respStr(response);
-        REQUIRE(respStr.find("431 Request Header Fields Too Large") != std::string::npos);
+        REQUIRE(respStr.find("431 Request Header Fields Too Large")
+            != std::string::npos);
     }
-    
+
     // Connection should be closed by server or closing after write
     std::this_thread::sleep_for(std::chrono::milliseconds(200));
-    
+
     // Attempting to send again should fail or be ignored
     char extra = 'Y';
     client.send(&extra, 1);
-    
+
     server.requestStop();
     serverThread.join();
 }

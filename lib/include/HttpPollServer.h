@@ -145,6 +145,10 @@ class HttpPollServer : public ServerBase<HttpClientState> {
         : ServerBase<HttpClientState>(bind, AddressFamily::IPv4, result)
         , bind_(bind) {}
 
+    // Override the Slowloris timeout for testing (default:
+    // SLOWLORIS_TIMEOUT_MS)
+    void setSlowlorisTimeout(int ms) { slowlorisTimeoutMs_ = ms; }
+
     void run(ClientLimit maxClients = ClientLimit::Default,
         Milliseconds timeout = Milliseconds{-1});
 
@@ -187,6 +191,7 @@ class HttpPollServer : public ServerBase<HttpClientState> {
 
     private:
     static constexpr size_t RECV_BUF_SIZE = 64 * 1024;
+    int slowlorisTimeoutMs_{SLOWLORIS_TIMEOUT_MS};
 
     ServerResult onReadable(TcpSocket& sock, HttpClientState& s) final;
     ServerResult onWritable(TcpSocket& sock, HttpClientState& s) final;

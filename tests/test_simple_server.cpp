@@ -109,8 +109,6 @@ static void test_poll_clients_echo() {
     });
 
     REQUIRE(waitFor([&] { return serverReady.load(); }));
-    std::this_thread::sleep_for(
-        std::chrono::milliseconds(20)); // let listen() settle
 
     auto res = SocketFactory::createTcpClient(AddressFamily::IPv4,
         ConnectArgs{"127.0.0.1", port, Milliseconds{1000}});
@@ -163,7 +161,6 @@ static void test_poll_clients_disconnect_on_false() {
     });
 
     REQUIRE(waitFor([&] { return serverReady.load(); }));
-    std::this_thread::sleep_for(std::chrono::milliseconds(20));
 
     auto res = SocketFactory::createTcpClient(AddressFamily::IPv4,
         ConnectArgs{"127.0.0.1", port, Milliseconds{1000}});
@@ -174,10 +171,8 @@ static void test_poll_clients_disconnect_on_false() {
 
     // Wait for the callback to fire - this confirms the server received data
     REQUIRE(waitFor([&] { return callbackFired.load(); }));
-
-    // The callback returned false to disconnect, but clientCount() updates
-    // asynchronously Give the server loop time to process the disconnect
-    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    // Wait for the server to process the disconnect (callback returned false)
+    REQUIRE(waitFor([&] { return server.clientCount() == 0; }));
 
     server.requestStop();
     client.reset();
@@ -220,7 +215,6 @@ static void test_accept_clients() {
     });
 
     REQUIRE(waitFor([&] { return serverReady.load(); }));
-    std::this_thread::sleep_for(std::chrono::milliseconds(20));
 
     // Connect two clients sequentially; wait for each callback to complete
     // before connecting the next one (acceptClients is synchronous).

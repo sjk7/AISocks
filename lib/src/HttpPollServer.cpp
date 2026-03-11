@@ -130,16 +130,17 @@ static bool resolveKeepAlive_(const HttpRequest& req) {
     return http10 ? !hasKeepAlive : hasClose;
 }
 
-// Returns true when the slowloris deadline has expired: more than 5 seconds
-// have elapsed since the first byte arrived but headers are still incomplete.
-// `now` is passed in from the recv loop (already computed once per iteration).
-static bool isSlowlorisTimeout_(
-    const HttpClientState& s, std::chrono::steady_clock::time_point now) {
+// Returns true when the slowloris deadline has expired: more than `timeoutMs`
+// milliseconds have elapsed since the first byte arrived but headers are still
+// incomplete. `now` is passed in from the recv loop (already computed once per
+// iteration).
+static bool isSlowlorisTimeout_(const HttpClientState& s,
+    std::chrono::steady_clock::time_point now, int timeoutMs) {
     if (!s.responseView.empty()) return false; // already responding
     if (s.request.empty()) return false;
     const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
         now - s.startTime);
-    return elapsed.count() > HttpPollServer::SLOWLORIS_TIMEOUT_MS;
+    return elapsed.count() > timeoutMs;
 }
 
 void HttpPollServer::dispatchBuildResponse(HttpClientState& s) {
@@ -170,7 +171,8 @@ ServerResult HttpPollServer::onReadable(TcpSocket& sock, HttpClientState& s) {
         // Clock is read once per loop iteration and reused by the timeout
         // check.
         const auto now = std::chrono::steady_clock::now();
-        if (isSlowlorisTimeout_(s, now)) return ServerResult::Disconnect;
+        if (isSlowlorisTimeout_(s, now, slowlorisTimeoutMs_))
+            return ServerResult::Disconnect;
 
         int n = sock.receive(buf, sizeof(buf));
 

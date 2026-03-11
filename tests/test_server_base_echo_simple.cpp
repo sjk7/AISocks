@@ -92,64 +92,53 @@ int main() {
 
         // Wait for server to be ready
         while (!ready) //-V776 //-V1044
-            std::this_thread::sleep_for(std::chrono::milliseconds{10});
+            std::this_thread::sleep_for(std::chrono::milliseconds{1});
 
         // Connect one client
         auto result = SocketFactory::createTcpClient(AddressFamily::IPv4,
             ConnectArgs{"127.0.0.1", port, Milliseconds{1000}});
 
-        if (result.isSuccess()) {
-            printf("Client connected successfully\n");
-            auto client
-                = std::make_unique<TcpSocket>(std::move(result.value()));
+        REQUIRE(result.isSuccess());
+        auto client = std::make_unique<TcpSocket>(std::move(result.value()));
 
-            // Make client non-blocking
-            client->setBlocking(false);
+        // Make client non-blocking
+        client->setBlocking(false);
 
-            // Send some data
-            const char* msg = "Hello Echo!";
-            bool sent = client->send(msg, strlen(msg));
-            if (sent) {
-                printf("Data sent successfully\n");
+        // Send some data
+        const char* msg = "Hello Echo!";
+        bool sent = client->send(msg, strlen(msg));
+        REQUIRE(sent);
 
-                // Wait for echo with timeout
-                auto start = std::chrono::steady_clock::now();
-                const auto timeout = std::chrono::seconds{2};
-                char buf[256];
-                int received = 0;
+        // Wait for echo with timeout
+        auto start = std::chrono::steady_clock::now();
+        const auto timeout = std::chrono::seconds{2};
+        char buf[256];
+        int received = 0;
 
-                while (received <= 0) {
-                    received = client->receive(buf, sizeof(buf));
-                    if (received > 0) break;
+        while (received <= 0) {
+            received = client->receive(buf, sizeof(buf));
+            if (received > 0) break;
 
-                    if (client->getLastError() != SocketError::WouldBlock) {
-                        break; // Real error
-                    }
-
-                    // Check timeout
-                    if (std::chrono::steady_clock::now() - start > timeout) {
-                        printf("Receive timeout\n");
-                        break;
-                    }
-
-                    // Small sleep to prevent busy waiting
-                    std::this_thread::sleep_for(std::chrono::milliseconds{10});
-                }
-
-                if (received > 0) {
-                    printf("Received echo: %.*s\n", received, buf);
-                }
+            if (client->getLastError() != SocketError::WouldBlock) {
+                break; // Real error
             }
 
-            printf(
-                "Server client count: %zu\n", server.atomicClientCount_.load());
+            // Check timeout
+            if (std::chrono::steady_clock::now() - start > timeout) {
+                printf("Receive timeout\n");
+                break;
+            }
+
+            // Small sleep to prevent busy waiting
+            std::this_thread::sleep_for(std::chrono::milliseconds{1});
         }
+
+        REQUIRE(received == static_cast<int>(strlen(msg)));
+        REQUIRE(std::string(buf, received) == msg);
 
         // Stop server
         server.requestStop();
         serverThread.join();
-
-        printf("Simple echo test completed\n");
     }
 
     return test_summary();
