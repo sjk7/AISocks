@@ -213,4 +213,18 @@ else()
         DEPENDS ${TEST_SOURCES}
         VERBATIM
     )
+
+    # wine --version at post-build time confirms wine is on PATH and the Wine
+    # prefix is healthy.  The x86_64 wine binary runs under Rosetta on Apple
+    # Silicon; this call is too short to meaningfully warm the Rosetta JIT, but
+    # it catches a missing/broken wine installation before wine_test.sh runs.
+    list(GET TEST_SOURCES -1 _LAST_TEST)
+    find_program(_WINE_EXECUTABLE wine)
+    if(_WINE_EXECUTABLE)
+        add_custom_command(TARGET ${_LAST_TEST} POST_BUILD
+            COMMAND "${_WINE_EXECUTABLE}" --version
+            COMMENT "Checking wine is available..."
+            VERBATIM
+        )
+    endif()
 endif()

@@ -1,44 +1,35 @@
 #!/usr/bin/env bash
-# wine_test.sh — run the MinGW/Wine ctest suite with a persistent wineserver
-# so subsequent wine process launches reuse the already-running server and
-# skip its ~4s initialisation cost.
+# wine_test.sh — run the MinGW/Wine ctest suite.
+# Starts a persistent wineserver so each wine process reuses it (~0.6s startup)
+# instead of spawning its own (~5s cold start).
 #
 # Usage:
 #   ./scripts/wine_test.sh [extra ctest args...]
-#
-# Safe to Ctrl-C: the EXIT trap kills the persistent wineserver.
 
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+WINESERVER_REAL=$(realpath "$(which wineserver)" 2>/dev/null || which wineserver)
 
-# ---------------------------------------------------------------------------
-cleanup() {
-    echo "[wine_test] Stopping wineserver..."
-    wineserver -k 2>/dev/null || true
-}
-trap cleanup EXIT
+# Kill any leftover wineserver, then start a fresh persistent one.
+# -p with no argument = stay alive indefinitely after the last client exits.
+# No -f: without foreground mode wineserver daemonizes cleanly and does not
+# hold the tty open.
+wineserver -k 2>/dev/null || true
+"$WINESERVER_REAL" -p &
+sleep 0.5   # give the daemon time to create its socket
 
-# ---------------------------------------------------------------------------
-# Ensure a Wine prefix exists before starting the server.
-if [[ ! -d "${WINEPREFIX:-${HOME}/.wine}/drive_c" ]]; then
-    echo "[wine_test] Initialising Wine prefix (one-time)..."
-    WINEDEBUG=-all wineboot --init 2>/dev/null || true
-    sleep 2
-fi
+echo "Wineserver PID before prime: $(pgrep -f wineserver || echo NONE)"
 
-# ---------------------------------------------------------------------------
-# Start a persistent wineserver.
-#   -f  = run in foreground (we background it ourselves)
-#   -p0 = stay alive until explicitly killed (don't exit when last client quits)
-echo "[wine_test] Starting persistent wineserver..."
-WINEDEBUG=-all wineserver -f -p0 &
-sleep 0.5   # allow server socket to be ready before tests fire
+# Run one wine process to completion to fully initialize the Wine prefix.
+# Without this, all 8 parallel ctest workers race to initialize through the
+# same wineserver simultaneously, causing a deadlock hang.
+echo "Priming Wine prefix..."
+WINEDEBUG=-all wine build-mingw/tests/test_result.exe > /dev/null 2>&1 || true
 
-# ---------------------------------------------------------------------------
-# Run ctest via the mingw-debug preset (configured for -j8).
-echo "[wine_test] Running ctest..."
+echo "Wineserver PID after prime:  $(pgrep -f wineserver || echo NONE)"
+
 WINEDEBUG=-all ctest --preset mingw-debug "$@"
 STATUS=$?
 
+wineserver -k 2>/dev/null || true
 exit $STATUS

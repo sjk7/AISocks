@@ -351,8 +351,8 @@
             "configurePreset": "mingw-debug",
             "displayName": "Run Tests (MinGW-w64 / Wine)",
             "execution": {
-                "jobs": 8,
-                "noTestsAction": "error"
+                "noTestsAction": "error",
+                "jobs": 8
             },
             "output": {
                 "outputOnFailure": true
