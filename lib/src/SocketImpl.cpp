@@ -74,9 +74,9 @@ SocketImpl::SocketImpl(SocketType type, AddressFamily family)
     platformInit();
 
 #ifdef AISOCKS_HAVE_UNIX_SOCKETS
-    int af = (family == AddressFamily::Unix)  ? AF_UNIX
-           : (family == AddressFamily::IPv6)  ? AF_INET6
-                                              : AF_INET;
+    int af = (family == AddressFamily::Unix) ? AF_UNIX
+        : (family == AddressFamily::IPv6)    ? AF_INET6
+                                             : AF_INET;
 #else
     int af = (family == AddressFamily::IPv6) ? AF_INET6 : AF_INET;
 #endif
@@ -85,7 +85,8 @@ SocketImpl::SocketImpl(SocketType type, AddressFamily family)
 #ifdef AISOCKS_HAVE_UNIX_SOCKETS
         (family == AddressFamily::Unix) ? 0 :
 #endif
-        (type == SocketType::TCP) ? IPPROTO_TCP : IPPROTO_UDP;
+        (type == SocketType::TCP) ? IPPROTO_TCP
+                                  : IPPROTO_UDP;
 
     socketHandle = socket(af, sockType, protocol);
 
@@ -205,8 +206,7 @@ void SocketImpl::propagateSocketProps(SocketImpl& child) const {
     int sndBuf = getSendBufferSize();
     if (sndBuf > 0) child.setSendBufferSize(sndBuf);
 
-    if (socketType == SocketType::TCP
-            && addressFamily != AddressFamily::Unix) {
+    if (socketType == SocketType::TCP && addressFamily != AddressFamily::Unix) {
         child.setNoDelay(getNoDelay());
         child.setKeepAlive(getKeepAlive());
     }
@@ -229,10 +229,10 @@ std::unique_ptr<SocketImpl> SocketImpl::accept() {
             int sa_fam = reinterpret_cast<sockaddr*>(&clientAddr)->sa_family;
             AddressFamily clientFamily =
 #ifdef AISOCKS_HAVE_UNIX_SOCKETS
-                (sa_fam == AF_UNIX)  ? AddressFamily::Unix  :
+                (sa_fam == AF_UNIX) ? AddressFamily::Unix :
 #endif
-                (sa_fam == AF_INET6) ? AddressFamily::IPv6  :
-                                       AddressFamily::IPv4;
+                (sa_fam == AF_INET6) ? AddressFamily::IPv6
+                                     : AddressFamily::IPv4;
             auto child = std::make_unique<SocketImpl>(
                 clientSocket, socketType, clientFamily);
             propagateSocketProps(*child);
@@ -441,17 +441,16 @@ bool SocketImpl::resolveAddress_(const std::string& address, Port port,
     Milliseconds timeout, sockaddr_storage& out_addr, socklen_t& out_len) {
     struct DnsResult {
         sockaddr_storage addr{};
-        socklen_t        addrLen{0};
-        SocketError      error{SocketError::None};
-        int              gaiErr{0};
+        socklen_t addrLen{0};
+        SocketError error{SocketError::None};
+        int gaiErr{0};
     };
     auto dnsRes = std::make_shared<DnsResult>();
     std::promise<void> dnsProm;
     auto dnsFut = dnsProm.get_future();
 
-    std::thread([addr = address, p = port, af = addressFamily,
-                 st = socketType, res = dnsRes,
-                 prom = std::move(dnsProm)]() mutable {
+    std::thread([addr = address, p = port, af = addressFamily, st = socketType,
+                    res = dnsRes, prom = std::move(dnsProm)]() mutable {
         res->error = resolveToSockaddr(addr, p, af, st,
             /*doDns=*/true, res->addr, res->addrLen, &res->gaiErr);
         prom.set_value();
@@ -460,7 +459,7 @@ bool SocketImpl::resolveAddress_(const std::string& address, Port port,
     static constexpr int64_t kDefaultDnsTimeoutMs = 5000;
     int64_t dnsMs = (timeout.count > 0) ? timeout.count : kDefaultDnsTimeoutMs;
     if (dnsFut.wait_for(std::chrono::milliseconds(dnsMs))
-            == std::future_status::timeout) {
+        == std::future_status::timeout) {
 #ifdef _WIN32
         WSASetLastError(WSAETIMEDOUT);
 #else
@@ -486,7 +485,7 @@ bool SocketImpl::resolveAddress_(const std::string& address, Port port,
     }
 
     out_addr = dnsRes->addr;
-    out_len  = dnsRes->addrLen;
+    out_len = dnsRes->addrLen;
     return true;
 }
 
@@ -514,11 +513,12 @@ bool SocketImpl::waitForConnect_(Milliseconds timeout) {
 
     for (;;) {
         auto remaining = std::chrono::duration_cast<std::chrono::milliseconds>(
-            deadline - std::chrono::steady_clock::now()).count();
+            deadline - std::chrono::steady_clock::now())
+                             .count();
         if (remaining <= 0) {
             setError(SocketError::Timeout,
-                "connect() timed out after "
-                    + std::to_string(timeout.count) + " ms");
+                "connect() timed out after " + std::to_string(timeout.count)
+                    + " ms");
             return false;
         }
         const long long sliceMs = (remaining < 100) ? remaining : 100;
@@ -704,107 +704,23 @@ bool SocketImpl::setBlocking(bool blocking) {
     return true;
 }
 
+// SO_REUSEADDR semantics differ critically by platform:
+//   Unix:    safe — prevents TIME_WAIT stalls; still blocks concurrent binds.
+//   Windows: DANGEROUS — allows multiple processes to bind the same port
+//            (port hijacking). We never set it; Windows default behaviour
+//            already provides exclusive binding and has negligible TIME_WAIT.
+//            reuse=false uses SO_EXCLUSIVEADDRUSE for explicit enforcement.
 bool SocketImpl::setReuseAddress(bool reuse) {
     RETURN_IF_INVALID();
 
 #ifdef _WIN32
-    // ═══════════════════════════════════════════════════════════════════════
-    // WINDOWS SOCKET REUSE BEHAVIOR - CRITICAL PLATFORM DIFFERENCES
-    // ═══════════════════════════════════════════════════════════════════════
-    //
-    // PROBLEM: SO_REUSEADDR has COMPLETELY DIFFERENT semantics on Windows vs
-    // Unix.
-    //
-    // On Unix/Linux, SO_REUSEADDR:
-    //   ✓ Prevents multiple processes from binding to the same active port
-    //   ✓ Allows binding to ports in TIME_WAIT state (quick rebind after crash)
-    //   ✓ This is the desired behavior for server sockets
-    //
-    // On Windows, SO_REUSEADDR:
-    //   ✗ ALLOWS multiple processes to bind to the same active port
-    //   simultaneously! ✗ Only the first socket receives connections; others
-    //   are in zombie state ✗ This is a security vulnerability (port
-    //   hijacking/wildcard hijacking) ✗ Example: Two http_file_server.exe
-    //   instances can both bind to port 8080
-    //
-    // SOLUTION: Platform-specific handling to achieve consistent behavior:
-    //   Goal 1: Prevent simultaneous binds (second bind() should fail)
-    //   Goal 2: Allow quick rebind after server crash (no TIME_WAIT wait)
-    //
-    // ───────────────────────────────────────────────────────────────────────
-    // WINDOWS IMPLEMENTATION (reuse=true, the default for server sockets):
-    // ───────────────────────────────────────────────────────────────────────
-    //
-    // Strategy: Don't set SO_REUSEADDR at all. Use default Windows behavior.
-    //
-    // Why this works:
-    //   1. EXCLUSIVE BINDING: Without SO_REUSEADDR, Windows prevents multiple
-    //      processes from binding to the same port. Second bind() fails with
-    //      WSAEADDRINUSE. This achieves Goal 1.
-    //
-    //   2. QUICK REBIND: Windows does NOT enforce strict TIME_WAIT like Unix.
-    //      When a process terminates (even forcefully via taskkill /F), Windows
-    //      releases the port IMMEDIATELY - there is no 60-120 second wait.
-    //      This achieves Goal 2 without needing SO_REUSEADDR.
-    //
-    //   3. NORMAL SHUTDOWN: Even on graceful shutdown, Windows TIME_WAIT is
-    //      much shorter than Unix (typically a few seconds vs 60-120 seconds).
-    //
-    // Alternative considered: SO_EXCLUSIVEADDRUSE
-    //   - This flag explicitly prevents all reuse, including TIME_WAIT reuse
-    //   - Would make rebinding slower after graceful shutdown
-    //   - Not needed since default behavior already provides exclusive binding
-    //   - Only used when reuse=false is explicitly requested
-    //
-    // Testing:
-    //   - Start server on port 8080 → succeeds
-    //   - Start second server on port 8080 → fails with "port already in use"
-    //   - Kill first server with taskkill /F
-    //   - Start new server on port 8080 → succeeds IMMEDIATELY (no delay)
-    //
     if (!reuse) {
-        // Explicitly request exclusive use (stricter than default)
         int exclusive = 1;
         return setSocketOption(socketHandle, SOL_SOCKET, SO_EXCLUSIVEADDRUSE,
             exclusive, "Failed to set exclusive address use");
     }
-    // When reuse=true (default), don't set any flags.
-    // Default Windows behavior provides exclusive binding + quick rebind.
-    return true;
-
+    return true; // default Windows behaviour is already exclusively-bound
 #else
-    // ───────────────────────────────────────────────────────────────────────
-    // UNIX/LINUX IMPLEMENTATION:
-    // ───────────────────────────────────────────────────────────────────────
-    //
-    // Strategy: Use SO_REUSEADDR when reuse=true (the default).
-    //
-    // Why this works:
-    //   1. EXCLUSIVE BINDING: SO_REUSEADDR on Unix does NOT allow multiple
-    //      processes to bind to the same active port. Second bind() fails
-    //      with EADDRINUSE. This achieves Goal 1.
-    //
-    //   2. QUICK REBIND: SO_REUSEADDR allows binding to ports in TIME_WAIT
-    //      state. Without this flag, you'd have to wait 60-120 seconds after
-    //      server shutdown before the port becomes available again.
-    //      This achieves Goal 2.
-    //
-    // TIME_WAIT explanation:
-    //   - When a TCP connection closes, the socket enters TIME_WAIT state
-    //   - This prevents delayed packets from interfering with new connections
-    //   - Unix enforces this strictly: ports in TIME_WAIT cannot be reused
-    //   - SO_REUSEADDR overrides this restriction for server sockets
-    //   - This is safe because server sockets use bind() before listen(),
-    //     and the kernel ensures no connection state conflicts
-    //
-    // Testing:
-    //   - Start server on port 8080 → succeeds
-    //   - Start second server on port 8080 → fails with "address already in
-    //   use"
-    //   - Stop first server (Ctrl+C or kill)
-    //   - Start new server on port 8080 → succeeds immediately (no TIME_WAIT
-    //   wait)
-    //
     int optval = reuse ? 1 : 0;
     return setSocketOption(socketHandle, SOL_SOCKET, SO_REUSEADDR, optval,
         "Failed to set reuse address option");
@@ -1291,7 +1207,7 @@ Endpoint SocketImpl::endpointFromSockaddr(const sockaddr_storage& addr) {
 #ifdef AISOCKS_HAVE_UNIX_SOCKETS
     if (addr.ss_family == AF_UNIX) {
         ep.family = AddressFamily::Unix;
-        ep.port   = Port{0};
+        ep.port = Port{0};
         const auto* un = reinterpret_cast<const sockaddr_un*>(&addr);
         ep.address = un->sun_path; // may be empty for anonymous sockets
         return ep;
