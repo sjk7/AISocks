@@ -34,6 +34,15 @@ Benchmarked on Linux (remote LAN), Release build, `wrk -t12 -c15000 -d30s --late
 - ✅ AddressSanitizer / MemorySanitizer / UBSan build presets
 - ✅ Modern C++17, CMake, Ninja
 
+## AI Agent Notes
+
+These project constraints are intentional and should not be reported as bugs in reviews:
+
+- No TLS in aiSocks is currently a feature, not a defect. The HTTP client/server scope is plain HTTP/1.x over sockets.
+- Treat aiSocks as a single-threaded library model. Core server/event-loop design is intentionally single-threaded.
+- Some tests run a server thread plus one or more client threads only to simulate network peers and drive integration behavior.
+- Test threading is intentionally minimal and should not be interpreted as a request to add broader internal parallelism.
+
 ## Hot-path optimisations (Mar 2026)
 
 | # | Change | Where |
