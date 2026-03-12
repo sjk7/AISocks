@@ -227,8 +227,7 @@ static void test_headers_complete_early() {
 static void test_reject_oversized_headers() {
     BEGIN_TEST("reject oversized response headers");
     std::string huge(70000, 'h');
-    std::string raw
-        = "HTTP/1.1 200 OK\r\nX-Huge: " + huge + "\r\n\r\nbody";
+    std::string raw = "HTTP/1.1 200 OK\r\nX-Huge: " + huge + "\r\n\r\nbody";
     HttpResponseParser p;
     auto state = p.feed(raw.data(), raw.size());
     REQUIRE(state == HttpResponseParser::State::Error);
@@ -260,6 +259,32 @@ static void test_reject_oversized_chunk_size_line() {
     REQUIRE(p.isError());
 }
 
+// 15. Content-Length at configured cap is accepted (headers-only phase)
+static void test_accept_max_content_length_header() {
+    BEGIN_TEST("accept max Content-Length header");
+    std::string raw = "HTTP/1.1 200 OK\r\n"
+                      "Content-Length: 67108864\r\n"
+                      "\r\n";
+    HttpResponseParser p;
+    auto state = p.feed(raw.data(), raw.size());
+    REQUIRE(state == HttpResponseParser::State::HeadersComplete
+        || state == HttpResponseParser::State::Incomplete);
+    REQUIRE(!p.isError());
+}
+
+// 16. Chunk size line at configured cap is accepted (awaiting body bytes)
+static void test_accept_max_chunk_size_line() {
+    BEGIN_TEST("accept max chunk size line");
+    std::string raw = "HTTP/1.1 200 OK\r\n"
+                      "Transfer-Encoding: chunked\r\n"
+                      "\r\n"
+                      "1000000\r\n";
+    HttpResponseParser p;
+    auto state = p.feed(raw.data(), raw.size());
+    REQUIRE(state != HttpResponseParser::State::Error);
+    REQUIRE(!p.isError());
+}
+
 // ---------------------------------------------------------------------------
 int main() {
     test_simple_200();
@@ -276,5 +301,7 @@ int main() {
     test_reject_oversized_headers();
     test_reject_oversized_content_length();
     test_reject_oversized_chunk_size_line();
+    test_accept_max_content_length_header();
+    test_accept_max_chunk_size_line();
     return test_summary();
 }

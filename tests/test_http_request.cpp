@@ -555,6 +555,22 @@ static void test_non_connect_rejects_authority_form() {
     REQUIRE(!req.valid);
 }
 
+// 37d. OPTIONS origin-form remains valid
+static void test_options_origin_form_valid() {
+    BEGIN_TEST("OPTIONS origin-form target");
+    auto req = HttpRequest::parse("OPTIONS /status HTTP/1.1\r\n\r\n");
+    REQUIRE(req.valid);
+    CHECK_FIELD("OPTIONS method", req.method, "OPTIONS");
+    CHECK_FIELD("OPTIONS path", req.path, "/status");
+}
+
+// 37e. OPTIONS asterisk-form must not carry a query string
+static void test_options_asterisk_query_rejected() {
+    BEGIN_TEST("OPTIONS asterisk query rejected");
+    auto req = HttpRequest::parse("OPTIONS *?x=1 HTTP/1.1\r\n\r\n");
+    REQUIRE(!req.valid);
+}
+
 // 38. Trailing whitespace on request line is rejected
 static void test_trailing_whitespace_request_line() {
     BEGIN_TEST("trailing whitespace on request line");
@@ -689,6 +705,29 @@ static void test_reject_oversized_header_section() {
     REQUIRE(!req.valid);
 }
 
+// 46b. Accept request header section at exact configured limit
+static void test_accept_header_section_at_limit() {
+    BEGIN_TEST("accept header section at exact limit");
+    const size_t kHeaderCap = 16 * 1024;
+    const std::string prefix = "GET / HTTP/1.1\r\nX-Huge: ";
+    const size_t valueLen = kHeaderCap - prefix.size() - 2; // trailing CRLF
+    std::string raw = prefix + std::string(valueLen, 'h') + "\r\n\r\n";
+    auto req = HttpRequest::parse(raw);
+    REQUIRE(req.valid);
+}
+
+// 47b. Accept request body at exact configured max
+static void test_accept_max_body_content_length() {
+    BEGIN_TEST("accept max body by Content-Length");
+    const size_t kBodyCap = 16 * 1024 * 1024;
+    std::string body(kBodyCap, 'a');
+    std::string raw = "POST /upload HTTP/1.1\r\nContent-Length: "
+        + std::to_string(kBodyCap) + "\r\n\r\n" + body;
+    auto req = HttpRequest::parse(raw);
+    REQUIRE(req.valid);
+    REQUIRE(req.body.size() == kBodyCap);
+}
+
 // 47. Reject oversized request body by Content-Length
 static void test_reject_oversized_body_content_length() {
     BEGIN_TEST("reject oversized body by Content-Length");
@@ -739,6 +778,8 @@ int main() {
     test_connect_form();
     test_connect_rejects_absolute_form();
     test_non_connect_rejects_authority_form();
+    test_options_origin_form_valid();
+    test_options_asterisk_query_rejected();
     test_trailing_whitespace_request_line();
     test_incomplete_request();
     test_bare_lf_separator();
@@ -749,6 +790,8 @@ int main() {
     test_reject_content_length_mismatch();
     test_reject_oversized_query();
     test_reject_oversized_header_section();
+    test_accept_header_section_at_limit();
     test_reject_oversized_body_content_length();
+    test_accept_max_body_content_length();
     return test_summary();
 }

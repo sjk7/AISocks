@@ -946,11 +946,27 @@ int main() {
         REQUIRE(response.find("400 Bad Request") != std::string::npos);
         REQUIRE(response.find("Connection: close") != std::string::npos);
 
-        // A follow-up receive should observe closure or timeout/error after the
-        // server has sent the close response.
+        // A follow-up receive should observe EOF (peer close), not just a
+        // timeout. Poll briefly to allow FIN to arrive.
+        bool sawEof = false;
         char b[8];
-        int n = client.receive(b, sizeof(b));
-        REQUIRE(n <= 0);
+        for (int i = 0; i < 20; ++i) {
+            int n = client.receive(b, sizeof(b));
+            if (n == 0) {
+                sawEof = true;
+                break;
+            }
+            if (n < 0) {
+                const auto err = client.getLastError();
+                if (err == SocketError::WouldBlock
+                    || err == SocketError::Timeout) {
+                    std::this_thread::sleep_for(10ms);
+                    continue;
+                }
+                break;
+            }
+        }
+        REQUIRE(sawEof);
 
         g_serverSignalStop.store(true);
         serverThread.join();

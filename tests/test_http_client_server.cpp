@@ -363,10 +363,10 @@ static void test_resolve_url_relative_redirects() {
     REQUIRE(HttpClient::resolveUrl(base, "../up") == "http://example.com/a/up");
     REQUIRE(HttpClient::resolveUrl(base, "./here?x=1")
         == "http://example.com/a/b/here?x=1");
-    REQUIRE(HttpClient::resolveUrl(base, "dir/")
-        == "http://example.com/a/b/dir/");
-    REQUIRE(HttpClient::resolveUrl(base, "../up/")
-        == "http://example.com/a/up/");
+    REQUIRE(
+        HttpClient::resolveUrl(base, "dir/") == "http://example.com/a/b/dir/");
+    REQUIRE(
+        HttpClient::resolveUrl(base, "../up/") == "http://example.com/a/up/");
     REQUIRE(
         HttpClient::resolveUrl(base, "?q=2") == "http://example.com/a/b/c?q=2");
     REQUIRE(HttpClient::resolveUrl(base, "#new")
