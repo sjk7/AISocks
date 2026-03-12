@@ -16,7 +16,7 @@ namespace aiSocks {
 
 // Lightweight milliseconds type used throughout the API.
 // Construct with an integer: Milliseconds{5000}.
-// For std::chrono conversions include lib/src/ChronoCompat.h.
+// For std::chrono conversions use explicit duration_cast at call sites.
 struct Milliseconds {
     int64_t count;
 

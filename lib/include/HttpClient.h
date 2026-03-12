@@ -98,7 +98,12 @@ class HttpClient {
     public:
     struct Options {
         /// TCP connect timeout in milliseconds.
-        /// 0 = no timeout (block until connected or OS-level error).
+        /// Must be > 0.
+        ///
+        /// NOTE: aiSocks reserves Milliseconds{0} for poller-driven async
+        /// connect-in-progress semantics (WouldBlock) in ConnectArgs.
+        /// HttpClient is synchronous, so it rejects 0 to avoid accidental
+        /// non-blocking connect behavior.
         /// Default: 30 000 ms (30 s).
         Milliseconds connectTimeout;
 
@@ -347,6 +352,11 @@ class HttpClient {
     Result<HttpClientResponse> performRequest(const std::string& method,
         const std::string& url, const std::string& body,
         const HeaderMap& headers) {
+        if (options_.connectTimeout.count <= 0) {
+            return Result<HttpClientResponse>::failure(SocketError::Unknown,
+                "HttpClient Options.connectTimeout must be > 0 ms");
+        }
+
         std::vector<std::string> redirectChain;
         std::string currentUrl = url;
 
@@ -375,8 +385,11 @@ class HttpClient {
             ConnectArgs args{host, port, options_.connectTimeout};
             auto socketResult = SocketFactory::createTcpClient(args);
             if (!socketResult.isSuccess()) {
-                return Result<HttpClientResponse>::failure(
-                    SocketError::ConnectFailed, "Connection failed");
+                return Result<HttpClientResponse>::failureOwned(
+                    socketResult.error(),
+                    "Connection failed to " + host + ":"
+                        + std::to_string(port.value()) + " - "
+                        + socketResult.message());
             }
 
             TcpSocket socket = std::move(socketResult.value());
@@ -405,8 +418,10 @@ class HttpClient {
 
             std::string request = requestBuilder.build();
             if (!socket.sendAll(request.data(), request.size())) {
-                return Result<HttpClientResponse>::failure(
-                    SocketError::SendFailed, "Failed to send request");
+                return Result<HttpClientResponse>::failureOwned(
+                    socket.getLastError(),
+                    "Failed to send request to " + currentUrl + " - "
+                        + socket.getErrorMessage());
             }
 
             // Parse response using existing HttpResponseParser
@@ -467,8 +482,9 @@ class HttpClient {
                         || err == SocketError::WouldBlock)
                         return Result<HttpClientResponse>::failure(
                             SocketError::Timeout, "Request timed out");
-                    return Result<HttpClientResponse>::failure(
-                        SocketError::ReceiveFailed, "Receive error");
+                    return Result<HttpClientResponse>::failureOwned(err,
+                        "Receive error from " + currentUrl + " - "
+                            + socket.getErrorMessage());
                 }
                 if (n == 0) {
                     parser

@@ -8,7 +8,7 @@
 #define AISOCKS_RESULT_H
 
 #include "SocketTypes.h"
-#include <cassert>
+#include <cstdlib>
 #include <cstdio>
 #include <memory>
 #include <string>
@@ -266,13 +266,13 @@ template <typename T> class [[nodiscard]] Result {
     }
 
     // Access value — Precondition: isSuccess() must be true.
-    // Always prints to stderr on violation; asserts (aborts) in debug builds.
+    // Always prints to stderr and aborts on violation.
     const T& value() const& {
         if (!has_value_) {
             fprintf(stderr,
                 "Result::value() called on an error Result"
                 " — check isSuccess() first\n");
-            assert(false);
+            std::abort();
         }
         return value_ref();
     }
@@ -281,7 +281,7 @@ template <typename T> class [[nodiscard]] Result {
             fprintf(stderr,
                 "Result::value() called on an error Result"
                 " — check isSuccess() first\n");
-            assert(false);
+            std::abort();
         }
         return value_ref();
     }
@@ -290,7 +290,7 @@ template <typename T> class [[nodiscard]] Result {
             fprintf(stderr,
                 "Result::value() called on an error Result"
                 " — check isSuccess() first\n");
-            assert(false);
+            std::abort();
         }
         return std::move(value_ref());
     }
