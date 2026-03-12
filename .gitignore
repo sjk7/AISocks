@@ -449,3 +449,13 @@ build-fuzz/
 
 # Fuzz corpus inputs
 fuzz_corpus/
+
+# Code coverage output
+coverage-report/
+*.gcda
+*.gcno
+*.info
+*.profraw
+
+# Fuzzer slow-unit outputs
+slow-unit-*

@@ -149,6 +149,23 @@
             }
         },
         {
+            "name": "coverage",
+            "inherits": "base",
+            "displayName": "Coverage (Clang source-based)",
+            "binaryDir": "${sourceDir}/build-coverage",
+            "condition": {
+                "type": "notEquals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Windows"
+            },
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "BUILD_TESTS": "ON",
+                "BUILD_EXAMPLES": "OFF",
+                "ENABLE_COVERAGE": "ON"
+            }
+        },
+        {
             "name": "mingw-debug",
             "displayName": "MinGW-w64 Debug (Wine)",
             "description": "Cross-compile for Windows x86-64 with MinGW-w64; run tests under Wine",
@@ -221,6 +238,12 @@
             "inherits": "base-build",
             "configurePreset": "relwithdebinfo",
             "displayName": "Build RelWithDebInfo"
+        },
+        {
+            "name": "coverage",
+            "inherits": "base-build",
+            "configurePreset": "coverage",
+            "displayName": "Build Coverage"
         },
         {
             "name": "test-socket-basics",
@@ -366,6 +389,11 @@
             "name": "build_mac_arm",
             "configurePreset": "build_mac_arm",
             "displayName": "build_mac_arm"
+        },
+        {
+            "name": "coverage",
+            "configurePreset": "coverage",
+            "displayName": "Coverage Tests"
         },
         {
             "name": "mingw-debug",

@@ -43,6 +43,7 @@ option(ENABLE_ASAN    "Enable AddressSanitizer"    OFF)
 option(ENABLE_MSAN    "Enable MemorySanitizer"     OFF)
 option(ENABLE_UBSAN   "Enable UndefinedBehaviorSanitizer" OFF)
 option(ENABLE_TSAN    "Enable ThreadSanitizer"     OFF)
+option(ENABLE_COVERAGE "Enable Clang source-based code coverage" OFF)
 
 # Add AddressSanitizer if enabled
 if(ENABLE_ASAN AND MSVC)
@@ -95,6 +96,18 @@ if(ENABLE_MSAN AND NOT MSVC)
     message(STATUS "MemorySanitizer enabled - use RelWithDebInfo for -O2 -g (recommended)")
 elseif(ENABLE_MSAN AND MSVC)
     message(FATAL_ERROR "MemorySanitizer is not supported on MSVC/Windows")
+endif()
+
+# Add source-based coverage instrumentation if enabled
+if(ENABLE_COVERAGE AND MSVC)
+    message(FATAL_ERROR "Source-based coverage (llvm-cov) is not supported on MSVC.")
+elseif(ENABLE_COVERAGE)
+    if(ENABLE_ASAN OR ENABLE_MSAN OR ENABLE_UBSAN OR ENABLE_TSAN)
+        message(FATAL_ERROR "ENABLE_COVERAGE cannot be combined with sanitizers")
+    endif()
+    add_compile_options(-fprofile-instr-generate -fcoverage-mapping -fno-omit-frame-pointer)
+    add_link_options(-fprofile-instr-generate)
+    message(STATUS "Source-based coverage enabled (use scripts/coverage.sh to generate report)")
 endif()
 
 # Add the library

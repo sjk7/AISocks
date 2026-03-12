@@ -94,6 +94,10 @@ class TestHttpServer : public HttpPollServer {
         responseSentCount.fetch_add(1, std::memory_order_release);
         HttpPollServer::onResponseSent(state);
     }
+
+    public:
+    // Expose protected printStartupBanner for coverage testing
+    void callPrintStartupBanner() { printStartupBanner(); }
 };
 
 // Receive an HTTP response from an already-connected socket,
@@ -751,6 +755,141 @@ int main() {
         g_serverSignalStop.store(true);
         serverThread.join();
         g_serverSignalStop.store(false);
+    }
+
+    // -----------------------------------------------------------------------
+    // HttpClientState assignment operators (copy and move)
+    // -----------------------------------------------------------------------
+
+    // Test 16: Copy assignment — basic
+    // Use a response long enough to be heap-allocated (> 22 bytes for libc++
+    // SSO). The copy-assignment fixup redirects responseView into the new
+    // responseBuf only when it pointed into the original's responseBuf.
+    BEGIN_TEST("HttpClientState: copy assignment copies all fields");
+    {
+        HttpClientState src;
+        src.request = "GET / HTTP/1.1\r\n\r\n";
+        src.responseBuf = "HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\nHello";
+        src.responseView = src.responseBuf; // view into own buf
+        src.sent = 7;
+        src.responseStarted = true;
+        src.closeAfterSend = true;
+        src.requestScanPos = 3;
+
+        HttpClientState dst;
+        dst = src;
+
+        REQUIRE(dst.request == src.request);
+        REQUIRE(dst.sent == src.sent);
+        REQUIRE(dst.responseStarted == src.responseStarted);
+        REQUIRE(dst.closeAfterSend == src.closeAfterSend);
+        REQUIRE(dst.requestScanPos == src.requestScanPos);
+        REQUIRE(dst.responseBuf == src.responseBuf);
+        // responseView must have been redirected into dst's own responseBuf
+        REQUIRE(dst.responseView.data() == dst.responseBuf.data());
+    }
+
+    // Test 17: Copy assignment — self-assignment is a no-op
+    BEGIN_TEST("HttpClientState: copy self-assignment is safe");
+    {
+        HttpClientState s;
+        s.request = "hello";
+        s.sent = 42;
+        HttpClientState& ref = s;
+        ref = s; // self-assign
+        REQUIRE(s.request == "hello");
+        REQUIRE(s.sent == 42u);
+    }
+
+    // Test 18: Copy assignment — responseView pointing outside responseBuf
+    // is NOT redirected (it belongs to external storage)
+    BEGIN_TEST("HttpClientState: copy assignment with external responseView");
+    {
+        static const std::string sharedStorage = "HTTP/1.1 200 OK\r\n\r\n";
+        HttpClientState src;
+        src.responseBuf.clear();
+        src.responseView = sharedStorage; // view into external storage
+
+        HttpClientState dst;
+        dst = src;
+
+        // responseBuf is empty -> no fixup branch taken
+        REQUIRE(dst.responseBuf.empty());
+        // responseView still points at sharedStorage (unchanged)
+        REQUIRE(dst.responseView.data() == sharedStorage.data());
+    }
+
+    // Test 19: Move assignment — basic
+    // Use a response long enough to be heap-allocated (> 22 bytes for libc++
+    // SSO). The move-assignment fixup relies on the moved-from data() address
+    // being preserved, which only happens for heap strings, not SSO strings.
+    BEGIN_TEST("HttpClientState: move assignment transfers all fields");
+    {
+        HttpClientState src;
+        src.request = "GET / HTTP/1.1\r\n\r\n";
+        src.responseBuf = "HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\nHello";
+        src.responseView = src.responseBuf; // view into own buf
+        src.sent = 5;
+        src.closeAfterSend = true;
+        src.requestScanPos = 2;
+
+        HttpClientState dst;
+        dst = std::move(src);
+
+        REQUIRE(dst.request == "GET / HTTP/1.1\r\n\r\n");
+        REQUIRE(dst.sent == 5u);
+        REQUIRE(dst.closeAfterSend == true);
+        REQUIRE(dst.requestScanPos == 2u);
+        REQUIRE(!dst.responseBuf.empty());
+        // responseView must have been fixed up to dst's responseBuf
+        REQUIRE(dst.responseView.data() == dst.responseBuf.data());
+        // After move, src.responseView should be cleared
+        REQUIRE(src.responseView.empty()); // NOLINT(bugprone-use-after-move)
+    }
+
+    // Test 20: Move assignment — self-assignment is a no-op
+    BEGIN_TEST("HttpClientState: move self-assignment is safe");
+    {
+        HttpClientState s;
+        s.request = "world";
+        s.sent = 99;
+        s = std::move(
+            *&s); // self-move-assign via pointer to silence -Wself-move
+        REQUIRE(s.sent == 99u);
+    }
+
+    // Test 21: Move assignment — external responseView not redirected
+    BEGIN_TEST("HttpClientState: move assignment with external responseView");
+    {
+        static const std::string ext = "HTTP/1.1 404 Not Found\r\n\r\n";
+        HttpClientState src;
+        src.responseBuf.clear();
+        src.responseView = ext; // external storage: no fixup needed
+
+        HttpClientState dst;
+        dst = std::move(src);
+
+        REQUIRE(dst.responseBuf.empty());
+        REQUIRE(dst.responseView.data() == ext.data());
+    }
+
+    // -----------------------------------------------------------------------
+    // printBuildInfo and printStartupBanner smoke tests
+    // -----------------------------------------------------------------------
+
+    // Test 22: printBuildInfo runs without crashing
+    BEGIN_TEST("printBuildInfo: smoke test (output goes to stdout)");
+    {
+        HttpPollServer::printBuildInfo();
+        REQUIRE(true);
+    }
+
+    // Test 23: printStartupBanner runs without crashing
+    BEGIN_TEST("printStartupBanner: smoke test via TestHttpServer accessor");
+    {
+        TestHttpServer tmp(ServerBind{"127.0.0.1", Port{0}});
+        tmp.callPrintStartupBanner();
+        REQUIRE(true);
     }
 
     return test_summary();

@@ -7,7 +7,7 @@
 // Tests for lib/include/FileServerUtils.h
 //
 // Coverage:
-//   urlDecodePath   — 9 cases
+//   urlDecodePath   — 10 cases (incl. valid-hi/invalid-lo branch)
 //   getFileExtension — 6 cases
 //   formatHttpDate   — 4 cases
 //   securityHeadersBlock — 3 cases
@@ -71,6 +71,12 @@ static void test_urldecode_incomplete_sequence() {
 static void test_urldecode_invalid_hex_chars() {
     BEGIN_TEST("urlDecodePath: %ZZ (non-hex) passes through unchanged");
     REQUIRE(FileServerUtils::urlDecodePath("%ZZ") == "%ZZ");
+}
+
+static void test_urldecode_valid_hi_invalid_lo() {
+    BEGIN_TEST(
+        "urlDecodePath: %2Z (valid hi, invalid lo) passes through unchanged");
+    REQUIRE(FileServerUtils::urlDecodePath("%2Z") == "%2Z");
 }
 
 // ============================================================
@@ -199,6 +205,7 @@ int main() {
     test_urldecode_percent_at_end();
     test_urldecode_incomplete_sequence();
     test_urldecode_invalid_hex_chars();
+    test_urldecode_valid_hi_invalid_lo();
 
     // getFileExtension
     test_ext_html();
