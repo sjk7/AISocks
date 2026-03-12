@@ -32,23 +32,23 @@ class ClientHttpRequest {
         Builder() = default;
 
         Builder& method(std::string_view m) {
-            method_ = m;
+            method_.assign(m.data(), m.size());
             return *this;
         }
         Builder& url(std::string_view u) {
-            url_ = u;
+            url_.assign(u.data(), u.size());
             return *this;
         }
         Builder& body(std::string_view b) {
-            body_ = b;
+            body_.assign(b.data(), b.size());
             return *this;
         }
         Builder& userAgent(std::string_view ua) {
-            userAgent_ = ua;
+            userAgent_.assign(ua.data(), ua.size());
             return *this;
         }
         Builder& accept(std::string_view a) {
-            accept_ = a;
+            accept_.assign(a.data(), a.size());
             return *this;
         }
         Builder& header(std::string_view name, std::string_view value);
@@ -57,12 +57,12 @@ class ClientHttpRequest {
         std::string build() const;
 
         private:
-        std::string_view method_{"GET"};
-        std::string_view url_;
-        std::string_view body_;
-        std::string_view userAgent_{"AISocks-HttpClient/1.0"};
-        std::string_view accept_{"*/*"};
-        std::vector<std::pair<std::string_view, std::string_view>> headers_;
+        std::string method_{"GET"};
+        std::string url_;
+        std::string body_;
+        std::string userAgent_{"AISocks-HttpClient/1.0"};
+        std::string accept_{"*/*"};
+        std::vector<std::pair<std::string, std::string>> headers_;
 
         // Parse URL components into string_views that reference the original
         // URL
@@ -102,7 +102,8 @@ class ClientHttpRequest {
 
 inline ClientHttpRequest::Builder& ClientHttpRequest::Builder::header(
     std::string_view name, std::string_view value) {
-    headers_.emplace_back(name, value);
+    headers_.emplace_back(std::string(name.data(), name.size()),
+        std::string(value.data(), value.size()));
     return *this;
 }
 
