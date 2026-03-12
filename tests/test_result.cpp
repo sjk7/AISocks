@@ -11,7 +11,9 @@
 
 #include "Result.h"
 #include "TcpSocket.h"
+#include "UdpSocket.h"
 #include "SocketFactory.h"
+#include "SocketTypes.h"
 #include "test_helpers.h"
 #include <string>
 #include <vector>
@@ -464,6 +466,100 @@ int main() {
             || msg.find("address") != std::string::npos
             || msg.find("use") != std::string::npos
             || msg.find("Bind") != std::string::npos);
+    }
+
+    // Test 36: value() rvalue-ref overload
+    BEGIN_TEST("value() &&: rvalue overload moves value out");
+    {
+        Result<std::string> result(std::string("rvalue-test"));
+        std::string moved = std::move(result).value();
+        REQUIRE(moved == "rvalue-test");
+    }
+
+    // Test 37: message() on a success Result returns empty string
+    BEGIN_TEST("message() on success: returns empty string");
+    {
+        Result<int> result(42);
+        const std::string& msg = result.message();
+        REQUIRE(msg.empty());
+    }
+
+    // Test 38: move assignment error -> value (has_value_ false in destructor
+    // branch)
+    BEGIN_TEST(
+        "Move assignment: error replaces success (has_value_ false path)");
+    {
+        Result<int> dst(100); // starts as success
+        Result<int> src(SocketError::SendFailed, "send failed", 32);
+        dst = std::move(src);
+        REQUIRE(dst.isError());
+        REQUIRE(dst.error() == SocketError::SendFailed);
+    }
+
+    // Test 39: buildErrorMessage with null description
+    BEGIN_TEST("buildErrorMessage: null description returns \"Unknown error\"");
+    {
+        Result<int> result(SocketError::Unknown, nullptr, 0);
+        const std::string& msg = result.message();
+        REQUIRE(msg == "Unknown error");
+    }
+
+    // Test 40: buildErrorMessage with isDns=true (gai_strerror path)
+    BEGIN_TEST("buildErrorMessage: isDns=true uses gai_strerror");
+    {
+        // EAI_NONAME (-2 on most POSIX systems) is a well-known DNS error code.
+        Result<int> result(
+            SocketError::ConnectFailed, "DNS lookup failed", -2, true);
+        const std::string& msg = result.message();
+        REQUIRE(!msg.empty());
+        REQUIRE(msg.find("DNS lookup failed") != std::string::npos);
+    }
+
+    // Test 41: Result<bool> error instantiation (covers unexecuted
+    // isError/error)
+    BEGIN_TEST(
+        "Result<bool>: error instantiation exercises bool specialisation");
+    {
+        Result<bool> r(SocketError::ConnectFailed, "bool error");
+        REQUIRE(r.isError());
+        REQUIRE(!r.isSuccess());
+        REQUIRE(r.error() == SocketError::ConnectFailed);
+    }
+
+    // Test 42: Result<bool> success — exercises value_ref() for bool
+    BEGIN_TEST("Result<bool>: success value access exercises value_ref");
+    {
+        Result<bool> r(true);
+        REQUIRE(r.isSuccess());
+        REQUIRE(r.value() == true);
+    }
+
+    // Test 43: Result<Port> error instantiation
+    BEGIN_TEST(
+        "Result<Port>: error instantiation exercises Port specialisation");
+    {
+        Result<Port> r(SocketError::BindFailed, "port error");
+        REQUIRE(r.isError());
+        REQUIRE(r.error() == SocketError::BindFailed);
+    }
+
+    // Test 44: Result<Port> success — exercises value_ref() for Port
+    BEGIN_TEST("Result<Port>: success value access exercises value_ref");
+    {
+        Result<Port> r(Port{8080});
+        REQUIRE(r.isSuccess());
+        REQUIRE(r.value() == Port{8080});
+    }
+
+    // Test 45: Result<UdpSocket> move-constructor exercises UdpSocket
+    // instantiation
+    BEGIN_TEST("Result<UdpSocket>: move-ctor from error exercises UdpSocket "
+               "specialisation");
+    {
+        Result<UdpSocket> r(SocketError::BindFailed, "udp error");
+        Result<UdpSocket> r2(std::move(r));
+        REQUIRE(r2.isError());
+        REQUIRE(r2.error() == SocketError::BindFailed);
     }
 
     return test_summary();
