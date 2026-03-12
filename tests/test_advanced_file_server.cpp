@@ -71,6 +71,7 @@ class CustomFileServer : public HttpFileServer {
         // Special handling for root path - show testing instructions
         if (request.path == "/" || request.path == "/index.html") {
             std::string instructions = generateTestingInstructions();
+            const bool headOnly = (request.method == "HEAD");
 
             std::string response;
             response.reserve(256 + instructions.size());
@@ -88,7 +89,7 @@ class CustomFileServer : public HttpFileServer {
             }
 
             response += "\r\n";
-            response += instructions;
+            if (!headOnly) response += instructions;
 
             state.responseBuf = std::move(response);
             state.responseView = state.responseBuf;
@@ -974,8 +975,7 @@ void testHeadMethodBehavior() {
         TestFramework::assert_contains(
             contentLength, "", "HEAD should return Content-Length header");
         TestFramework::assert_true(
-            body.empty() || body.find("Test Page") == std::string::npos,
-            "HEAD request should have empty or no body");
+            body.empty(), "HEAD request should not include a body");
     }
 
     // Behavior: HEAD request for CSS file also returns headers only

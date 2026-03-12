@@ -77,6 +77,14 @@ namespace {
             response, cfg.enableSecurityHeaders, cfg.customHeaders);
     }
 
+    // For HEAD, keep headers (including Content-Length) but drop the body.
+    void stripBodyForHead_(HttpClientState& state) {
+        const size_t sep = state.responseBuf.find("\r\n\r\n");
+        if (sep == std::string::npos) return;
+        state.responseBuf.resize(sep + 4);
+        state.responseView = state.responseBuf;
+    }
+
 } // anonymous namespace
 
 HttpFileServer::HttpFileServer(
@@ -137,6 +145,8 @@ void HttpFileServer::buildResponse(HttpClientState& state) {
         return;
     }
 
+    const bool headOnly = (request.method == "HEAD");
+
     std::string filePath = resolveFilePath(request.path);
 
     if (!validateFilePath_(state, filePath)) return;
@@ -145,6 +155,7 @@ void HttpFileServer::buildResponse(HttpClientState& state) {
 
     if (!fileInfo.exists) {
         sendError(state, 404, "Not Found", "File not found");
+        if (headOnly) stripBodyForHead_(state);
         return;
     }
 
@@ -153,6 +164,8 @@ void HttpFileServer::buildResponse(HttpClientState& state) {
     } else {
         handleFileRequest(state, filePath, fileInfo, request);
     }
+
+    if (headOnly) stripBodyForHead_(state);
 }
 
 std::string HttpFileServer::resolveFilePath(const std::string& target) const {

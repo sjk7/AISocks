@@ -34,6 +34,9 @@ namespace aiSocks {
 // ---------------------------------------------------------------------------
 struct HttpClientState {
     std::string request;
+    // Bytes for subsequent pipelined requests received while a response is
+    // already being written.
+    std::string queuedRequest;
     // Zero-copy response path: responseView is the active view of the response
     // data.  For static pre-built responses it points directly into the
     // server's long-lived std::string storage — no copy, no allocation.
@@ -60,6 +63,7 @@ struct HttpClientState {
 
     HttpClientState(const HttpClientState& other)
         : request(other.request)
+        , queuedRequest(other.queuedRequest)
         , responseView(other.responseView)
         , responseBuf(other.responseBuf)
         , sent(other.sent)
@@ -76,6 +80,7 @@ struct HttpClientState {
 
     HttpClientState(HttpClientState&& other) noexcept
         : request(std::move(other.request))
+        , queuedRequest(std::move(other.queuedRequest))
         , responseView(other.responseView)
         , responseBuf(std::move(other.responseBuf))
         , sent(other.sent)
@@ -96,6 +101,7 @@ struct HttpClientState {
     HttpClientState& operator=(const HttpClientState& other) {
         if (this == &other) return *this;
         request = other.request;
+        queuedRequest = other.queuedRequest;
         responseView = other.responseView;
         responseBuf = other.responseBuf;
         sent = other.sent;
@@ -114,6 +120,7 @@ struct HttpClientState {
     HttpClientState& operator=(HttpClientState&& other) noexcept {
         if (this == &other) return *this;
         request = std::move(other.request);
+        queuedRequest = std::move(other.queuedRequest);
         responseView = other.responseView;
         responseBuf = std::move(other.responseBuf);
         sent = other.sent;

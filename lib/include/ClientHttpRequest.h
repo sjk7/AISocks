@@ -195,14 +195,30 @@ ClientHttpRequest::Builder::parseUrl(std::string_view url) {
     parsed.path = (pathStart < remaining.size()) ? remaining.substr(pathStart)
                                                  : std::string_view("/");
 
-    // Extract port from host
-    size_t portPos = hostPort.find(':');
-    if (portPos == std::string::npos) {
+    // Extract host + optional port. Bracketed IPv6 literal is allowed.
+    if (!hostPort.empty() && hostPort.front() == '[') {
+        const size_t rb = hostPort.find(']');
+        if (rb == std::string_view::npos) {
+            parsed.host = hostPort;
+            parsed.port = "";
+            return parsed;
+        }
+        parsed.host = hostPort.substr(0, rb + 1); // keep brackets for Host:
+        if (rb + 1 < hostPort.size() && hostPort[rb + 1] == ':')
+            parsed.port = hostPort.substr(rb + 2);
+        else
+            parsed.port = "";
+        return parsed;
+    }
+
+    const size_t colonPos = hostPort.find(':');
+    if (colonPos != std::string_view::npos
+        && hostPort.find(':', colonPos + 1) == std::string_view::npos) {
+        parsed.host = hostPort.substr(0, colonPos);
+        parsed.port = hostPort.substr(colonPos + 1);
+    } else {
         parsed.host = hostPort;
         parsed.port = "";
-    } else {
-        parsed.host = hostPort.substr(0, portPos);
-        parsed.port = hostPort.substr(portPos + 1);
     }
 
     return parsed;

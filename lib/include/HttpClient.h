@@ -19,6 +19,7 @@
 #include "ClientHttpRequest.h"
 #include "SocketFactory.h"
 #include "SocketTypes.h"
+#include <chrono>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -207,6 +208,54 @@ class HttpClient {
     private:
     Options options_;
 
+    static bool parseAuthority_(
+        const std::string& authority, std::string& hostOut, Port& portOut) {
+        hostOut.clear();
+        portOut = Port{80};
+        if (authority.empty()) return false;
+
+        if (authority.front() == '[') {
+            const size_t rb = authority.find(']');
+            if (rb == std::string::npos) return false;
+
+            hostOut = authority.substr(1, rb - 1); // connect() wants raw IPv6
+            if (rb + 1 < authority.size()) {
+                if (authority[rb + 1] != ':') return false;
+                const std::string portStr = authority.substr(rb + 2);
+                if (!portStr.empty()) {
+                    try {
+                        const int portNum = std::stoi(portStr);
+                        if (portNum < 1 || portNum > 65535) return false;
+                        portOut = Port{static_cast<uint16_t>(portNum)};
+                    } catch (...) {
+                        return false;
+                    }
+                }
+            }
+            return true;
+        }
+
+        const size_t colon = authority.find(':');
+        if (colon != std::string::npos
+            && authority.find(':', colon + 1) == std::string::npos) {
+            hostOut = authority.substr(0, colon);
+            const std::string portStr = authority.substr(colon + 1);
+            if (!portStr.empty()) {
+                try {
+                    const int portNum = std::stoi(portStr);
+                    if (portNum < 1 || portNum > 65535) return false;
+                    portOut = Port{static_cast<uint16_t>(portNum)};
+                } catch (...) {
+                    return false;
+                }
+            }
+            return !hostOut.empty();
+        }
+
+        hostOut = authority;
+        return true;
+    }
+
     // Core request implementation
     Result<HttpClientResponse> performRequest(const std::string& method,
         const std::string& url, const std::string& body,
@@ -227,26 +276,16 @@ class HttpClient {
             size_t pathStart = remaining.find('/');
             if (pathStart == std::string::npos) pathStart = remaining.size();
 
-            std::string hostPort = remaining.substr(0, pathStart);
-
-            // Extract port from host if specified
+            const std::string authority = remaining.substr(0, pathStart);
+            std::string host;
             Port port{80};
-            size_t portPos = hostPort.find(':');
-            if (portPos != std::string::npos) {
-                std::string portStr = hostPort.substr(portPos + 1);
-                hostPort = hostPort.substr(0, portPos);
-                try {
-                    int portNum = std::stoi(portStr);
-                    if (portNum >= 1 && portNum <= 65535) {
-                        port = Port{static_cast<uint16_t>(portNum)};
-                    }
-                } catch (...) {
-                    port = Port{80};
-                }
+            if (!parseAuthority_(authority, host, port)) {
+                return Result<HttpClientResponse>::failure(
+                    SocketError::Unknown, "Invalid URL authority");
             }
 
             // Connect using existing SocketFactory
-            ConnectArgs args{hostPort, port, options_.connectTimeout};
+            ConnectArgs args{host, port, options_.connectTimeout};
             auto socketResult = SocketFactory::createTcpClient(args);
             if (!socketResult.isSuccess()) {
                 return Result<HttpClientResponse>::failure(
@@ -255,11 +294,9 @@ class HttpClient {
 
             TcpSocket socket = std::move(socketResult.value());
 
-            // Apply the per-request receive timeout so that a server that
-            // accepts the connection but never sends a response does not
-            // block the caller indefinitely.
-            if (options_.requestTimeout.count > 0)
-                socket.setReceiveTimeout(options_.requestTimeout);
+            const bool boundedRequest = options_.requestTimeout.count > 0;
+            const auto requestDeadline = std::chrono::steady_clock::now()
+                + std::chrono::milliseconds(options_.requestTimeout.count);
 
             auto requestBuilder = ClientHttpRequest::builder()
                                       .method(method)
@@ -323,6 +360,19 @@ class HttpClient {
             };
 
             while (true) {
+                if (boundedRequest) {
+                    const auto now = std::chrono::steady_clock::now();
+                    const auto remaining
+                        = std::chrono::duration_cast<std::chrono::milliseconds>(
+                            requestDeadline - now)
+                              .count();
+                    if (remaining <= 0) {
+                        return Result<HttpClientResponse>::failure(
+                            SocketError::Timeout, "Request timed out");
+                    }
+                    socket.setReceiveTimeout(Milliseconds{remaining});
+                }
+
                 int n = socket.receive(buffer, sizeof(buffer));
                 if (n < 0) {
                     const auto err = socket.getLastError();

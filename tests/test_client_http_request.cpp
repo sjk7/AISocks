@@ -16,6 +16,7 @@
 // 13. builder() PUT with body emits Content-Length
 // 14. builder() GET with body does NOT emit Content-Length
 // 15. forUrl() output is parseable by HttpRequest::parse()
+// 16. forUrl() with bracketed IPv6 literal keeps Host brackets
 
 #include "ClientHttpRequest.h"
 #include "HttpRequest.h"
@@ -222,6 +223,16 @@ static void test_forUrl_parseable() {
 }
 
 // ---------------------------------------------------------------------------
+// 16. forUrl() with bracketed IPv6 literal keeps Host brackets
+// ---------------------------------------------------------------------------
+static void test_forUrl_ipv6_bracketed_host() {
+    BEGIN_TEST("forUrl() bracketed IPv6 host");
+    std::string req = ClientHttpRequest::forUrl("http://[::1]:8080/path");
+    REQUIRE(startsWith(req, "GET /path HTTP/1.1\r\n"));
+    REQUIRE(contains(req, "Host: [::1]:8080\r\n"));
+}
+
+// ---------------------------------------------------------------------------
 int main() {
     test_forUrl_defaults();
     test_forUrl_host();
@@ -238,5 +249,6 @@ int main() {
     test_builder_put_content_length();
     test_builder_get_no_content_length();
     test_forUrl_parseable();
+    test_forUrl_ipv6_bracketed_host();
     return test_summary();
 }

@@ -270,6 +270,49 @@ static void test_request_timeout_fails() {
     REQUIRE(!result.isSuccess());
 }
 
+static void test_request_timeout_is_total_deadline() {
+    BEGIN_TEST("HttpClient requestTimeout applies to full response deadline");
+
+    auto listenerResult = SocketFactory::createTcpServer(
+        AddressFamily::IPv4, ServerBind{"127.0.0.1", Port{0}});
+    REQUIRE(listenerResult.isSuccess());
+    if (!listenerResult.isSuccess()) return;
+    TcpSocket listener = std::move(listenerResult.value());
+    REQUIRE(listener.setReceiveTimeout(Milliseconds{500}));
+
+    const Port port = listener.getLocalEndpoint().value().port;
+
+    std::thread serverThread([&] {
+        auto client = listener.accept();
+        if (!client) return;
+
+        client->setReceiveTimeout(Milliseconds{500});
+        char reqBuf[1024];
+        (void)client->receive(reqBuf, sizeof(reqBuf)); // drain request bytes
+
+        const std::string hdr = "HTTP/1.1 200 OK\r\n"
+                                "Content-Length: 5\r\n"
+                                "Connection: close\r\n\r\n";
+        if (!client->sendAll(hdr.data(), hdr.size())) return;
+
+        const char* body = "hello";
+        for (int i = 0; i < 5; ++i) {
+            if (!client->sendAll(body + i, 1)) break;
+            std::this_thread::sleep_for(80ms);
+        }
+    });
+
+    HttpClient::Options opts;
+    opts.connectTimeout = Milliseconds{500};
+    opts.requestTimeout = Milliseconds{150};
+
+    auto result = HttpClient{opts}.get(
+        "http://127.0.0.1:" + std::to_string(port.value()) + "/");
+
+    serverThread.join();
+    REQUIRE(!result.isSuccess());
+}
+
 static void test_server_init_failure_unblocks_waiter() {
     BEGIN_TEST("waitReady() unblocks and isValid() returns false when server "
                "fails to start");
@@ -318,6 +361,7 @@ int main() {
     test_bad_dns_fails();
     test_connect_timeout_fails();
     test_request_timeout_fails();
+    test_request_timeout_is_total_deadline();
     test_server_init_failure_unblocks_waiter();
 
     return test_summary();

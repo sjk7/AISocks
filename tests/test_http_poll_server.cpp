@@ -473,7 +473,7 @@ int main() {
     }
 
     // Test 9: Multiple pipelined requests (HTTP/1.1 keep-alive)
-    BEGIN_TEST("Pipelining: multiple requests on same connection");
+    BEGIN_TEST("Pipelining: coalesced requests receive multiple responses");
     {
         TestHttpServer server(ServerBind{"127.0.0.1", Port{0}});
         REQUIRE(server.isValid());
@@ -490,23 +490,47 @@ int main() {
         auto& client = clientResult.value();
         client.setReceiveTimeout(Milliseconds{1000});
 
-        int successfulRequests = 0;
-        for (int i = 0; i < 3; ++i) {
-            std::string req = "GET / HTTP/1.1\r\nHost: localhost\r\n\r\n";
-            if (client.sendAll(req.data(), req.size())) {
-                std::string response = receiveCompleteResponse(client);
-                if (!response.empty()
-                    && response.find("200") != std::string::npos) {
-                    successfulRequests++;
+        const std::string one = "GET / HTTP/1.1\r\nHost: localhost\r\n\r\n";
+        const std::string pipelined = one + one;
+        REQUIRE(client.sendAll(pipelined.data(), pipelined.size()));
+
+        std::string all;
+        char buf[2048];
+        auto start = std::chrono::steady_clock::now();
+        while (std::chrono::steady_clock::now() - start
+            < std::chrono::milliseconds(1500)) {
+            int n = client.receive(buf, sizeof(buf));
+            if (n > 0) {
+                all.append(buf, static_cast<size_t>(n));
+                size_t count200 = 0;
+                size_t pos = 0;
+                while ((pos = all.find("HTTP/1.1 200 OK", pos))
+                    != std::string::npos) {
+                    ++count200;
+                    pos += 15;
                 }
+                if (count200 >= 2) break;
+                continue;
             }
+            if (n == 0) break;
+            const auto err = client.getLastError();
+            if (err == SocketError::WouldBlock || err == SocketError::Timeout)
+                continue;
+            break;
+        }
+
+        size_t count200 = 0;
+        size_t pos = 0;
+        while ((pos = all.find("HTTP/1.1 200 OK", pos)) != std::string::npos) {
+            ++count200;
+            pos += 15;
         }
 
         g_serverSignalStop.store(true);
         serverThread.join();
         g_serverSignalStop.store(false);
 
-        REQUIRE(successfulRequests >= 2); // At least 2 should succeed
+        REQUIRE(count200 >= 2);
     }
 
     // Test 10: Request buffering - partial request handling

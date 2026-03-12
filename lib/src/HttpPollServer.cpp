@@ -178,6 +178,18 @@ ServerResult HttpPollServer::onReadable(TcpSocket& sock, HttpClientState& s) {
 
         if (n > 0) {
             touchClient(sock, now);
+
+            // If a response is already in-flight, park incoming bytes as the
+            // next pipelined request payload and process them after send.
+            if (!s.responseView.empty()) {
+                s.queuedRequest.append(buf, static_cast<size_t>(n));
+                continue;
+            }
+
+            if (s.request.empty()) {
+                // Start a new slowloris window for each new request.
+                s.startTime = now;
+            }
             s.request.append(buf, static_cast<size_t>(n));
 
             if (s.request.size() > HttpPollServer::MAX_HEADER_SIZE) {
@@ -193,6 +205,15 @@ ServerResult HttpPollServer::onReadable(TcpSocket& sock, HttpClientState& s) {
 
             if (s.responseView.empty()
                 && requestComplete(s.request, s.requestScanPos)) {
+                // Consume exactly one request so any pipelined tail remains
+                // queued for the next response cycle.
+                const size_t end = s.request.find("\r\n\r\n");
+                if (end != std::string::npos && end + 4 < s.request.size()) {
+                    s.queuedRequest.append(s.request.data() + end + 4,
+                        s.request.size() - (end + 4));
+                    s.request.resize(end + 4);
+                }
+                s.requestScanPos = 0;
                 dispatchBuildResponse(s);
                 setClientWritable(sock, true);
                 return onWritable(sock, s);
@@ -235,6 +256,23 @@ ServerResult HttpPollServer::onWritable(TcpSocket& sock, HttpClientState& s) {
         const bool shouldClose = s.closeAfterSend;
         resetAfterSend_(s);
         setClientWritable(sock, false);
+
+        if (!shouldClose && !s.request.empty()
+            && requestComplete(s.request, s.requestScanPos)) {
+            // Immediately process queued pipelined data already buffered on
+            // this connection.
+            const size_t end = s.request.find("\r\n\r\n");
+            if (end != std::string::npos && end + 4 < s.request.size()) {
+                s.queuedRequest.append(
+                    s.request.data() + end + 4, s.request.size() - (end + 4));
+                s.request.resize(end + 4);
+            }
+            s.requestScanPos = 0;
+            dispatchBuildResponse(s);
+            setClientWritable(sock, true);
+            return onWritable(sock, s);
+        }
+
         return shouldClose ? ServerResult::Disconnect
                            : ServerResult::KeepConnection;
     }
@@ -242,14 +280,16 @@ ServerResult HttpPollServer::onWritable(TcpSocket& sock, HttpClientState& s) {
 }
 
 void HttpPollServer::resetAfterSend_(HttpClientState& s) {
-    s.request.clear();
+    s.request = std::move(s.queuedRequest);
+    s.queuedRequest.clear();
     s.responseView = {};
     s.responseBuf.clear();
     s.parsedRequest = HttpRequest{};
     s.sent = 0;
     s.responseStarted = false;
     s.closeAfterSend = false;
-    s.requestScanPos = 0;
+    s.requestScanPos = s.request.size() >= 3 ? s.request.size() - 3 : 0;
+    if (!s.request.empty()) s.startTime = std::chrono::steady_clock::now();
 }
 
 ServerResult HttpPollServer::onIdle() {

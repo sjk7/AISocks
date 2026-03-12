@@ -1,5 +1,6 @@
 set(TEST_SOURCES
     test_socket_basics
+    test_socket_types
     test_ip_utils
     test_blocking
     test_move_semantics
