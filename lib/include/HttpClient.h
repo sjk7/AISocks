@@ -187,22 +187,99 @@ class HttpClient {
     const Options& getOptions() const noexcept { return options_; }
 
     /// Resolve a Location header value against the base URL that produced it.
-    /// If location is already absolute (contains "://") it is returned as-is.
-    /// If it starts with '/' it is resolved against the scheme+host of base.
+    /// Supports absolute, scheme-relative, root-relative, query-relative,
+    /// and path-relative references with dot-segment normalization.
     static std::string resolveUrl(
         const std::string& base, const std::string& location) {
+        if (location.empty()) return base;
+
         if (location.find("://") != std::string::npos) return location;
-        if (!location.empty() && location[0] == '/') {
-            size_t schemeEnd = base.find("://");
-            size_t hostEnd = (schemeEnd != std::string::npos)
-                ? base.find('/', schemeEnd + 3)
-                : std::string::npos;
-            std::string origin = (hostEnd != std::string::npos)
-                ? base.substr(0, hostEnd)
-                : base;
-            return origin + location;
+
+        const size_t schemeEnd = base.find("://");
+        if (schemeEnd == std::string::npos) return location;
+
+        const std::string scheme = base.substr(0, schemeEnd);
+        const size_t authStart = schemeEnd + 3;
+        const size_t pathStart = base.find('/', authStart);
+        const std::string origin = (pathStart == std::string::npos)
+            ? base
+            : base.substr(0, pathStart);
+
+        if (location.size() >= 2 && location[0] == '/' && location[1] == '/')
+            return scheme + ":" + location;
+
+        if (location[0] == '/') return origin + location;
+
+        const size_t queryPos = base.find('?', authStart);
+        const size_t fragPos = base.find('#', authStart);
+        size_t basePathEnd = std::string::npos;
+        if (queryPos != std::string::npos && fragPos != std::string::npos)
+            basePathEnd = (queryPos < fragPos) ? queryPos : fragPos;
+        else if (queryPos != std::string::npos)
+            basePathEnd = queryPos;
+        else
+            basePathEnd = fragPos;
+
+        const std::string basePath = (pathStart == std::string::npos)
+            ? "/"
+            : base.substr(pathStart,
+                  (basePathEnd == std::string::npos)
+                      ? std::string::npos
+                      : (basePathEnd - pathStart));
+
+        if (location[0] == '?') return origin + basePath + location;
+        if (location[0] == '#') {
+            std::string out = base;
+            const size_t oldFrag = out.find('#', authStart);
+            if (oldFrag != std::string::npos) out.resize(oldFrag);
+            out += location;
+            return out;
         }
-        return location;
+
+        size_t cut = location.find('?');
+        const size_t hashCut = location.find('#');
+        if (cut == std::string::npos
+            || (hashCut != std::string::npos && hashCut < cut))
+            cut = hashCut;
+        const std::string relPath = location.substr(0, cut);
+        const std::string suffix
+            = (cut == std::string::npos) ? std::string{} : location.substr(cut);
+
+        std::string baseDir = basePath;
+        const size_t lastSlash = baseDir.rfind('/');
+        baseDir = (lastSlash == std::string::npos)
+            ? "/"
+            : baseDir.substr(0, lastSlash + 1);
+
+        std::string merged = baseDir + relPath;
+        std::vector<std::string> segs;
+        segs.reserve(8);
+        size_t i = 0;
+        while (i <= merged.size()) {
+            const size_t j = merged.find('/', i);
+            const std::string seg = (j == std::string::npos)
+                ? merged.substr(i)
+                : merged.substr(i, j - i);
+
+            if (seg.empty() || seg == ".") {
+                // ignore
+            } else if (seg == "..") {
+                if (!segs.empty()) segs.pop_back();
+            } else {
+                segs.push_back(seg);
+            }
+
+            if (j == std::string::npos) break;
+            i = j + 1;
+        }
+
+        std::string normalized = "/";
+        for (size_t k = 0; k < segs.size(); ++k) {
+            if (k) normalized.push_back('/');
+            normalized += segs[k];
+        }
+
+        return origin + normalized + suffix;
     }
 
     private:

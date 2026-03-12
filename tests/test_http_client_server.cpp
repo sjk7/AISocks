@@ -348,6 +348,27 @@ static void test_server_init_failure_unblocks_waiter() {
     occupantThread.join();
 }
 
+static void test_resolve_url_relative_redirects() {
+    BEGIN_TEST("HttpClient::resolveUrl handles relative Location values");
+
+    const std::string base = "http://example.com/a/b/c?old=1#frag";
+
+    REQUIRE(HttpClient::resolveUrl(base, "https://other.test/x")
+        == "https://other.test/x");
+    REQUIRE(
+        HttpClient::resolveUrl(base, "//cdn.test/r") == "http://cdn.test/r");
+    REQUIRE(HttpClient::resolveUrl(base, "/root") == "http://example.com/root");
+    REQUIRE(
+        HttpClient::resolveUrl(base, "next") == "http://example.com/a/b/next");
+    REQUIRE(HttpClient::resolveUrl(base, "../up") == "http://example.com/a/up");
+    REQUIRE(HttpClient::resolveUrl(base, "./here?x=1")
+        == "http://example.com/a/b/here?x=1");
+    REQUIRE(
+        HttpClient::resolveUrl(base, "?q=2") == "http://example.com/a/b/c?q=2");
+    REQUIRE(HttpClient::resolveUrl(base, "#new")
+        == "http://example.com/a/b/c?old=1#new");
+}
+
 // ---------------------------------------------------------------------------
 
 int main() {
@@ -363,6 +384,7 @@ int main() {
     test_request_timeout_fails();
     test_request_timeout_is_total_deadline();
     test_server_init_failure_unblocks_waiter();
+    test_resolve_url_relative_redirects();
 
     return test_summary();
 }
