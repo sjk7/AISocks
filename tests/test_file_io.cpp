@@ -14,6 +14,7 @@
 #else
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <unistd.h>
 #endif
 
 using namespace aiSocks;
@@ -157,6 +158,29 @@ int main() {
         REQUIRE(info.lastModified > 0);
     }
 
+#ifndef _WIN32
+    // Test 9: Read-only open does not follow symlink final component
+    BEGIN_TEST("File: read-only open rejects symlink final component");
+    {
+        {
+            File target("test_symlink_target.txt", "w");
+            REQUIRE(target.isOpen());
+            REQUIRE(target.writeString("sensitive\n"));
+        }
+
+        // Best-effort cleanup before creating link.
+        ::unlink("test_symlink_link.txt");
+        REQUIRE(
+            ::symlink("test_symlink_target.txt", "test_symlink_link.txt") == 0);
+
+        File viaLink("test_symlink_link.txt", "r");
+        REQUIRE(!viaLink.isOpen());
+
+        ::unlink("test_symlink_link.txt");
+        ::unlink("test_symlink_target.txt");
+    }
+#endif
+
     // Tests 9-12 (StringBuilder) removed — StringBuilder replaced by
     // std::string.
 
@@ -166,6 +190,8 @@ int main() {
     remove("test_move.txt");
     remove("test_move2.txt");
     remove("test_lock.txt");
+    remove("test_symlink_link.txt");
+    remove("test_symlink_target.txt");
 
     return test_summary();
 }

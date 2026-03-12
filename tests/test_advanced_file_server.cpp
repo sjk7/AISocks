@@ -143,6 +143,7 @@ class CustomFileServer : public HttpFileServer {
         html += "</div></body></html>";
         return html;
     }
+    size_t cacheSize() { return getFileCache().size(); }
 
     protected:
     bool isAuthenticated(const HttpRequest& request) const {
@@ -392,6 +393,49 @@ void setupTestEnvironment() {
     File envFile("test_www/.env", "w");
     envFile.writeString("SECRET_KEY=abc123");
     envFile.close();
+}
+/// Regression: requests with query strings must bypass file-content cache.
+void testQueryStringBypassesCache() {
+    fputs("\n=== QUERY CACHE BYPASS REGRESSION TESTS ===\n", stdout);
+
+    HttpFileServer::Config config;
+    config.documentRoot = "test_www";
+    config.enableCache = true;
+    CustomFileServer server(ServerBind{"127.0.0.1", Port{0}}, config);
+
+    // Query requests should be served but not inserted into file cache.
+    {
+        std::string request = BehavioralTestHelper::makeHttpRequest(
+            "GET", "/script.js?cacheBust=123", "YWRtaW46c2VjcmV0");
+        HttpClientState state;
+        state.request = request;
+
+        server.buildResponse(state);
+        std::string status
+            = BehavioralTestHelper::extractStatus(state.responseBuf);
+
+        TestFramework::assert_contains(
+            status, "200", "Query request should be served successfully");
+        TestFramework::assert_true(server.cacheSize() == 0,
+            "Query request must bypass file cache insertion");
+    }
+
+    // Non-query requests are cache-eligible and should populate cache.
+    {
+        std::string request = BehavioralTestHelper::makeHttpRequest(
+            "GET", "/script.js", "YWRtaW46c2VjcmV0");
+        HttpClientState state;
+        state.request = request;
+
+        server.buildResponse(state);
+        std::string status
+            = BehavioralTestHelper::extractStatus(state.responseBuf);
+
+        TestFramework::assert_contains(
+            status, "200", "Non-query request should be served successfully");
+        TestFramework::assert_true(
+            server.cacheSize() > 0, "Non-query request should populate cache");
+    }
 }
 
 /// Clean up test environment
@@ -1323,6 +1367,7 @@ int main() {
         testHeadMethodBehavior();
         testRangeRequestBehavior();
         testCachingHeadersBehavior();
+        testQueryStringBypassesCache();
         testMimeTypeBehavior();
         testConcurrencyBehavior();
 

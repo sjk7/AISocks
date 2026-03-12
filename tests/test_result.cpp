@@ -12,6 +12,9 @@
 #include "Result.h"
 #include "TcpSocket.h"
 #include "UdpSocket.h"
+#ifdef AISOCKS_HAVE_UNIX_SOCKETS
+#include "UnixSocket.h"
+#endif
 #include "SocketFactory.h"
 #include "SocketTypes.h"
 #include "test_helpers.h"
@@ -592,9 +595,11 @@ int main() {
             = Result<UdpSocket>::failure(SocketError::BindFailed, "udp-fail");
         REQUIRE(ru.isError());
 
+#ifdef AISOCKS_HAVE_UNIX_SOCKETS
         auto rx = Result<UnixSocket>::failure(
             SocketError::ConnectFailed, "unix-fail");
         REQUIRE(rx.isError());
+#endif
     }
 
     // Test 48: static success() for bool and Port
