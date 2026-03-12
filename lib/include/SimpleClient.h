@@ -56,7 +56,8 @@ class SimpleClient {
             lastErrorMessage_.clear();
             if (!socket_->setReceiveTimeout(args.connectTimeout)) {
                 lastErrorCode_ = socket_->getLastError();
-                lastErrorMessage_ = "Connected, but failed to set receive timeout - "
+                lastErrorMessage_
+                    = "Connected, but failed to set receive timeout - "
                     + socket_->getErrorMessage();
             }
         } else {
