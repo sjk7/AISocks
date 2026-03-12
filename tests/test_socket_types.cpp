@@ -120,24 +120,43 @@ int main() {
 
     BEGIN_TEST("Port: named well-known port constants");
     {
-        REQUIRE(Port::ftp == 21);
-        REQUIRE(Port::ftpData == 20);
-        REQUIRE(Port::ssh == 22);
-        REQUIRE(Port::telnet == 23);
-        REQUIRE(Port::smtp == 25);
-        REQUIRE(Port::dns == 53);
-        REQUIRE(Port::http == 80);
-        REQUIRE(Port::pop3 == 110);
-        REQUIRE(Port::imap == 143);
-        REQUIRE(Port::https == 443);
-        REQUIRE(Port::smtps == 465);
-        REQUIRE(Port::smtpSubmit == 587);
-        REQUIRE(Port::imaps == 993);
-        REQUIRE(Port::pop3s == 995);
-        REQUIRE(Port::httpAlt == 8080);
-        REQUIRE(Port::httpsAlt == 8443);
-        REQUIRE(Port::ephemeralStart == 49152);
-        REQUIRE(Port::any.value() == 0);
+        volatile uint16_t ftp = Port::ftp;
+        volatile uint16_t ftpData = Port::ftpData;
+        volatile uint16_t ssh = Port::ssh;
+        volatile uint16_t telnet = Port::telnet;
+        volatile uint16_t smtp = Port::smtp;
+        volatile uint16_t dns = Port::dns;
+        volatile uint16_t http = Port::http;
+        volatile uint16_t pop3 = Port::pop3;
+        volatile uint16_t imap = Port::imap;
+        volatile uint16_t https = Port::https;
+        volatile uint16_t smtps = Port::smtps;
+        volatile uint16_t smtpSubmit = Port::smtpSubmit;
+        volatile uint16_t imaps = Port::imaps;
+        volatile uint16_t pop3s = Port::pop3s;
+        volatile uint16_t httpAlt = Port::httpAlt;
+        volatile uint16_t httpsAlt = Port::httpsAlt;
+        volatile uint16_t ephemeralStart = Port::ephemeralStart;
+        volatile uint16_t anyPort = Port::any.value();
+
+        REQUIRE(ftp == 21);
+        REQUIRE(ftpData == 20);
+        REQUIRE(ssh == 22);
+        REQUIRE(telnet == 23);
+        REQUIRE(smtp == 25);
+        REQUIRE(dns == 53);
+        REQUIRE(http == 80);
+        REQUIRE(pop3 == 110);
+        REQUIRE(imap == 143);
+        REQUIRE(https == 443);
+        REQUIRE(smtps == 465);
+        REQUIRE(smtpSubmit == 587);
+        REQUIRE(imaps == 993);
+        REQUIRE(pop3s == 995);
+        REQUIRE(httpAlt == 8080);
+        REQUIRE(httpsAlt == 8443);
+        REQUIRE(ephemeralStart == 49152);
+        REQUIRE(anyPort == 0);
     }
 
     // -----------------------------------------------------------------------
@@ -159,12 +178,17 @@ int main() {
 
     BEGIN_TEST("Backlog: named platform constants");
     {
-        REQUIRE(Backlog::somaxconnMacOS == 128);
-        REQUIRE(Backlog::somaxconnLinux == 128);
-        REQUIRE(Backlog::defaultBacklog == 64);
-        REQUIRE(Backlog::maxBacklog > 0);
+        volatile int somaxconnMacOS = Backlog::somaxconnMacOS;
+        volatile int somaxconnLinux = Backlog::somaxconnLinux;
+        volatile int defaultBacklogValue = Backlog::defaultBacklog;
+        volatile int maxBacklogValue = Backlog::maxBacklog;
+        REQUIRE(somaxconnMacOS == 128);
+        REQUIRE(somaxconnLinux == 128);
+        REQUIRE(defaultBacklogValue == 64);
+        REQUIRE(maxBacklogValue > 0);
         // Windows sentinel value check
-        REQUIRE(Backlog::somaxconnWindows == static_cast<int>(0x7fff'ffff));
+        volatile int somaxconnWindows = Backlog::somaxconnWindows;
+        REQUIRE(somaxconnWindows == static_cast<int>(0x7fff'ffff));
     }
 
     // -----------------------------------------------------------------------

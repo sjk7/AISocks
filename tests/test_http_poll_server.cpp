@@ -877,8 +877,15 @@ int main() {
         HttpClientState s;
         s.request = "world";
         s.sent = 99;
+#if defined(__clang__) || defined(__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wself-move"
+#endif
         s = std::move(
             *&s); // self-move-assign via pointer to silence -Wself-move
+#if defined(__clang__) || defined(__GNUC__)
+#pragma GCC diagnostic pop
+#endif
         REQUIRE(s.sent == 99u);
     }
 
