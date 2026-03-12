@@ -562,5 +562,161 @@ int main() {
         REQUIRE(r2.error() == SocketError::BindFailed);
     }
 
+    // Test 46: static factory - failure() for easy types
+    BEGIN_TEST("static failure(): bool, Port, Endpoint factories");
+    {
+        auto rb = Result<bool>::failure(SocketError::ConnectFailed, "b-fail");
+        REQUIRE(rb.isError());
+        REQUIRE(rb.error() == SocketError::ConnectFailed);
+
+        auto rp = Result<Port>::failure(SocketError::BindFailed, "p-fail");
+        REQUIRE(rp.isError());
+        REQUIRE(rp.error() == SocketError::BindFailed);
+
+        auto re
+            = Result<Endpoint>::failure(SocketError::ConnectFailed, "e-fail");
+        REQUIRE(re.isError());
+        REQUIRE(!static_cast<bool>(re)); // operator bool on error
+    }
+
+    // Test 47: static failure() for socket types
+    BEGIN_TEST("static failure(): TcpSocket, UdpSocket, UnixSocket factories");
+    {
+        auto rt = Result<TcpSocket>::failure(
+            SocketError::ConnectFailed, "tcp-fail");
+        REQUIRE(rt.isError());
+        REQUIRE(rt.error() == SocketError::ConnectFailed);
+        REQUIRE(!rt.message().empty());
+
+        auto ru
+            = Result<UdpSocket>::failure(SocketError::BindFailed, "udp-fail");
+        REQUIRE(ru.isError());
+
+        auto rx = Result<UnixSocket>::failure(
+            SocketError::ConnectFailed, "unix-fail");
+        REQUIRE(rx.isError());
+    }
+
+    // Test 48: static success() for bool and Port
+    BEGIN_TEST("static success(): bool and Port");
+    {
+        auto rb = Result<bool>::success(true);
+        REQUIRE(rb.isSuccess());
+        REQUIRE(rb.value() == true);
+
+        auto rp = Result<Port>::success(Port{9090});
+        REQUIRE(rp.isSuccess());
+        REQUIRE(rp.value() == Port{9090});
+    }
+
+    // Test 49: static success() for Endpoint — exercises value_ref()
+    BEGIN_TEST("static success(): Endpoint - value_ref() and operator bool");
+    {
+        Endpoint ep{"127.0.0.1", Port{80}, AddressFamily::IPv4};
+        auto r = Result<Endpoint>::success(ep);
+        REQUIRE(r.isSuccess());
+        REQUIRE(static_cast<bool>(r));
+        const Endpoint& ref = r.value();
+        REQUIRE(ref.port == Port{80});
+    }
+
+    // Test 50: static success() for UdpSocket — exercises UdpSocket value_ref
+    BEGIN_TEST(
+        "static success(): UdpSocket - success factory with real socket");
+    {
+        UdpSocket udp{};
+        auto r = Result<UdpSocket>::success(std::move(udp));
+        REQUIRE(r.isSuccess());
+        (void)r.value(); // exercises value_ref() for UdpSocket
+    }
+
+    // Test 51: Result<TcpSocket> error — isError, error(), message()
+    BEGIN_TEST("Result<TcpSocket>: isError/error/message on failure result");
+    {
+        Result<TcpSocket> r(
+            SocketError::ConnectFailed, "connection refused", 111);
+        REQUIRE(r.isError());
+        REQUIRE(r.error() == SocketError::ConnectFailed);
+        const std::string& msg = r.message();
+        REQUIRE(!msg.empty());
+    }
+
+    // -------------------------------------------------------------------
+    // Result<bool>::message() — unexecuted instantiation coverage
+    // -------------------------------------------------------------------
+
+    // Test 52: Result<bool> message() on error exercises the bool instantiation
+    BEGIN_TEST("Result<bool>: message() on error result");
+    {
+        Result<bool> r(SocketError::ConnectFailed, "bool msg test", 7);
+        const std::string& msg = r.message();
+        REQUIRE(!msg.empty());
+        REQUIRE(msg.find("bool msg test") != std::string::npos);
+    }
+
+    // -------------------------------------------------------------------
+    // Result<void> — completely untested (lines 378-445 all zero)
+    // -------------------------------------------------------------------
+
+    // Test 53: Result<void> success path
+    BEGIN_TEST("Result<void>: success() factory and isSuccess/isError/operator "
+               "bool");
+    {
+        Result<void> r = Result<void>::success();
+        REQUIRE(r.isSuccess());
+        REQUIRE(!r.isError());
+        REQUIRE(static_cast<bool>(r));
+        REQUIRE(r.error() == SocketError::None);
+        const std::string& msg = r.message();
+        REQUIRE(msg.empty()); // success → empty message
+    }
+
+    // Test 54: Result<void> error path via constructor
+    BEGIN_TEST("Result<void>: error constructor and message() lazy build");
+    {
+        Result<void> r(SocketError::BindFailed, "void error", 98);
+        REQUIRE(r.isError());
+        REQUIRE(!r.isSuccess());
+        REQUIRE(!static_cast<bool>(r));
+        REQUIRE(r.error() == SocketError::BindFailed);
+        const std::string& msg = r.message();
+        REQUIRE(!msg.empty());
+        REQUIRE(msg.find("void error") != std::string::npos);
+    }
+
+    // Test 55: Result<void> failure() and failureOwned() static factories
+    BEGIN_TEST("Result<void>: failure() and failureOwned() static factories");
+    {
+        auto rf = Result<void>::failure(SocketError::SendFailed, "send void");
+        REQUIRE(rf.isError());
+        REQUIRE(rf.error() == SocketError::SendFailed);
+
+        auto ro = Result<void>::failureOwned(
+            SocketError::SendFailed, std::string("owned void"));
+        REQUIRE(ro.isError());
+        REQUIRE(ro.message().find("owned void") != std::string::npos);
+    }
+
+    // Test 56: Result<void> copy constructor and copy assignment
+    BEGIN_TEST("Result<void>: copy ctor and copy assignment");
+    {
+        Result<void> src(SocketError::Timeout, "timeout void", 110);
+
+        // copy ctor
+        Result<void> copy(src);
+        REQUIRE(copy.isError());
+        REQUIRE(copy.error() == SocketError::Timeout);
+
+        // copy assignment
+        Result<void> dst = Result<void>::success();
+        dst = src;
+        REQUIRE(dst.isError());
+        REQUIRE(dst.error() == SocketError::Timeout);
+
+        // self-assign
+        dst = *&dst;
+        REQUIRE(dst.isError());
+    }
+
     return test_summary();
 }
