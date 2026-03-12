@@ -44,6 +44,7 @@ set(TEST_SOURCES
     test_client_http_request
     test_bugfix_coverage
     test_http_client_server
+    test_dns_resolution_gate
 )
 
 # Slow tests (disabled by default, enable with -DALLOW_SLOW_TESTS=ON)
@@ -105,6 +106,7 @@ endif()
 foreach(TEST_NAME ${TEST_SOURCES})
     add_executable(${TEST_NAME} ${TEST_NAME}.cpp)
     target_link_libraries(${TEST_NAME} PRIVATE aiSocksLib)
+    target_compile_definitions(${TEST_NAME} PRIVATE AISOCKS_TESTING=1)
     target_include_directories(${TEST_NAME} PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}
         ${CMAKE_SOURCE_DIR}/lib/include

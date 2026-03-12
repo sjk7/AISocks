@@ -180,6 +180,14 @@ class Socket {
     static bool isValidIPv6(const std::string& address);
     static std::string ipToString(const void* addr, AddressFamily family);
 
+#ifdef AISOCKS_TESTING
+    // Test hooks for DNS resolver concurrency gate in SocketImpl.
+    static size_t dnsWorkerLimitForTesting() noexcept;
+    static size_t activeDnsWorkersForTesting() noexcept;
+    static void setDnsTestDelayForTesting(Milliseconds delay) noexcept;
+    static void resetDnsTestHooksForTesting() noexcept;
+#endif
+
     // Prevent copying
     Socket(const Socket&) = delete;
     Socket& operator=(const Socket&) = delete;

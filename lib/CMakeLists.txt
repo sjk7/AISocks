@@ -44,6 +44,10 @@ target_include_directories(aiSocksLib
         ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
+if(BUILD_TESTS)
+    target_compile_definitions(aiSocksLib PRIVATE AISOCKS_TESTING=1)
+endif()
+
 # Platform-specific libraries and compile definitions
 if(WIN32)
     target_link_libraries(aiSocksLib PRIVATE ws2_32 iphlpapi mswsock winmm)

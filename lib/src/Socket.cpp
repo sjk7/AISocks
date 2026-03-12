@@ -353,4 +353,22 @@ std::string Socket::ipToString(const void* addr, AddressFamily family) {
     return SocketImpl::ipToString(addr, family);
 }
 
+#ifdef AISOCKS_TESTING
+size_t Socket::dnsWorkerLimitForTesting() noexcept {
+    return SocketImpl::dnsWorkerLimitForTesting();
+}
+
+size_t Socket::activeDnsWorkersForTesting() noexcept {
+    return SocketImpl::activeDnsWorkersForTesting();
+}
+
+void Socket::setDnsTestDelayForTesting(Milliseconds delay) noexcept {
+    SocketImpl::setDnsTestDelayForTesting(delay);
+}
+
+void Socket::resetDnsTestHooksForTesting() noexcept {
+    SocketImpl::resetDnsTestHooksForTesting();
+}
+#endif
+
 } // namespace aiSocks

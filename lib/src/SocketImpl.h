@@ -75,14 +75,22 @@ class SocketImpl {
     static bool isValidIPv6(const std::string& address);
     static std::string ipToString(const void* addr, AddressFamily family);
 
+#ifdef AISOCKS_TESTING
+    // Test hooks for DNS concurrency-gate behavior.
+    static size_t dnsWorkerLimitForTesting() noexcept;
+    static size_t activeDnsWorkersForTesting() noexcept;
+    static void setDnsTestDelayForTesting(Milliseconds delay) noexcept;
+    static void resetDnsTestHooksForTesting() noexcept;
+#endif
+
     // Server operations
     bool bind(const std::string& address, Port port);
     bool listen(int backlog);
     std::unique_ptr<SocketImpl> accept();
 
     // Client operations
-    // timeout == 0: blocking (OS default). >0: fail with Timeout if the
-    // TCP handshake takes longer than timeout (DNS resolution is not covered).
+    // timeout == 0: blocking (OS default). >0: fail with Timeout if DNS queue
+    // wait + DNS lookup + TCP handshake together exceed timeout.
     bool connect(const std::string& address, Port port,
         Milliseconds timeout = defaultConnectTimeout);
 

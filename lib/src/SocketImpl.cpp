@@ -8,6 +8,7 @@
 #include "SocketImpl.h"
 #include "SocketImplHelpers.h"
 #include "Result.h"
+#include <atomic>
 #include <chrono>
 #include <cstring>
 #include <future>
@@ -25,6 +26,32 @@
 #endif
 
 namespace aiSocks {
+
+namespace {
+    // DNS lookups can block for a long time; cap detached resolver workers to
+    // prevent unbounded thread growth under repeated connection attempts.
+    static constexpr size_t kMaxConcurrentDnsWorkers = 4;
+    static constexpr int64_t kDnsGateSleepMs = 5;
+    std::atomic<size_t> g_activeDnsWorkers{0};
+#ifdef AISOCKS_TESTING
+    std::atomic<int64_t> g_dnsTestDelayMs{0};
+#endif
+
+    [[maybe_unused]] static bool acquireDnsWorkerSlot_(
+        std::chrono::steady_clock::time_point deadline) {
+        for (;;) {
+            size_t cur = g_activeDnsWorkers.load(std::memory_order_relaxed);
+            while (cur < kMaxConcurrentDnsWorkers) {
+                if (g_activeDnsWorkers.compare_exchange_weak(cur, cur + 1,
+                        std::memory_order_acq_rel, std::memory_order_relaxed))
+                    return true;
+            }
+            if (std::chrono::steady_clock::now() >= deadline) return false;
+            std::this_thread::sleep_for(
+                std::chrono::milliseconds(kDnsGateSleepMs));
+        }
+    }
+} // namespace
 
 // Platform-specific initialization
 #ifdef _WIN32
@@ -448,17 +475,55 @@ bool SocketImpl::resolveAddress_(const std::string& address, Port port,
     auto dnsRes = std::make_shared<DnsResult>();
     std::promise<void> dnsProm;
     auto dnsFut = dnsProm.get_future();
-
-    std::thread([addr = address, p = port, af = addressFamily, st = socketType,
-                    res = dnsRes, prom = std::move(dnsProm)]() mutable {
-        res->error = resolveToSockaddr(addr, p, af, st,
-            /*doDns=*/true, res->addr, res->addrLen, &res->gaiErr);
-        prom.set_value();
-    }).detach();
-
     static constexpr int64_t kDefaultDnsTimeoutMs = 5000;
-    int64_t dnsMs = (timeout.count > 0) ? timeout.count : kDefaultDnsTimeoutMs;
-    if (dnsFut.wait_for(std::chrono::milliseconds(dnsMs))
+    const int64_t dnsMs
+        = (timeout.count > 0) ? timeout.count : kDefaultDnsTimeoutMs;
+    const auto deadline
+        = std::chrono::steady_clock::now() + std::chrono::milliseconds(dnsMs);
+
+    if (!acquireDnsWorkerSlot_(deadline)) {
+#ifdef _WIN32
+        WSASetLastError(WSAETIMEDOUT);
+#else
+        errno = ETIMEDOUT;
+#endif
+        setError(SocketError::Timeout,
+            "DNS resolution queue wait timed out for '" + address + "'");
+        return false;
+    }
+
+    // We resolve on a detached worker because DNS lookups can be super-slow
+    // and effectively uninterruptible; this keeps connect() timeout-bounded.
+    try {
+        std::thread([addr = address, p = port, af = addressFamily,
+                        st = socketType, res = dnsRes,
+                        prom = std::move(dnsProm)]() mutable {
+            struct DnsSlotGuard {
+                ~DnsSlotGuard() {
+                    g_activeDnsWorkers.fetch_sub(1, std::memory_order_acq_rel);
+                }
+            } guard;
+#ifdef AISOCKS_TESTING
+            const int64_t testDelay
+                = g_dnsTestDelayMs.load(std::memory_order_relaxed);
+            if (testDelay > 0)
+                std::this_thread::sleep_for(std::chrono::milliseconds(testDelay));
+#endif
+            res->error = resolveToSockaddr(addr, p, af, st,
+                /*doDns=*/true, res->addr, res->addrLen, &res->gaiErr);
+            prom.set_value();
+        }).detach();
+    } catch (...) {
+        g_activeDnsWorkers.fetch_sub(1, std::memory_order_acq_rel);
+        setError(SocketError::ConnectFailed, "Failed to start DNS worker");
+        return false;
+    }
+
+    const auto remainingMs = std::chrono::duration_cast<std::chrono::milliseconds>(
+                                 deadline - std::chrono::steady_clock::now())
+                                 .count();
+    if (remainingMs <= 0
+        || dnsFut.wait_for(std::chrono::milliseconds(remainingMs))
         == std::future_status::timeout) {
 #ifdef _WIN32
         WSASetLastError(WSAETIMEDOUT);
@@ -488,6 +553,24 @@ bool SocketImpl::resolveAddress_(const std::string& address, Port port,
     out_len = dnsRes->addrLen;
     return true;
 }
+
+#ifdef AISOCKS_TESTING
+size_t SocketImpl::dnsWorkerLimitForTesting() noexcept {
+    return kMaxConcurrentDnsWorkers;
+}
+
+size_t SocketImpl::activeDnsWorkersForTesting() noexcept {
+    return g_activeDnsWorkers.load(std::memory_order_relaxed);
+}
+
+void SocketImpl::setDnsTestDelayForTesting(Milliseconds delay) noexcept {
+    g_dnsTestDelayMs.store(delay.count, std::memory_order_relaxed);
+}
+
+void SocketImpl::resetDnsTestHooksForTesting() noexcept {
+    g_dnsTestDelayMs.store(0, std::memory_order_relaxed);
+}
+#endif
 
 // ---------------------------------------------------------------------------
 // SocketImpl::waitForConnect_
