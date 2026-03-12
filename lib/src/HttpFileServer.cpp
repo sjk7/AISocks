@@ -95,16 +95,13 @@ HttpFileServer::HttpFileServer(
     config_.indexFile
         = config.indexFile.empty() ? "index.html" : config.indexFile;
     config_.enableDirectoryListing = config.enableDirectoryListing;
-    config_.enableETag = config.enableETag ? config.enableETag : true;
-    config_.enableLastModified
-        = config.enableLastModified ? config.enableLastModified : true;
+    config_.enableETag = config.enableETag;
+    config_.enableLastModified = config.enableLastModified;
     config_.maxFileSize
         = config.maxFileSize ? config.maxFileSize : 100 * 1024 * 1024;
     config_.enableCache = config.enableCache;
-    config_.enableSecurityHeaders
-        = config.enableSecurityHeaders ? config.enableSecurityHeaders : true;
-    config_.hideServerVersion
-        = config.hideServerVersion ? config.hideServerVersion : true;
+    config_.enableSecurityHeaders = config.enableSecurityHeaders;
+    config_.hideServerVersion = config.hideServerVersion;
     config_.customHeaders = config.customHeaders;
 
     if (!config_.documentRoot.empty() && config_.documentRoot.back() != '/') {
@@ -293,8 +290,7 @@ bool HttpFileServer::checkCacheConditions_(HttpClientState& state,
 void HttpFileServer::handleFileRequest(HttpClientState& state,
     const std::string& filePath, const FileInfo& fileInfo,
     const HttpRequest& request) {
-    bool useCache
-        = config_.enableCache && request.path.find('?') == std::string::npos;
+    bool useCache = config_.enableCache && request.queryString.empty();
 
     if (useCache) {
         const FileCache::CachedFile* cached

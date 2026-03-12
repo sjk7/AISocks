@@ -5,6 +5,7 @@
 #include "HttpPollServer.h"
 
 #include "BuildInfo.h"
+#include "HttpParserUtils.h"
 #include "HttpRequest.h"
 #include <cstdio>
 #include <string>
@@ -62,17 +63,33 @@ bool HttpPollServer::isHttpRequest(const std::string& req) {
 }
 
 bool HttpPollServer::requestComplete(const std::string& req) {
-    return req.find("\r\n\r\n") != std::string::npos;
+    const auto [sep, sepLen]
+        = aiSocks::detail::findHeaderBodySep(std::string_view(req));
+    (void)sepLen;
+    return sep != std::string_view::npos;
 }
 
 bool HttpPollServer::requestComplete(const std::string& req, size_t& scanPos) {
     const size_t start = scanPos >= 3 ? scanPos - 3 : 0;
-    const size_t pos = req.find("\r\n\r\n", start);
-    if (pos != std::string::npos) {
+    const auto [sep, sepLen]
+        = aiSocks::detail::findHeaderBodySep(std::string_view(req), start);
+    (void)sepLen;
+    if (sep != std::string_view::npos) {
         return true;
     }
     scanPos = req.size() >= 3 ? req.size() - 3 : 0;
     return false;
+}
+
+// Consume one complete HTTP/1.x header block from the front of req.
+// Returns true on success and writes the consumed length (including separator)
+// to consumedLen.
+static bool consumeRequestHead_(const std::string& req, size_t& consumedLen) {
+    const auto [sep, sepLen]
+        = aiSocks::detail::findHeaderBodySep(std::string_view(req));
+    if (sep == std::string_view::npos) return false;
+    consumedLen = sep + sepLen;
+    return true;
 }
 
 std::string HttpPollServer::makeResponse(const char* statusLine,
@@ -200,23 +217,24 @@ ServerResult HttpPollServer::onReadable(TcpSocket& sock, HttpClientState& s) {
                 s.responseView = s.responseBuf;
                 s.closeAfterSend = true;
                 setClientWritable(sock, true);
-                return onWritable(sock, s);
+                return ServerResult::KeepConnection;
             }
 
             if (s.responseView.empty()
                 && requestComplete(s.request, s.requestScanPos)) {
                 // Consume exactly one request so any pipelined tail remains
                 // queued for the next response cycle.
-                const size_t end = s.request.find("\r\n\r\n");
-                if (end != std::string::npos && end + 4 < s.request.size()) {
-                    s.queuedRequest.append(s.request.data() + end + 4,
-                        s.request.size() - (end + 4));
-                    s.request.resize(end + 4);
+                size_t consumed = 0;
+                if (consumeRequestHead_(s.request, consumed)
+                    && consumed < s.request.size()) {
+                    s.queuedRequest.append(
+                        s.request.data() + consumed, s.request.size() - consumed);
+                    s.request.resize(consumed);
                 }
                 s.requestScanPos = 0;
                 dispatchBuildResponse(s);
                 setClientWritable(sock, true);
-                return onWritable(sock, s);
+                return ServerResult::KeepConnection;
             }
         } else if (n == 0) {
             return ServerResult::Disconnect;
@@ -231,52 +249,54 @@ ServerResult HttpPollServer::onReadable(TcpSocket& sock, HttpClientState& s) {
 }
 
 ServerResult HttpPollServer::onWritable(TcpSocket& sock, HttpClientState& s) {
-    if (s.responseView.empty()) return ServerResult::KeepConnection;
+    while (true) {
+        if (s.responseView.empty()) return ServerResult::KeepConnection;
 
-    if (!s.responseStarted) {
-        s.responseStarted = true;
-        onResponseBegin(s);
-    }
+        if (!s.responseStarted) {
+            s.responseStarted = true;
+            onResponseBegin(s);
+        }
 
-    int sent = sock.sendChunked(
-        s.responseView.data() + s.sent, s.responseView.size() - s.sent);
+        int sent = sock.sendChunked(
+            s.responseView.data() + s.sent, s.responseView.size() - s.sent);
 
-    if (sent > 0) {
-        touchClient(sock, std::chrono::steady_clock::now());
-        s.sent += static_cast<size_t>(sent);
-    } else {
-        const auto err = sock.getLastError();
-        if (err == SocketError::WouldBlock || err == SocketError::Timeout)
-            return ServerResult::KeepConnection;
-        return ServerResult::Disconnect;
-    }
+        if (sent > 0) {
+            touchClient(sock, std::chrono::steady_clock::now());
+            s.sent += static_cast<size_t>(sent);
+        } else {
+            const auto err = sock.getLastError();
+            if (err == SocketError::WouldBlock || err == SocketError::Timeout)
+                return ServerResult::KeepConnection;
+            return ServerResult::Disconnect;
+        }
 
-    if (s.sent >= s.responseView.size()) {
+        if (s.sent < s.responseView.size()) return ServerResult::KeepConnection;
+
         onResponseSent(s);
         const bool shouldClose = s.closeAfterSend;
         resetAfterSend_(s);
         setClientWritable(sock, false);
 
-        if (!shouldClose && !s.request.empty()
-            && requestComplete(s.request, s.requestScanPos)) {
+        if (shouldClose) return ServerResult::Disconnect;
+
+        if (!s.request.empty() && requestComplete(s.request, s.requestScanPos)) {
             // Immediately process queued pipelined data already buffered on
             // this connection.
-            const size_t end = s.request.find("\r\n\r\n");
-            if (end != std::string::npos && end + 4 < s.request.size()) {
+            size_t consumed = 0;
+            if (consumeRequestHead_(s.request, consumed)
+                && consumed < s.request.size()) {
                 s.queuedRequest.append(
-                    s.request.data() + end + 4, s.request.size() - (end + 4));
-                s.request.resize(end + 4);
+                    s.request.data() + consumed, s.request.size() - consumed);
+                s.request.resize(consumed);
             }
             s.requestScanPos = 0;
             dispatchBuildResponse(s);
             setClientWritable(sock, true);
-            return onWritable(sock, s);
+            continue;
         }
 
-        return shouldClose ? ServerResult::Disconnect
-                           : ServerResult::KeepConnection;
+        return ServerResult::KeepConnection;
     }
-    return ServerResult::KeepConnection;
 }
 
 void HttpPollServer::resetAfterSend_(HttpClientState& s) {

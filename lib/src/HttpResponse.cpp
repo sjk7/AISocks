@@ -188,7 +188,8 @@ void HttpResponseParser::determineBodyMode_() {
             int64_t parsed = 0;
             auto [ptr, ec]
                 = std::from_chars(cl->data(), cl->data() + cl->size(), parsed);
-            if (ec == std::errc{})
+            if (ec == std::errc{} && ptr == cl->data() + cl->size()
+                && parsed >= 0)
                 contentLength_ = parsed;
             else {
                 markError_();
