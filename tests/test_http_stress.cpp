@@ -135,19 +135,18 @@ static void test_malformed_header_lines() {
 }
 
 static void test_oversized_header_parse() {
-    BEGIN_TEST("oversized header parse (8KB benchmark)");
+    BEGIN_TEST("oversized header parse is rejected");
 
-    // Verify HttpRequest::parse behavior with a 1MB input.
-    // We keep the large parsing test to ensure the parser itself isn't
-    // artificially limited, even if the server is.
+    // Parser-level hardening: header section beyond the configured cap
+    // must fail parse deterministically.
     std::string longHeader(1024 * 1024, 'a');
     std::string raw = "GET / HTTP/1.1\r\n"
                       "X-Long: "
         + longHeader + "\r\n\r\n";
 
     auto req = HttpRequest::parse(raw);
-    REQUIRE(req.valid);
-    REQUIRE(req.headerOr("x-long").size() == longHeader.size());
+    REQUIRE(!req.valid);
+    REQUIRE(req.header("x-long") == nullptr);
 }
 
 static void test_server_enforces_header_limit() {
