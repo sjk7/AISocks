@@ -52,7 +52,16 @@ class SimpleClient {
         auto result = SocketFactory::createTcpClient(family, args);
         if (result.isSuccess()) {
             socket_ = std::make_unique<TcpSocket>(std::move(result.value()));
-            (void)socket_->setReceiveTimeout(args.connectTimeout);
+            lastErrorCode_ = SocketError::None;
+            lastErrorMessage_.clear();
+            if (!socket_->setReceiveTimeout(args.connectTimeout)) {
+                lastErrorCode_ = socket_->getLastError();
+                lastErrorMessage_ = "Connected, but failed to set receive timeout - "
+                    + socket_->getErrorMessage();
+            }
+        } else {
+            lastErrorCode_ = result.error();
+            lastErrorMessage_ = result.message();
         }
     }
 
@@ -86,10 +95,18 @@ class SimpleClient {
     bool isConnected() const noexcept { return socket_ != nullptr; }
 
     // Returns a human-readable description of the last socket error, or an
-    // empty string if not connected / no error recorded.
+    // empty string if no error is recorded.
     std::string getLastError() const {
-        if (!socket_) return {};
-        return socket_->getErrorMessage();
+        if (!socket_) return lastErrorMessage_;
+        const auto msg = socket_->getErrorMessage();
+        return msg.empty() ? lastErrorMessage_ : msg;
+    }
+
+    // Returns the last known error code from connect/timeout setup.
+    SocketError getLastErrorCode() const noexcept {
+        if (!socket_) return lastErrorCode_;
+        const auto err = socket_->getLastError();
+        return (err == SocketError::None) ? lastErrorCode_ : err;
     }
 
     // Direct socket access for callers that want to perform I/O without
@@ -102,6 +119,8 @@ class SimpleClient {
 
     private:
     std::unique_ptr<TcpSocket> socket_;
+    SocketError lastErrorCode_{SocketError::None};
+    std::string lastErrorMessage_;
 };
 
 } // namespace aiSocks
