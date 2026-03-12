@@ -6,10 +6,16 @@
 #include "HttpParserUtils.h"
 #include "UrlCodec.h"
 
+#include <cstdint>
 #include <string>
 #include <string_view>
 
 namespace aiSocks {
+
+namespace {
+    constexpr size_t kMaxRequestLineLen = 4096;
+    constexpr size_t kMaxQueryStringLen = 8192;
+} // namespace
 
 const std::string* HttpRequest::header(std::string_view name) const {
     return detail::lookupHeaderCI(headers, name);
@@ -24,23 +30,64 @@ std::string_view HttpRequest::headerOr(
 // Parses "METHOD SP request-target SP HTTP-version".
 // Returns false if the line is malformed (caller should return an invalid req).
 static bool parseRequestLine_(std::string_view requestLine, HttpRequest& req) {
+    if (requestLine.empty() || requestLine.size() > kMaxRequestLineLen)
+        return false;
+
     const auto sp1 = requestLine.find(' ');
     if (sp1 == std::string_view::npos) return false;
     const auto sp2 = requestLine.find(' ', sp1 + 1);
     if (sp2 == std::string_view::npos) return false;
+    if (requestLine.find(' ', sp2 + 1) != std::string_view::npos) return false;
+    if (sp1 == 0 || sp2 <= sp1 + 1 || sp2 + 1 >= requestLine.size())
+        return false;
 
     req.method = requestLine.substr(0, sp1);
     req.version = requestLine.substr(sp2 + 1);
 
+    // Reject embedded control bytes in request-line tokens.
+    auto hasCtl = [](std::string_view s) {
+        for (unsigned char c : s) {
+            if (c < 0x20 || c == 0x7f) return true;
+        }
+        return false;
+    };
+    if (hasCtl(req.method) || hasCtl(req.version)) return false;
+    if (req.version != "HTTP/1.0" && req.version != "HTTP/1.1") return false;
+
     const std::string_view target = requestLine.substr(sp1 + 1, sp2 - sp1 - 1);
+    if (target.empty()) return false;
+    if (hasCtl(target)) return false;
     const auto qmark = target.find('?');
     if (qmark == std::string_view::npos) {
         req.rawPath = target;
     } else {
         req.rawPath = target.substr(0, qmark);
         req.queryString = target.substr(qmark + 1);
+        if (req.queryString.size() > kMaxQueryStringLen) return false;
     }
+
+    const bool isAsterisk = req.rawPath == "*";
+    const bool isAbsolute = req.rawPath.find("://") != std::string::npos;
+    const bool isOrigin = !req.rawPath.empty() && req.rawPath.front() == '/';
+    const bool isAuthority = !req.rawPath.empty() && !isAsterisk && !isAbsolute
+        && req.rawPath.front() != '/';
+
+    // Allowed request-target forms:
+    // - origin-form (starts with '/')
+    // - absolute-form (contains scheme://)
+    // - asterisk-form ('*') for OPTIONS
+    // - authority-form for CONNECT
+    if (isAsterisk) {
+        if (req.method != "OPTIONS" || !req.queryString.empty()) return false;
+    } else if (isAuthority) {
+        if (req.method != "CONNECT" || !req.queryString.empty()) return false;
+    } else if (!isOrigin && !isAbsolute) {
+        return false;
+    }
+
     req.path = urlDecodePath(req.rawPath);
+    if (req.path.empty()) return false;
+    if (isOrigin && req.path.front() != '/') return false;
     return true;
 }
 
@@ -90,6 +137,24 @@ HttpRequest HttpRequest::parse(std::string_view raw) {
             [&req](std::string key, std::string_view val) {
                 req.headers[std::move(key)] = std::string(val);
             });
+
+    // Disallow framing ambiguity in requests: both Transfer-Encoding and
+    // Content-Length present at once is rejected.
+    if (req.header("transfer-encoding") && req.header("content-length"))
+        return HttpRequest{};
+
+    if (const std::string* cl = req.header("content-length")) {
+        // Accept only a non-negative decimal number with no trailing bytes.
+        if (cl->empty()) return HttpRequest{};
+        uint64_t parsed = 0;
+        for (char ch : *cl) {
+            if (ch < '0' || ch > '9') return HttpRequest{};
+            const uint64_t digit = static_cast<uint64_t>(ch - '0');
+            if (parsed > (UINT64_MAX - digit) / 10) return HttpRequest{};
+            parsed = parsed * 10 + digit;
+        }
+        if (parsed != req.body.size()) return HttpRequest{};
+    }
 
     if (!req.queryString.empty()) parseQueryParams_(req);
 

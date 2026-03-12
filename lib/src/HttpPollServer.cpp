@@ -227,8 +227,8 @@ ServerResult HttpPollServer::onReadable(TcpSocket& sock, HttpClientState& s) {
                 size_t consumed = 0;
                 if (consumeRequestHead_(s.request, consumed)
                     && consumed < s.request.size()) {
-                    s.queuedRequest.append(
-                        s.request.data() + consumed, s.request.size() - consumed);
+                    s.queuedRequest.append(s.request.data() + consumed,
+                        s.request.size() - consumed);
                     s.request.resize(consumed);
                 }
                 s.requestScanPos = 0;
@@ -279,7 +279,8 @@ ServerResult HttpPollServer::onWritable(TcpSocket& sock, HttpClientState& s) {
 
         if (shouldClose) return ServerResult::Disconnect;
 
-        if (!s.request.empty() && requestComplete(s.request, s.requestScanPos)) {
+        if (!s.request.empty()
+            && requestComplete(s.request, s.requestScanPos)) {
             // Immediately process queued pipelined data already buffered on
             // this connection.
             size_t consumed = 0;

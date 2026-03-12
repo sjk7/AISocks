@@ -11,7 +11,7 @@
 // ---------------------------------------------
 // 1.  Basic GET -- method / path / version split
 // 2.  All common methods (POST, PUT, DELETE, PATCH, HEAD, OPTIONS, TRACE)
-// 3.  HTTP/1.0 vs HTTP/1.1 vs HTTP/2 version strings
+// 3.  HTTP/1.0 vs HTTP/1.1 version strings (reject unsupported versions)
 // 4.  Path URL decoding -- rawPath preserved, path decoded
 // 5.  '%2F' in path -- decoded in path but kept encoded in rawPath
 // 6.  Query string split at first '?' only (second '?' belongs to value)
@@ -46,8 +46,7 @@
 // 35. Very long header value preserved intact
 // 36. Request with many headers
 // 37. CONNECT / authority-form request target
-// 38. Trailing whitespace on request line -- version gains trailing spaces (not
-// trimmed)
+// 38. Trailing whitespace on request line is rejected
 // 39. Incomplete request (no \r\n\r\n terminator) -- parser accepts as valid
 // 40. Bare LF (\n\n) as header/body separator -- RFC 7230 §3.5
 // 41. Bare LF (\n) as line terminator in headers -- RFC 7230 §3.5
@@ -132,8 +131,7 @@ static void test_versions() {
     }
     {
         auto req = HttpRequest::parse("GET / HTTP/2\r\n\r\n");
-        REQUIRE(req.valid);
-        CHECK_FIELD("version 2", req.version, "HTTP/2");
+        REQUIRE(!req.valid);
     }
 }
 
@@ -322,7 +320,7 @@ static void test_header_tab_ows() {
 static void test_header_accessor_case() {
     BEGIN_TEST("header() accessor case-insensitivity");
     std::string raw = "GET / HTTP/1.1\r\n"
-                      "Content-Length: 42\r\n"
+                      "Content-Length: 0\r\n"
                       "\r\n";
     auto req = HttpRequest::parse(raw);
     REQUIRE(req.valid);
@@ -330,7 +328,7 @@ static void test_header_accessor_case() {
     REQUIRE(req.header("Content-Length") != nullptr);
     REQUIRE(req.header("CONTENT-LENGTH") != nullptr);
     REQUIRE(req.header("Content-length") != nullptr);
-    CHECK_FIELD("via accessor", *req.header("Content-Length"), "42"); //-V522
+    CHECK_FIELD("via accessor", *req.header("Content-Length"), "0"); //-V522
     REQUIRE(req.header("x-not-present") == nullptr);
 }
 
@@ -542,18 +540,13 @@ static void test_connect_form() {
     REQUIRE(req.queryString.empty());
 }
 
-// 38. Trailing whitespace on request line -- version string is NOT trimmed
+// 38. Trailing whitespace on request line is rejected
 static void test_trailing_whitespace_request_line() {
     BEGIN_TEST("trailing whitespace on request line");
-    // The parser does not trim the version field; trailing spaces become part
-    // of req.version.  This documents the current behaviour.
+    // Strict parser rejects extra whitespace after HTTP-version.
     std::string raw = "GET / HTTP/1.1   \r\n\r\n";
     auto req = HttpRequest::parse(raw);
-    REQUIRE(req.valid);
-    CHECK_FIELD("method", req.method, "GET");
-    // Version includes the trailing spaces -- callers should trim if needed.
-    REQUIRE_MSG(req.version.substr(0, 8) == "HTTP/1.1",
-        "version starts with HTTP/1.1 even with trailing whitespace");
+    REQUIRE(!req.valid);
 }
 
 // 39. Incomplete request (no \r\n\r\n terminator)
@@ -627,6 +620,51 @@ static void test_typical_browser_request() {
     REQUIRE(req.body.empty());
 }
 
+// 42. Disallow request framing ambiguity (TE + Content-Length)
+static void test_reject_te_and_content_length() {
+    BEGIN_TEST("reject Transfer-Encoding + Content-Length");
+    std::string raw = "POST /upload HTTP/1.1\r\n"
+                      "Host: example.com\r\n"
+                      "Transfer-Encoding: chunked\r\n"
+                      "Content-Length: 4\r\n"
+                      "\r\n"
+                      "data";
+    auto req = HttpRequest::parse(raw);
+    REQUIRE(!req.valid);
+}
+
+// 43. Reject malformed Content-Length values
+static void test_reject_bad_content_length() {
+    BEGIN_TEST("reject malformed Content-Length values");
+
+    auto reqNeg
+        = HttpRequest::parse("POST /x HTTP/1.1\r\nContent-Length: -1\r\n\r\n");
+    REQUIRE(!reqNeg.valid);
+
+    auto reqJunk = HttpRequest::parse(
+        "POST /x HTTP/1.1\r\nContent-Length: 10abc\r\n\r\n");
+    REQUIRE(!reqJunk.valid);
+}
+
+// 44. Reject Content-Length/body mismatch
+static void test_reject_content_length_mismatch() {
+    BEGIN_TEST("reject Content-Length mismatch");
+    std::string raw = "POST /api HTTP/1.1\r\n"
+                      "Content-Length: 10\r\n"
+                      "\r\n"
+                      "abc";
+    auto req = HttpRequest::parse(raw);
+    REQUIRE(!req.valid);
+}
+
+// 45. Reject oversized query strings
+static void test_reject_oversized_query() {
+    BEGIN_TEST("reject oversized query string");
+    std::string big(9000, 'a');
+    auto req = HttpRequest::parse("GET /search?q=" + big + " HTTP/1.1\r\n\r\n");
+    REQUIRE(!req.valid);
+}
+
 // -- main -------------------------------------------------------------------
 
 int main() {
@@ -672,5 +710,9 @@ int main() {
     test_bare_lf_separator();
     test_bare_lf_line_endings();
     test_typical_browser_request();
+    test_reject_te_and_content_length();
+    test_reject_bad_content_length();
+    test_reject_content_length_mismatch();
+    test_reject_oversized_query();
     return test_summary();
 }

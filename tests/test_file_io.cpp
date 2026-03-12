@@ -54,13 +54,9 @@ int main() {
 
         size_t sz = file.size();
         REQUIRE(sz > 0);
-        // 21 bytes on Unix (LF); 23 bytes on Windows (CRLF text-mode expands
-        // each \n to \r\n).
-#ifdef _WIN32
-        REQUIRE(sz == 23);
-#else
+        // File opens are forced to binary mode across OSes, so newline bytes
+        // are preserved exactly.
         REQUIRE(sz == 21);
-#endif
     }
 
     // Test 4: File printf

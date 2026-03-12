@@ -362,15 +362,15 @@ class HttpClient {
             while (true) {
                 if (boundedRequest) {
                     const auto now = std::chrono::steady_clock::now();
-                    const auto remaining
+                    const auto remainingMs
                         = std::chrono::duration_cast<std::chrono::milliseconds>(
                             requestDeadline - now)
                               .count();
-                    if (remaining <= 0) {
+                    if (remainingMs <= 0) {
                         return Result<HttpClientResponse>::failure(
                             SocketError::Timeout, "Request timed out");
                     }
-                    socket.setReceiveTimeout(Milliseconds{remaining});
+                    socket.setReceiveTimeout(Milliseconds{remainingMs});
                 }
 
                 int n = socket.receive(buffer, sizeof(buffer));

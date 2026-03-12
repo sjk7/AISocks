@@ -10,7 +10,9 @@
 
 #include "FileIO.h"
 
+#include <algorithm>
 #include <errno.h>
+#include <fcntl.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -33,6 +35,19 @@
 #endif
 
 namespace aiSocks {
+
+namespace {
+    std::string binaryMode_(const char* mode) {
+        if (!mode || !*mode) return {};
+        std::string out(mode);
+
+        // Force binary semantics across platforms; POSIX ignores 'b', Windows
+        // treats it as required for byte-exact reads/writes.
+        out.erase(std::remove(out.begin(), out.end(), 't'), out.end());
+        if (out.find('b') == std::string::npos) out.push_back('b');
+        return out;
+    }
+} // namespace
 
 // ---------------------------------------------------------------------------
 // File
@@ -67,13 +82,39 @@ bool File::open(const char* filename, const char* mode) {
     close();
 
     LockMode lockMode = determineLockMode(mode);
+    const std::string modeStr = binaryMode_(mode);
+    if (modeStr.empty()) return false;
+    const char* openMode = modeStr.c_str();
 
 #ifdef _WIN32
-    errno_t err = fopen_s(&file_, filename, mode);
+    errno_t err = fopen_s(&file_, filename, openMode);
     if (err != 0 || !file_) return false;
 #else
-    file_ = fopen(filename, mode);
-    if (!file_) return false;
+    // For read-only opens, avoid following a final-path symlink to reduce
+    // TOCTOU exposure when serving files from untrusted paths.
+    const bool hasWrite = (mode && strchr(mode, 'w') != nullptr);
+    const bool hasAppend = (mode && strchr(mode, 'a') != nullptr);
+    const bool hasPlus = (mode && strchr(mode, '+') != nullptr);
+    const bool readOnly = !hasWrite && !hasAppend && !hasPlus;
+
+#ifdef O_NOFOLLOW
+    if (readOnly) {
+        const int fd = ::open(filename, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
+        if (fd >= 0) {
+            file_ = fdopen(fd, openMode);
+            if (!file_) {
+                ::close(fd);
+                return false;
+            }
+        } else {
+            return false;
+        }
+    } else
+#endif
+    {
+        file_ = fopen(filename, openMode);
+        if (!file_) return false;
+    }
 #endif
 
     if (!applyLock(lockMode)) {
