@@ -79,6 +79,7 @@ if(NOT APPLE)
         ${CMAKE_CURRENT_SOURCE_DIR}/pch_stub.cpp
     )
     target_link_libraries(test_pch_host PRIVATE aiSocksLib)
+    target_compile_definitions(test_pch_host PRIVATE AISOCKS_TESTING=1)
     target_include_directories(test_pch_host PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}
         ${CMAKE_SOURCE_DIR}/lib/include
