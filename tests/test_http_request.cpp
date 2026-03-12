@@ -540,6 +540,21 @@ static void test_connect_form() {
     REQUIRE(req.queryString.empty());
 }
 
+// 37b. CONNECT must reject absolute-form
+static void test_connect_rejects_absolute_form() {
+    BEGIN_TEST("CONNECT rejects absolute-form target");
+    auto req = HttpRequest::parse(
+        "CONNECT http://host.example.com:443/ HTTP/1.1\r\n\r\n");
+    REQUIRE(!req.valid);
+}
+
+// 37c. Non-CONNECT must reject authority-form
+static void test_non_connect_rejects_authority_form() {
+    BEGIN_TEST("non-CONNECT rejects authority-form");
+    auto req = HttpRequest::parse("GET host.example.com:443 HTTP/1.1\r\n\r\n");
+    REQUIRE(!req.valid);
+}
+
 // 38. Trailing whitespace on request line is rejected
 static void test_trailing_whitespace_request_line() {
     BEGIN_TEST("trailing whitespace on request line");
@@ -665,6 +680,23 @@ static void test_reject_oversized_query() {
     REQUIRE(!req.valid);
 }
 
+// 46. Reject oversized request header section
+static void test_reject_oversized_header_section() {
+    BEGIN_TEST("reject oversized header section");
+    std::string huge(17000, 'h');
+    std::string raw = "GET / HTTP/1.1\r\nX-Huge: " + huge + "\r\n\r\n";
+    auto req = HttpRequest::parse(raw);
+    REQUIRE(!req.valid);
+}
+
+// 47. Reject oversized request body by Content-Length
+static void test_reject_oversized_body_content_length() {
+    BEGIN_TEST("reject oversized body by Content-Length");
+    auto req = HttpRequest::parse(
+        "POST /upload HTTP/1.1\r\nContent-Length: 16777217\r\n\r\n");
+    REQUIRE(!req.valid);
+}
+
 // -- main -------------------------------------------------------------------
 
 int main() {
@@ -705,6 +737,8 @@ int main() {
     test_long_header_value();
     test_many_headers();
     test_connect_form();
+    test_connect_rejects_absolute_form();
+    test_non_connect_rejects_authority_form();
     test_trailing_whitespace_request_line();
     test_incomplete_request();
     test_bare_lf_separator();
@@ -714,5 +748,7 @@ int main() {
     test_reject_bad_content_length();
     test_reject_content_length_mismatch();
     test_reject_oversized_query();
+    test_reject_oversized_header_section();
+    test_reject_oversized_body_content_length();
     return test_summary();
 }

@@ -923,5 +923,39 @@ int main() {
         REQUIRE(true);
     }
 
+    // Test 24: Malformed request closes connection deterministically
+    BEGIN_TEST("Malformed request returns 400 and closes connection");
+    {
+        TestHttpServer server(ServerBind{"127.0.0.1", Port{0}});
+        REQUIRE(server.isValid());
+
+        std::thread serverThread(
+            [&server]() { server.run(ClientLimit{1}, Milliseconds{1}); });
+        server.waitReady();
+
+        auto clientResult = SocketFactory::createTcpClient(
+            AddressFamily::IPv4, ConnectArgs{"127.0.0.1", server.serverPort()});
+        REQUIRE(clientResult.isSuccess());
+        auto& client = clientResult.value();
+        client.setReceiveTimeout(Milliseconds{500});
+
+        const std::string malformed = "BOGUS\r\n\r\n";
+        REQUIRE(client.sendAll(malformed.data(), malformed.size()));
+
+        std::string response = receiveCompleteResponse(client);
+        REQUIRE(response.find("400 Bad Request") != std::string::npos);
+        REQUIRE(response.find("Connection: close") != std::string::npos);
+
+        // A follow-up receive should observe closure or timeout/error after the
+        // server has sent the close response.
+        char b[8];
+        int n = client.receive(b, sizeof(b));
+        REQUIRE(n <= 0);
+
+        g_serverSignalStop.store(true);
+        serverThread.join();
+        g_serverSignalStop.store(false);
+    }
+
     return test_summary();
 }

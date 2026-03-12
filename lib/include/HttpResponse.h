@@ -135,6 +135,10 @@ class HttpResponse {
 // ---------------------------------------------------------------------------
 class HttpResponseParser {
     public:
+    static constexpr size_t kMaxHeaderSectionLen = 64 * 1024;
+    static constexpr size_t kMaxBodyLen = 64 * 1024 * 1024;
+    static constexpr size_t kMaxChunkSize = 16 * 1024 * 1024;
+
     enum class State {
         Incomplete, ///< More data needed
         HeadersComplete, ///< Status line + all headers parsed; body may be

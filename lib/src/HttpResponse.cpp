@@ -48,11 +48,10 @@ bool HttpResponseParser::parseHexSize_(
             digit = uc - 'A' + 10;
         else
             return false;
-        if (out > (size_t{1} << 30))
-            return false; // reject malformed > 1 GB chunks
+        if (out > (kMaxChunkSize - digit) / 16) return false;
         out = out * 16 + digit;
     }
-    return true;
+    return out <= kMaxChunkSize;
 }
 
 // static — Strips chunk-extensions (everything after ';', per RFC 7230 §4.1.1)
@@ -89,6 +88,10 @@ bool HttpResponseParser::tryParseHeaders_() {
         // Not yet — advance scan frontier (keep 3 tail bytes for overlap)
         headerScanPos_ = inBuf_.size() >= 3 ? inBuf_.size() - 3 : 0;
         return false; // really means "not ready yet" — caller checks bool
+    }
+    if (sepPos > kMaxHeaderSectionLen) {
+        markError_();
+        return false;
     }
 
     // Freeze header section
@@ -145,6 +148,7 @@ bool HttpResponseParser::tryParseHeaders_() {
             });
 
     determineBodyMode_();
+    if (state_ == State::Error) return false;
     headersParsed_ = true;
     return true;
 }
@@ -192,6 +196,10 @@ void HttpResponseParser::determineBodyMode_() {
                 && parsed >= 0)
                 contentLength_ = parsed;
             else {
+                markError_();
+                return;
+            }
+            if (contentLength_ > static_cast<int64_t>(kMaxBodyLen)) {
                 markError_();
                 return;
             }
@@ -289,6 +297,10 @@ HttpResponseParser::State HttpResponseParser::processChunked_() {
             return state_;
         }
 
+        if (decodedBody_.size() > kMaxBodyLen - chunkSize) {
+            markError_();
+            return state_;
+        }
         decodedBody_.append(bodyBuf_.data() + dataStart, chunkSize);
         chunkScanPos_ = nextChunk;
     }
@@ -350,12 +362,18 @@ HttpResponseParser::State HttpResponseParser::feed(
         if (!tryParseHeaders_()) {
             // Either need more data (state_ == Incomplete)
             // or malformed (state_ == Error, set by tryParseHeaders_)
+            if (state_ != State::Error && inBuf_.size() > kMaxHeaderSectionLen)
+                markError_();
             return state_;
         }
         return advanceAfterHeaders_();
     }
 
     // Headers already parsed — accumulate further body bytes
+    if (len > kMaxBodyLen || bodyBuf_.size() > kMaxBodyLen - len) {
+        markError_();
+        return state_;
+    }
     bodyBuf_.append(data, len);
 
     if (bodyMode_ == BodyMode::Chunked) return processChunked_();

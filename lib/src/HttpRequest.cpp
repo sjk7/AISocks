@@ -15,6 +15,8 @@ namespace aiSocks {
 namespace {
     constexpr size_t kMaxRequestLineLen = 4096;
     constexpr size_t kMaxQueryStringLen = 8192;
+    constexpr size_t kMaxRequestHeaderSectionLen = 16 * 1024;
+    constexpr size_t kMaxRequestBodyLen = 16 * 1024 * 1024;
 } // namespace
 
 const std::string* HttpRequest::header(std::string_view name) const {
@@ -77,12 +79,13 @@ static bool parseRequestLine_(std::string_view requestLine, HttpRequest& req) {
     // - absolute-form (contains scheme://)
     // - asterisk-form ('*') for OPTIONS
     // - authority-form for CONNECT
-    if (isAsterisk) {
+    if (req.method == "CONNECT") {
+        if (!isAuthority || !req.queryString.empty()) return false;
+    } else if (isAsterisk) {
         if (req.method != "OPTIONS" || !req.queryString.empty()) return false;
-    } else if (isAuthority) {
-        if (req.method != "CONNECT" || !req.queryString.empty()) return false;
-    } else if (!isOrigin && !isAbsolute) {
-        return false;
+    } else {
+        if (isAuthority) return false;
+        if (!isOrigin && !isAbsolute) return false;
     }
 
     req.path = urlDecodePath(req.rawPath);
@@ -125,7 +128,9 @@ HttpRequest HttpRequest::parse(std::string_view raw) {
     const auto [sep, sepLen] = detail::findHeaderBodySep(sv);
     const std::string_view headerSection
         = (sep == std::string_view::npos) ? sv : sv.substr(0, sep);
+    if (headerSection.size() > kMaxRequestHeaderSectionLen) return req;
     if (sep != std::string_view::npos) req.body = sv.substr(sep + sepLen);
+    if (req.body.size() > kMaxRequestBodyLen) return HttpRequest{};
 
     // Split off the request line.
     const auto [requestLine, firstNL] = detail::extractFirstLine(headerSection);
@@ -153,6 +158,7 @@ HttpRequest HttpRequest::parse(std::string_view raw) {
             if (parsed > (UINT64_MAX - digit) / 10) return HttpRequest{};
             parsed = parsed * 10 + digit;
         }
+        if (parsed > kMaxRequestBodyLen) return HttpRequest{};
         if (parsed != req.body.size()) return HttpRequest{};
     }
 

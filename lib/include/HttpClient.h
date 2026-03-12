@@ -244,6 +244,8 @@ class HttpClient {
         const std::string relPath = location.substr(0, cut);
         const std::string suffix
             = (cut == std::string::npos) ? std::string{} : location.substr(cut);
+        const bool keepTrailingSlash
+            = !relPath.empty() && relPath.back() == '/';
 
         std::string baseDir = basePath;
         const size_t lastSlash = baseDir.rfind('/');
@@ -251,7 +253,10 @@ class HttpClient {
             ? "/"
             : baseDir.substr(0, lastSlash + 1);
 
-        std::string merged = baseDir + relPath;
+        std::string merged;
+        merged.reserve(baseDir.size() + relPath.size());
+        merged += baseDir;
+        merged += relPath;
         std::vector<std::string> segs;
         segs.reserve(8);
         size_t i = 0;
@@ -273,10 +278,15 @@ class HttpClient {
             i = j + 1;
         }
 
-        std::string normalized = "/";
+        std::string normalized;
+        normalized.reserve(merged.size() + 1);
+        normalized.push_back('/');
         for (size_t k = 0; k < segs.size(); ++k) {
             if (k) normalized.push_back('/');
             normalized += segs[k];
+        }
+        if (keepTrailingSlash && normalized.back() != '/') {
+            normalized.push_back('/');
         }
 
         return origin + normalized + suffix;

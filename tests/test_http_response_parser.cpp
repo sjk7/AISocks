@@ -223,6 +223,43 @@ static void test_headers_complete_early() {
     REQUIRE(p.response().statusCode == 200);
 }
 
+// 12. Oversized header section is rejected
+static void test_reject_oversized_headers() {
+    BEGIN_TEST("reject oversized response headers");
+    std::string huge(70000, 'h');
+    std::string raw
+        = "HTTP/1.1 200 OK\r\nX-Huge: " + huge + "\r\n\r\nbody";
+    HttpResponseParser p;
+    auto state = p.feed(raw.data(), raw.size());
+    REQUIRE(state == HttpResponseParser::State::Error);
+    REQUIRE(p.isError());
+}
+
+// 13. Content-Length beyond configured cap is rejected
+static void test_reject_oversized_content_length() {
+    BEGIN_TEST("reject oversized Content-Length");
+    std::string raw = "HTTP/1.1 200 OK\r\n"
+                      "Content-Length: 67108865\r\n"
+                      "\r\n";
+    HttpResponseParser p;
+    auto state = p.feed(raw.data(), raw.size());
+    REQUIRE(state == HttpResponseParser::State::Error);
+    REQUIRE(p.isError());
+}
+
+// 14. Chunk size beyond cap is rejected without needing full body bytes
+static void test_reject_oversized_chunk_size_line() {
+    BEGIN_TEST("reject oversized chunk size line");
+    std::string raw = "HTTP/1.1 200 OK\r\n"
+                      "Transfer-Encoding: chunked\r\n"
+                      "\r\n"
+                      "1000001\r\n";
+    HttpResponseParser p;
+    auto state = p.feed(raw.data(), raw.size());
+    REQUIRE(state == HttpResponseParser::State::Error);
+    REQUIRE(p.isError());
+}
+
 // ---------------------------------------------------------------------------
 int main() {
     test_simple_200();
@@ -236,5 +273,8 @@ int main() {
     test_malformed_status_line();
     test_reset_keepalive();
     test_headers_complete_early();
+    test_reject_oversized_headers();
+    test_reject_oversized_content_length();
+    test_reject_oversized_chunk_size_line();
     return test_summary();
 }

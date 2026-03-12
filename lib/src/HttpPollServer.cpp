@@ -161,21 +161,35 @@ static bool isSlowlorisTimeout_(const HttpClientState& s,
 }
 
 void HttpPollServer::dispatchBuildResponse(HttpClientState& s) {
-    // Only allow GET and HEAD methods for security.
-    if (s.request.compare(0, 4, "GET ") != 0
-        && s.request.compare(0, 5, "HEAD ") != 0) {
-        s.responseBuf = makeResponse("HTTP/1.1 405 Method Not Allowed",
-            "text/plain; charset=utf-8",
-            "405 Method Not Allowed\nOnly GET and HEAD are supported.\n",
-            false);
+    // Fast method gate for unsupported methods: keeps behavior stable even
+    // when request bodies are not yet buffered for non-GET/HEAD requests.
+    const size_t sp = s.request.find(' ');
+    if (sp != std::string::npos && sp > 0) {
+        const std::string_view m{s.request.data(), sp};
+        if (m != "GET" && m != "HEAD") {
+            s.responseBuf = makeResponse("HTTP/1.1 405 Method Not Allowed",
+                "text/plain; charset=utf-8",
+                "405 Method Not Allowed\nOnly GET and HEAD are supported.\n",
+                false);
+            s.responseView = s.responseBuf;
+            s.closeAfterSend = true;
+            s.parsedRequest = HttpRequest{};
+            return;
+        }
+    }
+
+    auto req = HttpRequest::parse(s.request);
+    if (!req.valid) {
+        s.responseBuf = makeResponse("HTTP/1.1 400 Bad Request",
+            "text/plain; charset=utf-8", "400 Bad Request\n", false);
         s.responseView = s.responseBuf;
         s.closeAfterSend = true;
+        s.parsedRequest = HttpRequest{};
         return;
     }
 
-    // Parse once to determine connection semantics and cache the result so
+    // Determine connection semantics and cache the parse result so
     // buildResponse() overrides do not need to re-parse the same bytes.
-    auto req = HttpRequest::parse(s.request);
     s.closeAfterSend = resolveKeepAlive_(req);
     s.parsedRequest = std::move(req);
     buildResponse(s);
