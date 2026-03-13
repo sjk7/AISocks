@@ -21,6 +21,7 @@
 
 #ifdef _WIN32
 #include <io.h>
+#include <share.h>
 #include <sys/locking.h>
 #include <windows.h>
 #ifndef S_ISDIR
@@ -87,8 +88,10 @@ bool File::open(const char* filename, const char* mode) {
     const char* openMode = modeStr.c_str();
 
 #ifdef _WIN32
-    errno_t err = fopen_s(&file_, filename, openMode);
-    if (err != 0 || !file_) return false;
+    // Use _fsopen with _SH_DENYNO so that write-mode opens (e.g. log files)
+    // allow concurrent reads from the same process, matching POSIX behaviour.
+    file_ = _fsopen(filename, openMode, _SH_DENYNO);
+    if (!file_) return false;
 #else
     // For read-only opens, avoid following a final-path symlink to reduce
     // TOCTOU exposure when serving files from untrusted paths.

@@ -252,27 +252,16 @@ class CustomFileServer : public HttpFileServer {
     }
 
     std::string readAccessLogTail(size_t maxLines) const {
-        std::FILE* file = std::fopen("access.log", "rb");
-        if (!file) return {};
+        File f("access.log", "rb");
+        if (!f.isOpen()) return {};
 
-        if (std::fseek(file, 0, SEEK_END) != 0) {
-            std::fclose(file);
-            return {};
-        }
-        const long fileSize = std::ftell(file);
-        if (fileSize <= 0) {
-            std::fclose(file);
-            return {};
-        }
-        if (std::fseek(file, 0, SEEK_SET) != 0) {
-            std::fclose(file);
-            return {};
-        }
+        if (!f.seek(0, SEEK_END)) return {};
+        const auto fileSize = f.tell();
+        if (fileSize <= 0) return {};
+        if (!f.seek(0, SEEK_SET)) return {};
 
         std::vector<char> bytes(static_cast<size_t>(fileSize));
-        const size_t bytesRead
-            = std::fread(bytes.data(), 1, bytes.size(), file);
-        std::fclose(file);
+        const size_t bytesRead = f.read(bytes.data(), 1, bytes.size());
         if (bytesRead == 0) return {};
         bytes.resize(bytesRead);
 

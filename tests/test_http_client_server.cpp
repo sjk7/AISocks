@@ -547,6 +547,12 @@ static void test_keepalive_connection_reuse() {
     std::thread serverThread(
         [&] { server.run(ClientLimit::Unlimited, Milliseconds{1}); });
     server.waitReady();
+    REQUIRE(server.isValid());
+    if (!server.isValid()) {
+        server.requestStop();
+        serverThread.join();
+        return;
+    }
 
     HttpClient::Options opts;
     opts.connectTimeout = Milliseconds{500};
@@ -581,6 +587,12 @@ static void test_connection_close_header_disables_reuse() {
     std::thread serverThread(
         [&] { server.run(ClientLimit::Unlimited, Milliseconds{1}); });
     server.waitReady();
+    REQUIRE(server.isValid());
+    if (!server.isValid()) {
+        server.requestStop();
+        serverThread.join();
+        return;
+    }
 
     HttpClient::Options opts;
     opts.connectTimeout = Milliseconds{500};
@@ -594,6 +606,9 @@ static void test_connection_close_header_disables_reuse() {
         auto result = client.get(baseUrl + "/close");
         REQUIRE(result.isSuccess());
         if (!result.isSuccess()) {
+            fprintf(stderr,
+                "close-header iteration %d failed: %s\n", i,
+                result.message().c_str());
             server.requestStop();
             serverThread.join();
             return;
