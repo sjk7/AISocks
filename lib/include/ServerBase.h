@@ -239,18 +239,28 @@ template <typename ClientData> class ServerBase {
     }
 
     // Access the underlying listening socket (e.g. to set socket options).
-    TcpSocket& getSocket() { return *listener_; }
-    const TcpSocket& getSocket() const { return *listener_; }
+    TcpSocket& getSocket() {
+        assert(listener_ && "getSocket() requires a valid server listener");
+        return *listener_;
+    }
+    const TcpSocket& getSocket() const {
+        assert(listener_ && "getSocket() requires a valid server listener");
+        return *listener_;
+    }
 
     // The local endpoint (address + port) the server is bound to.
     // Returns an error Result if the socket is invalid.
     Result<Endpoint> serverEndpoint() const {
-        return getSocket().getLocalEndpoint();
+        if (!listener_ || !listener_->isValid()) {
+            return Result<Endpoint>(SocketError::InvalidSocket,
+                "ServerBase::serverEndpoint() called on invalid server");
+        }
+        return listener_->getLocalEndpoint();
     }
 
     // The port the server is listening on (useful when binding to Port{0}).
     Port serverPort() const {
-        auto ep = getSocket().getLocalEndpoint();
+        auto ep = serverEndpoint();
         return ep.isSuccess() ? ep.value().port : Port::any;
     }
 
