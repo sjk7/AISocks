@@ -38,7 +38,7 @@
 // Always-on step tracer: flushed immediately so CI output survives a SEGFAULT.
 #define STEP(msg)                                                              \
     do {                                                                       \
-        printf("  [STEP %s:%d] %s\n", __FILE__, __LINE__, (msg));             \
+        printf("  [STEP %s:%d] %s\n", __FILE__, __LINE__, (msg));              \
         fflush(stdout);                                                        \
     } while (0)
 
