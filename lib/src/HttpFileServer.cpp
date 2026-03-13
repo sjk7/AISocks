@@ -31,6 +31,10 @@ namespace aiSocks {
 // ---------------------------------------------------------------------------
 namespace {
 
+    // Large responses use a direct-read path that fills the final response
+    // buffer in place, avoiding an extra full-file temporary allocation.
+    constexpr size_t kLargeDirectReadThresholdBytes = 256 * 1024;
+
     // Append security headers (if enabled) and all custom headers, then the
     // blank line that terminates the HTTP header section.
     void appendConfigAndTrailingCRLF(std::string& response,
@@ -290,9 +294,12 @@ bool HttpFileServer::checkCacheConditions_(HttpClientState& state,
 void HttpFileServer::handleFileRequest(HttpClientState& state,
     const std::string& filePath, const FileInfo& fileInfo,
     const HttpRequest& request) {
-    bool useCache = config_.enableCache && request.queryString.empty();
+    const bool cacheEligible = config_.enableCache
+        && request.queryString.empty()
+        && fileInfo.size <= fileCache_.getConfig().maxFileSize
+        && fileInfo.size < kLargeDirectReadThresholdBytes;
 
-    if (useCache) {
+    if (cacheEligible) {
         const FileCache::CachedFile* cached
             = fileCache_.get(filePath, fileInfo.lastModified);
         if (cached) {
@@ -337,15 +344,40 @@ void HttpFileServer::handleFileRequest(HttpClientState& state,
 
     if (checkCacheConditions_(state, request, fileInfo)) return;
 
+    if (!file.seek(0, SEEK_SET)) {
+        sendError(state, 500, "Internal Server Error", "Failed to read file");
+        return;
+    }
+
+    if (!cacheEligible && fdInfo.size >= kLargeDirectReadThresholdBytes) {
+        std::string response;
+        response.reserve(512 + fdInfo.size);
+        appendOkHeaders(response, filePath, fdInfo.size, fileInfo.lastModified,
+            fileInfo.etag, config_);
+
+        const size_t headerSize = response.size();
+        response.resize(headerSize + fdInfo.size);
+        const size_t bytesRead
+            = file.read(response.data() + headerSize, 1, fdInfo.size);
+        if (bytesRead != fdInfo.size) {
+            sendError(
+                state, 500, "Internal Server Error", "Failed to read file");
+            return;
+        }
+
+        state.responseBuf = std::move(response);
+        state.responseView = state.responseBuf;
+        return;
+    }
+
     std::vector<char> fileContent = file.readAll();
     if (fileContent.empty() && fdInfo.size > 0) {
         sendError(state, 500, "Internal Server Error", "Failed to read file");
         return;
     }
 
-    if (useCache) {
+    if (cacheEligible)
         fileCache_.put(filePath, fileContent, fileInfo.lastModified);
-    }
 
     std::string response;
     response.reserve(512 + fileContent.size());

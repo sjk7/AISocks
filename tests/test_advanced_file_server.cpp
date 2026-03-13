@@ -376,6 +376,11 @@ void setupTestEnvironment() {
     textFile.writeString("This is a readme file.");
     textFile.close();
 
+    File largeFile("test_www/large.bin", "wb");
+    std::vector<char> largeData(300 * 1024, 'L');
+    largeFile.write(largeData.data(), 1, largeData.size());
+    largeFile.close();
+
     // Create blocked files (should return 403)
     File confFile("test_www/config.conf", "w");
     confFile.writeString("server.port=8080");
@@ -438,12 +443,44 @@ void testQueryStringBypassesCache() {
     }
 }
 
+/// Regression: large files should use the non-cached direct-read path.
+void testLargeFileBypassesCacheForHotPath() {
+    fputs("\n=== LARGE FILE HOT-PATH TESTS ===\n", stdout);
+
+    HttpFileServer::Config config;
+    config.documentRoot = "test_www";
+    config.enableCache = true;
+    CustomFileServer server(ServerBind{"127.0.0.1", Port{0}}, config);
+
+    std::string request = BehavioralTestHelper::makeHttpRequest(
+        "GET", "/large.bin", "YWRtaW46c2VjcmV0");
+    HttpClientState state;
+    state.request = request;
+
+    server.buildResponse(state);
+
+    std::string status = BehavioralTestHelper::extractStatus(state.responseBuf);
+    std::string contentLength = BehavioralTestHelper::extractHeader(
+        state.responseBuf, "Content-Length");
+    std::string body = BehavioralTestHelper::extractBody(state.responseBuf);
+
+    TestFramework::assert_contains(
+        status, "200", "Large file should be served successfully");
+    TestFramework::assert_equals(std::to_string(300 * 1024), contentLength,
+        "Large file should return expected Content-Length");
+    TestFramework::assert_true(body.size() == 300 * 1024,
+        "Large file response body should include all bytes");
+    TestFramework::assert_true(server.cacheSize() == 0,
+        "Large file should bypass cache insertion on hot path");
+}
+
 /// Clean up test environment
 void cleanupTestEnvironment() {
     // Simple cleanup - remove files first, then directories
     std::remove("test_www/index.html");
     std::remove("test_www/style.css");
     std::remove("test_www/script.js");
+    std::remove("test_www/large.bin");
     std::remove("test_www/config.conf");
     std::remove("test_www/debug.log");
     std::remove("test_www/.htpasswd");
@@ -1368,6 +1405,7 @@ int main() {
         testRangeRequestBehavior();
         testCachingHeadersBehavior();
         testQueryStringBypassesCache();
+        testLargeFileBypassesCacheForHotPath();
         testMimeTypeBehavior();
         testConcurrencyBehavior();
 
