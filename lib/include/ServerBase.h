@@ -144,16 +144,19 @@ template <typename ClientData> class ServerBase {
                 *result = std::move(createResult);
             }
             // listener_ is null (never assigned) — isValid() returns false.
-            // Still print the error for backward compatibility
-            fprintf(stderr,
-                "FATAL: SocketFactory::createTcpServer() failed with error "
-                "code %d: %s\n",
-                static_cast<int>(createResult.error()),
-                createResult.message().c_str());
-            fprintf(stderr,
-                "FATAL: Cannot start server - port %d is already in use or "
-                "invalid\n",
-                args.port.value());
+            // Still print the error for backward compatibility unless
+            // explicitly suppressed by the caller (e.g. negative tests).
+            if (args.logStartupErrors) {
+                fprintf(stderr,
+                    "FATAL: SocketFactory::createTcpServer() failed with "
+                    "error code %d: %s\n",
+                    static_cast<int>(createResult.error()),
+                    createResult.message().c_str());
+                fprintf(stderr,
+                    "FATAL: Cannot start server - port %d is already in "
+                    "use or invalid\n",
+                    args.port.value());
+            }
             // exit(1); // NO! Bad form!
         }
     }

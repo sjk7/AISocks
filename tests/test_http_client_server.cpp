@@ -414,7 +414,8 @@ static void test_server_init_failure_unblocks_waiter() {
 
     // Construct a server targeting the already-bound port with reuseAddr=false
     // so the bind fails at construction time — isValid() is false before run().
-    EchoServer failing{ServerBind{"127.0.0.1", takenPort, Backlog{}, false}};
+    EchoServer failing{
+        ServerBind{"127.0.0.1", takenPort, Backlog{}, false, false}};
     REQUIRE(!failing.isValid());
 
     // run() on a thread must call onReady() and exit immediately.

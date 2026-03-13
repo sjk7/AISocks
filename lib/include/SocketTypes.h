@@ -320,6 +320,7 @@ struct ServerBind {
     Port port{};
     Backlog backlog{};
     bool reuseAddr = true;
+    bool logStartupErrors = true;
 };
 
 // Creates a connected client socket: socket()  connect()

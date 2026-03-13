@@ -39,7 +39,7 @@ class CustomFileServer : public HttpFileServer {
     public:
     explicit CustomFileServer(ServerBind bind, const Config& config = Config{})
         : HttpFileServer(std::move(bind), config)
-        , logFile_("access.log", "a") {}
+        , logFile_("access.log", "a+") {}
 
     ~CustomFileServer() { logFile_.close(); }
 
@@ -252,16 +252,17 @@ class CustomFileServer : public HttpFileServer {
     }
 
     std::string readAccessLogTail(size_t maxLines) const {
-        File f("access.log", "rb");
-        if (!f.isOpen()) return {};
+        if (!logFile_.isOpen()) return {};
+        (void)logFile_.flush();
 
-        if (!f.seek(0, SEEK_END)) return {};
-        const auto fileSize = f.tell();
+        if (!logFile_.seek(0, SEEK_END)) return {};
+        const auto fileSize = logFile_.tell();
         if (fileSize <= 0) return {};
-        if (!f.seek(0, SEEK_SET)) return {};
+        if (!logFile_.seek(0, SEEK_SET)) return {};
 
         std::vector<char> bytes(static_cast<size_t>(fileSize));
-        const size_t bytesRead = f.read(bytes.data(), 1, bytes.size());
+        const size_t bytesRead = logFile_.read(bytes.data(), 1, bytes.size());
+        (void)logFile_.seek(0, SEEK_END);
         if (bytesRead == 0) return {};
         bytes.resize(bytesRead);
 
@@ -421,6 +422,22 @@ class TestFramework {
 
 int TestFramework::passedTests = 0;
 int TestFramework::failedTests = 0;
+
+static void runTestWithTrace(const char* name, void (*testFn)()) {
+    printf("[TRACE] START: %s\n", name);
+    fflush(stdout);
+
+    const int failedBefore = TestFramework::failedTests;
+    const int passedBefore = TestFramework::passedTests;
+
+    testFn();
+
+    const int failedDelta = TestFramework::failedTests - failedBefore;
+    const int passedDelta = TestFramework::passedTests - passedBefore;
+    printf("[TRACE] END: %s (passed +%d, failed +%d)\n", name, passedDelta,
+        failedDelta);
+    fflush(stdout);
+}
 
 /// Create test environment
 void setupTestEnvironment() {
@@ -1574,6 +1591,9 @@ void testConcurrencyBehavior() {
 /// Main test runner - focused on behavior, not implementation
 // Test comment to verify brittleness is fixed - strings are centralized
 int main() {
+    setvbuf(stdout, nullptr, _IONBF, 0);
+    setvbuf(stderr, nullptr, _IONBF, 0);
+
     aiSocks::Stopwatch totalTimer;
     printf("[TEST] CustomFileServer Behavioral Test Suite\n");
     printf("=========================================\n");
@@ -1583,22 +1603,33 @@ int main() {
     try {
         setupTestEnvironment();
 
-        testAuthenticationBehavior();
-        testFileServingBehavior();
-        testErrorHandlingBehavior();
-        testInvalidMethodsBehavior();
-        testMalformedRequestsBehavior();
-        testPathTraversalBehavior();
-        testAuthenticationFailuresBehavior();
-        testHeadMethodBehavior();
-        testRangeRequestBehavior();
-        testCachingHeadersBehavior();
-        testQueryStringBypassesCache();
-        testPublicLandingPageSignInLinkTargetsProtectedPage();
-        testAccessLogBrowserTailBehavior();
-        testLargeFileBypassesCacheForHotPath();
-        testMimeTypeBehavior();
-        testConcurrencyBehavior();
+        runTestWithTrace(
+            "testAuthenticationBehavior", testAuthenticationBehavior);
+        runTestWithTrace("testFileServingBehavior", testFileServingBehavior);
+        runTestWithTrace(
+            "testErrorHandlingBehavior", testErrorHandlingBehavior);
+        runTestWithTrace(
+            "testInvalidMethodsBehavior", testInvalidMethodsBehavior);
+        runTestWithTrace(
+            "testMalformedRequestsBehavior", testMalformedRequestsBehavior);
+        runTestWithTrace(
+            "testPathTraversalBehavior", testPathTraversalBehavior);
+        runTestWithTrace("testAuthenticationFailuresBehavior",
+            testAuthenticationFailuresBehavior);
+        runTestWithTrace("testHeadMethodBehavior", testHeadMethodBehavior);
+        runTestWithTrace("testRangeRequestBehavior", testRangeRequestBehavior);
+        runTestWithTrace(
+            "testCachingHeadersBehavior", testCachingHeadersBehavior);
+        runTestWithTrace(
+            "testQueryStringBypassesCache", testQueryStringBypassesCache);
+        runTestWithTrace("testPublicLandingPageSignInLinkTargetsProtectedPage",
+            testPublicLandingPageSignInLinkTargetsProtectedPage);
+        runTestWithTrace("testAccessLogBrowserTailBehavior",
+            testAccessLogBrowserTailBehavior);
+        runTestWithTrace("testLargeFileBypassesCacheForHotPath",
+            testLargeFileBypassesCacheForHotPath);
+        runTestWithTrace("testMimeTypeBehavior", testMimeTypeBehavior);
+        runTestWithTrace("testConcurrencyBehavior", testConcurrencyBehavior);
 
         cleanupTestEnvironment();
 
