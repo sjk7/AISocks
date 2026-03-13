@@ -12,6 +12,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BUILD_DIR="${BUILD_DIR:-$ROOT_DIR/build-relwithdebinfo}"
 SERVER_BIN="${SERVER_BIN:-$BUILD_DIR/advanced_file_server}"
+BENCH_ROOT="${BENCH_ROOT:-$ROOT_DIR/www}"
 PORT="${PORT:-18080}"
 REPEATS="${REPEATS:-8}"
 LARGE_MB="${LARGE_MB:-16}"
@@ -29,33 +30,65 @@ require_cmd curl
 require_cmd awk
 require_cmd dd
 require_cmd mktemp
+require_cmd lsof
 
 if [[ ! -x "$SERVER_BIN" ]]; then
     echo "Server binary not found at $SERVER_BIN. Building advanced_file_server..."
     cmake --build "$BUILD_DIR" --target advanced_file_server
 fi
 
+kill_port_users() {
+    local port="$1"
+    local pids
+    pids="$(lsof -ti "tcp:$port" || true)"
+    if [[ -z "$pids" ]]; then
+        return
+    fi
+
+    echo "Port $port is already in use. Terminating: $pids"
+    kill $pids 2>/dev/null || true
+
+    for _ in {1..20}; do
+        if [[ -z "$(lsof -ti "tcp:$port" || true)" ]]; then
+            return
+        fi
+        sleep 0.05
+    done
+
+    pids="$(lsof -ti "tcp:$port" || true)"
+    if [[ -n "$pids" ]]; then
+        echo "Force-killing remaining processes on port $port: $pids"
+        kill -9 $pids 2>/dev/null || true
+    fi
+}
+
 TMP_ROOT="$(mktemp -d)"
 SERVER_LOG="$TMP_ROOT/server.log"
+LARGE_FILE_NAME="bench_large_${PORT}_$$.bin"
+SMALL_FILE_NAME="bench_small_${PORT}_$$.bin"
+LARGE_FILE_PATH="$BENCH_ROOT/$LARGE_FILE_NAME"
+SMALL_FILE_PATH="$BENCH_ROOT/$SMALL_FILE_NAME"
 
 cleanup() {
     if [[ -n "${SERVER_PID:-}" ]] && kill -0 "$SERVER_PID" 2>/dev/null; then
         kill "$SERVER_PID" 2>/dev/null || true
         wait "$SERVER_PID" 2>/dev/null || true
     fi
+    rm -f "$LARGE_FILE_PATH" "$SMALL_FILE_PATH"
     rm -rf "$TMP_ROOT"
 }
 trap cleanup EXIT
 
-mkdir -p "$TMP_ROOT/www"
+mkdir -p "$BENCH_ROOT"
 
-echo "Preparing benchmark files in $TMP_ROOT/www"
-dd if=/dev/zero of="$TMP_ROOT/www/bench_large.bin" bs=1m count="$LARGE_MB" status=none
+echo "Preparing benchmark files in $BENCH_ROOT"
+dd if=/dev/zero of="$LARGE_FILE_PATH" bs=1m count="$LARGE_MB" status=none
 
-dd if=/dev/zero of="$TMP_ROOT/www/bench_small.bin" bs=1k count="$SMALL_KB" status=none
+dd if=/dev/zero of="$SMALL_FILE_PATH" bs=1k count="$SMALL_KB" status=none
 
 echo "Starting server on port $PORT"
-"$SERVER_BIN" "$PORT" "$TMP_ROOT/www" >"$SERVER_LOG" 2>&1 &
+kill_port_users "$PORT"
+"$SERVER_BIN" "$PORT" "$BENCH_ROOT" >"$SERVER_LOG" 2>&1 &
 SERVER_PID=$!
 
 for _ in {1..80}; do
@@ -115,9 +148,9 @@ run_case() {
 echo
 echo "Benchmark results (REPEATS=$REPEATS, LARGE_MB=$LARGE_MB, SMALL_KB=$SMALL_KB)"
 echo "--------------------------------------------------------------------------"
-run_case "large-uncached" "http://127.0.0.1:$PORT/bench_large.bin" "uncached"
-run_case "large-reused"   "http://127.0.0.1:$PORT/bench_large.bin" "reused"
-run_case "small-reused"   "http://127.0.0.1:$PORT/bench_small.bin" "reused"
+run_case "large-uncached" "http://127.0.0.1:$PORT/$LARGE_FILE_NAME" "uncached"
+run_case "large-reused"   "http://127.0.0.1:$PORT/$LARGE_FILE_NAME" "reused"
+run_case "small-reused"   "http://127.0.0.1:$PORT/$SMALL_FILE_NAME" "reused"
 
 echo
 echo "Interpretation:"

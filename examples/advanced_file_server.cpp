@@ -655,7 +655,7 @@ class CustomFileServer : public HttpFileServer {
 #else
         struct tm* timeinfo = localtime(&time_t);
         logFile_.printf(
-            "%04d-%02d-%02d %02d:%02d:%02d %s %s from client\n", //-V111 //-V111
+            "%04d-%02d-%02d %02d:%02d:%02d %.*s %s from client\n", //-V111 //-V111
             static_cast<int>(timeinfo->tm_year + 1900),
             static_cast<int>(timeinfo->tm_mon + 1),
             static_cast<int>(timeinfo->tm_mday),
