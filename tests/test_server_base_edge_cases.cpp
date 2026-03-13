@@ -35,6 +35,13 @@
     } while (0)
 #endif
 
+// Always-on step tracer: flushed immediately so CI output survives a SEGFAULT.
+#define STEP(msg)                                                              \
+    do {                                                                       \
+        printf("  [STEP %s:%d] %s\n", __FILE__, __LINE__, (msg));             \
+        fflush(stdout);                                                        \
+    } while (0)
+
 using namespace aiSocks;
 
 // Testing constants for edge case scenarios
@@ -226,12 +233,17 @@ int main() {
     // Test 1: Server under load with many connections
     BEGIN_TEST("Edge case: server handles high connection load");
     {
+        STEP("construct server");
         EdgeCaseServer server(Port::any);
+        STEP("get port");
         Port port = server.serverPort();
 
+        STEP("start server thread");
         auto serverThread
             = startServerInBackground(server, ClientLimit::Unlimited);
+        STEP("wait ready");
         waitForServerReady(server);
+        STEP("connecting clients");
 
         std::vector<std::unique_ptr<TcpSocket>> clients;
         const int numClients = 20; // High load
@@ -267,12 +279,16 @@ int main() {
     // Test 2: Client limit exactly at capacity
     BEGIN_TEST("Edge case: server at exactly maximum client capacity");
     {
+        STEP("construct server");
         EdgeCaseServer server(Port::any);
+        STEP("get port");
         Port port = server.serverPort();
 
         const size_t maxClients = 5;
+        STEP("start server thread");
         auto serverThread
             = startServerInBackground(server, ClientLimit{maxClients});
+        STEP("wait ready");
         waitForServerReady(server);
 
         std::vector<std::unique_ptr<TcpSocket>> clients;
@@ -302,10 +318,14 @@ int main() {
     // Test 3: Client limit of 1 (minimal capacity)
     BEGIN_TEST("Edge case: server with minimal client limit (1)");
     {
+        STEP("construct server");
         EdgeCaseServer server(Port::any);
+        STEP("get port");
         Port port = server.serverPort();
 
+        STEP("start server thread");
         auto serverThread = startServerInBackground(server, ClientLimit{1});
+        STEP("wait ready");
         waitForServerReady(server);
 
         // Connect one client
@@ -330,12 +350,16 @@ int main() {
     // Test 4: Rapid connect/disconnect cycling
     BEGIN_TEST("Edge case: rapid connect/disconnect/reconnect cycling");
     {
+        STEP("construct server");
         EdgeCaseServer server(Port::any);
         server.setCustomKeepAliveTimeout(Milliseconds{5000});
+        STEP("get port");
         Port port = server.serverPort();
 
+        STEP("start server thread");
         auto serverThread
             = startServerInBackground(server, ClientLimit::Unlimited);
+        STEP("wait ready");
         waitForServerReady(server);
 
         // Connect/disconnect cycle
@@ -362,12 +386,16 @@ int main() {
     // Test 5: Keep-alive timeout detection
     BEGIN_TEST("Edge case: keep-alive timeout disconnects idle clients");
     {
+        STEP("construct server");
         EdgeCaseServer server(Port::any);
         server.setCustomKeepAliveTimeout(Milliseconds{10});
+        STEP("get port");
         Port port = server.serverPort();
 
+        STEP("start server thread");
         auto serverThread
             = startServerInBackground(server, ClientLimit::Unlimited);
+        STEP("wait ready");
         waitForServerReady(server);
 
         // Connect a client
@@ -400,11 +428,15 @@ int main() {
     BEGIN_TEST(
         "Edge case: large messages from multiple clients simultaneously");
     {
+        STEP("construct server");
         EdgeCaseServer server(Port::any);
+        STEP("get port");
         Port port = server.serverPort();
 
+        STEP("start server thread");
         auto serverThread
             = startServerInBackground(server, ClientLimit::Unlimited);
+        STEP("wait ready");
         waitForServerReady(server);
 
         std::vector<std::unique_ptr<TcpSocket>> clients;
@@ -442,11 +474,15 @@ int main() {
     // Test 7: Shutdown with active connections
     BEGIN_TEST("Edge case: graceful shutdown with multiple active connections");
     {
+        STEP("construct server");
         EdgeCaseServer server(Port::any);
+        STEP("get port");
         Port port = server.serverPort();
 
+        STEP("start server thread");
         auto serverThread
             = startServerInBackground(server, ClientLimit::Unlimited);
+        STEP("wait ready");
         waitForServerReady(server);
 
         std::vector<std::unique_ptr<TcpSocket>> clients;
@@ -475,11 +511,15 @@ int main() {
     // Test 8: Client limit of zero (should be treated as unlimited)
     BEGIN_TEST("Edge case: client limit sanity (zero or unlimited)");
     {
+        STEP("construct server");
         EdgeCaseServer server(Port::any);
+        STEP("get port");
         Port port = server.serverPort();
 
+        STEP("start server thread");
         auto serverThread
             = startServerInBackground(server, ClientLimit::Unlimited);
+        STEP("wait ready");
         waitForServerReady(server);
 
         // Connect a few clients and send data so we can sync
@@ -504,12 +544,16 @@ int main() {
     // Test 9: Connection attempt rejection after hitting limit
     BEGIN_TEST("Edge case: new connection attempts when at client limit");
     {
+        STEP("construct server");
         EdgeCaseServer server(Port::any);
+        STEP("get port");
         Port port = server.serverPort();
 
         const size_t maxClients = 3;
+        STEP("start server thread");
         auto serverThread
             = startServerInBackground(server, ClientLimit{maxClients});
+        STEP("wait ready");
         waitForServerReady(server);
 
         std::vector<std::unique_ptr<TcpSocket>> clients;
@@ -546,11 +590,15 @@ int main() {
     // Test 10: Polling timeout accuracy
     BEGIN_TEST("Edge case: server responds within reasonable time");
     {
+        STEP("construct server");
         EdgeCaseServer server(Port::any);
+        STEP("get port");
         Port port = server.serverPort();
 
+        STEP("start server thread");
         auto serverThread
             = startServerInBackground(server, ClientLimit::Unlimited);
+        STEP("wait ready");
         waitForServerReady(server);
 
         // Connect and send data quickly
@@ -581,13 +629,17 @@ int main() {
     // Test 11: wait_forever suppresses onIdle()
     BEGIN_TEST("Edge case: wait_forever — onIdle() never called while idle");
     {
+        STEP("construct server");
         EdgeCaseServer server(Port::any);
+        STEP("get port");
         Port port = server.serverPort();
 
         // Run with wait_forever: poller blocks until a real event fires,
         // so onIdle() must never be called during a quiet period.
+        STEP("start server thread (wait_forever)");
         auto serverThread = std::thread(
             [&server]() { server.run(ClientLimit::Unlimited, wait_forever); });
+        STEP("wait ready");
         waitForServerReady(server);
 
         // Sit quietly for 30ms — server should be blocked in the poller.
@@ -616,11 +668,15 @@ int main() {
     // events)
     BEGIN_TEST("Edge case: accept-filter rejects do not leak poller state");
     {
+        STEP("construct server");
         EdgeCaseServer server(Port::any);
+        STEP("get port");
         Port port = server.serverPort();
 
+        STEP("start server thread");
         auto serverThread
             = startServerInBackground(server, ClientLimit::Unlimited);
+        STEP("wait ready");
         waitForServerReady(server);
 
         server.setRejectNewConnections(true);
@@ -660,51 +716,61 @@ int main() {
     // Test 13: isValid()==false — serverEndpoint() returns an error Result
     BEGIN_TEST("Invalid server: serverEndpoint() returns error Result");
     {
-        // Start a valid server to hold the port, then attempt to bind again
-        // to the same port so the second construction fails.
+        STEP("construct holder");
         EdgeCaseServer holder(Port::any);
         REQUIRE(holder.isValid());
+        STEP("get taken port");
         Port takenPort = holder.serverPort();
         REQUIRE(takenPort.value() != 0);
-
+        STEP("construct bad server on taken port");
         InvalidInstanceServer bad(takenPort);
+        STEP("check isValid");
         REQUIRE(!bad.isValid());
-
+        STEP("call serverEndpoint");
         auto ep = bad.serverEndpoint();
         REQUIRE(!ep.isSuccess());
         REQUIRE(ep.error() == SocketError::InvalidSocket);
+        STEP("done");
     }
 
     // Test 14: isValid()==false — serverPort() returns Port::any
     BEGIN_TEST("Invalid server: serverPort() returns Port::any");
     {
+        STEP("construct holder");
         EdgeCaseServer holder(Port::any);
         REQUIRE(holder.isValid());
+        STEP("get taken port");
         Port takenPort = holder.serverPort();
-
+        STEP("construct bad server on taken port");
         InvalidInstanceServer bad(takenPort);
+        STEP("check isValid");
         REQUIRE(!bad.isValid());
-
+        STEP("call serverPort");
         Port p = bad.serverPort();
         REQUIRE(p.value() == Port::any.value());
+        STEP("done");
     }
 
     // Test 15: isValid()==false — run() returns immediately and calls onReady()
     BEGIN_TEST("Invalid server: run() returns immediately, onReady() called");
     {
+        STEP("construct holder");
         EdgeCaseServer holder(Port::any);
         REQUIRE(holder.isValid());
+        STEP("get taken port");
         Port takenPort = holder.serverPort();
-
+        STEP("construct bad server on taken port");
         InvalidInstanceServer bad(takenPort);
+        STEP("check isValid");
         REQUIRE(!bad.isValid());
         REQUIRE(!bad.onReadyCalled.load());
-
+        STEP("call run() on invalid server");
         // run() must not block and must invoke onReady() before returning.
         bad.run();
-
+        STEP("run() returned");
         REQUIRE(bad.onReadyCalled.load());
         REQUIRE(bad.clientCount() == 0);
+        STEP("done");
     }
 
     return test_summary();

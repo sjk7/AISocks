@@ -48,10 +48,12 @@ static std::string g_currentTest;
     do {                                                                       \
         if (!g_currentTest.empty()) {                                          \
             printf("  [%.1f ms]\n", g_testTimer.elapsedMs());                  \
+            fflush(stdout);                                                    \
         }                                                                      \
         g_currentTest = (name);                                                \
         g_testTimer.reset();                                                   \
         printf("\n--- %s ---\n", name);                                        \
+        fflush(stdout);                                                        \
     } while (0)
 
 inline int test_summary() {
