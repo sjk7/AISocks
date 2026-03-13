@@ -285,6 +285,44 @@ static void test_accept_max_chunk_size_line() {
     REQUIRE(!p.isError());
 }
 
+// 17. Decoded chunked body beyond configured cap is rejected
+static void test_reject_decoded_chunked_body_over_cap() {
+    BEGIN_TEST("reject decoded chunked body beyond cap");
+    HttpResponseParser p;
+
+    const std::string headers = "HTTP/1.1 200 OK\r\n"
+                                "Transfer-Encoding: chunked\r\n"
+                                "\r\n";
+    auto state = p.feed(headers.data(), headers.size());
+    REQUIRE(state != HttpResponseParser::State::Error);
+
+    const std::string chunkPayload(HttpResponseParser::kMaxChunkSize, 'a');
+    const std::string chunk = "1000000\r\n" + chunkPayload + "\r\n";
+
+    for (int i = 0; i < 4; ++i) {
+        state = p.feed(chunk.data(), chunk.size());
+        REQUIRE(state != HttpResponseParser::State::Error);
+    }
+
+    const std::string extraChunk = "1\r\nZ\r\n";
+    state = p.feed(extraChunk.data(), extraChunk.size());
+    REQUIRE(state == HttpResponseParser::State::Error);
+    REQUIRE(p.isError());
+}
+
+// 18. Overflow-formatted chunk sizes are rejected cleanly
+static void test_reject_overflow_formatted_chunk_size() {
+    BEGIN_TEST("reject overflow-formatted chunk size");
+    std::string raw = "HTTP/1.1 200 OK\r\n"
+                      "Transfer-Encoding: chunked\r\n"
+                      "\r\n"
+                      "FFFFFFFFFFFFFFFF\r\n";
+    HttpResponseParser p;
+    auto state = p.feed(raw.data(), raw.size());
+    REQUIRE(state == HttpResponseParser::State::Error);
+    REQUIRE(p.isError());
+}
+
 // ---------------------------------------------------------------------------
 int main() {
     test_simple_200();
@@ -303,5 +341,7 @@ int main() {
     test_reject_oversized_chunk_size_line();
     test_accept_max_content_length_header();
     test_accept_max_chunk_size_line();
+    test_reject_decoded_chunked_body_over_cap();
+    test_reject_overflow_formatted_chunk_size();
     return test_summary();
 }

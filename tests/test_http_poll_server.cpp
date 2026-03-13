@@ -973,5 +973,54 @@ int main() {
         g_serverSignalStop.store(false);
     }
 
+    // Test 25: Method rejection closes connection deterministically
+    BEGIN_TEST("Unsupported method returns 405 and closes connection");
+    {
+        TestHttpServer server(ServerBind{"127.0.0.1", Port{0}});
+        REQUIRE(server.isValid());
+
+        std::thread serverThread(
+            [&server]() { server.run(ClientLimit{1}, Milliseconds{1}); });
+        server.waitReady();
+
+        auto clientResult = SocketFactory::createTcpClient(
+            AddressFamily::IPv4, ConnectArgs{"127.0.0.1", server.serverPort()});
+        REQUIRE(clientResult.isSuccess());
+        auto& client = clientResult.value();
+        client.setReceiveTimeout(Milliseconds{500});
+
+        const std::string request = "POST / HTTP/1.1\r\nHost: localhost\r\n"
+                                    "Content-Length: 0\r\n\r\n";
+        REQUIRE(client.sendAll(request.data(), request.size()));
+
+        std::string response = receiveCompleteResponse(client);
+        REQUIRE(response.find("405 Method Not Allowed") != std::string::npos);
+        REQUIRE(response.find("Connection: close") != std::string::npos);
+
+        bool sawEof = false;
+        char b[8];
+        for (int i = 0; i < 20; ++i) {
+            int n = client.receive(b, sizeof(b));
+            if (n == 0) {
+                sawEof = true;
+                break;
+            }
+            if (n < 0) {
+                const auto err = client.getLastError();
+                if (err == SocketError::WouldBlock
+                    || err == SocketError::Timeout) {
+                    std::this_thread::sleep_for(10ms);
+                    continue;
+                }
+                break;
+            }
+        }
+        REQUIRE(sawEof);
+
+        g_serverSignalStop.store(true);
+        serverThread.join();
+        g_serverSignalStop.store(false);
+    }
+
     return test_summary();
 }
