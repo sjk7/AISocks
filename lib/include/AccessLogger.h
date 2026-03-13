@@ -57,6 +57,11 @@ class AccessLogger {
     void log(const std::string& peerIp, const std::string& requestLine,
         int statusCode, size_t responseBytes, const std::string& user = {});
 
+    // Flush any buffered log entries to disk.  Called automatically every
+    // 64 writes; also call explicitly on idle or shutdown to ensure no
+    // entries are lost.
+    void flush();
+
     // ---- static helpers used by the wiring code -------------------------
 
     // Extract the first request line from a raw HTTP request buffer.
@@ -69,6 +74,7 @@ class AccessLogger {
 
     private:
     File file_;
+    unsigned writeCount_{0};
 
     // Format `t` as "13/Mar/2026:12:34:56 +0000" (UTC, Apache style).
     static std::string formatTimestamp(std::time_t t);

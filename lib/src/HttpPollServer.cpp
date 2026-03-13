@@ -278,6 +278,7 @@ void HttpPollServer::run(ClientLimit maxClients, Milliseconds timeout) {
 #endif
 
     ServerBase<HttpClientState>::run(maxClients, timeout);
+    if (accessLogger_) accessLogger_->flush(); // drain any buffered log entries
 
 #ifndef NDEBUG
     printf("[DEBUG] HttpPollServer::run() - Server completed\n");
@@ -686,6 +687,7 @@ void HttpPollServer::resetAfterSend_(HttpClientState& s) {
 
 ServerResult HttpPollServer::onIdle() {
     tracker_.record(clientCount(), peakClientCount());
+    if (accessLogger_) accessLogger_->flush();
     return ServerBase<HttpClientState>::onIdle();
 }
 

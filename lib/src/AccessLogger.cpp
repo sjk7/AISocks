@@ -60,7 +60,15 @@ void AccessLogger::log(const std::string& peerIp,
     file_.writeString("] \"");
     file_.writeString(rl);
     file_.writeString(suffix);
-    file_.flush();
+    // Flush every 64 entries instead of every write.  This batches the
+    // fwrite→kernel write syscall so it fires at most once per 64 log
+    // lines rather than once per request, cutting per-request I/O cost
+    // by ~64×.  onIdle() and server shutdown call flush() explicitly.
+    if ((++writeCount_ & 63u) == 0) file_.flush();
+}
+
+void AccessLogger::flush() {
+    if (file_.isOpen()) file_.flush();
 }
 
 // ---------------------------------------------------------------------------
