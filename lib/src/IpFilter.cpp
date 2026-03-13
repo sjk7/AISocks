@@ -209,8 +209,7 @@ void IpFilter::recordRequest(const std::string& peerAddress) {
     const auto now = std::chrono::steady_clock::now();
 
     auto& entry = rateTracker_[peerAddress];
-    const auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(
-        now - entry.windowStart);
+    const auto elapsed = now - entry.windowStart;
 
     if (elapsed >= autoBlacklistWindow_) {
         // Start fresh window

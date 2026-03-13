@@ -59,12 +59,12 @@ class IpFilter {
     void setAutoBlacklistThreshold(int n) { autoBlacklistThreshold_ = n; }
 
     // Sliding window duration for the rate counter (default: 60 s).
-    void setAutoBlacklistWindow(std::chrono::seconds w) {
+    void setAutoBlacklistWindow(std::chrono::steady_clock::duration w) {
         autoBlacklistWindow_ = w;
     }
 
     // How long a rate-blacklisted IP stays blocked (default: 90 min).
-    void setAutoBlacklistDuration(std::chrono::seconds d) {
+    void setAutoBlacklistDuration(std::chrono::steady_clock::duration d) {
         autoBlacklistDuration_ = d;
     }
 
@@ -97,8 +97,10 @@ class IpFilter {
     std::unordered_map<std::string, RateEntry> rateTracker_;
 
     int autoBlacklistThreshold_{200};
-    std::chrono::seconds autoBlacklistWindow_{60};
-    std::chrono::seconds autoBlacklistDuration_{5400}; // 90 min
+    std::chrono::steady_clock::duration autoBlacklistWindow_
+        = std::chrono::seconds{60};
+    std::chrono::steady_clock::duration autoBlacklistDuration_
+        = std::chrono::seconds{5400}; // 90 min
 
     // Parse "a.b.c.d" into a host-byte-order uint32.  Returns false on error.
     static bool parseIpv4(const std::string& s, uint32_t& out);

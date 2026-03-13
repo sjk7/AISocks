@@ -25,6 +25,12 @@
 using namespace aiSocks;
 using namespace std::chrono_literals;
 
+namespace {
+constexpr auto kFastBlacklistDuration = std::chrono::milliseconds{80};
+constexpr auto kFastRateWindow = std::chrono::milliseconds{80};
+constexpr auto kFastSleepBuffer = std::chrono::milliseconds{180};
+} // namespace
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -233,8 +239,8 @@ int main() {
         IpFilter f;
         f.setAutoBlacklistThreshold(3);
         f.setAutoBlacklistWindow(std::chrono::seconds{60});
-        // 1-second blacklist duration so we don't have to wait long
-        f.setAutoBlacklistDuration(std::chrono::seconds{1});
+        // Keep this short so the test stays fast but deterministic.
+        f.setAutoBlacklistDuration(kFastBlacklistDuration);
 
         const std::string ip = "10.20.30.40";
         f.recordRequest(ip);
@@ -242,9 +248,10 @@ int main() {
         f.recordRequest(ip); // threshold reached
         REQUIRE(!f.isAllowed(ip));
 
-        // Wait for expiry (2 s > 1 s duration)
-        printf("  [sleeping 2s for blacklist expiry...]\n");
-        std::this_thread::sleep_for(std::chrono::seconds{2});
+        // Wait past expiry with a small scheduling buffer.
+        printf("  [sleeping %lldms for blacklist expiry...]\n",
+            static_cast<long long>(kFastSleepBuffer.count()));
+        std::this_thread::sleep_for(kFastSleepBuffer);
 
         REQUIRE(f.isAllowed(ip)); // should have expired
     }
@@ -254,8 +261,8 @@ int main() {
     {
         IpFilter f;
         f.setAutoBlacklistThreshold(10);
-        // 1-second rate window
-        f.setAutoBlacklistWindow(std::chrono::seconds{1});
+        // Keep this short so the test stays fast but deterministic.
+        f.setAutoBlacklistWindow(kFastRateWindow);
         f.setAutoBlacklistDuration(std::chrono::seconds{60});
 
         const std::string ip = "5.6.7.8";
@@ -263,9 +270,10 @@ int main() {
         for (int i = 0; i < 9; ++i) f.recordRequest(ip);
         REQUIRE(f.isAllowed(ip));
 
-        // Wait for the rate window to expire
-        printf("  [sleeping 2s for rate window reset...]\n");
-        std::this_thread::sleep_for(std::chrono::seconds{2});
+        // Wait past the rate window with a small scheduling buffer.
+        printf("  [sleeping %lldms for rate window reset...]\n",
+            static_cast<long long>(kFastSleepBuffer.count()));
+        std::this_thread::sleep_for(kFastSleepBuffer);
 
         // First request in new window: counter resets, still allowed
         f.recordRequest(ip);
