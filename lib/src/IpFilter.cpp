@@ -10,7 +10,6 @@
 #include <algorithm>
 #include <cctype>
 #include <cstdlib>
-#include <cstdio>
 #include <string>
 
 namespace aiSocks {
@@ -20,10 +19,19 @@ namespace aiSocks {
 // ---------------------------------------------------------------------------
 
 bool IpFilter::parseIpv4(const std::string& s, uint32_t& out) {
-    unsigned a = 0, b = 0, c = 0, d = 0;
-    if (sscanf(s.c_str(), "%u.%u.%u.%u", &a, &b, &c, &d) != 4) return false;
-    if (a > 255 || b > 255 || c > 255 || d > 255) return false;
-    out = (a << 24u) | (b << 16u) | (c << 8u) | d;
+    const char* p = s.c_str();
+    char* end = nullptr;
+    unsigned long parts[4];
+    for (int i = 0; i < 4; ++i) {
+        parts[i] = std::strtoul(p, &end, 10);
+        if (end == p || parts[i] > 255) return false;
+        if (i < 3) {
+            if (*end != '.') return false;
+            p = end + 1;
+        }
+    }
+    if (*end != '\0') return false;
+    out = (parts[0] << 24u) | (parts[1] << 16u) | (parts[2] << 8u) | parts[3];
     return true;
 }
 
