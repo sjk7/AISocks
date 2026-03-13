@@ -73,6 +73,12 @@ class EdgeCaseServer : public ServerBase<EdgeCaseState> {
     std::atomic<int> disconnectCount{0};
     std::atomic<int> idleCallCount{0};
     std::atomic<size_t> atomicClientCount_{0};
+    std::atomic<int> acceptFilterCalls{0};
+    std::atomic<int> acceptFilterRejected{0};
+
+    void setRejectNewConnections(bool reject) {
+        rejectNewConnections_.store(reject, std::memory_order_relaxed);
+    }
 
     std::atomic<bool> ready_{false};
     void waitReady() const {
@@ -90,6 +96,15 @@ class EdgeCaseServer : public ServerBase<EdgeCaseState> {
     }
 
     protected:
+    bool onAcceptFilter(const std::string& /*peerAddress*/) override {
+        acceptFilterCalls.fetch_add(1, std::memory_order_relaxed);
+        const bool reject
+            = rejectNewConnections_.load(std::memory_order_relaxed);
+        if (reject)
+            acceptFilterRejected.fetch_add(1, std::memory_order_relaxed);
+        return !reject;
+    }
+
     void onClientConnected(TcpSocket&, EdgeCaseState& /*s*/) override {
         atomicClientCount_.fetch_add(1, std::memory_order_relaxed);
     }
@@ -151,6 +166,9 @@ class EdgeCaseServer : public ServerBase<EdgeCaseState> {
         idleCallCount++;
         return ServerResult::KeepConnection;
     }
+
+    private:
+    std::atomic<bool> rejectNewConnections_{false};
 };
 
 // ---------------------------------------------------------------------------
@@ -569,6 +587,51 @@ int main() {
         // socket event that wakes the poller out of its indefinite wait.
         server.requestStop();
         client.reset(); // closes socket → wakes poller → stop flag is seen
+        serverThread.join();
+    }
+
+    // Test 12: accept filter rejects before registration (no stale client
+    // events)
+    BEGIN_TEST("Edge case: accept-filter rejects do not leak poller state");
+    {
+        EdgeCaseServer server(Port::any);
+        Port port = server.serverPort();
+
+        auto serverThread
+            = startServerInBackground(server, ClientLimit::Unlimited);
+        waitForServerReady(server);
+
+        server.setRejectNewConnections(true);
+
+        // Repeatedly connect while filter rejects to exercise the reject path
+        // and encourage fd reuse patterns.
+        for (int i = 0; i < 40; ++i) {
+            auto client = connectClient(port, Milliseconds{100});
+            if (client) {
+                client->setBlocking(true);
+                const char* msg = "x";
+                (void)client->sendAll(msg, 1);
+            }
+        }
+
+        // Give the server loop time to process all reject-path activity.
+        std::this_thread::sleep_for(std::chrono::milliseconds{60});
+
+        REQUIRE(server.acceptFilterCalls.load() > 0);
+        REQUIRE(server.acceptFilterRejected.load() > 0);
+        REQUIRE(server.totalMessagesReceived.load() == 0);
+
+        // Turn off rejection and verify a new client is accepted and served.
+        server.setRejectNewConnections(false);
+        auto acceptedClient = connectClient(port, Milliseconds{200});
+        REQUIRE(acceptedClient != nullptr);
+        acceptedClient->setBlocking(true);
+        REQUIRE(acceptedClient->sendAll("ok", 2));
+
+        server.waitForMessages(1);
+        REQUIRE(server.totalMessagesReceived.load() > 0);
+
+        server.requestStop();
         serverThread.join();
     }
 

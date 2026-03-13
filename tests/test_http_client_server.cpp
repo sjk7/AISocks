@@ -117,6 +117,45 @@ class SilentServer : public HttpPollServer {
 };
 
 // ---------------------------------------------------------------------------
+// RedirectToHttpsServer — always returns a redirect to an https URL.
+// Used to verify client behavior for unsupported https redirects.
+// ---------------------------------------------------------------------------
+class RedirectToHttpsServer : public HttpPollServer {
+    public:
+    explicit RedirectToHttpsServer()
+        : HttpPollServer(ServerBind{"127.0.0.1", Port{0}}) {
+        setHandleSignals(false);
+    }
+
+    void waitReady() {
+        std::unique_lock<std::mutex> lk(readyMtx_);
+        readyCv_.wait(lk, [this] { return ready_.load(); });
+    }
+
+    protected:
+    void onReady() override {
+        {
+            std::lock_guard<std::mutex> lk(readyMtx_);
+            ready_ = true;
+        }
+        readyCv_.notify_all();
+    }
+
+    void buildResponse(HttpClientState& s) override {
+        s.responseBuf = "HTTP/1.1 302 Found\r\n"
+                        "Location: https://example.com/secure\r\n"
+                        "Content-Length: 0\r\n"
+                        "Connection: close\r\n\r\n";
+        s.responseView = s.responseBuf;
+    }
+
+    private:
+    std::atomic<bool> ready_{false};
+    std::mutex readyMtx_;
+    std::condition_variable readyCv_;
+};
+
+// ---------------------------------------------------------------------------
 // RAII helper: starts the server on construction, stops+joins on destruction
 // ---------------------------------------------------------------------------
 struct ServerGuard {
@@ -348,6 +387,42 @@ static void test_server_init_failure_unblocks_waiter() {
     occupantThread.join();
 }
 
+static void test_https_scheme_rejected() {
+    BEGIN_TEST("HttpClient rejects direct https URLs with explicit error");
+
+    HttpClient::Options opts;
+    opts.connectTimeout = Milliseconds{150};
+    opts.requestTimeout = Milliseconds{150};
+    HttpClient client{opts};
+
+    auto result = client.get("https://example.com/");
+    REQUIRE(!result.isSuccess());
+    REQUIRE(result.message().find("HTTPS is not supported")
+        != std::string::npos);
+}
+
+static void test_redirect_to_https_is_rejected() {
+    BEGIN_TEST("HttpClient rejects redirects to https URLs");
+
+    RedirectToHttpsServer server;
+    std::thread serverThread(
+        [&] { server.run(ClientLimit::Unlimited, Milliseconds{1}); });
+    server.waitReady();
+
+    HttpClient::Options opts;
+    opts.connectTimeout = Milliseconds{500};
+    opts.requestTimeout = Milliseconds{500};
+    auto result = HttpClient{opts}.get("http://127.0.0.1:"
+        + std::to_string(server.serverPort().value()) + "/");
+
+    server.requestStop();
+    serverThread.join();
+
+    REQUIRE(!result.isSuccess());
+    REQUIRE(result.message().find("HTTPS is not supported")
+        != std::string::npos);
+}
+
 static void test_resolve_url_relative_redirects() {
     BEGIN_TEST("HttpClient::resolveUrl handles relative Location values");
 
@@ -388,6 +463,8 @@ int main() {
     test_request_timeout_fails();
     test_request_timeout_is_total_deadline();
     test_server_init_failure_unblocks_waiter();
+    test_https_scheme_rejected();
+    test_redirect_to_https_is_rejected();
     test_resolve_url_relative_redirects();
 
     return test_summary();

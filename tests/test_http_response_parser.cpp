@@ -178,6 +178,35 @@ static void test_malformed_status_line() {
     REQUIRE(p.isError());
 }
 
+// 9b. Invalid HTTP version token with valid code is rejected
+static void test_reject_invalid_http_version_token() {
+    BEGIN_TEST("reject invalid HTTP version token");
+    std::string raw = "XYZ 200 OK\r\n\r\n";
+    HttpResponseParser p;
+    auto state = p.feed(raw.data(), raw.size());
+    REQUIRE(state == HttpResponseParser::State::Error);
+    REQUIRE(p.isError());
+}
+
+// 9c. Only HTTP/1.0 and HTTP/1.1 are accepted
+static void test_reject_unsupported_http_versions() {
+    BEGIN_TEST("reject unsupported HTTP version values");
+    {
+        std::string raw = "HTTP/2 200 OK\r\n\r\n";
+        HttpResponseParser p;
+        auto state = p.feed(raw.data(), raw.size());
+        REQUIRE(state == HttpResponseParser::State::Error);
+        REQUIRE(p.isError());
+    }
+    {
+        std::string raw = "HTTP/1.2 200 OK\r\n\r\n";
+        HttpResponseParser p;
+        auto state = p.feed(raw.data(), raw.size());
+        REQUIRE(state == HttpResponseParser::State::Error);
+        REQUIRE(p.isError());
+    }
+}
+
 // ---------------------------------------------------------------------------
 // 10. reset() between keep-alive responses
 // ---------------------------------------------------------------------------
@@ -334,6 +363,8 @@ int main() {
     test_bare_lf_separator();
     test_bare_lf_line_endings();
     test_malformed_status_line();
+    test_reject_invalid_http_version_token();
+    test_reject_unsupported_http_versions();
     test_reset_keepalive();
     test_headers_complete_early();
     test_reject_oversized_headers();

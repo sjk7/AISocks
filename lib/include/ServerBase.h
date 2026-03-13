@@ -698,6 +698,16 @@ template <typename ClientData> class ServerBase {
             // construction time and also propagated.  Nothing extra needed
             // here.
 
+            // Accept filter: allows derived classes to reject connections
+            // before the client is registered with the poller.
+            std::string peerAddrStr;
+            {
+                auto pep = client->getPeerEndpoint();
+                if (pep.isSuccess()) peerAddrStr = pep.value().address;
+            }
+            if (!onAcceptFilter(peerAddrStr))
+                continue; // socket closed via RAII
+
             uintptr_t key = client->getNativeHandle();
             if (!loop.add(*client, PollEvent::Readable | PollEvent::Error)) {
                 // Capture peer address before the socket is destroyed.
@@ -708,16 +718,6 @@ template <typename ClientData> class ServerBase {
                 // client goes out of scope here — socket closed via RAII.
                 continue;
             }
-
-            // Accept filter: allows derived classes to reject connections
-            // before the client is registered with the poller.
-            std::string peerAddrStr;
-            {
-                auto pep = client->getPeerEndpoint();
-                if (pep.isSuccess()) peerAddrStr = pep.value().address;
-            }
-            if (!onAcceptFilter(peerAddrStr))
-                continue; // socket closed via RAII
 
             ClientEntry& ce = emplaceClient(key, std::move(client));
             onClientConnected(*ce.socket, ce.data);

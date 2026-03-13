@@ -134,8 +134,14 @@ bool HttpResponseParser::tryParseHeaders_() {
         return false;
     }
 
+    const std::string_view versionTok = statusLine.substr(0, sp1);
+    if (versionTok != "HTTP/1.0" && versionTok != "HTTP/1.1") {
+        markError_();
+        return false;
+    }
+
     response_.statusCode = code;
-    response_.version_ = std::string(hdr.substr(0, sp1));
+    response_.version_ = std::string(versionTok);
     response_.statusText_ = (sp2 == std::string_view::npos)
         ? std::string{}
         : std::string(statusLine.substr(sp2 + 1));

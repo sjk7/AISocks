@@ -20,6 +20,7 @@
 #include "SocketFactory.h"
 #include "SocketTypes.h"
 #include <chrono>
+#include <cctype>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -367,6 +368,20 @@ class HttpClient {
             if (schemeEnd == std::string::npos) {
                 return Result<HttpClientResponse>::failure(
                     SocketError::Unknown, "Invalid URL format");
+            }
+
+            std::string scheme = currentUrl.substr(0, schemeEnd);
+            for (char& c : scheme)
+                c = static_cast<char>(
+                    std::tolower(static_cast<unsigned char>(c)));
+            if (scheme != "http") {
+                if (scheme == "https") {
+                    return Result<HttpClientResponse>::failure(
+                        SocketError::Unknown, "HTTPS is not supported");
+                }
+                return Result<HttpClientResponse>::failureOwned(
+                    SocketError::Unknown,
+                    "Unsupported URL scheme: " + scheme);
             }
 
             std::string remaining = currentUrl.substr(schemeEnd + 3);
