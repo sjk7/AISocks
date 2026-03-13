@@ -20,6 +20,8 @@
   ],
   "cmake.autoRestartBuild": true,
   "cmake.enableTraceLogging": true,
+  "githubPullRequests.notifications": "pullRequests",
+  "githubPullRequests.experimental.notificationsMarkPullRequests": "markAsRead",
   "chat.tools.terminal.autoApprove": {
     "/^gh(\\s|$).*$": true,
     "/^git (status|diff|show\\b.*|log\\b.*|branch\\b.*|checkout\\b.*|switch\\b.*|restore\\b.*|add\\b.*|commit\\b.*|push\\b.*|pull\\b.*|fetch\\b.*|rebase\\b.*|merge\\b.*|tag\\b.*)$/": true,

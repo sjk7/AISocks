@@ -4,6 +4,30 @@
 
 The aiSocks test suite includes **30 comprehensive tests** covering sockets, servers, HTTP protocols, and utilities. All tests are included when building with `-DBUILD_TESTS=ON`.
 
+## VS Code CI Failure Notifications
+
+To get CI failure notifications in the IDE without using the `gh` CLI:
+
+1. Install extensions:
+      - `GitHub Pull Requests and Issues` (`GitHub.vscode-pull-request-github`)
+      - `GitHub Actions` (`GitHub.vscode-github-actions`)
+2. Sign in to GitHub from VS Code using the Pull Requests view (`pr.signin`).
+3. Keep notifications enabled (turn off Do Not Disturb in the bell menu).
+4. Open these views in the sidebar:
+      - GitHub Pull Requests
+      - GitHub Notifications
+      - GitHub Actions
+5. Recommended workspace settings:
+
+```json
+{
+  "githubPullRequests.notifications": "pullRequests",
+  "githubPullRequests.experimental.notificationsMarkPullRequests": "markAsRead"
+}
+```
+
+When a workflow/check fails on a PR, status indicators and GitHub notifications appear in VS Code.
+
 ## Building with Tests
 
 ### Release with Debug Info (Recommended)
