@@ -50,6 +50,10 @@ struct HttpClientState {
     std::chrono::steady_clock::time_point startTime{};
     bool responseStarted{false}; // true once onResponseBegin has been called
     bool closeAfterSend{false}; // set by keep-alive negotiation
+    bool expectContinueSent{
+        false}; // interim 100 Continue already sent for current request
+    bool interimResponse{
+        false}; // true when responseView contains interim 1xx (not final)
     // Tracks how far requestComplete() has already scanned so repeated
     // calls are O(n) total even when bytes arrive one at a time.
     size_t requestScanPos{0};
@@ -75,6 +79,8 @@ struct HttpClientState {
         , startTime(other.startTime)
         , responseStarted(other.responseStarted)
         , closeAfterSend(other.closeAfterSend)
+        , expectContinueSent(other.expectContinueSent)
+        , interimResponse(other.interimResponse)
         , requestScanPos(other.requestScanPos)
         , parsedRequest(other.parsedRequest)
         , peerAddress(other.peerAddress) {
@@ -93,6 +99,8 @@ struct HttpClientState {
         , startTime(other.startTime)
         , responseStarted(other.responseStarted)
         , closeAfterSend(other.closeAfterSend)
+        , expectContinueSent(other.expectContinueSent)
+        , interimResponse(other.interimResponse)
         , requestScanPos(other.requestScanPos)
         , parsedRequest(std::move(other.parsedRequest))
         , peerAddress(std::move(other.peerAddress)) {
@@ -115,6 +123,8 @@ struct HttpClientState {
         startTime = other.startTime;
         responseStarted = other.responseStarted;
         closeAfterSend = other.closeAfterSend;
+        expectContinueSent = other.expectContinueSent;
+        interimResponse = other.interimResponse;
         requestScanPos = other.requestScanPos;
         parsedRequest = other.parsedRequest;
         peerAddress = other.peerAddress;
@@ -135,6 +145,8 @@ struct HttpClientState {
         startTime = other.startTime;
         responseStarted = other.responseStarted;
         closeAfterSend = other.closeAfterSend;
+        expectContinueSent = other.expectContinueSent;
+        interimResponse = other.interimResponse;
         requestScanPos = other.requestScanPos;
         parsedRequest = std::move(other.parsedRequest);
         peerAddress = std::move(other.peerAddress);

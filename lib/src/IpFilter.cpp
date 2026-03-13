@@ -31,7 +31,10 @@ bool IpFilter::parseIpv4(const std::string& s, uint32_t& out) {
         }
     }
     if (*end != '\0') return false;
-    out = (parts[0] << 24u) | (parts[1] << 16u) | (parts[2] << 8u) | parts[3];
+    out = (static_cast<uint32_t>(parts[0]) << 24u)
+        | (static_cast<uint32_t>(parts[1]) << 16u)
+        | (static_cast<uint32_t>(parts[2]) << 8u)
+        | static_cast<uint32_t>(parts[3]);
     return true;
 }
 

@@ -21,6 +21,8 @@
 #include "SocketTypes.h"
 #include <chrono>
 #include <cctype>
+#include <functional>
+#include <memory>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -300,6 +302,82 @@ class HttpClient {
 
     private:
     Options options_;
+    std::string cachedHost_;
+    Port cachedPort_{80};
+    std::shared_ptr<TcpSocket> cachedSocket_;
+
+    static bool hasTokenCI_(std::string_view field, std::string_view token) {
+        auto trim = [](std::string_view s) {
+            size_t begin = 0;
+            size_t end = s.size();
+            while (begin < end
+                && std::isspace(static_cast<unsigned char>(s[begin])))
+                ++begin;
+            while (end > begin
+                && std::isspace(static_cast<unsigned char>(s[end - 1])))
+                --end;
+            return s.substr(begin, end - begin);
+        };
+
+        auto equalsCI = [](std::string_view a, std::string_view b) {
+            if (a.size() != b.size()) return false;
+            for (size_t i = 0; i < a.size(); ++i) {
+                const char ac = static_cast<char>(
+                    std::tolower(static_cast<unsigned char>(a[i])));
+                const char bc = static_cast<char>(
+                    std::tolower(static_cast<unsigned char>(b[i])));
+                if (ac != bc) return false;
+            }
+            return true;
+        };
+
+        token = trim(token);
+        if (token.empty()) return false;
+
+        size_t pos = 0;
+        while (pos <= field.size()) {
+            const size_t comma = field.find(',', pos);
+            const std::string_view part = (comma == std::string::npos)
+                ? field.substr(pos)
+                : field.substr(pos, comma - pos);
+            if (equalsCI(trim(part), token)) return true;
+            if (comma == std::string::npos) break;
+            pos = comma + 1;
+        }
+        return false;
+    }
+
+    static bool shouldKeepAlive_(const HttpResponse& resp) {
+        const auto conn = resp.header("connection");
+        const std::string_view connValue
+            = conn ? std::string_view(*conn) : std::string_view{};
+        const std::string_view version = resp.version();
+
+        if (version == "HTTP/1.0") {
+            return hasTokenCI_(connValue, "keep-alive");
+        }
+
+        return !hasTokenCI_(connValue, "close");
+    }
+
+    static bool hasHeaderCI_(const HeaderMap& headers, std::string_view name) {
+        auto equalsCI = [](std::string_view a, std::string_view b) {
+            if (a.size() != b.size()) return false;
+            for (size_t i = 0; i < a.size(); ++i) {
+                const char ac = static_cast<char>(
+                    std::tolower(static_cast<unsigned char>(a[i])));
+                const char bc = static_cast<char>(
+                    std::tolower(static_cast<unsigned char>(b[i])));
+                if (ac != bc) return false;
+            }
+            return true;
+        };
+
+        for (const auto& header : headers) {
+            if (equalsCI(header.first, name)) return true;
+        }
+        return false;
+    }
 
     static bool parseAuthority_(
         const std::string& authority, std::string& hostOut, Port& portOut) {
@@ -395,18 +473,26 @@ class HttpClient {
                     SocketError::Unknown, "Invalid URL authority");
             }
 
-            // Connect using existing SocketFactory
-            ConnectArgs args{host, port, options_.connectTimeout};
-            auto socketResult = SocketFactory::createTcpClient(args);
-            if (!socketResult.isSuccess()) {
-                return Result<HttpClientResponse>::failureOwned(
-                    socketResult.error(),
-                    "Connection failed to " + host + ":"
-                        + std::to_string(port.value()) + " - "
-                        + socketResult.message());
+            std::shared_ptr<TcpSocket> socket;
+            bool reusedConnection = false;
+            bool retriedReusedConnection = false;
+            if (cachedSocket_ && cachedSocket_->isValid() && cachedHost_ == host
+                && cachedPort_.value() == port.value()) {
+                socket = cachedSocket_;
+                reusedConnection = true;
+            } else {
+                ConnectArgs args{host, port, options_.connectTimeout};
+                auto socketResult = SocketFactory::createTcpClient(args);
+                if (!socketResult.isSuccess()) {
+                    return Result<HttpClientResponse>::failureOwned(
+                        socketResult.error(),
+                        "Connection failed to " + host + ":"
+                            + std::to_string(port.value()) + " - "
+                            + socketResult.message());
+                }
+                socket = std::make_shared<TcpSocket>(
+                    std::move(socketResult.value()));
             }
-
-            TcpSocket socket = std::move(socketResult.value());
 
             const bool boundedRequest = options_.requestTimeout.count > 0;
             const auto requestDeadline = std::chrono::steady_clock::now()
@@ -424,6 +510,10 @@ class HttpClient {
             for (const auto& header : headers) {
                 requestBuilder.header(header.first, header.second);
             }
+            if (!hasHeaderCI_(options_.defaultHeaders, "Connection")
+                && !hasHeaderCI_(headers, "Connection")) {
+                requestBuilder.header("Connection", "keep-alive");
+            }
 
             // Add body for POST/PUT
             if (!body.empty()) {
@@ -431,11 +521,32 @@ class HttpClient {
             }
 
             std::string request = requestBuilder.build();
-            if (!socket.sendAll(request.data(), request.size())) {
-                return Result<HttpClientResponse>::failureOwned(
-                    socket.getLastError(),
-                    "Failed to send request to " + currentUrl + " - "
-                        + socket.getErrorMessage());
+            if (!socket->sendAll(request.data(), request.size())) {
+                if (reusedConnection) {
+                    cachedSocket_.reset();
+
+                    ConnectArgs retryArgs{host, port, options_.connectTimeout};
+                    auto retrySocketResult
+                        = SocketFactory::createTcpClient(retryArgs);
+                    if (!retrySocketResult.isSuccess()) {
+                        return Result<HttpClientResponse>::failureOwned(
+                            retrySocketResult.error(),
+                            "Connection failed to " + host + ":"
+                                + std::to_string(port.value()) + " - "
+                                + retrySocketResult.message());
+                    }
+
+                    socket = std::make_shared<TcpSocket>(
+                        std::move(retrySocketResult.value()));
+                    reusedConnection = false;
+                }
+
+                if (!socket->sendAll(request.data(), request.size())) {
+                    return Result<HttpClientResponse>::failureOwned(
+                        socket->getLastError(),
+                        "Failed to send request to " + currentUrl + " - "
+                            + socket->getErrorMessage());
+                }
             }
 
             // Parse response using existing HttpResponseParser
@@ -449,7 +560,33 @@ class HttpClient {
             Result<HttpClientResponse> finalResult
                 = Result<HttpClientResponse>::failure(SocketError::Unknown, "");
             bool haveResult = false;
-            auto handleComplete = [&]() {
+            bool consumedInterim = false;
+            std::function<void()> handleComplete;
+            handleComplete = [&]() {
+                const int code = parser.response().statusCode;
+                // Ignore interim HTTP/1.1 informational responses and keep
+                // reading the final response on the same connection.
+                if (code >= 100 && code < 200 && code != 101) {
+                    consumedInterim = true;
+                    std::string remainder = parser.takeRemainingBytes();
+                    parser.reset();
+                    if (!remainder.empty()) {
+                        auto remState
+                            = parser.feed(remainder.data(), remainder.size());
+                        if (remState == HttpResponseParser::State::Error) {
+                            finalResult = Result<HttpClientResponse>::failure(
+                                SocketError::Unknown, "Response parse error");
+                            haveResult = true;
+                            return;
+                        }
+                        if (remState == HttpResponseParser::State::Complete) {
+                            handleComplete();
+                            return;
+                        }
+                    }
+                    return;
+                }
+
                 HttpClientResponse resp{
                     parser.response(), currentUrl, redirectChain};
                 if (options_.followRedirects && resp.isRedirect()) {
@@ -486,19 +623,25 @@ class HttpClient {
                         return Result<HttpClientResponse>::failure(
                             SocketError::Timeout, "Request timed out");
                     }
-                    socket.setReceiveTimeout(Milliseconds{remainingMs});
+                    socket->setReceiveTimeout(Milliseconds{remainingMs});
                 }
 
-                int n = socket.receive(buffer, sizeof(buffer));
+                int n = socket->receive(buffer, sizeof(buffer));
                 if (n < 0) {
-                    const auto err = socket.getLastError();
+                    const auto err = socket->getLastError();
                     if (err == SocketError::Timeout
                         || err == SocketError::WouldBlock)
                         return Result<HttpClientResponse>::failure(
                             SocketError::Timeout, "Request timed out");
+                    if (reusedConnection && !retriedReusedConnection) {
+                        cachedSocket_.reset();
+                        retriedReusedConnection = true;
+                        --redirectCount;
+                        continue;
+                    }
                     return Result<HttpClientResponse>::failureOwned(err,
                         "Receive error from " + currentUrl + " - "
-                            + socket.getErrorMessage());
+                            + socket->getErrorMessage());
                 }
                 if (n == 0) {
                     parser
@@ -509,13 +652,35 @@ class HttpClient {
                 auto state = parser.feed(buffer, n);
 
                 if (state == HttpResponseParser::State::Error) {
+                    if (reusedConnection && !retriedReusedConnection) {
+                        cachedSocket_.reset();
+                        retriedReusedConnection = true;
+                        --redirectCount;
+                        continue;
+                    }
                     return Result<HttpClientResponse>::failure(
                         SocketError::Unknown, "Response parse error");
                 }
 
                 if (state == HttpResponseParser::State::Complete) {
+                    consumedInterim = false;
                     handleComplete();
-                    if (haveResult) return finalResult;
+                    if (haveResult) {
+                        if (finalResult.isSuccess()) {
+                            const auto& resp = finalResult.value().response;
+                            if (shouldKeepAlive_(resp)) {
+                                cachedHost_ = host;
+                                cachedPort_ = port;
+                                cachedSocket_ = socket;
+                            } else {
+                                cachedSocket_.reset();
+                            }
+                        } else {
+                            cachedSocket_.reset();
+                        }
+                        return finalResult;
+                    }
+                    if (consumedInterim) continue;
                     break; // redirect detected; outer loop opens next
                            // connection
                 }
@@ -528,12 +693,33 @@ class HttpClient {
             // including the (rare) case of a connection-close redirect.
             if (parser.isComplete()) {
                 handleComplete();
-                if (haveResult) return finalResult;
+                if (haveResult) {
+                    if (finalResult.isSuccess()) {
+                        const auto& resp = finalResult.value().response;
+                        if (shouldKeepAlive_(resp)) {
+                            cachedHost_ = host;
+                            cachedPort_ = port;
+                            cachedSocket_ = socket;
+                        } else {
+                            cachedSocket_.reset();
+                        }
+                    } else {
+                        cachedSocket_.reset();
+                    }
+                    return finalResult;
+                }
                 if (redirectDetected) continue;
             }
 
             // Connection closed before response was complete.
             if (!redirectDetected) {
+                if (reusedConnection && !retriedReusedConnection) {
+                    cachedSocket_.reset();
+                    retriedReusedConnection = true;
+                    --redirectCount;
+                    continue;
+                }
+                cachedSocket_.reset();
                 return Result<HttpClientResponse>::failure(
                     SocketError::ConnectionReset, "Incomplete response");
             }

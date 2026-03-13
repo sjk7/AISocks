@@ -70,6 +70,28 @@ void HttpResponseParser::markComplete_() {
     state_ = State::Complete;
 }
 
+std::string HttpResponseParser::takeRemainingBytes() {
+    if (state_ != State::Complete || !headersParsed_) return {};
+
+    if (bodyMode_ == BodyMode::ContentLength && contentLength_ >= 0) {
+        const size_t consumed = static_cast<size_t>(contentLength_);
+        if (bodyBuf_.size() > consumed) return bodyBuf_.substr(consumed);
+        return {};
+    }
+
+    if (bodyMode_ == BodyMode::Chunked) {
+        if (chunkScanPos_ < bodyBuf_.size())
+            return bodyBuf_.substr(chunkScanPos_);
+        return {};
+    }
+
+    if (bodyMode_ == BodyMode::ConnectionClose) return {};
+
+    // 1xx / 204 / 304 complete in headers phase; bodyBuf_ holds any
+    // coalesced bytes for the next response.
+    return bodyBuf_;
+}
+
 // ---------------------------------------------------------------------------
 // tryParseHeaders_
 //
@@ -284,6 +306,7 @@ HttpResponseParser::State HttpResponseParser::processChunked_() {
             // start of the \r\n\r\n terminator, so search from crlfPos.
             const size_t trailerEnd = bodyBuf_.find("\r\n\r\n", crlfPos);
             if (trailerEnd == std::string::npos) break; // need more data
+            chunkScanPos_ = trailerEnd + 4;
             // Terminal chunk consumed — body complete
             response_.body_ = std::move(decodedBody_);
             markComplete_();

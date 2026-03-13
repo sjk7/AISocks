@@ -6,6 +6,7 @@
 #include "HttpParserUtils.h"
 #include "UrlCodec.h"
 
+#include <cctype>
 #include <cstdint>
 #include <string>
 #include <string_view>
@@ -17,6 +18,96 @@ namespace {
     constexpr size_t kMaxQueryStringLen = 8192;
     constexpr size_t kMaxRequestHeaderSectionLen = 16 * 1024;
     constexpr size_t kMaxRequestBodyLen = 16 * 1024 * 1024;
+
+    static bool transferEncodingEndsInChunked_(std::string_view value) {
+        size_t pos = 0;
+        std::string_view last;
+        while (pos < value.size()) {
+            const size_t comma = value.find(',', pos);
+            const size_t end
+                = (comma == std::string_view::npos) ? value.size() : comma;
+            std::string_view tok = value.substr(pos, end - pos);
+            const size_t ts = tok.find_first_not_of(" \t");
+            if (ts != std::string_view::npos) tok = tok.substr(ts);
+            const size_t te = tok.find_last_not_of(" \t");
+            if (te != std::string_view::npos)
+                tok = tok.substr(0, te + 1);
+            else
+                tok = {};
+            if (!tok.empty()) last = tok;
+            if (comma == std::string_view::npos) break;
+            pos = comma + 1;
+        }
+
+        if (last.size() != 7) return false;
+        return std::tolower(static_cast<unsigned char>(last[0])) == 'c'
+            && std::tolower(static_cast<unsigned char>(last[1])) == 'h'
+            && std::tolower(static_cast<unsigned char>(last[2])) == 'u'
+            && std::tolower(static_cast<unsigned char>(last[3])) == 'n'
+            && std::tolower(static_cast<unsigned char>(last[4])) == 'k'
+            && std::tolower(static_cast<unsigned char>(last[5])) == 'e'
+            && std::tolower(static_cast<unsigned char>(last[6])) == 'd';
+    }
+
+    static bool parseChunkSize_(std::string_view sizeLine, size_t& out) {
+        const size_t extPos = sizeLine.find(';');
+        const std::string_view hex = (extPos == std::string_view::npos)
+            ? sizeLine
+            : sizeLine.substr(0, extPos);
+        if (hex.empty()) return false;
+        out = 0;
+        for (char c : hex) {
+            const unsigned char uc = static_cast<unsigned char>(c);
+            size_t digit = 0;
+            if (uc >= '0' && uc <= '9')
+                digit = static_cast<size_t>(uc - '0');
+            else if (uc >= 'a' && uc <= 'f')
+                digit = static_cast<size_t>(uc - 'a' + 10);
+            else if (uc >= 'A' && uc <= 'F')
+                digit = static_cast<size_t>(uc - 'A' + 10);
+            else
+                return false;
+
+            if (out > (kMaxRequestBodyLen - digit) / 16) return false;
+            out = out * 16 + digit;
+        }
+        return true;
+    }
+
+    static bool decodeChunkedBody_(
+        std::string_view rawBody, std::string& decodedOut) {
+        decodedOut.clear();
+        size_t pos = 0;
+
+        while (true) {
+            const size_t crlfPos = rawBody.find("\r\n", pos);
+            if (crlfPos == std::string_view::npos) return false;
+
+            size_t chunkSize = 0;
+            if (!parseChunkSize_(rawBody.substr(pos, crlfPos - pos), chunkSize))
+                return false;
+
+            if (chunkSize == 0) {
+                const size_t trailerEnd = rawBody.find("\r\n\r\n", crlfPos);
+                if (trailerEnd == std::string_view::npos) return false;
+                const size_t consumed = trailerEnd + 4;
+                return consumed == rawBody.size();
+            }
+
+            if (decodedOut.size() > kMaxRequestBodyLen - chunkSize)
+                return false;
+
+            const size_t dataStart = crlfPos + 2;
+            const size_t dataEnd = dataStart + chunkSize;
+            const size_t nextChunk = dataEnd + 2;
+            if (nextChunk > rawBody.size()) return false;
+            if (rawBody[dataEnd] != '\r' || rawBody[dataEnd + 1] != '\n')
+                return false;
+
+            decodedOut.append(rawBody.data() + dataStart, chunkSize);
+            pos = nextChunk;
+        }
+    }
 } // namespace
 
 const std::string* HttpRequest::header(std::string_view name) const {
@@ -130,7 +221,6 @@ HttpRequest HttpRequest::parse(std::string_view raw) {
         = (sep == std::string_view::npos) ? sv : sv.substr(0, sep);
     if (headerSection.size() > kMaxRequestHeaderSectionLen) return req;
     if (sep != std::string_view::npos) req.body = sv.substr(sep + sepLen);
-    if (req.body.size() > kMaxRequestBodyLen) return HttpRequest{};
 
     // Split off the request line.
     const auto [requestLine, firstNL] = detail::extractFirstLine(headerSection);
@@ -147,6 +237,16 @@ HttpRequest HttpRequest::parse(std::string_view raw) {
     // Content-Length present at once is rejected.
     if (req.header("transfer-encoding") && req.header("content-length"))
         return HttpRequest{};
+
+    if (const std::string* te = req.header("transfer-encoding")) {
+        if (!transferEncodingEndsInChunked_(*te)) return HttpRequest{};
+
+        std::string decoded;
+        if (!decodeChunkedBody_(req.body, decoded)) return HttpRequest{};
+        req.body = std::move(decoded);
+    } else if (req.body.size() > kMaxRequestBodyLen) {
+        return HttpRequest{};
+    }
 
     if (const std::string* cl = req.header("content-length")) {
         // Accept only a non-negative decimal number with no trailing bytes.

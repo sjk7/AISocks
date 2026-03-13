@@ -156,6 +156,54 @@ class RedirectToHttpsServer : public HttpPollServer {
 };
 
 // ---------------------------------------------------------------------------
+// ReuseTrackingServer — serves keep-alive responses and tracks accepted
+// connections and dispatched requests.
+// ---------------------------------------------------------------------------
+class ReuseTrackingServer : public HttpPollServer {
+    public:
+    explicit ReuseTrackingServer()
+        : HttpPollServer(ServerBind{"127.0.0.1", Port{0}}) {
+        setHandleSignals(false);
+    }
+
+    void waitReady() {
+        std::unique_lock<std::mutex> lk(readyMtx_);
+        readyCv_.wait(lk, [this] { return ready_.load(); });
+    }
+
+    std::atomic<int> connectionsAccepted{0};
+    std::atomic<int> requestsServed{0};
+
+    protected:
+    void onReady() override {
+        {
+            std::lock_guard<std::mutex> lk(readyMtx_);
+            ready_ = true;
+        }
+        readyCv_.notify_all();
+    }
+
+    void onClientConnected(TcpSocket& sock, HttpClientState& s) override {
+        connectionsAccepted.fetch_add(1, std::memory_order_relaxed);
+        HttpPollServer::onClientConnected(sock, s);
+    }
+
+    void buildResponse(HttpClientState& s) override {
+        s.responseBuf = "HTTP/1.1 200 OK\r\n"
+                        "Content-Length: 2\r\n"
+                        "Connection: keep-alive\r\n\r\n"
+                        "OK";
+        s.responseView = s.responseBuf;
+        requestsServed.fetch_add(1, std::memory_order_relaxed);
+    }
+
+    private:
+    std::atomic<bool> ready_{false};
+    std::mutex readyMtx_;
+    std::condition_variable readyCv_;
+};
+
+// ---------------------------------------------------------------------------
 // RAII helper: starts the server on construction, stops+joins on destruction
 // ---------------------------------------------------------------------------
 struct ServerGuard {
@@ -387,6 +435,50 @@ static void test_server_init_failure_unblocks_waiter() {
     occupantThread.join();
 }
 
+static void test_interim_100_response_is_ignored() {
+    BEGIN_TEST("HttpClient ignores interim 100 Continue and returns final");
+
+    auto listenerResult = SocketFactory::createTcpServer(
+        AddressFamily::IPv4, ServerBind{"127.0.0.1", Port{0}});
+    REQUIRE(listenerResult.isSuccess());
+    if (!listenerResult.isSuccess()) return;
+    TcpSocket listener = std::move(listenerResult.value());
+    REQUIRE(listener.setReceiveTimeout(Milliseconds{500}));
+
+    const Port port = listener.getLocalEndpoint().value().port;
+
+    std::thread serverThread([&] {
+        auto client = listener.accept();
+        if (!client) return;
+        client->setReceiveTimeout(Milliseconds{500});
+
+        char reqBuf[1024];
+        (void)client->receive(reqBuf, sizeof(reqBuf));
+
+        const std::string interim = "HTTP/1.1 100 Continue\r\n\r\n";
+        const std::string final = "HTTP/1.1 200 OK\r\n"
+                                  "Content-Length: 2\r\n"
+                                  "Connection: close\r\n\r\n"
+                                  "OK";
+        (void)client->sendAll(interim.data(), interim.size());
+        std::this_thread::sleep_for(10ms);
+        (void)client->sendAll(final.data(), final.size());
+    });
+
+    HttpClient::Options opts;
+    opts.connectTimeout = Milliseconds{500};
+    opts.requestTimeout = Milliseconds{500};
+    auto result = HttpClient{opts}.get(
+        "http://127.0.0.1:" + std::to_string(port.value()) + "/");
+
+    serverThread.join();
+
+    REQUIRE(result.isSuccess());
+    if (!result.isSuccess()) return;
+    REQUIRE(result.value().statusCode() == 200);
+    REQUIRE(result.value().body() == "OK");
+}
+
 static void test_https_scheme_rejected() {
     BEGIN_TEST("HttpClient rejects direct https URLs with explicit error");
 
@@ -448,6 +540,73 @@ static void test_resolve_url_relative_redirects() {
         == "http://example.com/a/b/c?old=1#new");
 }
 
+static void test_keepalive_connection_reuse() {
+    BEGIN_TEST("HttpClient reuses keep-alive socket across sequential GETs");
+
+    ReuseTrackingServer server;
+    std::thread serverThread(
+        [&] { server.run(ClientLimit::Unlimited, Milliseconds{1}); });
+    server.waitReady();
+
+    HttpClient::Options opts;
+    opts.connectTimeout = Milliseconds{500};
+    opts.requestTimeout = Milliseconds{500};
+    HttpClient client{opts};
+    const std::string baseUrl =
+        "http://127.0.0.1:" + std::to_string(server.serverPort().value());
+
+    for (int i = 0; i < 3; ++i) {
+        auto result = client.get(baseUrl + "/reuse");
+        REQUIRE(result.isSuccess());
+        if (!result.isSuccess()) {
+            server.requestStop();
+            serverThread.join();
+            return;
+        }
+        REQUIRE(result.value().statusCode() == 200);
+        REQUIRE(result.value().body() == "OK");
+    }
+
+    server.requestStop();
+    serverThread.join();
+
+    REQUIRE(server.requestsServed.load() >= 3);
+    REQUIRE(server.connectionsAccepted.load() == 1);
+}
+
+static void test_connection_close_header_disables_reuse() {
+    BEGIN_TEST("HttpClient Connection: close header disables socket reuse");
+
+    ReuseTrackingServer server;
+    std::thread serverThread(
+        [&] { server.run(ClientLimit::Unlimited, Milliseconds{1}); });
+    server.waitReady();
+
+    HttpClient::Options opts;
+    opts.connectTimeout = Milliseconds{500};
+    opts.requestTimeout = Milliseconds{500};
+    opts.setHeader("Connection", "close");
+    HttpClient client{opts};
+    const std::string baseUrl =
+        "http://127.0.0.1:" + std::to_string(server.serverPort().value());
+
+    for (int i = 0; i < 2; ++i) {
+        auto result = client.get(baseUrl + "/close");
+        REQUIRE(result.isSuccess());
+        if (!result.isSuccess()) {
+            server.requestStop();
+            serverThread.join();
+            return;
+        }
+        REQUIRE(result.value().statusCode() == 200);
+    }
+
+    server.requestStop();
+    serverThread.join();
+
+    REQUIRE(server.connectionsAccepted.load() >= 2);
+}
+
 // ---------------------------------------------------------------------------
 
 int main() {
@@ -463,6 +622,9 @@ int main() {
     test_request_timeout_fails();
     test_request_timeout_is_total_deadline();
     test_server_init_failure_unblocks_waiter();
+    test_interim_100_response_is_ignored();
+    test_keepalive_connection_reuse();
+    test_connection_close_header_disables_reuse();
     test_https_scheme_rejected();
     test_redirect_to_https_is_rejected();
     test_resolve_url_relative_redirects();

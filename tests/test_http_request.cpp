@@ -736,6 +736,37 @@ static void test_reject_oversized_body_content_length() {
     REQUIRE(!req.valid);
 }
 
+// 48. Decode Transfer-Encoding: chunked request bodies
+static void test_decode_chunked_request_body() {
+    BEGIN_TEST("decode Transfer-Encoding: chunked request body");
+    std::string raw = "POST /upload HTTP/1.1\r\n"
+                      "Host: example.com\r\n"
+                      "Transfer-Encoding: chunked\r\n"
+                      "\r\n"
+                      "4\r\n"
+                      "Wiki\r\n"
+                      "5\r\n"
+                      "pedia\r\n"
+                      "0\r\n"
+                      "\r\n";
+    auto req = HttpRequest::parse(raw);
+    REQUIRE(req.valid);
+    CHECK_FIELD("method", req.method, "POST");
+    CHECK_FIELD("path", req.path, "/upload");
+    CHECK_FIELD("decoded body", req.body, "Wikipedia");
+}
+
+// 49. Reject unsupported transfer-codings in parser
+static void test_reject_unsupported_transfer_encoding() {
+    BEGIN_TEST("reject unsupported Transfer-Encoding values");
+    auto req = HttpRequest::parse("POST /upload HTTP/1.1\r\n"
+                                  "Host: example.com\r\n"
+                                  "Transfer-Encoding: gzip\r\n"
+                                  "\r\n"
+                                  "data");
+    REQUIRE(!req.valid);
+}
+
 // -- main -------------------------------------------------------------------
 
 int main() {
@@ -793,5 +824,7 @@ int main() {
     test_accept_header_section_at_limit();
     test_reject_oversized_body_content_length();
     test_accept_max_body_content_length();
+    test_decode_chunked_request_body();
+    test_reject_unsupported_transfer_encoding();
     return test_summary();
 }

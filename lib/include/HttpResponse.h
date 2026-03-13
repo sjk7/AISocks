@@ -188,6 +188,11 @@ class HttpResponseParser {
     /// body() and valid are set on isComplete().
     const HttpResponse& response() const noexcept { return response_; }
 
+    /// Extract bytes that were received beyond the currently completed
+    /// response frame (e.g. pipelined or coalesced next response bytes).
+    /// Returns an empty string if there is no buffered remainder.
+    std::string takeRemainingBytes();
+
     // ---- reset ----------------------------------------------------------
 
     /// Reset all state.  Call between keep-alive responses.

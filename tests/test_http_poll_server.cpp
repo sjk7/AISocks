@@ -577,6 +577,154 @@ int main() {
         REQUIRE(response.find("200 OK") != std::string::npos);
     }
 
+    // Test 10b: HTTP/1.1 requests must include Host
+    BEGIN_TEST("HTTP/1.1: missing Host header returns 400");
+    {
+        TestHttpServer server(ServerBind{"127.0.0.1", Port{0}});
+        REQUIRE(server.isValid());
+
+        std::thread serverThread(
+            [&server]() { server.run(ClientLimit{1}, Milliseconds{1}); });
+
+        server.waitReady();
+
+        std::string response
+            = sendHttpRequest(server.serverPort(), "GET / HTTP/1.1\r\n\r\n");
+
+        g_serverSignalStop.store(true);
+        serverThread.join();
+        g_serverSignalStop.store(false);
+
+        REQUIRE(!response.empty());
+        REQUIRE(response.find("400 Bad Request") != std::string::npos);
+    }
+
+    // Test 10c: Request body completeness gates dispatch for Content-Length
+    BEGIN_TEST("HTTP/1.1 framing: waits for full Content-Length body");
+    {
+        TestHttpServer server(ServerBind{"127.0.0.1", Port{0}});
+        REQUIRE(server.isValid());
+
+        std::thread serverThread(
+            [&server]() { server.run(ClientLimit{1}, Milliseconds{1}); });
+
+        server.waitReady();
+
+        auto clientResult = SocketFactory::createTcpClient(
+            AddressFamily::IPv4, ConnectArgs{"127.0.0.1", server.serverPort()});
+        REQUIRE(clientResult.isSuccess());
+        auto& client = clientResult.value();
+        client.setReceiveTimeout(Milliseconds{120});
+
+        const std::string head = "GET / HTTP/1.1\r\nHost: localhost\r\n"
+                                 "Content-Length: 4\r\n\r\n";
+        REQUIRE(client.sendAll(head.data(), head.size()));
+        REQUIRE(client.sendAll("ab", 2));
+
+        char tmp[64];
+        const int early = client.receive(tmp, sizeof(tmp));
+        REQUIRE(early < 0);
+        const auto earlyErr = client.getLastError();
+        REQUIRE(earlyErr == SocketError::Timeout
+            || earlyErr == SocketError::WouldBlock);
+
+        REQUIRE(client.sendAll("cd", 2));
+        std::string response = receiveCompleteResponse(client);
+
+        g_serverSignalStop.store(true);
+        serverThread.join();
+        g_serverSignalStop.store(false);
+
+        REQUIRE(!response.empty());
+        REQUIRE(response.find("200 OK") != std::string::npos);
+    }
+
+    // Test 10d: Expect: 100-continue interim response handling
+    BEGIN_TEST("HTTP/1.1 framing: Expect 100-continue interim response");
+    {
+        TestHttpServer server(ServerBind{"127.0.0.1", Port{0}});
+        REQUIRE(server.isValid());
+
+        std::thread serverThread(
+            [&server]() { server.run(ClientLimit{1}, Milliseconds{1}); });
+
+        server.waitReady();
+
+        auto clientResult = SocketFactory::createTcpClient(
+            AddressFamily::IPv4, ConnectArgs{"127.0.0.1", server.serverPort()});
+        REQUIRE(clientResult.isSuccess());
+        auto& client = clientResult.value();
+        client.setReceiveTimeout(Milliseconds{500});
+
+        const std::string headersOnly = "GET / HTTP/1.1\r\nHost: localhost\r\n"
+                                        "Expect: 100-continue\r\n"
+                                        "Content-Length: 4\r\n\r\n";
+        REQUIRE(client.sendAll(headersOnly.data(), headersOnly.size()));
+
+        std::string interim = receiveCompleteResponse(client);
+        REQUIRE(!interim.empty());
+        REQUIRE(interim.find("100 Continue") != std::string::npos);
+        REQUIRE(server.responseBeginCount == 0);
+        REQUIRE(server.responseSentCount == 0);
+
+        REQUIRE(client.sendAll("data", 4));
+        std::string finalResponse = receiveCompleteResponse(client);
+
+        g_serverSignalStop.store(true);
+        serverThread.join();
+        g_serverSignalStop.store(false);
+
+        REQUIRE(!finalResponse.empty());
+        REQUIRE(finalResponse.find("200 OK") != std::string::npos);
+        REQUIRE(server.responseBeginCount == 1);
+        REQUIRE(server.responseSentCount == 1);
+    }
+
+    // Test 10e: unsupported Expect returns 417
+    BEGIN_TEST("HTTP/1.1 framing: unsupported Expect returns 417");
+    {
+        TestHttpServer server(ServerBind{"127.0.0.1", Port{0}});
+        REQUIRE(server.isValid());
+
+        std::thread serverThread(
+            [&server]() { server.run(ClientLimit{1}, Milliseconds{1}); });
+
+        server.waitReady();
+
+        std::string response = sendHttpRequest(server.serverPort(),
+            "GET / HTTP/1.1\r\nHost: localhost\r\nExpect: kittens\r\n\r\n");
+
+        g_serverSignalStop.store(true);
+        serverThread.join();
+        g_serverSignalStop.store(false);
+
+        REQUIRE(!response.empty());
+        REQUIRE(response.find("417 Expectation Failed") != std::string::npos);
+    }
+
+    // Test 10f: unsupported transfer-coding returns 501 and closes
+    BEGIN_TEST("HTTP/1.1 framing: unsupported Transfer-Encoding returns 501");
+    {
+        TestHttpServer server(ServerBind{"127.0.0.1", Port{0}});
+        REQUIRE(server.isValid());
+
+        std::thread serverThread(
+            [&server]() { server.run(ClientLimit{1}, Milliseconds{1}); });
+
+        server.waitReady();
+
+        std::string response = sendHttpRequest(server.serverPort(),
+            "GET / HTTP/1.1\r\nHost: localhost\r\n"
+            "Transfer-Encoding: gzip\r\n\r\n");
+
+        g_serverSignalStop.store(true);
+        serverThread.join();
+        g_serverSignalStop.store(false);
+
+        REQUIRE(!response.empty());
+        REQUIRE(response.find("501 Not Implemented") != std::string::npos);
+    }
+
     BEGIN_TEST("Edge case: empty/incomplete request");
     {
         TestHttpServer server(ServerBind{"127.0.0.1", Port{0}});
