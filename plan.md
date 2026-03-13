@@ -24,33 +24,7 @@ Expected fix shape:
 - If registration must happen first for some reason, explicitly remove on rejection before the socket is destroyed.
 - Add a regression test that forces repeated reject/reuse behavior.
 
-Status note:
-
-- The current workspace already contains uncommitted changes in `ServerBase.h` and `HttpPollServer.*` that appear to move `onAcceptFilter()` before poller registration and add IP filtering hooks. These changes were not authored in this session and should be reviewed carefully before further edits.
-
-### 2. `HttpClient` silently mishandles `https://`
-
-Severity: Medium
-
-Problem discovered:
-
-- `HttpClient` parses a URL scheme but defaults to port 80 regardless of scheme.
-- It does not clearly reject unsupported HTTPS/TLS usage.
-- Redirects to `https://...` can therefore be misleading.
-
-Why it matters:
-
-- Users can reasonably assume `https://` is either supported or rejected clearly.
-- Current behavior risks connecting to the wrong port and making plain HTTP assumptions under an HTTPS URL.
-
-Expected fix shape:
-
-- Choose one explicit policy:
-  - Reject non-HTTP schemes with a clear error, or
-  - Treat `https` as port 443 but still return a clear "TLS unsupported" style error before trying to speak plain HTTP.
-- Add tests for direct `https://...` requests and redirects to HTTPS.
-
-### 3. `HttpFileServer` is not hot-path efficient for large responses
+### 1. `HttpFileServer` is not hot-path efficient for large responses
 
 Severity: Medium
 
@@ -68,7 +42,8 @@ Why it matters:
 
 Expected fix shape:
 
-- For large files, prefer streaming or `sendfile` where available.
+- For large files, prefer streaming or `sendfile` where available. Note that in my previous tests, sendfile was actually slower on some platforms. So be careful.
+
 - Consider a split response model: header buffer plus file payload, instead of one monolithic string.
 - Keep the current small-file fast path if it is simpler and good enough for cacheable small assets.
 
@@ -93,7 +68,8 @@ Expected fix shape:
 
 ## Secondary Observations
 
-- `HttpPollServer` directly prints status/debug output. This is simple, but it reduces library composability for users who want silent embedding or structured logging.
+- `HttpPollServer` directly prints status/debug output. This is simple, but it reduces library composability for users who want silent embedding or structured logging. Only print to stderr when there is actually a hard error.
+
 - `HttpPollServer` only supports `GET` and `HEAD` in the request-dispatch path. That may be acceptable if intentional, but the restriction is strong enough to deserve extremely explicit API and README wording.
 - The core server/poller architecture is strong:
   - sparse fd table plus dense active fd list
@@ -104,16 +80,10 @@ Expected fix shape:
 
 ## Coverage Assessment
 
-Coverage breadth is good. The project has a large test suite plus opt-in fuzz targets.
-
-Coverage is still weak in these specific areas:
-
 ### Missing or weak regression coverage
 
 - Accept-filter rejection path in `ServerBase`
 - fd reuse after rejection
-- direct `https://` handling in `HttpClient`
-- redirect-to-HTTPS behavior in `HttpClient`
 - invalid response version/status-line edge cases in `HttpResponseParser`
 - large-file performance and allocation regression checks in `HttpFileServer`
 
@@ -157,11 +127,6 @@ Coverage is still weak in these specific areas:
 - Repeat reject/accept cycles enough times to encourage fd reuse.
 - Verify no stale events are delivered to a later unrelated connection.
 
-### `HttpClient` tests
-
-- Direct `https://example.com/` request returns a clear error.
-- Redirect from `http://...` to `https://...` returns the same clear error.
-- If port 443 defaulting is implemented as part of rejection semantics, test that explicitly.
 
 ### `HttpResponseParser` tests
 

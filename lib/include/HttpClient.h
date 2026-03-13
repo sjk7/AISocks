@@ -380,8 +380,7 @@ class HttpClient {
                         SocketError::Unknown, "HTTPS is not supported");
                 }
                 return Result<HttpClientResponse>::failureOwned(
-                    SocketError::Unknown,
-                    "Unsupported URL scheme: " + scheme);
+                    SocketError::Unknown, "Unsupported URL scheme: " + scheme);
             }
 
             std::string remaining = currentUrl.substr(schemeEnd + 3);

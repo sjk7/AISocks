@@ -397,8 +397,8 @@ static void test_https_scheme_rejected() {
 
     auto result = client.get("https://example.com/");
     REQUIRE(!result.isSuccess());
-    REQUIRE(result.message().find("HTTPS is not supported")
-        != std::string::npos);
+    REQUIRE(
+        result.message().find("HTTPS is not supported") != std::string::npos);
 }
 
 static void test_redirect_to_https_is_rejected() {
@@ -419,8 +419,8 @@ static void test_redirect_to_https_is_rejected() {
     serverThread.join();
 
     REQUIRE(!result.isSuccess());
-    REQUIRE(result.message().find("HTTPS is not supported")
-        != std::string::npos);
+    REQUIRE(
+        result.message().find("HTTPS is not supported") != std::string::npos);
 }
 
 static void test_resolve_url_relative_redirects() {
