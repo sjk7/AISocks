@@ -50,6 +50,13 @@ if(BUILD_TESTS)
     target_compile_definitions(aiSocksLib PRIVATE AISOCKS_TESTING=1)
 endif()
 
+if(AISOCKS_ENABLE_TLS)
+    target_compile_definitions(aiSocksLib PUBLIC AISOCKS_ENABLE_TLS=1)
+    # PUBLIC is required so final executables linking aiSocksLib also link
+    # OpenSSL symbols referenced by aiSocksLib object files.
+    target_link_libraries(aiSocksLib PUBLIC OpenSSL::SSL OpenSSL::Crypto)
+endif()
+
 # Platform-specific libraries and compile definitions
 if(WIN32)
     target_link_libraries(aiSocksLib PRIVATE ws2_32 iphlpapi mswsock winmm)

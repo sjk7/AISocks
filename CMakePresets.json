@@ -114,6 +114,18 @@
             }
         },
         {
+            "name": "tls-relwithdebinfo",
+            "inherits": "base",
+            "displayName": "TLS RelWithDebInfo",
+            "binaryDir": "${sourceDir}/build-tls-relwithdebinfo",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+                "BUILD_EXAMPLES": "ON",
+                "BUILD_TESTS": "ON",
+                "AISOCKS_ENABLE_TLS": "ON"
+            }
+        },
+        {
             "name": "windows-debug",
             "displayName": "Windows Debug (MSVC)",
             "description": "Visual Studio 17 2022, Debug, examples and tests on Windows",
@@ -238,6 +250,12 @@
             "inherits": "base-build",
             "configurePreset": "relwithdebinfo",
             "displayName": "Build RelWithDebInfo"
+        },
+        {
+            "name": "tls-relwithdebinfo",
+            "inherits": "base-build",
+            "configurePreset": "tls-relwithdebinfo",
+            "displayName": "Build TLS RelWithDebInfo"
         },
         {
             "name": "coverage",
