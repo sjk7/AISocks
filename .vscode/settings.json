@@ -19,5 +19,15 @@
     "-DBUILD_TESTS=ON"
   ],
   "cmake.autoRestartBuild": true,
-  "cmake.enableTraceLogging": true
+  "cmake.enableTraceLogging": true,
+  "chat.tools.terminal.autoApprove": {
+    "/^gh(\\s|$).*$": true,
+    "/^git (status|diff|show\\b.*|log\\b.*|branch\\b.*|checkout\\b.*|switch\\b.*|restore\\b.*|add\\b.*|commit\\b.*|push\\b.*|pull\\b.*|fetch\\b.*|rebase\\b.*|merge\\b.*|tag\\b.*)$/": true,
+    "/^cmake(\\s|$).*$": true,
+    "/^(ctest|ninja|make)(\\s|$).*$": true,
+    "/^(lldb|gdb|lldb-server)(\\s|$).*$": true,
+    "/^(./)?build(_[A-Za-z0-9-]+)?\\/(.+)$/": true,
+    "/^(python3?|pytest|node|npm|pnpm|yarn)(\\s|$).*$": true,
+    "/(^|\\s)(rm -rf \\/|mkfs|dd if=|shutdown|reboot)(\\s|$)/": false
+  }
 }
