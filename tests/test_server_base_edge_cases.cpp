@@ -171,6 +171,28 @@ class EdgeCaseServer : public ServerBase<EdgeCaseState> {
     std::atomic<bool> rejectNewConnections_{false};
 };
 
+// Minimal server that can be constructed in a failing state (e.g. port already
+// in use) without flooding stderr. Tracks whether onReady() was called.
+class InvalidInstanceServer : public ServerBase<EdgeCaseState> {
+    public:
+    explicit InvalidInstanceServer(Port port)
+        : ServerBase<EdgeCaseState>(ServerBind{"127.0.0.1", port, Backlog{10},
+              /*reuseAddr=*/true, /*logStartupErrors=*/false}) {}
+
+    std::atomic<bool> onReadyCalled{false};
+
+    protected:
+    void onReady() override {
+        onReadyCalled.store(true, std::memory_order_release);
+    }
+    ServerResult onReadable(TcpSocket&, EdgeCaseState&) override {
+        return ServerResult::KeepConnection;
+    }
+    ServerResult onWritable(TcpSocket&, EdgeCaseState&) override {
+        return ServerResult::KeepConnection;
+    }
+};
+
 // ---------------------------------------------------------------------------
 // Test helpers
 // ---------------------------------------------------------------------------
@@ -633,6 +655,56 @@ int main() {
 
         server.requestStop();
         serverThread.join();
+    }
+
+    // Test 13: isValid()==false — serverEndpoint() returns an error Result
+    BEGIN_TEST("Invalid server: serverEndpoint() returns error Result");
+    {
+        // Start a valid server to hold the port, then attempt to bind again
+        // to the same port so the second construction fails.
+        EdgeCaseServer holder(Port::any);
+        REQUIRE(holder.isValid());
+        Port takenPort = holder.serverPort();
+        REQUIRE(takenPort.value() != 0);
+
+        InvalidInstanceServer bad(takenPort);
+        REQUIRE(!bad.isValid());
+
+        auto ep = bad.serverEndpoint();
+        REQUIRE(!ep.isSuccess());
+        REQUIRE(ep.error() == SocketError::InvalidSocket);
+    }
+
+    // Test 14: isValid()==false — serverPort() returns Port::any
+    BEGIN_TEST("Invalid server: serverPort() returns Port::any");
+    {
+        EdgeCaseServer holder(Port::any);
+        REQUIRE(holder.isValid());
+        Port takenPort = holder.serverPort();
+
+        InvalidInstanceServer bad(takenPort);
+        REQUIRE(!bad.isValid());
+
+        Port p = bad.serverPort();
+        REQUIRE(p.value() == Port::any.value());
+    }
+
+    // Test 15: isValid()==false — run() returns immediately and calls onReady()
+    BEGIN_TEST("Invalid server: run() returns immediately, onReady() called");
+    {
+        EdgeCaseServer holder(Port::any);
+        REQUIRE(holder.isValid());
+        Port takenPort = holder.serverPort();
+
+        InvalidInstanceServer bad(takenPort);
+        REQUIRE(!bad.isValid());
+        REQUIRE(!bad.onReadyCalled.load());
+
+        // run() must not block and must invoke onReady() before returning.
+        bad.run();
+
+        REQUIRE(bad.onReadyCalled.load());
+        REQUIRE(bad.clientCount() == 0);
     }
 
     return test_summary();
