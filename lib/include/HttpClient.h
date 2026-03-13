@@ -379,6 +379,29 @@ class HttpClient {
         return false;
     }
 
+    static bool headerHasTokenCI_(const HeaderMap& headers,
+        std::string_view name, std::string_view token) {
+        auto equalsCI = [](std::string_view a, std::string_view b) {
+            if (a.size() != b.size()) return false;
+            for (size_t i = 0; i < a.size(); ++i) {
+                const char ac = static_cast<char>(
+                    std::tolower(static_cast<unsigned char>(a[i])));
+                const char bc = static_cast<char>(
+                    std::tolower(static_cast<unsigned char>(b[i])));
+                if (ac != bc) return false;
+            }
+            return true;
+        };
+
+        for (const auto& header : headers) {
+            if (equalsCI(header.first, name)
+                && hasTokenCI_(header.second, token)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     static bool parseAuthority_(
         const std::string& authority, std::string& hostOut, Port& portOut) {
         hostOut.clear();
@@ -513,6 +536,15 @@ class HttpClient {
             if (!hasHeaderCI_(options_.defaultHeaders, "Connection")
                 && !hasHeaderCI_(headers, "Connection")) {
                 requestBuilder.header("Connection", "keep-alive");
+            }
+
+            const bool requestWantsClose
+                = headerHasTokenCI_(headers, "Connection", "close")
+                || headerHasTokenCI_(
+                    options_.defaultHeaders, "Connection", "close");
+            if (requestWantsClose) {
+                // Honor explicit close semantics across this client instance.
+                cachedSocket_.reset();
             }
 
             // Add body for POST/PUT
@@ -669,9 +701,13 @@ class HttpClient {
                         if (finalResult.isSuccess()) {
                             const auto& resp = finalResult.value().response;
                             if (shouldKeepAlive_(resp)) {
-                                cachedHost_ = host;
-                                cachedPort_ = port;
-                                cachedSocket_ = socket;
+                                if (!requestWantsClose) {
+                                    cachedHost_ = host;
+                                    cachedPort_ = port;
+                                    cachedSocket_ = socket;
+                                } else {
+                                    cachedSocket_.reset();
+                                }
                             } else {
                                 cachedSocket_.reset();
                             }
@@ -697,9 +733,13 @@ class HttpClient {
                     if (finalResult.isSuccess()) {
                         const auto& resp = finalResult.value().response;
                         if (shouldKeepAlive_(resp)) {
-                            cachedHost_ = host;
-                            cachedPort_ = port;
-                            cachedSocket_ = socket;
+                            if (!requestWantsClose) {
+                                cachedHost_ = host;
+                                cachedPort_ = port;
+                                cachedSocket_ = socket;
+                            } else {
+                                cachedSocket_.reset();
+                            }
                         } else {
                             cachedSocket_.reset();
                         }

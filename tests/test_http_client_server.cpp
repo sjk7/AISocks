@@ -558,8 +558,8 @@ static void test_keepalive_connection_reuse() {
     opts.connectTimeout = Milliseconds{500};
     opts.requestTimeout = Milliseconds{500};
     HttpClient client{opts};
-    const std::string baseUrl =
-        "http://127.0.0.1:" + std::to_string(server.serverPort().value());
+    const std::string baseUrl
+        = "http://127.0.0.1:" + std::to_string(server.serverPort().value());
 
     for (int i = 0; i < 3; ++i) {
         auto result = client.get(baseUrl + "/reuse");
@@ -599,16 +599,13 @@ static void test_connection_close_header_disables_reuse() {
     opts.requestTimeout = Milliseconds{500};
     opts.setHeader("Connection", "close");
     HttpClient client{opts};
-    const std::string baseUrl =
-        "http://127.0.0.1:" + std::to_string(server.serverPort().value());
+    const std::string baseUrl
+        = "http://127.0.0.1:" + std::to_string(server.serverPort().value());
 
     for (int i = 0; i < 2; ++i) {
         auto result = client.get(baseUrl + "/close");
         REQUIRE(result.isSuccess());
         if (!result.isSuccess()) {
-            fprintf(stderr,
-                "close-header iteration %d failed: %s\n", i,
-                result.message().c_str());
             server.requestStop();
             serverThread.join();
             return;
