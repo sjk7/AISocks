@@ -193,6 +193,22 @@ cmake --build build-release --parallel
 ctest --output-on-failure
 ```
 
+## Large-file Benchmark
+
+Use the benchmark script to compare cold/uncached and repeated large-file request timings with `advanced_file_server`:
+
+```bash
+scripts/benchmark_large_file_server.sh
+```
+
+Useful overrides:
+
+```bash
+PORT=18080 REPEATS=8 LARGE_MB=16 SMALL_KB=32 scripts/benchmark_large_file_server.sh
+```
+
+The script pre-cleans the chosen port, starts `advanced_file_server`, generates temporary benchmark assets under the configured root, prints timing summaries, and removes generated assets on exit.
+
 ## Running the HTTP server
 
 ```bash

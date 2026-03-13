@@ -395,3 +395,142 @@ Use something close to this to restart efficiently:
 - Response parser strictness is clarified and tested.
 - A concrete direction is chosen for `HttpFileServer` large-file efficiency.
 - Existing user changes in the worktree are preserved unless explicitly replaced.
+
+## TLS/HTTPS Readiness Plan (OpenSSL, Feature-Flagged)
+
+This section captures an implementation-ready direction for optional HTTPS support while preserving current plain-HTTP defaults.
+
+Important terminology note:
+
+- For HTTPS, use OpenSSL (TLS library), not OpenSSH (SSH stack).
+
+### Goal
+
+- Add optional TLS to server and client paths without destabilizing existing poller architecture.
+- Keep non-TLS builds dependency-free and behavior-identical.
+- Prefer virtual extension points in `HttpPollServer` for TLS I/O and handshake lifecycle.
+
+### Proposed Feature Flag
+
+- Add `AISOCKS_ENABLE_TLS` CMake option, default `OFF`.
+- When `OFF`:
+  - No OpenSSL dependency.
+  - Existing behavior unchanged.
+  - `HttpClient` continues returning explicit HTTPS-not-supported error.
+- When `ON`:
+  - Link OpenSSL (`OpenSSL::SSL`, `OpenSSL::Crypto`).
+  - Enable HTTPS server/client paths and TLS tests.
+
+Suggested CMake integration points:
+
+- top-level `CMakeLists.txt`: `option(AISOCKS_ENABLE_TLS "Enable TLS/HTTPS via OpenSSL" OFF)`
+- `lib/CMakeLists.txt`:
+  - conditional `find_package(OpenSSL REQUIRED)`
+  - conditional link libraries
+  - `target_compile_definitions(aiSocksLib PUBLIC AISOCKS_ENABLE_TLS)`
+- `CMakePresets.json`: add a `tls-debug` preset.
+
+### Architecture Constraints Observed
+
+- `HttpPollServer::onReadable()` and `onWritable()` are `final`, so TLS cannot be introduced by overriding these methods directly in derived classes.
+- `Socket` and `SocketImpl` data-transfer methods are not virtual, so replacing transport behavior below `TcpSocket` is not a low-friction path.
+- `ServerBase` stores clients as `std::unique_ptr<TcpSocket>`, so introducing a polymorphic socket family is expensive and invasive.
+
+Implication:
+
+- The least invasive design is to keep `TcpSocket` as the transport and add TLS adaptation inside `HttpPollServer` via virtual hooks called from existing `final` methods.
+
+### Proposed Virtual Hook Surface in `HttpPollServer`
+
+Add protected virtual methods in `HttpPollServer`:
+
+- `virtual int socketRead(TcpSocket& sock, HttpClientState& s, char* buf, int len);`
+- `virtual int socketWrite(TcpSocket& sock, HttpClientState& s, const char* data, int len);`
+- `virtual ServerResult doHandshakeStep(TcpSocket& sock, HttpClientState& s);`
+- `virtual bool isTlsMode(const HttpClientState& s) const;`
+
+Base defaults (plain HTTP):
+
+- `socketRead` -> `sock.receive(...)`
+- `socketWrite` -> `sock.sendChunked(...)`
+- `isTlsMode` -> `false`
+- `doHandshakeStep` -> not used in base (safe fallback)
+
+`HttpPollServer::onReadable()` / `onWritable()` behavior change:
+
+- Add handshake gate near function start:
+  - if TLS mode and handshake incomplete, run `doHandshakeStep(...)` and return its result.
+- Replace direct socket read/write calls with `socketRead(...)` / `socketWrite(...)`.
+
+### TLS Session State Placement
+
+Add TLS state to `HttpClientState` under `#ifdef AISOCKS_ENABLE_TLS`:
+
+- `std::unique_ptr<TlsSession> tls;`
+- `bool tlsHandshakeDone{false};`
+
+`TlsSession` responsibilities:
+
+- own `SSL*` lifetime for one client connection
+- perform non-blocking `SSL_accept` state machine
+- map `SSL_ERROR_WANT_READ/WRITE` to event-loop-friendly behavior
+- provide `read()` / `write()` wrappers for record I/O
+
+### New Server Types
+
+- `HttpsPollServer : public HttpPollServer`
+  - override handshake + I/O virtual hooks
+  - initialize per-client TLS state in `onClientConnected`
+- `HttpsFileServer : public HttpFileServer`
+  - same TLS overrides plus inherited file-serving behavior
+
+Note on inheritance design:
+
+- Avoid multiple-inheritance diamond (`HttpsPollServer` + `HttpFileServer`).
+- Keep `HttpsFileServer` deriving from `HttpFileServer` and implement TLS overrides there (or via shared helper).
+
+### HttpClient HTTPS Plan
+
+When TLS flag is ON:
+
+- For `https://` URLs, create TCP socket, then run `SSL_connect`, then send/receive through TLS session.
+- Preserve existing redirect semantics; redirects to HTTPS should use the same explicit TLS path.
+
+When TLS flag is OFF:
+
+- Keep deterministic failure message for `https://`.
+
+### Certificate Scope for Initial Implementation
+
+- Server: PEM cert/key file loading only.
+- Client: baseline TLS handshake support; advanced CA policy and pinning can be phase 2.
+- Keep initial certificate policy explicit in docs/tests to avoid ambiguous security posture.
+
+### Test Plan for TLS Integration
+
+Add conditional tests (only when TLS enabled):
+
+- basic HTTPS handshake and request/response for `HttpsPollServer`
+- `HttpsFileServer` serves file content over TLS
+- handshake progresses non-blocking across read/write readiness cycles
+- certificate load failure path returns clear error
+- connection teardown does not leak poller registrations/state
+
+Also keep non-TLS tests unchanged to verify feature-flag isolation.
+
+### Recommended Delivery Order
+
+1. Add feature flag and conditional build wiring.
+2. Add TLS context/session internals.
+3. Add `HttpPollServer` virtual hook surface and handshake gate.
+4. Add `HttpsPollServer` and TLS tests.
+5. Add `HttpsFileServer` and file-serving TLS tests.
+6. Add `HttpClient` HTTPS path (still flag-gated).
+
+### Acceptance Criteria for TLS Plan
+
+- Non-TLS build remains default and fully backward-compatible.
+- TLS build compiles cleanly and links only when opted in.
+- HTTPS server path works without blocking event loop during handshake.
+- TLS integration uses overridable behavior in `HttpPollServer` rather than poller redesign.
+- Existing code paths for plain HTTP remain measurable and unchanged when TLS is disabled.

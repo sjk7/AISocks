@@ -19,6 +19,7 @@
 #include <thread>
 #include <chrono>
 #include <cassert>
+#include <vector>
 
 #ifdef _WIN32
 #include <direct.h>
@@ -65,6 +66,31 @@ class CustomFileServer : public HttpFileServer {
         // Check authentication
         if (!isAuthenticated(request)) {
             sendAuthRequired(state);
+            return;
+        }
+
+        if (request.path == "/access.log") {
+            if (!isLocalClient(state.peerAddress)) {
+                sendError(state, 403, "Forbidden",
+                    "The access log viewer is only available from local "
+                    "connections.");
+                return;
+            }
+
+            std::string page = generateAccessLogTailPage();
+            const bool headOnly = (request.method == "HEAD");
+
+            std::string response;
+            response.reserve(256 + page.size());
+            response += "HTTP/1.1 200 OK\r\n";
+            response
+                += "Content-Type: text/html; charset=utf-8\r\nContent-Length: ";
+            response += std::to_string(page.size());
+            response += "\r\nCache-Control: no-store\r\nRefresh: 2\r\n\r\n";
+            if (!headOnly) response += page;
+
+            state.responseBuf = std::move(response);
+            state.responseView = state.responseBuf;
             return;
         }
 
@@ -158,6 +184,11 @@ class CustomFileServer : public HttpFileServer {
         return authValue == expectedAuth;
     }
 
+    bool isLocalClient(const std::string& peerAddress) const {
+        return peerAddress == "127.0.0.1" || peerAddress == "::1"
+            || peerAddress == "::ffff:127.0.0.1" || peerAddress == "localhost";
+    }
+
     void sendAuthRequired(HttpClientState& state) {
         std::string htmlBody = generateErrorHtml(
             401, "Unauthorized", TestStringLiterals::AUTH_REQUIRED_MESSAGE);
@@ -215,7 +246,61 @@ class CustomFileServer : public HttpFileServer {
         html += TestStringLiterals::TESTING_INSTRUCTIONS_DIR;
         html += TestStringLiterals::TESTING_INSTRUCTIONS_ACCESS;
         html += TestStringLiterals::TESTING_INSTRUCTIONS_ERROR;
+        html += "<p><a href=\"/access.log\">Open local access log tail</a></p>";
         html += "</body></html>";
+        return html;
+    }
+
+    std::string readAccessLogTail(size_t maxLines) const {
+        std::FILE* file = std::fopen("access.log", "rb");
+        if (!file) return {};
+
+        if (std::fseek(file, 0, SEEK_END) != 0) {
+            std::fclose(file);
+            return {};
+        }
+        const long fileSize = std::ftell(file);
+        if (fileSize <= 0) {
+            std::fclose(file);
+            return {};
+        }
+        if (std::fseek(file, 0, SEEK_SET) != 0) {
+            std::fclose(file);
+            return {};
+        }
+
+        std::vector<char> bytes(static_cast<size_t>(fileSize));
+        const size_t bytesRead
+            = std::fread(bytes.data(), 1, bytes.size(), file);
+        std::fclose(file);
+        if (bytesRead == 0) return {};
+        bytes.resize(bytesRead);
+
+        std::string content(bytes.begin(), bytes.end());
+        std::vector<size_t> lineStarts;
+        lineStarts.reserve(32);
+        lineStarts.push_back(0);
+        for (size_t i = 0; i < content.size(); ++i) {
+            if (content[i] == '\n' && i + 1 < content.size()) {
+                lineStarts.push_back(i + 1);
+            }
+        }
+
+        const size_t startIndex = (lineStarts.size() > maxLines)
+            ? (lineStarts.size() - maxLines)
+            : 0;
+        return content.substr(lineStarts[startIndex]);
+    }
+
+    std::string generateAccessLogTailPage() const {
+        const std::string tail = readAccessLogTail(100);
+        std::string html;
+        html += "<!DOCTYPE html><html><head><title>Access Log Tail</title>";
+        html += "<meta http-equiv=\"refresh\" content=\"2\">";
+        html += "</head><body><h1>Access Log Tail</h1>";
+        html += "<p>Visible only from local connections.</p><pre>";
+        html += tail.empty() ? std::string("No log entries yet.\n") : tail;
+        html += "</pre></body></html>";
         return html;
     }
 
@@ -350,6 +435,8 @@ int TestFramework::failedTests = 0;
 
 /// Create test environment
 void setupTestEnvironment() {
+    std::remove("access.log");
+
     // Create test directories and files
 #ifdef _WIN32
     _mkdir("test_www");
@@ -443,6 +530,118 @@ void testQueryStringBypassesCache() {
     }
 }
 
+static std::string readPublicLandingPage_() {
+    const char* candidates[] = {
+        "www/public.html",
+        "../www/public.html",
+        "../../www/public.html",
+    };
+
+    for (const char* path : candidates) {
+        File file(path, "rb");
+        if (!file.isOpen()) continue;
+        std::vector<char> content = file.readAll();
+        if (!content.empty()) {
+            return std::string(content.begin(), content.end());
+        }
+    }
+
+    std::string sourcePath = __FILE__;
+    const std::string marker = "/tests/test_advanced_file_server.cpp";
+    const size_t markerPos = sourcePath.rfind(marker);
+    if (markerPos != std::string::npos) {
+        sourcePath.resize(markerPos);
+        sourcePath += "/www/public.html";
+        File file(sourcePath.c_str(), "rb");
+        if (file.isOpen()) {
+            std::vector<char> content = file.readAll();
+            if (!content.empty()) {
+                return std::string(content.begin(), content.end());
+            }
+        }
+    }
+
+    return {};
+}
+
+void testPublicLandingPageSignInLinkTargetsProtectedPage() {
+    fputs("\n=== PUBLIC LANDING PAGE TESTS ===\n", stdout);
+
+    const std::string html = readPublicLandingPage_();
+    TestFramework::assert_true(
+        !html.empty(), "Public landing page fixture should be readable");
+    if (html.empty()) return;
+
+    TestFramework::assert_contains(html, "Sign in to open testing guide",
+        "Public landing page should expose sign-in CTA");
+    TestFramework::assert_contains(html, "href=\"/index.html\"",
+        "Sign-in CTA should target a protected path that triggers auth");
+    TestFramework::assert_not_contains(html, "href=\"/\"",
+        "Sign-in CTA must not loop back to the public landing page");
+}
+
+void testAccessLogBrowserTailBehavior() {
+    fputs("\n=== ACCESS LOG VIEWER TESTS ===\n", stdout);
+
+    File seedLog("access.log", "w");
+    seedLog.writeString("older line\n");
+    seedLog.writeString("recent line 1\n");
+    seedLog.writeString("recent line 2\n");
+    seedLog.close();
+
+    HttpFileServer::Config config;
+    config.documentRoot = "test_www";
+    CustomFileServer server(ServerBind{"127.0.0.1", Port{0}}, config);
+
+    {
+        std::string request = BehavioralTestHelper::makeHttpRequest(
+            "GET", "/access.log", "YWRtaW46c2VjcmV0");
+        HttpClientState state;
+        state.request = request;
+        state.peerAddress = "127.0.0.1";
+
+        server.buildResponse(state);
+
+        std::string status
+            = BehavioralTestHelper::extractStatus(state.responseBuf);
+        std::string contentType = BehavioralTestHelper::extractHeader(
+            state.responseBuf, "Content-Type");
+        std::string refresh
+            = BehavioralTestHelper::extractHeader(state.responseBuf, "Refresh");
+        std::string body = BehavioralTestHelper::extractBody(state.responseBuf);
+
+        TestFramework::assert_contains(
+            status, "200", "Local authenticated access log viewer should load");
+        TestFramework::assert_contains(contentType, "text/html",
+            "Access log viewer should render in the browser as HTML");
+        TestFramework::assert_contains(refresh, "2",
+            "Access log viewer should auto-refresh for tail behavior");
+        TestFramework::assert_contains(body, "Access Log Tail",
+            "Access log viewer should show a clear heading");
+        TestFramework::assert_contains(body, "recent line 2",
+            "Access log viewer should show recent log entries");
+    }
+
+    {
+        std::string request = BehavioralTestHelper::makeHttpRequest(
+            "GET", "/access.log", "YWRtaW46c2VjcmV0");
+        HttpClientState state;
+        state.request = request;
+        state.peerAddress = "198.51.100.24";
+
+        server.buildResponse(state);
+
+        std::string status
+            = BehavioralTestHelper::extractStatus(state.responseBuf);
+        std::string body = BehavioralTestHelper::extractBody(state.responseBuf);
+
+        TestFramework::assert_contains(status, "403",
+            "Non-local access log viewer requests should be blocked");
+        TestFramework::assert_contains(body, "local connections",
+            "Non-local block page should explain the restriction");
+    }
+}
+
 /// Regression: large files should use the non-cached direct-read path.
 void testLargeFileBypassesCacheForHotPath() {
     fputs("\n=== LARGE FILE HOT-PATH TESTS ===\n", stdout);
@@ -486,6 +685,7 @@ void cleanupTestEnvironment() {
     std::remove("test_www/.htpasswd");
     std::remove("test_www/.env");
     std::remove("test_www/subdir/readme.txt");
+    std::remove("access.log");
 #ifdef _WIN32
     _rmdir("test_www\\subdir");
     _rmdir("test_www");
@@ -1405,6 +1605,8 @@ int main() {
         testRangeRequestBehavior();
         testCachingHeadersBehavior();
         testQueryStringBypassesCache();
+        testPublicLandingPageSignInLinkTargetsProtectedPage();
+        testAccessLogBrowserTailBehavior();
         testLargeFileBypassesCacheForHotPath();
         testMimeTypeBehavior();
         testConcurrencyBehavior();

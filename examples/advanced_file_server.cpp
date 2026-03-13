@@ -27,14 +27,13 @@
 // Demonstrates how to derive from HttpFileServer and override virtual functions
 
 #include "HttpFileServer.h"
-#include "HtmlEscape.h"
-#include "PathHelper.h"
-#include "UrlCodec.h"
 #include "advanced_file_server_strings.h"
+#include "advanced_file_server_pages.h"
 #include "CustomFileServerHtmlHelpers.h"
 #include "FileIO.h"
 #include <cstdio>
 #include <chrono>
+#include <vector>
 
 using namespace aiSocks;
 
@@ -107,6 +106,98 @@ class CustomFileServer : public HttpFileServer {
             return;
         }
 
+        if (request.path == "/index.html") {
+            const std::string instructions
+                = AdvancedFileServerPages::generateTestingInstructions();
+            std::string response;
+            response.reserve(256 + instructions.size());
+            response.append("HTTP/1.1 200 OK\r\n");
+            response.append(
+                "Content-Type: text/html; charset=utf-8\r\nContent-Length: ");
+            response += std::to_string(instructions.size());
+            response.append("\r\n");
+
+            for (const auto& [name, value] : getConfig().customHeaders) {
+                response.append(name);
+                response.append(": ");
+                response.append(value);
+                response.append("\r\n");
+            }
+
+            response.append("\r\n");
+            if (request.method != "HEAD") {
+                response.append(instructions);
+            }
+
+            state.responseBuf = std::move(response);
+            state.responseView = state.responseBuf;
+            return;
+        }
+
+        if (request.path == "/jstest.html") {
+            const std::string demoPage
+                = AdvancedFileServerPages::generateDemoPage();
+            std::string response;
+            response.reserve(256 + demoPage.size());
+            response.append("HTTP/1.1 200 OK\r\n");
+            response.append(
+                "Content-Type: text/html; charset=utf-8\r\nContent-Length: ");
+            response += std::to_string(demoPage.size());
+            response.append("\r\n");
+
+            for (const auto& [name, value] : getConfig().customHeaders) {
+                response.append(name);
+                response.append(": ");
+                response.append(value);
+                response.append("\r\n");
+            }
+
+            response.append("\r\n");
+            if (request.method != "HEAD") {
+                response.append(demoPage);
+            }
+
+            state.responseBuf = std::move(response);
+            state.responseView = state.responseBuf;
+            return;
+        }
+
+        if (request.path == "/access.log") {
+            if (!isLocalClient(state.peerAddress)) {
+                sendError(state, 403, "Forbidden",
+                    "The access log viewer is only available from local "
+                    "connections.");
+                return;
+            }
+
+            const std::string page
+                = AdvancedFileServerPages::generateAccessLogTailPage(
+                    readAccessLogTail(100));
+            std::string response;
+            response.reserve(256 + page.size());
+            response.append("HTTP/1.1 200 OK\r\n");
+            response.append(
+                "Content-Type: text/html; charset=utf-8\r\nContent-Length: ");
+            response += std::to_string(page.size());
+            response.append("\r\nCache-Control: no-store\r\nRefresh: 2\r\n");
+
+            for (const auto& [name, value] : getConfig().customHeaders) {
+                response.append(name);
+                response.append(": ");
+                response.append(value);
+                response.append("\r\n");
+            }
+
+            response.append("\r\n");
+            if (request.method != "HEAD") {
+                response.append(page);
+            }
+
+            state.responseBuf = std::move(response);
+            state.responseView = state.responseBuf;
+            return;
+        }
+
         // Call base implementation for all other paths
         HttpFileServer::buildResponse(state);
     }
@@ -146,40 +237,8 @@ class CustomFileServer : public HttpFileServer {
     /// Override to customize error pages
     std::string generateErrorHtml(int code, const std::string& status,
         const std::string& message) const override {
-        std::string html;
-        html.reserve(1024);
-        html.append("<!DOCTYPE html>\n");
-        html.append("<html><head><title>");
-        html += std::to_string(code);
-        html.append(" ");
-        html.append(HtmlEscape::encode(status));
-        html.append("</title>\n");
-        html.append("<style>\n");
-        html.append("body { font-family: Arial, sans-serif; margin: 40px; "
-                    "background-color: #f5f5f5; }\n");
-        html.append(".error-container { max-width: 600px; margin: 0 auto; "
-                    "background: white; padding: 30px; border-radius: 8px; "
-                    "box-shadow: 0 2px 10px rgba(0,0,0,0.1); }\n");
-        html.append("h1 { color: #e74c3c; margin-bottom: 20px; }\n");
-        html.append("p { color: #555; line-height: 1.6; }\n");
-        html.append(".back-link { display: inline-block; margin-top: 20px; "
-                    "padding: 10px 20px; background: #3498db; color: white; "
-                    "text-decoration: none; border-radius: 4px; }\n");
-        html.append(".back-link:hover { background: #2980b9; }\n");
-        html.append("</style></head>\n");
-        html.append("<body><div class=\"error-container\">\n");
-        html.append("<h1>");
-        html += std::to_string(code);
-        html.append(" ");
-        html.append(HtmlEscape::encode(status));
-        html.append("</h1>\n");
-        html.append("<p>");
-        html.append(HtmlEscape::encode(message));
-        html.append("</p>\n");
-        html.append(
-            "<a href=\"/\" class=\"back-link\">&larr; Back to Home</a>\n");
-        html.append("</div></body></html>");
-        return html;
+        return AdvancedFileServerPages::generateErrorHtml(
+            code, status, message);
     }
 
     /// Override to customize directory request handling
@@ -187,271 +246,6 @@ class CustomFileServer : public HttpFileServer {
         const std::string& dirPath, const HttpRequest& request) override {
         // For all directories, show normal directory listing
         HttpFileServer::handleDirectoryRequest(state, dirPath, request);
-    }
-
-    std::string generateTestingInstructions() const {
-        std::string html;
-        html.reserve(8192);
-        html.append("<!DOCTYPE html>\n");
-        html.append("<html><head>\n");
-        html.append("<title>HttpFileServer - Testing Guide</title>\n");
-        html.append("<style>\n");
-        html.append("body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, "
-                    "sans-serif; margin: 0; padding: 20px; background: "
-                    "linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: "
-                    "#333; }\n");
-        html.append(".container { max-width: 1200px; margin: 0 auto; "
-                    "background: white; border-radius: 12px; box-shadow: 0 "
-                    "10px 30px rgba(0,0,0,0.2); overflow: hidden; }\n");
-        html.append(
-            ".header { background: linear-gradient(135deg, #4facfe 0%, #00f2fe "
-            "100%); color: white; padding: 30px; text-align: center; }\n");
-        html.append(
-            ".header h1 { margin: 0; font-size: 2.5em; font-weight: 300; }\n");
-        html.append(".header p { margin: 10px 0 0 0; opacity: 0.9; font-size: "
-                    "1.1em; }\n");
-        html.append(".content { padding: 30px; }\n");
-        html.append(
-            ".section { margin: 30px 0; padding: 20px; border-left: 4px solid "
-            "#4facfe; background: #f8f9fa; border-radius: 0 8px 8px 0; }\n");
-        html.append(".section h2 { color: #2c3e50; margin-top: 0; display: "
-                    "flex; align-items: center; gap: 10px; }\n");
-        html.append(".section h3 { color: #34495e; margin-top: 20px; }\n");
-        html.append(
-            "code { background: #f1f2f6; padding: 2px 6px; border-radius: 3px; "
-            "font-family: 'Courier New', monospace; color: #e74c3c; }\n");
-        html.append(".url { background: #2c3e50; color: #ecf0f1; padding: 8px "
-                    "12px; border-radius: 4px; font-family: 'Courier New', "
-                    "monospace; display: inline-block; margin: 5px 0; }\n");
-        html.append(".url a { color: #5dade2; font-weight: 500; }\n");
-        html.append(".url a:hover { color: #85c1e9; }\n");
-        html.append(".checklist { list-style: none; padding: 0; }\n");
-        html.append(".checklist li { margin: 8px 0; padding: 8px 0; "
-                    "border-bottom: 1px solid #ecf0f1; }\n");
-        html.append(".checklist li:before { content: '✓ '; color: #27ae60; "
-                    "font-weight: bold; }\n");
-        html.append(
-            ".warning { background: #fff3cd; border: 1px solid #ffeaa7; "
-            "border-radius: 4px; padding: 12px; margin: 10px 0; }\n");
-        html.append(
-            ".success { background: #d4edda; border: 1px solid #c3e6cb; "
-            "border-radius: 4px; padding: 12px; margin: 10px 0; }\n");
-        html.append("a { color: #2980b9; text-decoration: none; }\n");
-        html.append(
-            "a:hover { text-decoration: underline; color: #3498db; }\n");
-        html.append(".footer { background: #2c3e50; color: white; padding: "
-                    "20px; text-align: center; }\n");
-        html.append("</style></head><body>\n");
-
-        html.append("<div class=\"container\">\n");
-        html.append("<div class=\"header\">\n");
-        html.append("<h1>🚀 HttpFileServer</h1>\n");
-        html.append("<p>Complete Browser Testing Guide</p>\n");
-        html.append("</div>\n");
-
-        html.append("<div class=\"content\">\n");
-
-        // Authentication Section
-        html.append("<div class=\"section\">\n");
-        html.append("<h2>🔐 Authentication</h2>\n");
-        html.append("<p><strong>Server Credentials:</strong></p>\n");
-        html.append("<div class=\"url\">Username: admin</div>\n");
-        html.append("<div class=\"url\">Password: secret</div>\n");
-        html.append("<p>Browser will show a login dialog when you access any "
-                    "URL.</p>\n");
-        html.append("<div class=\"success\">✓ All requests are logged to "
-                    "<code>access.log</code></div>\n");
-        html.append(
-            "<p><strong>Public page</strong> (no login required):</p>\n");
-        html.append("<div class=\"url\"><a "
-                    "href=\"/public.html\">/public.html</a></div>\n");
-        html.append("</div>\n");
-
-        // File Serving Section
-        html.append("<div class=\"section\">\n");
-        html.append("<h2>📄 File Serving</h2>\n");
-        html.append("<h3>Test Files:</h3>\n");
-        html.append("<div class=\"url\"><a "
-                    "href=\"/index.html\">/index.html</a></div>\n");
-        html.append(
-            "<div class=\"url\"><a href=\"/style.css\">/style.css</a></div>\n");
-        html.append("<div class=\"url\"><a href=\"/app.js\">/app.js</a> (view "
-                    "source)</div>\n");
-        html.append(
-            "<div class=\"url\"><a href=\"/jstest.html\">/jstest.html</a> "
-            "(runs test.js)</div>\n");
-        html.append("<h3>Large File Download Test:</h3>\n");
-        html.append("<div class=\"url\"><a "
-                    "href=\"/large500MB.bin\">/large500MB.bin</a> (500 MB "
-                    "binary file)</div>\n");
-        html.append(
-            "<p>Files are served with correct MIME types and UTF-8 encoding. "
-            "Large file tests download speed and keep-alive behavior.</p>\n");
-        html.append("</div>\n");
-
-        // Directory Listing Section
-        html.append("<div class=\"section\">\n");
-        html.append("<h2>📁 Directory Listing</h2>\n");
-        html.append("<h3>Subdirectory:</h3>\n");
-        html.append(
-            "<div class=\"url\"><a href=\"/files/\">/files/</a></div>\n");
-        html.append("<p>Enhanced directory listings with file sizes, dates, "
-                    "and emoji icons. ");
-        html.append("Click on files to view them (browser will display or "
-                    "download based on MIME type).</p>\n");
-        html.append("</div>\n");
-
-        // Access Control Section
-        html.append("<div class=\"section\">\n");
-        html.append("<h2>🚫 Access Control</h2>\n");
-        html.append("<h3>Blocked Files (should return 403):</h3>\n");
-        html.append("<div class=\"url\"><a "
-                    "href=\"/config.conf\">/config.conf</a></div>\n");
-        html.append("<div class=\"url\"><a "
-                    "href=\"/server.log\">/server.log</a></div>\n");
-        html.append(
-            "<div class=\"url\"><a href=\"/temp.tmp\">/temp.tmp</a></div>\n");
-        html.append("<div class=\"warning\">⚠️ These files are blocked by "
-                    "access control rules</div>\n");
-        html.append("</div>\n");
-
-        // Performance Section
-        html.append("<div class=\"section\">\n");
-        html.append("<h2>⚡ Performance Features</h2>\n");
-        html.append("<h3>1. File Cache:</h3>\n");
-        html.append(
-            "<ul><li>Enable with <code>config.enableCache = "
-            "true</code></li><li>Caches file content in memory for faster "
-            "serving</li><li>Auto-invalidates when file modification time "
-            "changes</li><li>Skips cache for URLs with query strings "
-            "(<code>?param=value</code>)</li><li>View cache stats: "
-            "<code>server.getFileCache().size()</code> and "
-            "<code>totalBytes()</code></li></ul>\n");
-        html.append("<h3>2. ETag Support:</h3>\n");
-        html.append("<ul><li>Load any file twice</li><li>Second request should "
-                    "return <code>304 Not Modified</code></li><li>Check "
-                    "Network tab in browser dev tools</li></ul>\n");
-        html.append("<h3>3. Last-Modified Headers:</h3>\n");
-        html.append(
-            "<ul><li>Check Response Headers in dev tools</li><li>Should see "
-            "<code>Last-Modified</code> field</li></ul>\n");
-        html.append("</div>\n");
-
-        // Error Handling Section
-        html.append("<div class=\"section\">\n");
-        html.append("<h2>❌ Error Handling</h2>\n");
-        html.append("<h3>Test Error Pages:</h3>\n");
-        html.append(
-            "<div class=\"url\"><a "
-            "href=\"/nonexistent.html\">/nonexistent.html</a> (404)</div>\n");
-        html.append(
-            "<div class=\"url\"><a href=\"/../etc/passwd\">/../etc/passwd</a> "
-            "(404 in browser*, 403 via curl --path-as-is)</div>\n");
-        html.append("<p style=\"font-size: 0.9em; color: #666;\">*Browsers "
-                    "normalize URLs before sending, so the server receives "
-                    "/etc/passwd (404). Use curl --path-as-is to test actual "
-                    "path traversal protection (403).</p>\n");
-        html.append(
-            "<p>Custom styled error pages with helpful information.</p>\n");
-        html.append("</div>\n");
-
-        // Developer Tools Section
-        html.append("<div class=\"section\">\n");
-        html.append("<h2>🔍 Developer Tools Testing</h2>\n");
-        html.append("<h3>Open Chrome DevTools (F12):</h3>\n");
-        html.append(
-            "<ul><li><strong>Network Tab:</strong> See all requests, status "
-            "codes, headers</li><li><strong>Console Tab:</strong> Should see "
-            "no errors for valid files</li><li><strong>Application "
-            "Tab:</strong> Check browser caching</li></ul>\n");
-        html.append("</div>\n");
-
-        // Security Section
-        html.append("<div class=\"section\">\n");
-        html.append("<h2>🛡️ Security Features</h2>\n");
-        html.append("<ul><li><strong>Path Traversal Protection:</strong> "
-                    "Blocks <code>../</code> attacks</li><li><strong>Access "
-                    "Control:</strong> Blocks sensitive file "
-                    "types</li><li><strong>Authentication:</strong> Basic auth "
-                    "required</li><li><strong>Security Headers:</strong> "
-                    "X-Content-Type-Options, X-Frame-Options</li></ul>\n");
-        html.append("</div>\n");
-
-        // Testing Checklist
-        html.append("<div class=\"section\">\n");
-        html.append("<h2>🧪 Testing Checklist</h2>\n");
-        html.append("<ul class=\"checklist\">\n");
-        html.append("<li>Authentication prompt appears</li>\n");
-        html.append("<li>Valid credentials grant access</li>\n");
-        html.append("<li>Invalid credentials show 401 error</li>\n");
-        html.append("<li>Directory listings show file metadata</li>\n");
-        html.append("<li>Files download with correct MIME types</li>\n");
-        html.append("<li>Sensitive files return 403 errors</li>\n");
-        html.append("<li>Non-existent files return 404 errors</li>\n");
-        html.append("<li>Path traversal attempts are blocked</li>\n");
-        html.append("<li>ETag headers work (304 responses)</li>\n");
-        html.append("<li>Access log records all requests</li>\n");
-        html.append("<li>Custom headers appear in responses</li>\n");
-        html.append("</ul>\n");
-        html.append("</div>\n");
-
-        html.append("</div>\n");
-        html.append(
-            CustomFileServerHtmlHelpers::generateDirectoryListingFooter());
-
-        return html;
-    }
-    std::string generateDemoPage() const {
-        std::string html;
-        html.reserve(2048);
-        html.append(CustomFileServerHtmlHelpers::generateDemoPageStart());
-        html.append(".container { max-width: 800px; margin: 0 auto; "
-                    "background: white; border-radius: 12px; box-shadow: 0 "
-                    "10px 30px rgba(0,0,0,0.2); padding: 30px; }\n");
-        html.append("h1 { color: #2c3e50; margin-top: 0; }\n");
-        html.append(
-            ".info { background: #e3f2fd; border-left: 4px solid #2196f3; "
-            "padding: 15px; margin: 20px 0; border-radius: 4px; }\n");
-        html.append(
-            "#output { background: #f5f5f5; border: 1px solid #ddd; padding: "
-            "15px; border-radius: 4px; min-height: 100px; font-family: "
-            "'Courier New', monospace; white-space: pre-wrap; }\n");
-        html.append("button { background: #4CAF50; color: white; border: none; "
-                    "padding: 10px 20px; border-radius: 4px; cursor: pointer; "
-                    "font-size: 16px; margin: 10px 5px 10px 0; }\n");
-        html.append("button:hover { background: #45a049; }\n");
-        html.append(".back-link { display: inline-block; margin-top: 20px; "
-                    "color: #3498db; text-decoration: none; }\n");
-        html.append(".back-link:hover { text-decoration: underline; }\n");
-        html.append("</style>\n");
-        html.append("<script src=\"/app.js\"></script>\n");
-        html.append("</head><body>\n");
-        html.append("<div class=\"container\">\n");
-        html.append("<h1>🎯 JavaScript Execution Demo</h1>\n");
-        html.append("<div class=\"info\">\n");
-        html.append("<strong>ℹ️ Info:</strong> This page loads and executes "
-                    "<code>/app.js</code> using a <code>&lt;script "
-                    "src=\"/app.js\"&gt;&lt;/script&gt;</code> tag.\n");
-        html.append("</div>\n");
-        html.append("<h2>Output:</h2>\n");
-        html.append(
-            "<div id=\"output\">Waiting for JavaScript to execute...</div>\n");
-        html.append(
-            "<button onclick=\"testFunction()\">Run Test Function</button>\n");
-        html.append(
-            "<button onclick=\"location.reload()\">Reload Page</button>\n");
-        html.append("<p><a href=\"/\" class=\"back-link\">← Back to Testing "
-                    "Guide</a></p>\n");
-        html.append("</div>\n");
-        html.append("<script>\n");
-        html.append("// Display that the script loaded\n");
-        html.append("document.getElementById('output').textContent = 'test.js "
-                    "loaded successfully!\\n\\nClick \"Run Test Function\" to "
-                    "execute the test function from test.js';\n");
-        html.append("</script>\n");
-        html.append("</body></html>\n");
-
-        return html;
     }
 
     /// Generate 500MB test file on-the-fly
@@ -508,237 +302,163 @@ class CustomFileServer : public HttpFileServer {
     /// Override to customize directory listing
     std::string generateDirectoryListing(
         const std::string& dirPath) const override {
-        std::string html;
-        html.reserve(4096);
-        html.append("<!DOCTYPE html>\n");
-        html.append("<html><head>\n");
-        html.append("<title>Directory: ");
-        html.append(HtmlEscape::encode(dirPath));
-        html.append("</title>\n");
-        html.append("<style>\n");
-        html.append("body { font-family: Arial, sans-serif; margin: 20px; }\n");
-        html.append("table { border-collapse: collapse; width: 100%; }\n");
-        html.append("th, td { padding: 8px; text-align: left; border-bottom: "
-                    "1px solid #ddd; }\n");
-        html.append("th { background-color: #f2f2f2; }\n");
-        html.append("a { text-decoration: none; color: #3498db; }\n");
-        html.append("a:hover { text-decoration: underline; }\n");
-        html.append("</style>\n");
-        html.append("</head><body>\n");
-        html.append("<h1>Directory listing: ");
-        html.append(HtmlEscape::encode(dirPath));
-        html.append("</h1>\n");
-        html.append("<table>\n");
-        html.append("<tr><th>Name</th><th>Type</th><th>Size</th><th>Modified</"
-                    "th></tr>\n");
-
-        // Add parent directory link
-        if (dirPath != getConfig().documentRoot) {
-            html.append("<tr><td><a "
-                        "href=\"../\">../</a></td><td>Directory</td><td>-</"
-                        "td><td>-</td></tr>\n");
-            html.append(
-                "<tr><td><a href=\"../\">📁 "
-                "../</a></td><td>Directory</td><td>-</td><td>-</td></tr>\n");
-        }
-
-        std::vector<std::pair<std::string, bool>> entries; // name, isDirectory
-
-        std::vector<PathHelper::DirEntry> dirEntries
-            = PathHelper::listDirectory(dirPath);
-        for (const auto& entry : dirEntries) {
-            const std::string& name = entry.name;
-            if (name.empty() || name[0] == '.') continue; // Skip hidden files
-
-            bool isDir = entry.isDirectory;
-            entries.emplace_back(name, isDir);
-        }
-
-        // Sort entries: directories first, then files, both alphabetically
-        std::sort(
-            entries.begin(), entries.end(), [](const auto& a, const auto& b) {
-                if (a.second != b.second)
-                    return a.second > b.second; // directories first
-                return a.first < b.first; // alphabetical
-            });
-
-        for (const auto& [name, isDir] : entries) {
-            std::string type = isDir ? "Directory" : getFileExtension(name);
-            std::string size = "-";
-            std::string modified = "-";
-
-            if (!isDir) {
-                std::string fullPath = PathHelper::joinPath(dirPath, name);
-                PathHelper::FileInfo fileInfo
-                    = PathHelper::getFileInfo(fullPath);
-                if (fileInfo.exists) {
-                    size_t fileSize = fileInfo.size;
-                    if (fileSize < 1024) {
-                        size = std::to_string(fileSize) + " B";
-                    } else if (fileSize < 1024 * 1024) {
-                        size = std::to_string(fileSize / 1024) + " KB";
-                    } else {
-                        size = std::to_string(fileSize / (1024 * 1024)) + " MB";
-                    }
-
-                    std::time_t cftime = fileInfo.lastModified;
-
-                    char buffer[32];
-#ifdef _WIN32
-                    struct tm timeinfo = {};
-                    localtime_s(&timeinfo, &cftime);
-                    strftime(
-                        buffer, sizeof(buffer), "%Y-%m-%d %H:%M", &timeinfo);
-#else
-                    struct tm* timeinfo = localtime(&cftime);
-                    strftime(
-                        buffer, sizeof(buffer), "%Y-%m-%d %H:%M", timeinfo);
-#endif
-                    modified = std::string(buffer);
-                }
-            }
-
-            html.append("<tr><td><a href=\"");
-            html.append(urlEncode(name)); // percent-encode unsafe chars in href
-            if (isDir) {
-                html.append("/");
-            }
-            html.append("\">");
-            html.append(isDir ? "📁" : "📄");
-            html.append(" ");
-            html.append(HtmlEscape::encode(name)); // HTML-escape display text
-            if (isDir) {
-                html.append("/");
-            }
-            html.append("</a></td>");
-            html.append("<td>");
-            html.append(HtmlEscape::encode(type)); // file extension
-            html.append("</td>");
-            html.append("<td>");
-            html.append(size);
-            html.append("</td>");
-            html.append("<td>");
-            html.append(modified);
-            html.append("</td></tr>\n");
-        }
-
-        html.append("</table>\n");
-        html.append("<hr><p><small>Custom File Server | ");
-        html.append(getCurrentTime());
-        html.append("</small></p>\n");
-        html.append("</body></html>");
-        return html;
+        return AdvancedFileServerPages::generateDirectoryListing(
+            dirPath, getConfig().documentRoot);
     }
 
     private:
     File logFile_;
 
-    void logRequest(const HttpRequest& request, const HttpClientState& state) {
-        (void)state; // Suppress unused parameter warning - available for future
-                     // enhancements
-        if (!logFile_.isOpen()) return;
+bool isLocalClient(const std::string& peerAddress) const {
+    return peerAddress == "127.0.0.1" || peerAddress == "::1"
+        || peerAddress == "::ffff:127.0.0.1" || peerAddress == "localhost";
+}
 
-        auto now = std::chrono::system_clock::now();
-        auto time_t = std::chrono::system_clock::to_time_t(now);
+std::string readAccessLogTail(size_t maxLines) const {
+    std::FILE* file = std::fopen("access.log", "rb");
+    if (!file) return {};
 
-#ifdef _WIN32
-        struct tm timeinfo = {};
-        localtime_s(&timeinfo, &time_t);
-        logFile_.printf("%04d-%02d-%02d %02d:%02d:%02d %s %s from client\n",
-            static_cast<int>(timeinfo.tm_year + 1900),
-            static_cast<int>(timeinfo.tm_mon + 1),
-            static_cast<int>(timeinfo.tm_mday),
-            static_cast<int>(timeinfo.tm_hour),
-            static_cast<int>(timeinfo.tm_min),
-            static_cast<int>(timeinfo.tm_sec), request.method.c_str(),
-            request.path.c_str());
-#else
-        struct tm* timeinfo = localtime(&time_t);
-        logFile_.printf(
-            "%04d-%02d-%02d %02d:%02d:%02d %.*s %s from client\n", //-V111 //-V111
-            static_cast<int>(timeinfo->tm_year + 1900),
-            static_cast<int>(timeinfo->tm_mon + 1),
-            static_cast<int>(timeinfo->tm_mday),
-            static_cast<int>(timeinfo->tm_hour),
-            static_cast<int>(timeinfo->tm_min),
-            static_cast<int>(timeinfo->tm_sec),
-            static_cast<int>(request.method.size()), request.method.data(),
-            request.path.c_str());
-#endif
-        logFile_.flush();
+    if (std::fseek(file, 0, SEEK_END) != 0) {
+        std::fclose(file);
+        return {};
+    }
+    const long fileSize = std::ftell(file);
+    if (fileSize <= 0) {
+        std::fclose(file);
+        return {};
+    }
+    if (std::fseek(file, 0, SEEK_SET) != 0) {
+        std::fclose(file);
+        return {};
     }
 
-    /// Returns true for paths that are served without authentication.
-    bool isPublicPath(const std::string& path) const {
-        static const std::string publicPaths[] = {
-            "/public.html",
-        };
-        for (const auto& p : publicPaths) {
-            if (path == p) return true;
+    std::vector<char> bytes(static_cast<size_t>(fileSize));
+    const size_t bytesRead = std::fread(bytes.data(), 1, bytes.size(), file);
+    std::fclose(file);
+    if (bytesRead == 0) return {};
+    bytes.resize(bytesRead);
+
+    std::string content(bytes.begin(), bytes.end());
+    std::vector<size_t> lineStarts;
+    lineStarts.reserve(64);
+    lineStarts.push_back(0);
+
+    for (size_t i = 0; i < content.size(); ++i) {
+        if (content[i] == '\n' && i + 1 < content.size()) {
+            lineStarts.push_back(i + 1);
         }
+    }
+
+    const size_t startIndex
+        = (lineStarts.size() > maxLines) ? (lineStarts.size() - maxLines) : 0;
+    return content.substr(lineStarts[startIndex]);
+}
+
+void logRequest(const HttpRequest& request, const HttpClientState& state) {
+    (void)state; // Suppress unused parameter warning - available for future
+                 // enhancements
+    if (!logFile_.isOpen()) return;
+
+    auto now = std::chrono::system_clock::now();
+    auto time_t = std::chrono::system_clock::to_time_t(now);
+
+#ifdef _WIN32
+    struct tm timeinfo = {};
+    localtime_s(&timeinfo, &time_t);
+    logFile_.printf("%04d-%02d-%02d %02d:%02d:%02d %s %s from client\n",
+        static_cast<int>(timeinfo.tm_year + 1900),
+        static_cast<int>(timeinfo.tm_mon + 1),
+        static_cast<int>(timeinfo.tm_mday), static_cast<int>(timeinfo.tm_hour),
+        static_cast<int>(timeinfo.tm_min), static_cast<int>(timeinfo.tm_sec),
+        request.method.c_str(), request.path.c_str());
+#else
+    struct tm* timeinfo = localtime(&time_t);
+    logFile_.printf(
+        "%04d-%02d-%02d %02d:%02d:%02d %.*s %s from client\n", //-V111
+                                                               ////-V111
+        static_cast<int>(timeinfo->tm_year + 1900),
+        static_cast<int>(timeinfo->tm_mon + 1),
+        static_cast<int>(timeinfo->tm_mday),
+        static_cast<int>(timeinfo->tm_hour), static_cast<int>(timeinfo->tm_min),
+        static_cast<int>(timeinfo->tm_sec),
+        static_cast<int>(request.method.size()), request.method.data(),
+        request.path.c_str());
+#endif
+    logFile_.flush();
+}
+
+/// Returns true for paths that are served without authentication.
+bool isPublicPath(const std::string& path) const {
+    static const std::string publicPaths[] = {
+        "/public.html",
+    };
+    for (const auto& p : publicPaths) {
+        if (path == p) return true;
+    }
+    return false;
+}
+
+bool isAuthenticated(const HttpRequest& request) const {
+    // Simple basic authentication (username: admin, password: secret)
+    auto authIt = request.headers.find("authorization");
+    if (authIt == request.headers.end()) {
         return false;
     }
 
-    bool isAuthenticated(const HttpRequest& request) const {
-        // Simple basic authentication (username: admin, password: secret)
-        auto authIt = request.headers.find("authorization");
-        if (authIt == request.headers.end()) {
-            return false;
-        }
-
-        const std::string_view auth = authIt->second;
-        if (auth.substr(0, 6) != "Basic ") {
-            return false;
-        }
-
-        // In a real implementation, you'd decode the Base64 credentials
-        // For this example, we'll just check for a specific token
-        return auth.substr(6) == "YWRtaW46c2VjcmV0"; // "admin:secret" in Base64
+    const std::string_view auth = authIt->second;
+    if (auth.substr(0, 6) != "Basic ") {
+        return false;
     }
 
-    void sendAuthRequired(HttpClientState& state) {
-        std::string htmlBody = generateErrorHtml(401, "Unauthorized",
-            "This server requires authentication. Please provide valid "
-            "credentials.");
+    // In a real implementation, you'd decode the Base64 credentials
+    // For this example, we'll just check for a specific token
+    return auth.substr(6) == "YWRtaW46c2VjcmV0"; // "admin:secret" in Base64
+}
 
-        std::string response;
-        response.reserve(256 + htmlBody.size());
-        response.append("HTTP/1.1 401 Unauthorized\r\n");
-        response.append("Content-Type: text/html\r\nContent-Length: ");
-        response += std::to_string(htmlBody.size());
-        response.append(
-            "\r\nWWW-Authenticate: Basic realm=\"Secure Area\"\r\n\r\n");
-        response.append(htmlBody);
+void sendAuthRequired(HttpClientState& state) {
+    std::string htmlBody = generateErrorHtml(401, "Unauthorized",
+        "This server requires authentication. Please provide valid "
+        "credentials.");
 
-        state.responseBuf = std::move(response);
-        state.responseView = state.responseBuf;
-    }
+    std::string response;
+    response.reserve(256 + htmlBody.size());
+    response.append("HTTP/1.1 401 Unauthorized\r\n");
+    response.append("Content-Type: text/html\r\nContent-Length: ");
+    response += std::to_string(htmlBody.size());
+    response.append(
+        "\r\nWWW-Authenticate: Basic realm=\"Secure Area\"\r\n\r\n");
+    response.append(htmlBody);
 
-    std::string getCurrentTime() const {
-        auto now = std::chrono::system_clock::now();
-        auto time_t = std::chrono::system_clock::to_time_t(now);
+    state.responseBuf = std::move(response);
+    state.responseView = state.responseBuf;
+}
 
-        char buffer[32];
+std::string getCurrentTime() const {
+    auto now = std::chrono::system_clock::now();
+    auto time_t = std::chrono::system_clock::to_time_t(now);
+
+    char buffer[32];
 #ifdef _WIN32
-        struct tm timeinfo = {};
-        localtime_s(&timeinfo, &time_t);
-        strftime(buffer, sizeof(buffer), "%Y-%m-%d %H:%M:%S", &timeinfo);
+    struct tm timeinfo = {};
+    localtime_s(&timeinfo, &time_t);
+    strftime(buffer, sizeof(buffer), "%Y-%m-%d %H:%M:%S", &timeinfo);
 #else
-        struct tm* timeinfo = localtime(&time_t);
-        strftime(buffer, sizeof(buffer), "%Y-%m-%d %H:%M:%S", timeinfo);
+    struct tm* timeinfo = localtime(&time_t);
+    strftime(buffer, sizeof(buffer), "%Y-%m-%d %H:%M:%S", timeinfo);
 #endif
 
-        return std::string(buffer);
-    }
+    return std::string(buffer);
+}
 
-    std::string getFileExtension(const std::string& filePath) const {
-        size_t dotPos = filePath.find_last_of('.');
-        if (dotPos != std::string::npos && dotPos < filePath.length() - 1) {
-            return filePath.substr(dotPos);
-        }
-        return "";
+std::string getFileExtension(const std::string& filePath) const {
+    size_t dotPos = filePath.find_last_of('.');
+    if (dotPos != std::string::npos && dotPos < filePath.length() - 1) {
+        return filePath.substr(dotPos);
     }
-};
+    return "";
+}
+}
+;
 int main(int argc, char* argv[]) {
 
     printf("%s", ServerStrings::HEADER);
