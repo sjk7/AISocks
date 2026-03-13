@@ -305,6 +305,7 @@ void HttpPollServer::printStartupBanner() {
 void HttpPollServer::onClientConnected(TcpSocket& sock, HttpClientState& s) {
     auto ep = sock.getPeerEndpoint();
     if (ep.isSuccess()) s.peerAddress = ep.value().address;
+    if (isTlsMode(s)) onTlsClientConnected(sock, s);
 }
 
 // ---------------------------------------------------------------------------
@@ -498,6 +499,18 @@ void HttpPollServer::dispatchBuildResponse(HttpClientState& s) {
 ServerResult HttpPollServer::onReadable(TcpSocket& sock, HttpClientState& s) {
     char buf[RECV_BUF_SIZE];
     for (;;) {
+#ifdef AISOCKS_ENABLE_TLS
+        if (isTlsMode(s) && !s.tlsHandshakeDone) {
+            const ServerResult hs = doTlsHandshakeStep(sock, s);
+            if (hs != ServerResult::KeepConnection) return hs;
+            if (!s.tlsHandshakeDone) {
+                setClientWritable(sock, s.tlsWantsWrite);
+                return ServerResult::KeepConnection;
+            }
+            setClientWritable(sock, false);
+        }
+#endif
+
         // Slowloris protection: drop if headers not received within 5 seconds.
         // Clock is read once per loop iteration and reused by the timeout
         // check.
@@ -505,7 +518,7 @@ ServerResult HttpPollServer::onReadable(TcpSocket& sock, HttpClientState& s) {
         if (isSlowlorisTimeout_(s, now, slowlorisTimeoutMs_))
             return ServerResult::Disconnect;
 
-        int n = sock.receive(buf, sizeof(buf));
+        int n = tlsRead(sock, s, buf, sizeof(buf));
 
         if (n > 0) {
             touchClient(sock, now);
@@ -609,6 +622,18 @@ ServerResult HttpPollServer::onReadable(TcpSocket& sock, HttpClientState& s) {
 
 ServerResult HttpPollServer::onWritable(TcpSocket& sock, HttpClientState& s) {
     while (true) {
+#ifdef AISOCKS_ENABLE_TLS
+        if (isTlsMode(s) && !s.tlsHandshakeDone) {
+            const ServerResult hs = doTlsHandshakeStep(sock, s);
+            if (hs != ServerResult::KeepConnection) return hs;
+            if (!s.tlsHandshakeDone) {
+                setClientWritable(sock, s.tlsWantsWrite);
+                return ServerResult::KeepConnection;
+            }
+            setClientWritable(sock, false);
+        }
+#endif
+
         if (s.responseView.empty()) return ServerResult::KeepConnection;
 
         if (!s.responseStarted && !s.interimResponse) {
@@ -616,7 +641,7 @@ ServerResult HttpPollServer::onWritable(TcpSocket& sock, HttpClientState& s) {
             onResponseBegin(s);
         }
 
-        int sent = sock.sendChunked(
+        int sent = tlsWrite(sock, s,
             s.responseView.data() + s.sent, s.responseView.size() - s.sent);
 
         if (sent > 0) {

@@ -26,8 +26,13 @@
 #include "IpFilter.h"
 #include "ServerBase.h"
 #include <chrono>
+#include <memory>
 #include <string>
 #include <string_view>
+
+#ifdef AISOCKS_ENABLE_TLS
+#include "TlsOpenSsl.h"
+#endif
 
 namespace aiSocks {
 
@@ -66,6 +71,14 @@ struct HttpClientState {
     // Available in buildResponse() and onResponseSent().
     std::string peerAddress;
 
+#ifdef AISOCKS_ENABLE_TLS
+    // TLS state is present only in TLS-enabled builds.
+    // Default is plain-socket behavior (handshake already satisfied).
+    bool tlsHandshakeDone{true};
+    bool tlsWantsWrite{false};
+    std::shared_ptr<TlsSession> tlsSession;
+#endif
+
     HttpClientState() : startTime(std::chrono::steady_clock::now()) {
         request.reserve(4096); // typical HTTP request fits in 4 KB
     }
@@ -83,7 +96,13 @@ struct HttpClientState {
         , interimResponse(other.interimResponse)
         , requestScanPos(other.requestScanPos)
         , parsedRequest(other.parsedRequest)
-        , peerAddress(other.peerAddress) {
+        , peerAddress(other.peerAddress)
+    #ifdef AISOCKS_ENABLE_TLS
+        , tlsHandshakeDone(other.tlsHandshakeDone)
+        , tlsWantsWrite(other.tlsWantsWrite)
+        , tlsSession(other.tlsSession)
+    #endif
+     {
         // If view pointed into the original's responseBuf, redirect into ours.
         if (!responseBuf.empty()
             && other.responseView.data() == other.responseBuf.data())
@@ -103,7 +122,13 @@ struct HttpClientState {
         , interimResponse(other.interimResponse)
         , requestScanPos(other.requestScanPos)
         , parsedRequest(std::move(other.parsedRequest))
-        , peerAddress(std::move(other.peerAddress)) {
+        , peerAddress(std::move(other.peerAddress))
+    #ifdef AISOCKS_ENABLE_TLS
+        , tlsHandshakeDone(other.tlsHandshakeDone)
+        , tlsWantsWrite(other.tlsWantsWrite)
+        , tlsSession(std::move(other.tlsSession))
+    #endif
+     {
         // Fix up the view only if it was pointing into the moved-from buf.
         // After std::string move, responseBuf.data() == old
         // other.responseBuf.data() for heap-allocated strings, so the pointer
@@ -128,6 +153,11 @@ struct HttpClientState {
         requestScanPos = other.requestScanPos;
         parsedRequest = other.parsedRequest;
         peerAddress = other.peerAddress;
+    #ifdef AISOCKS_ENABLE_TLS
+        tlsHandshakeDone = other.tlsHandshakeDone;
+        tlsWantsWrite = other.tlsWantsWrite;
+        tlsSession = other.tlsSession;
+    #endif
         // If view pointed into the original's responseBuf, redirect into ours.
         if (!responseBuf.empty()
             && other.responseView.data() == other.responseBuf.data())
@@ -150,6 +180,11 @@ struct HttpClientState {
         requestScanPos = other.requestScanPos;
         parsedRequest = std::move(other.parsedRequest);
         peerAddress = std::move(other.peerAddress);
+    #ifdef AISOCKS_ENABLE_TLS
+        tlsHandshakeDone = other.tlsHandshakeDone;
+        tlsWantsWrite = other.tlsWantsWrite;
+        tlsSession = std::move(other.tlsSession);
+    #endif
         // Fix up the view only if it was pointing into the moved-from buf.
         if (!responseBuf.empty() && responseView.data() == responseBuf.data())
             responseView = responseBuf;
@@ -233,6 +268,37 @@ class HttpPollServer : public ServerBase<HttpClientState> {
     // Override points — called by the infrastructure hooks.
     void onClientConnected(TcpSocket& sock, HttpClientState& s) override;
     bool onAcceptFilter(const std::string& peerAddress) override;
+
+    // TLS extension points. Defaults preserve current plain-socket behavior.
+    virtual bool isTlsMode(const HttpClientState& /*s*/) const {
+        return false;
+    }
+    virtual void onTlsClientConnected(TcpSocket& /*sock*/, HttpClientState& s) {
+#ifdef AISOCKS_ENABLE_TLS
+        s.tlsHandshakeDone = true;
+        s.tlsWantsWrite = false;
+    #else
+        (void)s;
+#endif
+    }
+    virtual ServerResult doTlsHandshakeStep(
+        TcpSocket& /*sock*/, HttpClientState& s) {
+#ifdef AISOCKS_ENABLE_TLS
+        s.tlsHandshakeDone = true;
+        s.tlsWantsWrite = false;
+    #else
+        (void)s;
+#endif
+        return ServerResult::KeepConnection;
+    }
+    virtual int tlsRead(
+        TcpSocket& sock, HttpClientState& /*s*/, void* buf, size_t len) {
+        return sock.receive(buf, len);
+    }
+    virtual int tlsWrite(TcpSocket& sock, HttpClientState& /*s*/,
+        const char* data, size_t len) {
+        return sock.sendChunked(data, len);
+    }
 
     private:
     IpFilter* ipFilter_{nullptr};
