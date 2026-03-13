@@ -11,7 +11,9 @@
 #include "HttpPollServer.h"
 #include "TcpSocket.h"
 #include "SocketFactory.h"
+#include "FileIO.h"
 #include "test_helpers.h"
+#include <cstdio>
 #include <string>
 #include <thread>
 #include <chrono>
@@ -33,6 +35,19 @@
 using namespace aiSocks;
 using namespace std::chrono_literals;
 using namespace std::chrono;
+
+static const char* kAccessLogPath = "test_http_poll_server_access.log";
+
+static void removeAccessLog() {
+    std::remove(kAccessLogPath);
+}
+
+static std::string readAccessLog() {
+    File f(kAccessLogPath, "r");
+    if (!f.isOpen()) return {};
+    const auto bytes = f.readAll();
+    return std::string(bytes.begin(), bytes.end());
+}
 
 // Test server with instrumented hooks
 class TestHttpServer : public HttpPollServer {
@@ -359,6 +374,38 @@ int main() {
         g_serverSignalStop.store(false);
 
         REQUIRE(server.responseSentCount == 1);
+    }
+
+    BEGIN_TEST("Access log: zero-copy response logs correct status code");
+    {
+        removeAccessLog();
+        AccessLogger logger(kAccessLogPath);
+        REQUIRE(logger.isOpen());
+
+        TestHttpServer server(ServerBind{"127.0.0.1", Port{0}});
+        REQUIRE(server.isValid());
+        server.useStaticResponse = true;
+        server.setAccessLogger(&logger);
+
+        std::thread serverThread([&server]() {
+            server.run(ClientLimit::Unlimited, Milliseconds{1});
+        });
+
+        server.waitReady();
+
+        sendHttpRequest(
+            server.serverPort(), "GET / HTTP/1.1\r\nHost: localhost\r\n\r\n");
+
+        server.waitForResponseSent();
+        g_serverSignalStop.store(true);
+        serverThread.join();
+        g_serverSignalStop.store(false);
+
+        logger.close();
+        const std::string log = readAccessLog();
+        REQUIRE(log.find("\"GET / HTTP/1.1\" 200 ") != std::string::npos);
+
+        removeAccessLog();
     }
 
     // Test 6: HTTP/1.0 default close behavior

@@ -33,6 +33,7 @@
 #include <cstddef>
 #include <ctime>
 #include <string>
+#include <string_view>
 
 namespace aiSocks {
 
@@ -64,7 +65,7 @@ class AccessLogger {
 
     // Extract the HTTP status code from the first line of a raw response.
     // Returns 0 when the buffer is empty or unparseable.
-    static int extractStatusCode(const std::string& responseBuf);
+    static int extractStatusCode(std::string_view responseBuf);
 
     private:
     File file_;

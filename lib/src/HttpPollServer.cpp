@@ -320,7 +320,7 @@ bool HttpPollServer::onAcceptFilter(const std::string& peerAddress) {
 void HttpPollServer::onResponseSent(HttpClientState& s) {
     if (!accessLogger_) return;
     const std::string requestLine = AccessLogger::extractRequestLine(s.request);
-    const int statusCode = AccessLogger::extractStatusCode(s.responseBuf);
+    const int statusCode = AccessLogger::extractStatusCode(s.responseView);
     accessLogger_->log(
         s.peerAddress, requestLine, statusCode, s.responseView.size());
 }
