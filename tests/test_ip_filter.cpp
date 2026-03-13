@@ -8,6 +8,7 @@
 // and the auto-blacklist rate-limiting behaviour.
 
 #include "IpFilter.h"
+#include "FileIO.h"
 #include "test_helpers.h"
 
 #include <chrono>
@@ -38,10 +39,10 @@ constexpr auto kFastSleepBuffer = std::chrono::milliseconds{180};
 static const char* kCfgPath = "test_ipfilter_tmp.conf";
 
 static void writeConfig(const char* content) {
-    FILE* f = fopen(kCfgPath, "w");
+    File f(kCfgPath, "w");
     if (!f) return;
-    fputs(content, f);
-    fclose(f);
+    f.writeString(content);
+    f.flush();
 }
 
 static void removeConfig() {
