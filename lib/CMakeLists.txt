@@ -25,6 +25,10 @@ add_library(aiSocksLib STATIC
     src/AccessLogger.cpp
 )
 
+if(AISOCKS_ENABLE_TLS)
+    target_sources(aiSocksLib PRIVATE src/TlsOpenSsl.cpp)
+endif()
+
 # Platform-specific Poller backend (exactly one is compiled)
 if(APPLE OR CMAKE_SYSTEM_NAME MATCHES "FreeBSD")
     target_sources(aiSocksLib PRIVATE src/PollerKqueue.cpp)
