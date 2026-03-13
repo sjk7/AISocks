@@ -62,7 +62,8 @@ class TrackingServer : public SimpleServer {
     std::atomic<size_t> atomicClientCount_{0};
 
     protected:
-    void onClientConnected(TcpSocket& /*sock*/) override {
+    void onClientConnected(
+        TcpSocket& /*sock*/, detail::NoClientState& /*s*/) override {
         atomicClientCount_.fetch_add(1, std::memory_order_relaxed);
     }
     void onClientDisconnected() override {

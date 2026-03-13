@@ -90,7 +90,7 @@ class EdgeCaseServer : public ServerBase<EdgeCaseState> {
     }
 
     protected:
-    void onClientConnected(TcpSocket&) override {
+    void onClientConnected(TcpSocket&, EdgeCaseState& /*s*/) override {
         atomicClientCount_.fetch_add(1, std::memory_order_relaxed);
     }
     void onClientDisconnected() override {

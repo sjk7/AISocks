@@ -21,6 +21,12 @@ add_library(aiSocksLib STATIC
     src/HttpRequest.cpp
     src/HttpResponse.cpp
     src/UrlCodec.cpp
+    src/HttpFileServer.cpp
+    src/HttpRequest.cpp
+    src/HttpResponse.cpp
+    src/UrlCodec.cpp
+    src/IpFilter.cpp
+    src/AccessLogger.cpp
 )
 
 # Platform-specific Poller backend (exactly one is compiled)

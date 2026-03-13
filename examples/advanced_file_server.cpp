@@ -27,7 +27,9 @@
 // Demonstrates how to derive from HttpFileServer and override virtual functions
 
 #include "HttpFileServer.h"
+#include "HtmlEscape.h"
 #include "PathHelper.h"
+#include "UrlCodec.h"
 #include "advanced_file_server_strings.h"
 #include "CustomFileServerHtmlHelpers.h"
 #include "FileIO.h"
@@ -511,7 +513,7 @@ class CustomFileServer : public HttpFileServer {
         html.append("<!DOCTYPE html>\n");
         html.append("<html><head>\n");
         html.append("<title>Directory: ");
-        html.append(dirPath);
+        html.append(HtmlEscape::encode(dirPath));
         html.append("</title>\n");
         html.append("<style>\n");
         html.append("body { font-family: Arial, sans-serif; margin: 20px; }\n");
@@ -524,7 +526,7 @@ class CustomFileServer : public HttpFileServer {
         html.append("</style>\n");
         html.append("</head><body>\n");
         html.append("<h1>Directory listing: ");
-        html.append(dirPath);
+        html.append(HtmlEscape::encode(dirPath));
         html.append("</h1>\n");
         html.append("<table>\n");
         html.append("<tr><th>Name</th><th>Type</th><th>Size</th><th>Modified</"
@@ -597,20 +599,20 @@ class CustomFileServer : public HttpFileServer {
             }
 
             html.append("<tr><td><a href=\"");
-            html.append(name);
+            html.append(urlEncode(name)); // percent-encode unsafe chars in href
             if (isDir) {
                 html.append("/");
             }
             html.append("\">");
             html.append(isDir ? "📁" : "📄");
             html.append(" ");
-            html.append(name);
+            html.append(HtmlEscape::encode(name)); // HTML-escape display text
             if (isDir) {
                 html.append("/");
             }
             html.append("</a></td>");
             html.append("<td>");
-            html.append(type);
+            html.append(HtmlEscape::encode(type)); // file extension
             html.append("</td>");
             html.append("<td>");
             html.append(size);

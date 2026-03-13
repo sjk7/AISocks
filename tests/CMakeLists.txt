@@ -45,6 +45,8 @@ set(TEST_SOURCES
     test_bugfix_coverage
     test_http_client_server
     test_dns_resolution_gate
+    test_ip_filter
+    test_access_logger
 )
 
 # Slow tests (disabled by default, enable with -DALLOW_SLOW_TESTS=ON)

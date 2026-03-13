@@ -351,12 +351,23 @@ template <typename ClientData> class ServerBase {
     // Called on the server thread immediately after a new client has been
     // accepted and registered. Override in subclasses that need a thread-safe
     // client-count observable from outside threads.
-    virtual void onClientConnected(TcpSocket& /*sock*/) {}
+    // Called on the server thread immediately after a new client has been
+    // accepted, registered with the poller, and stored in the client map.
+    // Override to initialise per-connection state (e.g. store the peer
+    // address).
+    virtual void onClientConnected(TcpSocket& /*sock*/, ClientData& /*data*/) {}
 
     // Called on the server thread immediately after a client has been removed
     // from the active set (before the socket is closed).
     virtual void onClientDisconnected() {}
 
+    // Called immediately after a new connection is accepted from the OS but
+    // BEFORE it is registered with the poller.  Return true to accept the
+    // connection; return false to silently drop it (the socket is closed).
+    // Override in derived classes to implement IP-level access control.
+    virtual bool onAcceptFilter(const std::string& /*peerAddress*/) {
+        return true;
+    }
     // Called when a poll error event fires on a client socket.
     // sock is still valid at this point.
     // Return KeepConnection to leave the client registered (e.g. the error
@@ -698,8 +709,18 @@ template <typename ClientData> class ServerBase {
                 continue;
             }
 
+            // Accept filter: allows derived classes to reject connections
+            // before the client is registered with the poller.
+            std::string peerAddrStr;
+            {
+                auto pep = client->getPeerEndpoint();
+                if (pep.isSuccess()) peerAddrStr = pep.value().address;
+            }
+            if (!onAcceptFilter(peerAddrStr))
+                continue; // socket closed via RAII
+
             ClientEntry& ce = emplaceClient(key, std::move(client));
-            onClientConnected(*ce.socket);
+            onClientConnected(*ce.socket, ce.data);
             ++accepted;
             if (clientFds_.size() > peak_clients_)
                 peak_clients_ = clientFds_.size();

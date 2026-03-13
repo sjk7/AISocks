@@ -30,7 +30,7 @@ class SimpleEchoServer : public ServerBase<SimpleEchoState> {
     std::atomic<size_t> atomicClientCount_{0};
 
     protected:
-    void onClientConnected(TcpSocket&) override {
+    void onClientConnected(TcpSocket&, SimpleEchoState& /*s*/) override {
         atomicClientCount_.fetch_add(1, std::memory_order_relaxed);
     }
     void onClientDisconnected() override {

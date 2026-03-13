@@ -39,6 +39,33 @@ void HttpPollServer::printStartupBanner() {
     BuildInfo::print();
 }
 
+// ---------------------------------------------------------------------------
+// onClientConnected — store peer IP in per-connection state
+// ---------------------------------------------------------------------------
+void HttpPollServer::onClientConnected(TcpSocket& sock, HttpClientState& s) {
+    auto ep = sock.getPeerEndpoint();
+    if (ep.isSuccess()) s.peerAddress = ep.value().address;
+}
+
+// ---------------------------------------------------------------------------
+// onAcceptFilter — IP-level blocking before poller registration
+// ---------------------------------------------------------------------------
+bool HttpPollServer::onAcceptFilter(const std::string& peerAddress) {
+    if (ipFilter_ && !ipFilter_->isAllowed(peerAddress)) return false;
+    return true;
+}
+
+// ---------------------------------------------------------------------------
+// onResponseSent — Apache Combined Log entry
+// ---------------------------------------------------------------------------
+void HttpPollServer::onResponseSent(HttpClientState& s) {
+    if (!accessLogger_) return;
+    const std::string requestLine = AccessLogger::extractRequestLine(s.request);
+    const int statusCode = AccessLogger::extractStatusCode(s.responseBuf);
+    accessLogger_->log(
+        s.peerAddress, requestLine, statusCode, s.responseView.size());
+}
+
 ServerResult HttpPollServer::onError(TcpSocket& sock, HttpClientState& /*s*/) {
     auto err = sock.getLastError();
     // Poll systems can report error events with SO_ERROR==0 for connection
@@ -192,6 +219,21 @@ void HttpPollServer::dispatchBuildResponse(HttpClientState& s) {
     // buildResponse() overrides do not need to re-parse the same bytes.
     s.closeAfterSend = resolveKeepAlive_(req);
     s.parsedRequest = std::move(req);
+
+    // Record this request for rate tracking; reject if now auto-blacklisted.
+    if (ipFilter_) {
+        ipFilter_->recordRequest(s.peerAddress);
+        if (!ipFilter_->isAllowed(s.peerAddress)) {
+            s.responseBuf = makeResponse("HTTP/1.1 403 Forbidden",
+                "text/plain; charset=utf-8", "403 Forbidden\nAccess denied.\n",
+                false);
+            s.responseView = s.responseBuf;
+            s.closeAfterSend = true;
+            s.parsedRequest = HttpRequest{};
+            return;
+        }
+    }
+
     buildResponse(s);
 }
 

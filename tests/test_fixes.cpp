@@ -92,7 +92,7 @@ class BaseServer : public ServerBase<TS> {
         readyCv_.notify_all();
     }
 
-    void onClientConnected(TcpSocket&) override {
+    void onClientConnected(TcpSocket&, TS& /*s*/) override {
         atomicClientCount_.fetch_add(1, std::memory_order_relaxed);
     }
     void onClientDisconnected() override {

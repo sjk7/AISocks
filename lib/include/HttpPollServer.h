@@ -20,8 +20,10 @@
 //   onResponseSent(s)   -- called after the last byte of a response is sent
 // ---------------------------------------------------------------------------
 
+#include "AccessLogger.h"
 #include "CallIntervalTracker.h"
 #include "HttpRequest.h"
+#include "IpFilter.h"
 #include "ServerBase.h"
 #include <chrono>
 #include <string>
@@ -56,6 +58,9 @@ struct HttpClientState {
     // Cleared by resetAfterSend_() after the response is fully sent.
     // valid == false means no cached request yet.
     HttpRequest parsedRequest;
+    // Remote address populated by HttpPollServer::onClientConnected().
+    // Available in buildResponse() and onResponseSent().
+    std::string peerAddress;
 
     HttpClientState() : startTime(std::chrono::steady_clock::now()) {
         request.reserve(4096); // typical HTTP request fits in 4 KB
@@ -71,7 +76,8 @@ struct HttpClientState {
         , responseStarted(other.responseStarted)
         , closeAfterSend(other.closeAfterSend)
         , requestScanPos(other.requestScanPos)
-        , parsedRequest(other.parsedRequest) {
+        , parsedRequest(other.parsedRequest)
+        , peerAddress(other.peerAddress) {
         // If view pointed into the original's responseBuf, redirect into ours.
         if (!responseBuf.empty()
             && other.responseView.data() == other.responseBuf.data())
@@ -88,7 +94,8 @@ struct HttpClientState {
         , responseStarted(other.responseStarted)
         , closeAfterSend(other.closeAfterSend)
         , requestScanPos(other.requestScanPos)
-        , parsedRequest(std::move(other.parsedRequest)) {
+        , parsedRequest(std::move(other.parsedRequest))
+        , peerAddress(std::move(other.peerAddress)) {
         // Fix up the view only if it was pointing into the moved-from buf.
         // After std::string move, responseBuf.data() == old
         // other.responseBuf.data() for heap-allocated strings, so the pointer
@@ -110,6 +117,7 @@ struct HttpClientState {
         closeAfterSend = other.closeAfterSend;
         requestScanPos = other.requestScanPos;
         parsedRequest = other.parsedRequest;
+        peerAddress = other.peerAddress;
         // If view pointed into the original's responseBuf, redirect into ours.
         if (!responseBuf.empty()
             && other.responseView.data() == other.responseBuf.data())
@@ -129,6 +137,7 @@ struct HttpClientState {
         closeAfterSend = other.closeAfterSend;
         requestScanPos = other.requestScanPos;
         parsedRequest = std::move(other.parsedRequest);
+        peerAddress = std::move(other.peerAddress);
         // Fix up the view only if it was pointing into the moved-from buf.
         if (!responseBuf.empty() && responseView.data() == responseBuf.data())
             responseView = responseBuf;
@@ -151,6 +160,15 @@ class HttpPollServer : public ServerBase<HttpClientState> {
         const ServerBind& bind, Result<TcpSocket>* result = nullptr)
         : ServerBase<HttpClientState>(bind, AddressFamily::IPv4, result)
         , bind_(bind) {}
+
+    // ---- security / observability hooks ---------------------------------
+
+    // Attach an IpFilter.  The server does NOT take ownership; the caller
+    // must ensure the filter outlives the server.  Pass nullptr to disable.
+    void setIpFilter(IpFilter* filter) { ipFilter_ = filter; }
+
+    // Attach an AccessLogger.  Same lifetime contract as setIpFilter().
+    void setAccessLogger(AccessLogger* logger) { accessLogger_ = logger; }
 
     // Override the Slowloris timeout for testing (default:
     // SLOWLORIS_TIMEOUT_MS)
@@ -175,7 +193,10 @@ class HttpPollServer : public ServerBase<HttpClientState> {
     // Optional hooks (default: no-op)
     // -------------------------------------------------------------------------
     virtual void onResponseBegin(HttpClientState& /*s*/) {}
-    virtual void onResponseSent(HttpClientState& /*s*/) {}
+    // onResponseSent: base implementation writes to accessLogger_ (if set).
+    // Derived classes that override this should call
+    // HttpPollServer::onResponseSent(s) to preserve access logging.
+    virtual void onResponseSent(HttpClientState& s);
 
     ServerResult onError(TcpSocket& sock, HttpClientState& s) override;
 
@@ -196,7 +217,15 @@ class HttpPollServer : public ServerBase<HttpClientState> {
 
     void dispatchBuildResponse(HttpClientState& s);
 
+    protected:
+    // Override points — called by the infrastructure hooks.
+    void onClientConnected(TcpSocket& sock, HttpClientState& s) override;
+    bool onAcceptFilter(const std::string& peerAddress) override;
+
     private:
+    IpFilter* ipFilter_{nullptr};
+    AccessLogger* accessLogger_{nullptr};
+
     static constexpr size_t RECV_BUF_SIZE = 64 * 1024;
     int slowlorisTimeoutMs_{SLOWLORIS_TIMEOUT_MS};
 

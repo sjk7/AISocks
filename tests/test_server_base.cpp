@@ -71,7 +71,7 @@ class EchoServer : public ServerBase<EchoState> {
     }
 
     protected:
-    void onClientConnected(TcpSocket&) override {
+    void onClientConnected(TcpSocket&, EchoState& /*s*/) override {
         atomicClientCount_.fetch_add(1, std::memory_order_relaxed);
     }
     void onClientDisconnected() override {
