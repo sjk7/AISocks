@@ -261,9 +261,33 @@ static bool copyFile_(const std::string& src, const std::string& dst) {
     return static_cast<bool>(out);
 }
 
+static FILE* openFileReadBinary_(const std::string& path) {
+#ifdef _MSC_VER
+    FILE* fp = nullptr;
+    if (fopen_s(&fp, path.c_str(), "rb") != 0) return nullptr;
+    return fp;
+#else
+    return std::fopen(path.c_str(), "rb");
+#endif
+}
+
+static std::string getEnvValue_(const char* name) {
+#ifdef _MSC_VER
+    char* value = nullptr;
+    size_t len = 0;
+    if (_dupenv_s(&value, &len, name) != 0 || !value) return {};
+    std::string out(value);
+    std::free(value);
+    return out;
+#else
+    const char* value = std::getenv(name);
+    return value ? std::string(value) : std::string{};
+#endif
+}
+
 static bool appendHashedCaCert_(const std::string& certPemPath,
     const std::filesystem::path& capathDir, std::string& err) {
-    FILE* fp = std::fopen(certPemPath.c_str(), "rb");
+    FILE* fp = openFileReadBinary_(certPemPath);
     if (!fp) {
         err = "failed to open cert PEM for capath fixture";
         return false;
@@ -1056,8 +1080,8 @@ static void test_https_verify_depth_zero_still_succeeds_for_self_signed_leaf() {
 static void test_https_default_system_roots_smoke_gated() {
     BEGIN_TEST("HttpClient HTTPS default system roots smoke test (gated)");
 
-    const char* gate = std::getenv("AISOCKS_RUN_SYSTEM_ROOT_TLS_TEST");
-    if (!gate || std::string_view(gate) != "1") {
+    const std::string gate = getEnvValue_("AISOCKS_RUN_SYSTEM_ROOT_TLS_TEST");
+    if (gate != "1") {
         REQUIRE_MSG(true,
             "SKIP - set AISOCKS_RUN_SYSTEM_ROOT_TLS_TEST=1 to enable");
         return;
