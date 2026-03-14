@@ -28,7 +28,7 @@ namespace aiSocks {
 //
 // run() is a template so that the three handler lambdas from ServerBase
 // are monomorphised at the call site — zero overhead vs. writing the loop
-// inline.  No std::function, no heap allocation.
+// inline, with no heap allocation.
 //
 // Handler signatures:
 //   EventHandler  : bool(TcpSocket&, PollEvent)

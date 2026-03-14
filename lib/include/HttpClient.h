@@ -24,7 +24,6 @@
 #include <cctype>
 #include <cstdio>
 #include <cstdlib>
-#include <functional>
 #include <memory>
 #include <string>
 #include <string_view>
@@ -897,8 +896,7 @@ class HttpClient {
                 = Result<HttpClientResponse>::failure(SocketError::Unknown, "");
             bool haveResult = false;
             bool consumedInterim = false;
-            std::function<void()> handleComplete;
-            handleComplete = [&]() {
+            auto handleComplete = [&](auto&& self) -> void {
                 const int code = parser.response().statusCode;
                 // Ignore interim HTTP/1.1 informational responses and keep
                 // reading the final response on the same connection.
@@ -916,7 +914,7 @@ class HttpClient {
                             return;
                         }
                         if (remState == HttpResponseParser::State::Complete) {
-                            handleComplete();
+                            self(self);
                             return;
                         }
                     }
@@ -1000,7 +998,7 @@ class HttpClient {
 
                 if (state == HttpResponseParser::State::Complete) {
                     consumedInterim = false;
-                    handleComplete();
+                    handleComplete(handleComplete);
                     if (haveResult) {
                         if (finalResult.isSuccess()) {
                             const auto& resp = finalResult.value().response;
@@ -1036,7 +1034,7 @@ class HttpClient {
             // Handle responses completed by feedEof() (Connection: close),
             // including the (rare) case of a connection-close redirect.
             if (parser.isComplete()) {
-                handleComplete();
+                handleComplete(handleComplete);
                 if (haveResult) {
                     if (finalResult.isSuccess()) {
                         const auto& resp = finalResult.value().response;

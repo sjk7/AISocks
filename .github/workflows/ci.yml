@@ -40,6 +40,9 @@ jobs:
     needs: preflight
     name: Build and Test
     runs-on: ${{ matrix.os }}
+    env:
+      SCCACHE_GHA_ENABLED: "true"
+      SCCACHE_CACHE_SIZE: "2G"
 
     strategy:
       fail-fast: false          # run all matrix legs even if one fails
@@ -215,6 +218,16 @@ jobs:
         if: runner.os == 'Linux' && matrix.enable_tls == 'ON'
         run: sudo apt-get install -y libssl-dev
 
+      - name: Install sccache (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          if command -v sccache >/dev/null 2>&1; then
+            echo "sccache already present"
+          else
+            sudo apt-get update
+            sudo apt-get install -y sccache
+          fi
+
       - name: Install Ninja (macOS)
         if: runner.os == 'macOS'
         run: |
@@ -227,6 +240,15 @@ jobs:
       - name: Install OpenSSL (macOS TLS)
         if: runner.os == 'macOS' && matrix.enable_tls == 'ON'
         run: brew install openssl@3
+
+      - name: Install sccache (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          if command -v sccache >/dev/null 2>&1; then
+            echo "sccache already present"
+          else
+            brew install sccache
+          fi
 
       - name: Install Ninja + LLVM (Windows / clang-cl)
         if: matrix.os == 'windows-latest' && matrix.compiler == 'clang-cl'
@@ -251,6 +273,16 @@ jobs:
             choco install ninja -y
           } else {
             Write-Host "ninja already present"
+          }
+
+      - name: Install sccache (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          if (-not (Get-Command sccache -ErrorAction SilentlyContinue)) {
+            choco install sccache -y
+          } else {
+            Write-Host "sccache already present"
           }
 
       - name: Install OpenSSL (Windows TLS)
@@ -289,6 +321,14 @@ jobs:
             -DBUILD_EXAMPLES=OFF
             -DAISOCKS_ENABLE_TLS=${ENABLE_TLS}
           )
+          if command -v sccache >/dev/null 2>&1; then
+            echo "[ci] enabling sccache compiler launcher"
+            sccache --zero-stats || true
+            CMAKE_ARGS+=(
+              "-DCMAKE_C_COMPILER_LAUNCHER=sccache"
+              "-DCMAKE_CXX_COMPILER_LAUNCHER=sccache"
+            )
+          fi
           if [[ "$RUNNER_OS" == "Windows" && "${{ matrix.build_type }}" == "RelWithDebInfo" ]]; then
             # Use CMake's MSVC debug-info knob to request /Z7 without passing
             # raw /-style flags through Git Bash argument conversion.
@@ -379,6 +419,9 @@ jobs:
           echo "[ci] build parallel jobs=$BUILD_JOBS"
           cmake --build build \
             --parallel "$BUILD_JOBS"
+          if command -v sccache >/dev/null 2>&1; then
+            sccache --show-stats || true
+          fi
 
       # ------------------------------------------------------------------ #
       # 5. Test                                                             #

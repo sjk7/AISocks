@@ -52,7 +52,7 @@ namespace detail {
 
     // Non-owning type-erased reference to any bool(TcpSocket&, PollEvent)
     // callable.  The pointed-to object must outlive all operator() calls.
-    // Used instead of std::function to avoid heap allocation and <functional>.
+    // Avoids heap allocation and keeps dependencies minimal.
     struct CallbackRef {
         void* obj{nullptr};
         bool (*invoke)(void*, TcpSocket&, PollEvent){nullptr};
