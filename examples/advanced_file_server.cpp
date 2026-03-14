@@ -31,11 +31,30 @@
 #include "advanced_file_server_pages.h"
 #include "CustomFileServerHtmlHelpers.h"
 #include "FileIO.h"
+#include <charconv>
 #include <cstdio>
 #include <chrono>
 #include <vector>
 
 using namespace aiSocks;
+
+namespace {
+bool tryParsePortArg_(const char* arg, uint16_t& outPort) {
+    if (!arg) return false;
+    const std::string_view sv{arg};
+    if (sv.empty()) return false;
+
+    unsigned parsed = 0;
+    const auto* begin = sv.data();
+    const auto* end = begin + sv.size();
+    const auto result = std::from_chars(begin, end, parsed);
+    if (result.ec != std::errc() || result.ptr != end) return false;
+    if (parsed < 1 || parsed > 65535) return false;
+
+    outPort = static_cast<uint16_t>(parsed);
+    return true;
+}
+} // namespace
 
 // ============================================================================
 // CustomFileServer - Extends HttpFileServer with authentication and logging
@@ -315,6 +334,8 @@ class CustomFileServer : public HttpFileServer {
     }
 
     std::string readAccessLogTail(size_t maxLines) const {
+        if (maxLines == 0) return {};
+
         std::FILE* file = std::fopen("access.log", "rb");
         if (!file) return {};
 
@@ -327,19 +348,51 @@ class CustomFileServer : public HttpFileServer {
             std::fclose(file);
             return {};
         }
-        if (std::fseek(file, 0, SEEK_SET) != 0) {
-            std::fclose(file);
-            return {};
+
+        std::vector<std::string> chunks;
+        chunks.reserve(8);
+        size_t newlineCount = 0;
+        long cursor = fileSize;
+        constexpr size_t kChunkSize = 4096;
+
+        while (cursor > 0 && newlineCount <= maxLines) {
+            const size_t readSize = (cursor > static_cast<long>(kChunkSize))
+                ? kChunkSize
+                : static_cast<size_t>(cursor);
+            const long start = cursor - static_cast<long>(readSize);
+
+            if (std::fseek(file, start, SEEK_SET) != 0) {
+                std::fclose(file);
+                return {};
+            }
+
+            std::string chunk(readSize, '\0');
+            const size_t bytesRead
+                = std::fread(chunk.data(), 1, readSize, file);
+            if (bytesRead == 0) break;
+            chunk.resize(bytesRead);
+            for (char c : chunk) {
+                if (c == '\n') ++newlineCount;
+            }
+
+            chunks.push_back(std::move(chunk));
+            cursor = start;
         }
 
-        std::vector<char> bytes(static_cast<size_t>(fileSize));
-        const size_t bytesRead
-            = std::fread(bytes.data(), 1, bytes.size(), file);
         std::fclose(file);
-        if (bytesRead == 0) return {};
-        bytes.resize(bytesRead);
+        if (chunks.empty()) return {};
 
-        std::string content(bytes.begin(), bytes.end());
+        size_t totalSize = 0;
+        for (const auto& chunk : chunks) {
+            totalSize += chunk.size();
+        }
+
+        std::string content;
+        content.reserve(totalSize);
+        for (auto it = chunks.rbegin(); it != chunks.rend(); ++it) {
+            content.append(*it);
+        }
+
         std::vector<size_t> lineStarts;
         lineStarts.reserve(64);
         lineStarts.push_back(0);
@@ -497,7 +550,12 @@ int main(int argc, char* argv[]) {
     std::string root = "../www";
 
     if (argc > 1) {
-        port = static_cast<uint16_t>(std::atoi(argv[1]));
+        if (!tryParsePortArg_(argv[1], port)) {
+            fprintf(stderr,
+                "ERROR: Invalid port '%s'. Use an integer in range 1..65535.\n",
+                argv[1]);
+            return 1;
+        }
     }
     if (argc > 2) {
         root = argv[2];

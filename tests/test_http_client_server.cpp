@@ -519,6 +519,23 @@ static void test_redirect_to_https_is_rejected() {
 #endif // !AISOCKS_ENABLE_TLS — redirect-to-HTTPS is supported in TLS builds
 }
 
+static void test_invalid_authority_port_rejected() {
+    BEGIN_TEST("HttpClient rejects invalid authority ports with trailing junk");
+
+    HttpClient::Options opts;
+    opts.connectTimeout = Milliseconds{200};
+    opts.requestTimeout = Milliseconds{200};
+    HttpClient client{opts};
+
+    auto ipv4 = client.get("http://127.0.0.1:80abc/");
+    REQUIRE(!ipv4.isSuccess());
+    REQUIRE(ipv4.message().find("Invalid URL authority") != std::string::npos);
+
+    auto ipv6 = client.get("http://[::1]:443abc/");
+    REQUIRE(!ipv6.isSuccess());
+    REQUIRE(ipv6.message().find("Invalid URL authority") != std::string::npos);
+}
+
 static void test_resolve_url_relative_redirects() {
     BEGIN_TEST("HttpClient::resolveUrl handles relative Location values");
 
@@ -643,6 +660,7 @@ int main() {
     test_connection_close_header_disables_reuse();
     test_https_scheme_rejected();
     test_redirect_to_https_is_rejected();
+    test_invalid_authority_port_rejected();
     test_resolve_url_relative_redirects();
 
     return test_summary();

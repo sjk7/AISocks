@@ -1227,12 +1227,47 @@ static void test_https_wrong_port_fails() {
         result.message().find("HTTPS is not supported") == std::string::npos);
 }
 
+static void test_https_handshake_timeout_respects_request_timeout() {
+    BEGIN_TEST("HttpClient HTTPS handshake is bounded by requestTimeout");
+
+    auto listenerResult = SocketFactory::createTcpServer(
+        AddressFamily::IPv4, ServerBind{"127.0.0.1", Port{0}});
+    REQUIRE(listenerResult.isSuccess());
+    if (!listenerResult.isSuccess()) return;
+    TcpSocket listener = std::move(listenerResult.value());
+    REQUIRE(listener.setReceiveTimeout(Milliseconds{500}));
+
+    const Port port = listener.getLocalEndpoint().value().port;
+
+    std::thread serverThread([&] {
+        auto client = listener.accept();
+        if (!client) return;
+        std::this_thread::sleep_for(std::chrono::milliseconds{400});
+    });
+
+    HttpClient::Options opts;
+    opts.connectTimeout = Milliseconds{500};
+    opts.requestTimeout = Milliseconds{120};
+    opts.verifyCertificate = false;
+    HttpClient client{opts};
+
+    auto result
+        = client.get("https://127.0.0.1:" + std::to_string(port.value()) + "/");
+
+    serverThread.join();
+
+    REQUIRE(!result.isSuccess());
+    REQUIRE(
+        result.message().find("TLS handshake timed out") != std::string::npos);
+}
+
 // ---------------------------------------------------------------------------
 // main
 // ---------------------------------------------------------------------------
 int main() {
     test_https_cert_load_failure();
     test_https_wrong_port_fails();
+    test_https_handshake_timeout_respects_request_timeout();
     test_https_client_basic_get();
     test_https_client_multiple_requests_keep_alive();
     test_https_cache_is_not_reused_for_http_same_host_port();

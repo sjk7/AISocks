@@ -19,6 +19,7 @@
 #include "ClientHttpRequest.h"
 #include "SocketFactory.h"
 #include "SocketTypes.h"
+#include <charconv>
 #include <chrono>
 #include <cctype>
 #include <cstdio>
@@ -499,6 +500,18 @@ class HttpClient {
         portOut = defaultPort;
         if (authority.empty()) return false;
 
+        auto parsePort_ = [](std::string_view portStr, Port& out) -> bool {
+            if (portStr.empty()) return false;
+            uint32_t parsed = 0;
+            const auto* begin = portStr.data();
+            const auto* end = begin + portStr.size();
+            const auto result = std::from_chars(begin, end, parsed);
+            if (result.ec != std::errc() || result.ptr != end) return false;
+            if (parsed < 1 || parsed > 65535) return false;
+            out = Port{static_cast<uint16_t>(parsed)};
+            return true;
+        };
+
         if (authority.front() == '[') {
             const size_t rb = authority.find(']');
             if (rb == std::string::npos) return false;
@@ -508,13 +521,7 @@ class HttpClient {
                 if (authority[rb + 1] != ':') return false;
                 const std::string portStr = authority.substr(rb + 2);
                 if (!portStr.empty()) {
-                    try {
-                        const int portNum = std::stoi(portStr);
-                        if (portNum < 1 || portNum > 65535) return false;
-                        portOut = Port{static_cast<uint16_t>(portNum)};
-                    } catch (...) {
-                        return false;
-                    }
+                    if (!parsePort_(portStr, portOut)) return false;
                 }
             }
             return true;
@@ -526,13 +533,7 @@ class HttpClient {
             hostOut = authority.substr(0, colon);
             const std::string portStr = authority.substr(colon + 1);
             if (!portStr.empty()) {
-                try {
-                    const int portNum = std::stoi(portStr);
-                    if (portNum < 1 || portNum > 65535) return false;
-                    portOut = Port{static_cast<uint16_t>(portNum)};
-                } catch (...) {
-                    return false;
-                }
+                if (!parsePort_(portStr, portOut)) return false;
             }
             return !hostOut.empty();
         }
@@ -611,6 +612,9 @@ class HttpClient {
             std::shared_ptr<TcpSocket> socket;
             bool reusedConnection = false;
             bool retriedReusedConnection = false;
+            const bool boundedRequest = options_.requestTimeout.count > 0;
+            const auto requestDeadline = std::chrono::steady_clock::now()
+                + std::chrono::milliseconds(options_.requestTimeout.count);
             const bool connectAsIpv6 = Socket::isValidIPv6(host);
             if (cachedSocket_ && cachedSocket_->isValid() && cachedHost_ == host
                 && cachedPort_.value() == port.value()
@@ -711,6 +715,20 @@ class HttpClient {
                         sess->nativeHandle(), normalizedVerifyHost.c_str());
                 sess->setConnectState();
                 for (;;) {
+                    if (boundedRequest) {
+                        const auto now = std::chrono::steady_clock::now();
+                        const auto remainingMs = std::chrono::duration_cast<
+                            std::chrono::milliseconds>(requestDeadline - now)
+                                                     .count();
+                        if (remainingMs <= 0) {
+                            tlsSetupError = "TLS handshake timed out";
+                            tlsDebugLog_(tlsSetupError + " host=" + host);
+                            return false;
+                        }
+                        (void)socket->setReceiveTimeout(
+                            Milliseconds{remainingMs});
+                        (void)socket->setSendTimeout(Milliseconds{remainingMs});
+                    }
                     const int r = sess->handshake();
                     if (r == 1) break;
                     const int e = sess->getLastErrorCode(r);
@@ -757,6 +775,18 @@ class HttpClient {
                 if (tlsSession) {
                     size_t done = 0;
                     while (done < len) {
+                        if (boundedRequest) {
+                            const auto now = std::chrono::steady_clock::now();
+                            const auto remainingMs = std::chrono::duration_cast<
+                                std::chrono::milliseconds>(
+                                requestDeadline - now)
+                                                         .count();
+                            if (remainingMs <= 0) return false;
+                            (void)socket->setReceiveTimeout(
+                                Milliseconds{remainingMs});
+                            (void)socket->setSendTimeout(
+                                Milliseconds{remainingMs});
+                        }
                         int n = tlsSession->write(
                             d + done, static_cast<int>(len - done));
                         if (n > 0) {
@@ -785,10 +815,6 @@ class HttpClient {
                 return socket->receive(buf, sz);
             };
 #endif
-
-            const bool boundedRequest = options_.requestTimeout.count > 0;
-            const auto requestDeadline = std::chrono::steady_clock::now()
-                + std::chrono::milliseconds(options_.requestTimeout.count);
 
             auto requestBuilder = ClientHttpRequest::builder()
                                       .method(method)

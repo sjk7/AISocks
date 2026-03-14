@@ -23,7 +23,17 @@
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Debug",
                 "BUILD_EXAMPLES": "ON",
-                "BUILD_TESTS": "ON"
+                "BUILD_TESTS": "ON",
+                "AISOCKS_ENABLE_TLS": "OFF"
+            }
+        },
+        {
+            "name": "build_mac_arm_tls",
+            "inherits": "build_mac_arm",
+            "displayName": "build_mac_arm_tls",
+            "binaryDir": "${sourceDir}/build-tls-mac-arm",
+            "cacheVariables": {
+                "AISOCKS_ENABLE_TLS": "ON"
             }
         },
         {
@@ -142,6 +152,16 @@
             }
         },
         {
+            "name": "tls-windows-debug",
+            "inherits": "windows-debug",
+            "displayName": "Windows Debug TLS (MSVC)",
+            "description": "Visual Studio 17 2022, Debug, examples and tests on Windows with TLS enabled",
+            "binaryDir": "${sourceDir}/build-tls",
+            "cacheVariables": {
+                "AISOCKS_ENABLE_TLS": "ON"
+            }
+        },
+        {
             "name": "mingw-release",
             "displayName": "MinGW-w64 Release (Wine)",
             "description": "Cross-compile for Windows x86-64 with MinGW-w64 in Release mode",
@@ -158,6 +178,16 @@
                 "BUILD_EXAMPLES": "ON",
                 "BUILD_TESTS": "ON",
                 "CMAKE_CROSSCOMPILING_EMULATOR": "/opt/homebrew/bin/wine"
+            }
+        },
+        {
+            "name": "tls-mingw-release",
+            "inherits": "mingw-release",
+            "displayName": "MinGW-w64 Release TLS (Wine)",
+            "description": "Cross-compile for Windows x86-64 with MinGW-w64 in Release mode and TLS enabled",
+            "binaryDir": "${sourceDir}/build-mingw-rel-tls",
+            "cacheVariables": {
+                "AISOCKS_ENABLE_TLS": "ON"
             }
         },
         {
@@ -195,6 +225,16 @@
                 "BUILD_TESTS": "ON",
                 "CMAKE_CROSSCOMPILING_EMULATOR": "/opt/homebrew/bin/wine"
             }
+        },
+        {
+            "name": "tls-mingw-debug",
+            "inherits": "mingw-debug",
+            "displayName": "MinGW-w64 Debug TLS (Wine)",
+            "description": "Cross-compile for Windows x86-64 with MinGW-w64 and TLS enabled; run tests under Wine",
+            "binaryDir": "${sourceDir}/build-mingw-tls",
+            "cacheVariables": {
+                "AISOCKS_ENABLE_TLS": "ON"
+            }
         }
     ],
     "buildPresets": [
@@ -208,6 +248,12 @@
             "inherits": "base-build",
             "configurePreset": "build_mac_arm",
             "displayName": "build_mac_arm"
+        },
+        {
+            "name": "build_mac_arm_tls",
+            "inherits": "base-build",
+            "configurePreset": "build_mac_arm_tls",
+            "displayName": "Build build_mac_arm_tls"
         },
         {
             "name": "msan-debug",
@@ -361,10 +407,22 @@
             "displayName": "Build MinGW-w64 Debug"
         },
         {
+            "name": "tls-mingw-debug",
+            "inherits": "base-build",
+            "configurePreset": "tls-mingw-debug",
+            "displayName": "Build MinGW-w64 Debug TLS"
+        },
+        {
             "name": "mingw-release",
             "inherits": "base-build",
             "configurePreset": "mingw-release",
             "displayName": "Build MinGW-w64 Release"
+        },
+        {
+            "name": "tls-mingw-release",
+            "inherits": "base-build",
+            "configurePreset": "tls-mingw-release",
+            "displayName": "Build MinGW-w64 Release TLS"
         },
         {
             "name": "windows-unix-throughput",
@@ -379,6 +437,20 @@
             "inherits": "base-build",
             "configurePreset": "windows-debug",
             "displayName": "Build All (Windows RelWithDebInfo)",
+            "configuration": "RelWithDebInfo"
+        },
+        {
+            "name": "tls-windows-debug",
+            "inherits": "base-build",
+            "configurePreset": "tls-windows-debug",
+            "displayName": "Build All (Windows Debug TLS)",
+            "configuration": "Debug"
+        },
+        {
+            "name": "tls-windows-relwithdebinfo",
+            "inherits": "base-build",
+            "configurePreset": "tls-windows-debug",
+            "displayName": "Build All (Windows RelWithDebInfo TLS)",
             "configuration": "RelWithDebInfo"
         },
         {
@@ -409,14 +481,43 @@
             "displayName": "build_mac_arm"
         },
         {
+            "name": "build_mac_arm_tls",
+            "configurePreset": "build_mac_arm_tls",
+            "displayName": "build_mac_arm_tls"
+        },
+        {
             "name": "coverage",
             "configurePreset": "coverage",
             "displayName": "Coverage Tests"
         },
         {
+            "name": "tls-windows-debug",
+            "configurePreset": "tls-windows-debug",
+            "configuration": "Debug",
+            "displayName": "Windows Debug TLS Tests"
+        },
+        {
+            "name": "tls-windows-relwithdebinfo",
+            "configurePreset": "tls-windows-debug",
+            "configuration": "RelWithDebInfo",
+            "displayName": "Windows RelWithDebInfo TLS Tests"
+        },
+        {
             "name": "mingw-debug",
             "configurePreset": "mingw-debug",
             "displayName": "Run Tests (MinGW-w64 / Wine)",
+            "execution": {
+                "noTestsAction": "error",
+                "jobs": 8
+            },
+            "output": {
+                "outputOnFailure": true
+            }
+        },
+        {
+            "name": "tls-mingw-debug",
+            "configurePreset": "tls-mingw-debug",
+            "displayName": "Run TLS Tests (MinGW-w64 / Wine)",
             "execution": {
                 "noTestsAction": "error",
                 "jobs": 8
