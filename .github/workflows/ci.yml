@@ -37,12 +37,21 @@ jobs:
           echo "head_ref=${{ github.head_ref }}"
           echo "sha=${{ github.sha }}"
 
+  windows-priority-gate:
+    name: Windows Priority Gate
+    needs: preflight
+    runs-on: windows-latest
+    steps:
+      - name: Reserve Windows runner early
+        shell: bash
+        run: echo "Windows gate ready"
+
   build-and-test:
     if: |
       github.event_name == 'workflow_dispatch' ||
       (github.event_name == 'push' && contains(fromJson('["refs/heads/main","refs/heads/master","refs/heads/secure"]'), github.ref)) ||
       (github.event_name == 'pull_request' && contains(fromJson('["main","master","secure"]'), github.base_ref))
-    needs: preflight
+    needs: [preflight, windows-priority-gate]
     name: ${{ matrix.os }} / ${{ matrix.compiler }} / ${{ matrix.build_type }}
     runs-on: ${{ matrix.os }}
 
@@ -201,6 +210,7 @@ jobs:
         run: |
           echo "SCCACHE_GHA_ENABLED=true" >> "$GITHUB_ENV"
           echo "RUST_LOG=sccache=error" >> "$GITHUB_ENV"
+          echo "SCCACHE_CACHE_SIZE=15G" >> "$GITHUB_ENV"
 
       - name: Show sccache stats (before)
         shell: bash
@@ -211,7 +221,13 @@ jobs:
       # ------------------------------------------------------------------ #
       - name: Install Ninja (Linux)
         if: runner.os == 'Linux'
-        run: sudo apt-get install -y ninja-build
+        run: |
+          if command -v ninja >/dev/null 2>&1; then
+            echo "ninja already present"
+          else
+            sudo apt-get update
+            sudo apt-get install -y ninja-build
+          fi
 
       - name: Install OpenSSL development package (Linux TLS)
         if: runner.os == 'Linux' && matrix.enable_tls == 'ON'
@@ -219,7 +235,12 @@ jobs:
 
       - name: Install Ninja (macOS)
         if: runner.os == 'macOS'
-        run: brew install ninja
+        run: |
+          if command -v ninja >/dev/null 2>&1; then
+            echo "ninja already present"
+          else
+            brew install ninja
+          fi
 
       - name: Install OpenSSL (macOS TLS)
         if: runner.os == 'macOS' && matrix.enable_tls == 'ON'
@@ -227,15 +248,28 @@ jobs:
 
       - name: Install Ninja + LLVM (Windows / clang-cl)
         if: matrix.os == 'windows-latest' && matrix.compiler == 'clang-cl'
-        uses: crazy-max/ghaction-chocolatey@v3
-        with:
-          args: install ninja llvm -y
+        shell: pwsh
+        run: |
+          if (-not (Get-Command ninja -ErrorAction SilentlyContinue)) {
+            choco install ninja -y
+          } else {
+            Write-Host "ninja already present"
+          }
+          if (-not (Get-Command clang-cl -ErrorAction SilentlyContinue)) {
+            choco install llvm -y
+          } else {
+            Write-Host "clang-cl already present"
+          }
 
       - name: Install Ninja (Windows / MSVC)
         if: matrix.os == 'windows-latest' && startsWith(matrix.compiler, 'msvc')
-        uses: crazy-max/ghaction-chocolatey@v3
-        with:
-          args: install ninja -y
+        shell: pwsh
+        run: |
+          if (-not (Get-Command ninja -ErrorAction SilentlyContinue)) {
+            choco install ninja -y
+          } else {
+            Write-Host "ninja already present"
+          }
 
       - name: Install OpenSSL (Windows TLS)
         if: runner.os == 'Windows' && matrix.enable_tls == 'ON'
@@ -355,8 +389,22 @@ jobs:
         shell: bash
         if: github.event_name != 'pull_request' || matrix.tier == 'fast'
         run: |
+          if [[ "$RUNNER_OS" == "Windows" && -n "${NUMBER_OF_PROCESSORS:-}" ]]; then
+            BUILD_JOBS="$NUMBER_OF_PROCESSORS"
+          else
+            BUILD_JOBS="$(nproc 2>/dev/null || sysctl -n hw.logicalcpu 2>/dev/null || echo 4)"
+          fi
+          echo "[ci] build parallel jobs=$BUILD_JOBS"
+
+          TARGETS=(aiSocksLib)
+          while IFS= read -r t; do
+            [[ -n "$t" ]] && TARGETS+=("$t")
+          done < <(ctest -N --test-dir build -C "${{ matrix.build_type }}" 2>/dev/null | sed -n 's/^  Test #[0-9]\+: \(.*\)$/\1/p')
+
+          echo "[ci] build targets: ${#TARGETS[@]}"
           cmake --build build \
-            --parallel $(nproc 2>/dev/null || sysctl -n hw.logicalcpu 2>/dev/null || echo 4)
+            --parallel "$BUILD_JOBS" \
+            --target "${TARGETS[@]}"
 
       # ------------------------------------------------------------------ #
       # 5. Test                                                             #
@@ -387,10 +435,20 @@ jobs:
             echo "[ci-debug] Running focused verbose TLS test"
             ctest -V -R test_tls_client --output-on-failure --timeout ${{ matrix.ctest_timeout || 60 }}
           fi
+
+          if [[ "$RUNNER_OS" == "Windows" && -n "${NUMBER_OF_PROCESSORS:-}" ]]; then
+            CTEST_PARALLEL="$NUMBER_OF_PROCESSORS"
+            if [[ "$CTEST_PARALLEL" -gt 10 ]]; then
+              CTEST_PARALLEL=10
+            fi
+          else
+            CTEST_PARALLEL=4
+          fi
+          echo "[ci] ctest parallel jobs=$CTEST_PARALLEL"
           ctest --output-on-failure \
                 --no-compress-output \
                 --timeout ${{ matrix.ctest_timeout || 60 }} \
-                --parallel 4
+                --parallel "$CTEST_PARALLEL"
 
       - name: Show sccache stats (after)
         if: always()
