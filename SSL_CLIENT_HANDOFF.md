@@ -52,21 +52,14 @@ Scope: HttpClient TLS client path
 
 ## Open Work
 
-- [OPEN][ITER-1] Revocation strategy (OCSP/CRL) scope decision and docs:
-  - Decision target for this branch: keep revocation checks OFF by default and document this explicitly.
-  - Add options shape proposal (no implementation yet):
-    - enableOcspStaplingCheck (best-effort),
-    - crlFile / crlDir,
-    - hardFailOnRevocationUnavailable.
-  - Document platform caveats (OpenSSL does not do full online revocation by default).
-  - Exit criteria: README + SANITIZERS/TEST docs describe threat model and operator expectations.
-- [OPEN][ITER-2] Session resumption across new TCP connections:
-  - Current behavior is unchanged: only keep-alive reuse on the same live socket.
-  - Planned implementation:
+- [DEFERRED][FOLLOW-UP] Session resumption across new TCP connections:
+  - Current branch behavior remains unchanged: only keep-alive reuse on the same live socket.
+  - Re-evaluation outcome: do not ship new-connection resumption in this branch.
+  - Reason: deterministic proof was not stable on the current OpenSSL/TLS stack because resumable state delivery depends on post-handshake ticket timing.
+  - Follow-up branch scope if revived:
     - per-HttpClient in-memory SSL session cache keyed by scheme+host+port.
     - cache invalidation when setOptions() changes trust/verify knobs.
-    - conservative defaults (small bounded cache, no cross-process persistence).
-  - Exit criteria: second fresh TCP connection to same origin attempts resume, plus safe fallback on miss/failure.
+    - deterministic TLS 1.3 ticket-harvest strategy and cross-platform proof.
 
 ## Remaining Tests
 
@@ -74,8 +67,8 @@ Scope: HttpClient TLS client path
 
 ## Next Iteration Order
 
-1. Re-evaluate whether ITER-2 (session resumption across new TCP connections) should start in this branch or a follow-up branch.
-2. Finalize ITER-1 revocation scope text in docs before handoff close.
+1. No further in-branch TLS client work planned from this handoff.
+2. If session resumption is revisited, do it in a follow-up branch with deterministic TLS 1.3 proof.
 
 ## Latest Validation
 
@@ -94,6 +87,10 @@ Scope: HttpClient TLS client path
   - default run behavior is SKIP unless `AISOCKS_RUN_SYSTEM_ROOT_TLS_TEST=1`.
 - Current TLS integration run: 76 passed, 0 failed.
 - Non-SSL CMake suite re-run via CTest (`build-relwithdebinfo`): all discovered tests passed.
+- Finalized revocation scope docs in `README.md` and `README_TESTS.md`:
+  - revocation remains OFF by default.
+  - operator expectation is explicit trust-store + hostname verification, not OCSP/CRL enforcement.
+- Re-evaluated new-connection TLS session resumption and deferred it from this branch due non-deterministic TLS 1.3 ticket timing in proof tests.
 
 ## Current Key Touchpoints
 

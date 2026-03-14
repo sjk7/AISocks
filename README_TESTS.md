@@ -52,6 +52,19 @@ cmake --build build-release --config RelWithDebInfo --parallel
 
 ## Running Tests
 
+### TLS Test Notes
+
+- `test_tls_client` is built only when `-DAISOCKS_ENABLE_TLS=ON`.
+- Default TLS integration coverage is fully local/self-contained: custom CA
+      file/dir verification, redirect behavior, SNI policy, IPv4/IPv6 SAN checks,
+      and trust-source validation do not require external network access.
+- The system-roots smoke test is gated off by default. Enable it explicitly
+      with `AISOCKS_RUN_SYSTEM_ROOT_TLS_TEST=1` if you want to verify that the
+      runner can validate a known public HTTPS endpoint using platform/system CA
+      roots.
+- CI should keep that gated system-roots test disabled to avoid network and
+      environment flakiness.
+
 ### All Tests
 ```bash
 # Linux/macOS

@@ -39,6 +39,16 @@ These project constraints are intentional and should not be reported as bugs in 
 - `HttpClient::Options::verifyCertificate` defaults to `true`.
 - Callers should provide explicit trust configuration (`caCertFile` /
     `caCertDir`) where appropriate for their deployment.
+- Verification currently covers certificate chain validation and hostname/IP
+    matching against the configured trust store or system roots.
+- Revocation is not checked by default. aiSocks does not enable OCSP/CRL
+    fetching or hard-fail revocation policy automatically through OpenSSL.
+- If your threat model requires revocation enforcement, terminate TLS in a
+    proxy/load balancer that provides it, or add custom TLS integration on top
+    of aiSocks.
+- New-TCP TLS session resumption is not currently promised by the public
+    client contract. Same-socket keep-alive reuse is supported; broader
+    resumption remains follow-up work.
 
 ## Hot-path optimisations (Mar 2026)
 
