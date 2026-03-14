@@ -2,24 +2,12 @@
 
 > **Note:** This project was created entirely by AI (GitHub Copilot / Claude) under my direct supervision. The code is mine, but not physically typed by me.
 
+> **Note on Exceptions** The library does not throw exceptions willy-nilly. In fact, we do not throw them directly at all, currently.
+> However, STL is used, so xecptions may be thrown in truly exceptional circumstances. 
+
 Cross-platform C++17 socket library — and a high-performance poll-driven HTTP/1.x server built on top of it.
 
 Zero dependencies beyond a standard C++17 compiler and CMake.
-
-## Performance
-
-Benchmarked on Linux (remote LAN), Release build, `wrk -t12 -c15000 -d30s --latency` with Basic Auth:
-
-| Metric | aiSocks (port 8080) | nginx (port 8082) | Δ |
-|---|---|---|---|
-| Requests/sec | **14,385** | 1,924 | ✅ +648% |
-| Transfer/sec | **89.61 MB/s** | 1.57 MB/s | ✅ +5,609% |
-| Total requests (30 s) | **432,923** | 57,874 | ✅ +648% |
-| Avg latency | **70.23 ms** | 484.83 ms | ✅ −86% |
-| p99 latency | **95.61 ms** | 667.33 ms | ✅ −86% |
-| Read errors | **0** | 1,632 | ✅ |
-| Write errors | 56 | **0** | — |
-| Timeouts | **0** | 56 | ✅ |
 
 ## Features
 
