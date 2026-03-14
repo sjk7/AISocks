@@ -194,7 +194,7 @@ jobs:
           args: install ninja llvm -y
 
       - name: Install Ninja (Windows / MSVC)
-        if: matrix.os == 'windows-latest' && matrix.compiler == 'msvc'
+        if: matrix.os == 'windows-latest' && startsWith(matrix.compiler, 'msvc')
         uses: crazy-max/ghaction-chocolatey@v3
         with:
           args: install ninja -y
@@ -207,7 +207,7 @@ jobs:
 
       # Set up MSVC compiler environment (cl.exe, link.exe in PATH)
       - name: Set up MSVC environment
-        if: matrix.compiler == 'msvc'
+        if: startsWith(matrix.compiler, 'msvc')
         uses: ilammy/msvc-dev-cmd@v1
         with:
           arch: x64
@@ -244,8 +244,48 @@ jobs:
               if [[ ! -d "$OPENSSL_ROOT_DIR_WIN" ]]; then
                 OPENSSL_ROOT_DIR_WIN="/c/Program Files/OpenSSL"
               fi
+
+              # Chocolatey OpenSSL layouts vary across versions; pass explicit
+              # import library paths so FindOpenSSL can always resolve Crypto.
+              OPENSSL_SSL_LIBRARY_WIN=""
+              OPENSSL_CRYPTO_LIBRARY_WIN=""
+
+              for _cand in \
+                "$OPENSSL_ROOT_DIR_WIN/lib/libssl.lib" \
+                "$OPENSSL_ROOT_DIR_WIN/lib/VC/x64/MD/libssl.lib" \
+                "$OPENSSL_ROOT_DIR_WIN/lib/VC/static/libssl.lib" \
+                "$OPENSSL_ROOT_DIR_WIN/lib/ssl.lib" \
+                "$OPENSSL_ROOT_DIR_WIN/lib/VC/x64/MD/ssl.lib" \
+                "$OPENSSL_ROOT_DIR_WIN/lib/VC/static/ssl.lib"; do
+                if [[ -f "$_cand" ]]; then
+                  OPENSSL_SSL_LIBRARY_WIN="$_cand"
+                  break
+                fi
+              done
+
+              for _cand in \
+                "$OPENSSL_ROOT_DIR_WIN/lib/libcrypto.lib" \
+                "$OPENSSL_ROOT_DIR_WIN/lib/VC/x64/MD/libcrypto.lib" \
+                "$OPENSSL_ROOT_DIR_WIN/lib/VC/static/libcrypto.lib" \
+                "$OPENSSL_ROOT_DIR_WIN/lib/crypto.lib" \
+                "$OPENSSL_ROOT_DIR_WIN/lib/VC/x64/MD/crypto.lib" \
+                "$OPENSSL_ROOT_DIR_WIN/lib/VC/static/crypto.lib"; do
+                if [[ -f "$_cand" ]]; then
+                  OPENSSL_CRYPTO_LIBRARY_WIN="$_cand"
+                  break
+                fi
+              done
+
+              if [[ -z "$OPENSSL_SSL_LIBRARY_WIN" || -z "$OPENSSL_CRYPTO_LIBRARY_WIN" ]]; then
+                echo "Failed to resolve OpenSSL libraries under: $OPENSSL_ROOT_DIR_WIN" >&2
+                find "$OPENSSL_ROOT_DIR_WIN" -maxdepth 5 -type f \( -iname "*ssl*.lib" -o -iname "*crypto*.lib" \) -print || true
+                exit 1
+              fi
+
               CMAKE_ARGS+=(
                 "-DOPENSSL_ROOT_DIR=$OPENSSL_ROOT_DIR_WIN"
+                "-DOPENSSL_SSL_LIBRARY=$OPENSSL_SSL_LIBRARY_WIN"
+                "-DOPENSSL_CRYPTO_LIBRARY=$OPENSSL_CRYPTO_LIBRARY_WIN"
               )
             fi
           fi
