@@ -9,7 +9,7 @@ on:
 # Cancel superseded runs on the same branch/PR to save runner minutes.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != 'refs/heads/secure' }}
 
 jobs:
   build-and-test:
