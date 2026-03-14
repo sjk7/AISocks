@@ -580,10 +580,10 @@ void testPublicLandingPageSignInLinkTargetsProtectedPage() {
 
     TestFramework::assert_contains(html, "Welcome to nginx",
         "Public landing page should contain nginx welcome content");
-    TestFramework::assert_contains(html, "nginx.org",
-        "Public landing page should contain nginx.org link");
-    TestFramework::assert_not_contains(html, "href=\"/\"",
-        "Public landing page must not link to root path");
+    TestFramework::assert_contains(
+        html, "nginx.org", "Public landing page should contain nginx.org link");
+    TestFramework::assert_not_contains(
+        html, "href=\"/\"", "Public landing page must not link to root path");
 }
 
 void testAccessLogBrowserTailBehavior() {
