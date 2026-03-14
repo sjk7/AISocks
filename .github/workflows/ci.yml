@@ -59,6 +59,7 @@ jobs:
             cxx: g++
             cmake_generator: Ninja
             build_type: Debug
+            enable_tls: "OFF"
             tier: fast
 
           # Linux — Clang
@@ -68,6 +69,7 @@ jobs:
             cxx: clang++
             cmake_generator: Ninja
             build_type: Debug
+            enable_tls: "OFF"
             tier: fast
 
           # ---------------------------------------------------------------
@@ -79,6 +81,7 @@ jobs:
             cxx: clang++
             cmake_generator: Ninja
             build_type: Debug
+            enable_tls: "OFF"
             tier: fast
 
           # ---------------------------------------------------------------
@@ -88,6 +91,7 @@ jobs:
             compiler: msvc
             cmake_generator: Ninja
             build_type: Debug
+            enable_tls: "OFF"
             tier: fast
 
           # Windows — Clang-cl (LLVM toolchain on Windows)
@@ -95,6 +99,7 @@ jobs:
             compiler: clang-cl
             cmake_generator: Ninja
             build_type: Debug
+            enable_tls: "OFF"
             tier: fast
             env:
               CC: clang-cl
@@ -109,6 +114,7 @@ jobs:
             cxx: g++
             cmake_generator: Ninja
             build_type: RelWithDebInfo
+            enable_tls: "OFF"
             tier: full
 
           - os: macos-latest
@@ -117,12 +123,14 @@ jobs:
             cxx: clang++
             cmake_generator: Ninja
             build_type: RelWithDebInfo
+            enable_tls: "OFF"
             tier: full
 
           - os: windows-latest
             compiler: msvc
             cmake_generator: Ninja
             build_type: RelWithDebInfo
+            enable_tls: "OFF"
             tier: full
 
           # ---------------------------------------------------------------
@@ -168,6 +176,7 @@ jobs:
             cxx: clang++
             cmake_generator: Ninja
             build_type: Debug
+            enable_tls: "OFF"
             sanitizer_flags: "-fsanitize=address,undefined -fno-omit-frame-pointer"
             asan_options: "detect_leaks=1:strict_string_checks=1:detect_stack_use_after_return=1"
             ubsan_options: "print_stacktrace=1:halt_on_error=1"
@@ -181,6 +190,7 @@ jobs:
             cxx: clang++
             cmake_generator: Ninja
             build_type: Debug
+            enable_tls: "OFF"
             sanitizer_flags: "-fsanitize=thread -fno-omit-frame-pointer"
             tsan_options: "halt_on_error=1:second_deadlock_stack=1"
             ctest_timeout: 180
@@ -272,7 +282,10 @@ jobs:
           SANITIZER_FLAGS: ${{ matrix.sanitizer_flags }}
           ENABLE_TLS: ${{ matrix.enable_tls }}
         run: |
-          ENABLE_TLS="${ENABLE_TLS:-OFF}"
+          if [[ "$ENABLE_TLS" != "ON" && "$ENABLE_TLS" != "OFF" ]]; then
+            echo "Invalid matrix.enable_tls='$ENABLE_TLS' (expected ON or OFF)" >&2
+            exit 1
+          fi
           CMAKE_ARGS=(
             -S . -B build
             -G "${{ matrix.cmake_generator }}"
