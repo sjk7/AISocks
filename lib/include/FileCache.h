@@ -53,6 +53,7 @@ class FileCache {
 
     size_t size() const;
     size_t totalBytes() const;
+    size_t cacheHits() const;
     const Config& getConfig() const;
 
     private:
@@ -60,6 +61,7 @@ class FileCache {
     std::unordered_map<std::string, CachedFile> cache_;
     std::list<std::string> lruList_;
     size_t totalBytes_ = 0;
+    size_t cacheHits_ = 0;
 
     void evictLRU();
     void updateLRU(std::unordered_map<std::string, CachedFile>::iterator it);

@@ -170,6 +170,7 @@ class CustomFileServer : public HttpFileServer {
         return html;
     }
     size_t cacheSize() { return getFileCache().size(); }
+    size_t cacheHits() { return getFileCache().cacheHits(); }
 
     protected:
     bool isAuthenticated(const HttpRequest& request) const {
@@ -492,6 +493,64 @@ void setupTestEnvironment() {
     envFile.writeString("SECRET_KEY=abc123");
     envFile.close();
 }
+
+/// Assurance: the second request to the same file must be served from memory,
+/// not re-read from disk.  This is *the* proof that the cache is actually
+/// working: cacheHits() only increments inside FileCache::get() when it
+/// returns a non-null pointer, which only happens when the map lookup
+/// succeeds AND the mtime matches — no file I/O involved.
+void testCacheHitsOnRepeatedRequest() {
+    fputs("\n=== CACHE HIT ASSURANCE TESTS ===\n", stdout);
+
+    HttpFileServer::Config config;
+    config.documentRoot = "test_www";
+    config.enableCache = true;
+    CustomFileServer server(ServerBind{"127.0.0.1", Port{0}}, config);
+
+    // First request — cold miss: file is read from disk and inserted.
+    {
+        std::string request = BehavioralTestHelper::makeHttpRequest(
+            "GET", "/script.js", "YWRtaW46c2VjcmV0");
+        HttpClientState state;
+        state.request = request;
+        server.buildResponse(state);
+        std::string status = BehavioralTestHelper::extractStatus(state.responseBuf);
+        TestFramework::assert_contains(
+            status, "200", "First request should be served successfully");
+    }
+
+    TestFramework::assert_true(
+        server.cacheSize() == 1, "File should be in cache after first request");
+    TestFramework::assert_true(
+        server.cacheHits() == 0, "First request must be a cache miss");
+
+    // Second request — warm hit: served entirely from the in-memory map.
+    {
+        std::string request = BehavioralTestHelper::makeHttpRequest(
+            "GET", "/script.js", "YWRtaW46c2VjcmV0");
+        HttpClientState state;
+        state.request = request;
+        server.buildResponse(state);
+        std::string status = BehavioralTestHelper::extractStatus(state.responseBuf);
+        TestFramework::assert_contains(
+            status, "200", "Second request should be served successfully");
+    }
+
+    TestFramework::assert_true(
+        server.cacheHits() == 1, "Second request must be a cache hit (no disk read)");
+
+    // Third request — still from cache.
+    {
+        std::string request = BehavioralTestHelper::makeHttpRequest(
+            "GET", "/script.js", "YWRtaW46c2VjcmV0");
+        HttpClientState state;
+        state.request = request;
+        server.buildResponse(state);
+    }
+    TestFramework::assert_true(
+        server.cacheHits() == 2, "Third request must also be a cache hit");
+}
+
 /// Regression: requests with query strings must bypass file-content cache.
 void testQueryStringBypassesCache() {
     fputs("\n=== QUERY CACHE BYPASS REGRESSION TESTS ===\n", stdout);
@@ -1622,6 +1681,8 @@ int main() {
             "testCachingHeadersBehavior", testCachingHeadersBehavior);
         runTestWithTrace(
             "testQueryStringBypassesCache", testQueryStringBypassesCache);
+        runTestWithTrace(
+            "testCacheHitsOnRepeatedRequest", testCacheHitsOnRepeatedRequest);
         runTestWithTrace("testPublicLandingPageSignInLinkTargetsProtectedPage",
             testPublicLandingPageSignInLinkTargetsProtectedPage);
         runTestWithTrace("testAccessLogBrowserTailBehavior",

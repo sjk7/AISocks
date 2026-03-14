@@ -26,6 +26,7 @@ const FileCache::CachedFile* FileCache::get(
     if (it->second.lruIt != lruList_.begin()) {
         updateLRU(it);
     }
+    ++cacheHits_;
     return &it->second;
 }
 
@@ -91,6 +92,10 @@ size_t FileCache::size() const {
 
 size_t FileCache::totalBytes() const {
     return totalBytes_;
+}
+
+size_t FileCache::cacheHits() const {
+    return cacheHits_;
 }
 
 const FileCache::Config& FileCache::getConfig() const {
