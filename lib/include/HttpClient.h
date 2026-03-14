@@ -162,8 +162,8 @@ class HttpClient {
 
 #ifdef AISOCKS_ENABLE_TLS
         /// Verify the server TLS certificate chain against system CA paths.
-        /// Default: false (phase 1). Set to true in production for security.
-        bool verifyCertificate{false};
+        /// Default: true.
+        bool verifyCertificate{true};
 
         /// Optional PEM trust bundle/file used when verifyCertificate is true.
         /// Empty means system default CA paths.

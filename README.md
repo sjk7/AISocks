@@ -36,10 +36,9 @@ These project constraints are intentional and should not be reported as bugs in 
 
 ## TLS Client Defaults
 
-- `HttpClient::Options::verifyCertificate` currently defaults to `false` for
-    backward compatibility.
-- Production callers should set `verifyCertificate=true` and provide explicit
-    trust configuration (`caCertFile` / `caCertDir`) where appropriate.
+- `HttpClient::Options::verifyCertificate` defaults to `true`.
+- Callers should provide explicit trust configuration (`caCertFile` /
+    `caCertDir`) where appropriate for their deployment.
 
 ## Hot-path optimisations (Mar 2026)
 

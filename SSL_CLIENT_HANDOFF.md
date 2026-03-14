@@ -33,7 +33,7 @@ Scope: HttpClient TLS client path
 - [DONE] P0.2 trust-store API supports CA file/dir and deterministic invalid-path behavior.
 - [DONE] P1.4 SNI for IP literals is disabled; DNS hosts still send SNI.
 - [DONE] P1.3 host normalization + IDN policy: trailing-dot strip, robust IP literal checks, and non-ASCII DNS host rejection with punycode guidance under verify mode.
-- [OPEN] P0.1 verifyCertificate default-policy decision.
+- [DONE] P0.1 verifyCertificate default-policy decision.
 - [DONE] P1.5 verify depth option.
 - [OPEN] P1.6 revocation strategy.
 - [DONE] P2.7 SSL_CTX reuse per HttpClient instance.
@@ -42,11 +42,7 @@ Scope: HttpClient TLS client path
 ### P0: Security posture defaults and API ergonomics
 
 1. Decide production default for verifyCertificate.
-- Current default is false for backward compatibility.
-- Security target should be true by default in production-facing call sites.
-- Suggested path: keep library default false for one release, add deprecation warning in docs/changelog, then flip to true in next major/minor with migration notes.
-- Current state: docs now explicitly recommend `verifyCertificate=true` in
-  production, but runtime default has not yet been flipped.
+- [DONE] runtime default is now `verifyCertificate=true`.
 
 2. Improve trust-store API beyond single file. [DONE]
 - CA directory support is implemented (`caCertDir`) with deterministic precheck
