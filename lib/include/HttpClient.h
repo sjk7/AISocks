@@ -412,19 +412,15 @@ class HttpClient {
     }
 
 #ifdef AISOCKS_ENABLE_TLS
-    static bool isLikelyIpLiteral_(const std::string& host) {
-        if (host.empty()) return false;
-        if (host.find(':') != std::string::npos) return true;
-
-        bool hasDot = false;
-        for (char c : host) {
-            if (c == '.') {
-                hasDot = true;
-                continue;
-            }
-            if (c < '0' || c > '9') return false;
+    static std::string normalizeTlsHost_(std::string host) {
+        while (host.size() > 1 && host.back() == '.') {
+            host.pop_back();
         }
-        return hasDot;
+        return host;
+    }
+
+    static bool isLikelyIpLiteral_(const std::string& host) {
+        return Socket::isValidIPv4(host) || Socket::isValidIPv6(host);
     }
 #endif
 
@@ -597,6 +593,8 @@ class HttpClient {
                         static_cast<int>(socket->getNativeHandle()),
                         &tlsSetupError))
                     return false;
+                const std::string verifyHost = normalizeTlsHost_(host);
+                const bool verifyHostIsIp = isLikelyIpLiteral_(verifyHost);
                 if (options_.verifyCertificate) {
                     X509_VERIFY_PARAM* verifyParam
                         = SSL_get0_param(sess->nativeHandle());
@@ -605,23 +603,23 @@ class HttpClient {
                         return false;
                     }
 
-                    const int hostSet = isLikelyIpLiteral_(host)
+                    const int hostSet = verifyHostIsIp
                         ? X509_VERIFY_PARAM_set1_ip_asc(
-                              verifyParam, host.c_str())
+                              verifyParam, verifyHost.c_str())
                         : X509_VERIFY_PARAM_set1_host(
-                              verifyParam, host.c_str(), 0);
+                              verifyParam, verifyHost.c_str(), 0);
                     if (hostSet != 1) {
                         tlsSetupError = "TLS hostname verification setup "
                                         "failed for host: "
-                            + host;
+                            + verifyHost;
                         return false;
                     }
                 }
                 // Set SNI hostname so virtual-hosted servers pick the right
                 // cert.
-                if (!host.empty())
+                if (!verifyHost.empty() && !verifyHostIsIp)
                     SSL_set_tlsext_host_name(
-                        sess->nativeHandle(), host.c_str());
+                        sess->nativeHandle(), verifyHost.c_str());
                 sess->setConnectState();
                 for (;;) {
                     const int r = sess->handshake();

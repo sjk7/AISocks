@@ -64,6 +64,11 @@ class TestHttpsServer : public HttpPollServer {
 
     bool tlsReady() const noexcept { return ctx_ != nullptr; }
 
+    std::string lastSniName() const {
+        std::lock_guard<std::mutex> lk(sniMtx_);
+        return lastSniName_;
+    }
+
     void waitReady() {
         std::unique_lock<std::mutex> lk(readyMtx_);
         readyCv_.wait(lk, [this] { return ready_.load(); });
@@ -111,6 +116,12 @@ class TestHttpsServer : public HttpPollServer {
         if (!s.tlsSession) return ServerResult::Disconnect;
         const int r = s.tlsSession->handshake();
         if (r == 1) {
+            const char* sni = SSL_get_servername(
+                s.tlsSession->nativeHandle(), TLSEXT_NAMETYPE_host_name);
+            {
+                std::lock_guard<std::mutex> lk(sniMtx_);
+                lastSniName_ = sni ? std::string(sni) : std::string{};
+            }
             s.tlsHandshakeDone = true;
             s.tlsWantsWrite = false;
             return ServerResult::KeepConnection;
@@ -156,6 +167,8 @@ class TestHttpsServer : public HttpPollServer {
     std::atomic<bool> ready_{false};
     std::mutex readyMtx_;
     std::condition_variable readyCv_;
+    mutable std::mutex sniMtx_;
+    std::string lastSniName_;
 };
 
 // ---------------------------------------------------------------------------
@@ -430,6 +443,68 @@ static void test_https_verify_enabled_ca_file_plus_invalid_dir_fails_setup() {
     REQUIRE(result.message().find("TLS setup") != std::string::npos);
 }
 
+static void test_https_ip_literal_does_not_send_sni() {
+    BEGIN_TEST("HttpClient HTTPS with IP literal does not send SNI");
+
+    const std::string root = sourceRoot();
+    const std::string cert = root + "/tests/certs/test_cert.pem";
+    const std::string key = root + "/tests/certs/test_key.pem";
+
+    TestHttpsServer server{cert, key};
+    REQUIRE(server.tlsReady());
+
+    std::thread serverThread(
+        [&] { server.run(ClientLimit::Unlimited, Milliseconds{5}); });
+    server.waitReady();
+
+    HttpClient::Options opts;
+    opts.connectTimeout = Milliseconds{2000};
+    opts.requestTimeout = Milliseconds{2000};
+    opts.verifyCertificate = false;
+    HttpClient client{opts};
+
+    const std::string url = "https://127.0.0.1:"
+        + std::to_string(server.serverPort().value()) + "/no-sni-ip";
+    auto result = client.get(url);
+
+    server.requestStop();
+    serverThread.join();
+
+    REQUIRE(result.isSuccess());
+    REQUIRE(server.lastSniName().empty());
+}
+
+static void test_https_dns_host_sends_sni() {
+    BEGIN_TEST("HttpClient HTTPS with DNS host sends SNI");
+
+    const std::string root = sourceRoot();
+    const std::string cert = root + "/tests/certs/test_cert.pem";
+    const std::string key = root + "/tests/certs/test_key.pem";
+
+    TestHttpsServer server{cert, key};
+    REQUIRE(server.tlsReady());
+
+    std::thread serverThread(
+        [&] { server.run(ClientLimit::Unlimited, Milliseconds{5}); });
+    server.waitReady();
+
+    HttpClient::Options opts;
+    opts.connectTimeout = Milliseconds{2000};
+    opts.requestTimeout = Milliseconds{2000};
+    opts.verifyCertificate = false;
+    HttpClient client{opts};
+
+    const std::string url = "https://localhost:"
+        + std::to_string(server.serverPort().value()) + "/sni-dns";
+    auto result = client.get(url);
+
+    server.requestStop();
+    serverThread.join();
+
+    REQUIRE(result.isSuccess());
+    REQUIRE(server.lastSniName() == "localhost");
+}
+
 static void test_https_cert_load_failure() {
     BEGIN_TEST("TestHttpsServer reports failure when cert files are missing");
 
@@ -467,6 +542,8 @@ int main() {
     test_https_verify_enabled_invalid_ca_file_fails_setup();
     test_https_verify_enabled_invalid_ca_dir_fails_setup();
     test_https_verify_enabled_ca_file_plus_invalid_dir_fails_setup();
+    test_https_ip_literal_does_not_send_sni();
+    test_https_dns_host_sends_sni();
 
     return test_summary();
 }

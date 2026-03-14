@@ -43,16 +43,19 @@ Scope: HttpClient TLS client path
 
 ### P1: Hostname verification edge hardening
 
-3. Normalize host before OpenSSL hostname checks.
-- Consider:
-  - stripping a trailing dot from DNS names.
+3. Normalize host before OpenSSL hostname checks. [PARTIAL]
+- Done:
+  - strip trailing dots before OpenSSL host/IP verify setup.
+  - use robust IP literal detection via `Socket::isValidIPv4/isValidIPv6`.
+- Remaining:
   - IDN/punycode handling policy (callers must pass punycode vs library conversion).
-  - bracketed IPv6 should already be unwrapped by URL authority parser, but add explicit regression tests.
+  - add explicit IPv6 verification-path regression tests.
 
-4. SNI behavior for IP literals.
-- Current code sets SNI for any non-empty host.
-- Some stacks do not expect SNI with raw IPs.
-- Consider skipping SNI when host is an IP literal while still performing IP SAN verification.
+4. SNI behavior for IP literals. [DONE]
+- SNI is now sent for DNS hosts only; skipped for IP literals.
+- Added integration coverage:
+  - DNS host path sends SNI.
+  - IP-literal host path does not send SNI.
 
 ### P1: Verification depth and revocation
 
@@ -89,8 +92,8 @@ Scope: HttpClient TLS client path
 - add portable positive directory-only and valid file+dir success tests.
 
 3. SNI policy tests
-- DNS host sends SNI and succeeds.
-- IP literal path behavior after SNI policy decision remains compatible.
+- DNS host sends SNI and succeeds. [DONE]
+- IP literal path behavior after SNI policy decision remains compatible. [DONE]
 
 4. Redirect + TLS verification interactions
 - HTTPS redirect to different host with verify enabled (expected re-verify on new host).
