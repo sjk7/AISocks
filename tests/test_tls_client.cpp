@@ -44,11 +44,11 @@ using namespace aiSocks;
 // work regardless of which directory CTest runs the binary from.
 // ---------------------------------------------------------------------------
 static std::string sourceRoot() {
-    std::string path = __FILE__;
+    std::string path = std::filesystem::path(__FILE__).generic_string();
     const std::string marker = "/tests/test_tls_client.cpp";
     const size_t pos = path.rfind(marker);
-    if (pos != std::string::npos) path.resize(pos);
-    return path;
+    if (pos != std::string::npos) return path.substr(0, pos);
+    return ".";
 }
 
 // ---------------------------------------------------------------------------
@@ -392,7 +392,9 @@ static void test_https_client_basic_get() {
     server.requestStop();
     serverThread.join();
 
-    REQUIRE(result.isSuccess());
+    REQUIRE_MSG(result.isSuccess(),
+        ("HTTPS basic GET failed: " + result.message()).c_str());
+    if (!result.isSuccess()) return;
     REQUIRE(result.value().statusCode() == 200);
     REQUIRE(
         result.value().body().find("Hello, HTTPS!") != std::string_view::npos);
@@ -673,7 +675,9 @@ static void test_https_verify_enabled_ca_dir_only_succeeds() {
     server.requestStop();
     serverThread.join();
 
-    REQUIRE(result.isSuccess());
+    REQUIRE_MSG(result.isSuccess(),
+        ("CA dir-only request failed: " + result.message()).c_str());
+    if (!result.isSuccess()) return;
     REQUIRE(result.value().statusCode() == 200);
 }
 
@@ -715,7 +719,9 @@ static void test_https_verify_enabled_ca_file_plus_valid_dir_succeeds() {
     server.requestStop();
     serverThread.join();
 
-    REQUIRE(result.isSuccess());
+    REQUIRE_MSG(result.isSuccess(),
+        ("CA file+dir request failed: " + result.message()).c_str());
+    if (!result.isSuccess()) return;
     REQUIRE(result.value().statusCode() == 200);
 }
 
@@ -1073,7 +1079,9 @@ static void test_https_verify_depth_zero_still_succeeds_for_self_signed_leaf() {
     server.requestStop();
     serverThread.join();
 
-    REQUIRE(result.isSuccess());
+    REQUIRE_MSG(result.isSuccess(),
+        ("verifyDepth=0 request failed: " + result.message()).c_str());
+    if (!result.isSuccess()) return;
     REQUIRE(result.value().statusCode() == 200);
 }
 
@@ -1082,8 +1090,8 @@ static void test_https_default_system_roots_smoke_gated() {
 
     const std::string gate = getEnvValue_("AISOCKS_RUN_SYSTEM_ROOT_TLS_TEST");
     if (gate != "1") {
-        REQUIRE_MSG(true,
-            "SKIP - set AISOCKS_RUN_SYSTEM_ROOT_TLS_TEST=1 to enable");
+        REQUIRE_MSG(
+            true, "SKIP - set AISOCKS_RUN_SYSTEM_ROOT_TLS_TEST=1 to enable");
         return;
     }
 
@@ -1096,8 +1104,8 @@ static void test_https_default_system_roots_smoke_gated() {
     auto result = client.get("https://example.com/");
     REQUIRE(result.isSuccess());
     if (!result.isSuccess()) {
-        REQUIRE_MSG(false,
-            ("system roots smoke failed: " + result.message()).c_str());
+        REQUIRE_MSG(
+            false, ("system roots smoke failed: " + result.message()).c_str());
         return;
     }
     REQUIRE(result.value().statusCode() >= 200);
