@@ -1220,9 +1220,9 @@ int main() {
     // -----------------------------------------------------------------------
     // Latency tuning: verify the new constants are in effect
     // -----------------------------------------------------------------------
-    BEGIN_TEST("KeepAlive: HIGH_LOAD_THRESHOLD is 64 (not 256)");
+    BEGIN_TEST("KeepAlive: HIGH_LOAD_THRESHOLD is 256");
     {
-        REQUIRE(KeepAliveTimeoutManager::HIGH_LOAD_THRESHOLD == 64);
+        REQUIRE(KeepAliveTimeoutManager::HIGH_LOAD_THRESHOLD == 256);
     }
 
     BEGIN_TEST("KeepAlive: AGGRESSIVE_TIMEOUT is 500 ms (not 5000 ms)");
@@ -1231,15 +1231,15 @@ int main() {
         REQUIRE(KeepAliveTimeoutManager::AGGRESSIVE_TIMEOUT == ms{500});
     }
 
-    BEGIN_TEST("KeepAlive: adjustForLoad activates high-load at threshold 64");
+    BEGIN_TEST("KeepAlive: adjustForLoad activates high-load at threshold 256");
     {
         KeepAliveTimeoutManager mgr;
         mgr.setTimeout(std::chrono::milliseconds{30000});
         // Below threshold — normal timeout unchanged
-        mgr.adjustForLoad(63);
+        mgr.adjustForLoad(255);
         REQUIRE(mgr.getTimeout() == std::chrono::milliseconds{30000});
         // At threshold+1 — aggressive timeout kicks in
-        mgr.adjustForLoad(65);
+        mgr.adjustForLoad(257);
         REQUIRE(
             mgr.getTimeout() == KeepAliveTimeoutManager::AGGRESSIVE_TIMEOUT);
         // Drop back below threshold — normal timeout restored
@@ -1255,9 +1255,9 @@ int main() {
         REQUIRE(HttpPollServer::SLOWLORIS_TIMEOUT_MS == 5000);
     }
 
-    BEGIN_TEST("RECV_BUF_SIZE: per-loop read buffer is 4 KB");
+    BEGIN_TEST("RECV_BUF_SIZE: per-loop read buffer is 32 KB");
     {
-        REQUIRE(HttpPollServer::RECV_BUF_SIZE == 4 * 1024);
+        REQUIRE(HttpPollServer::RECV_BUF_SIZE == 32 * 1024);
     }
 
     return test_summary();

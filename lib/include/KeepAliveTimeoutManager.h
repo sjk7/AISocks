@@ -97,11 +97,11 @@ class KeepAliveTimeoutManager {
 
     // Adjust timeout based on current client count.  Call once per event batch.
     // Threshold and aggressive values are tuned to shed idle connections
-    // quickly once load rises — starting at 64 clients rather than the old 256,
+    // quickly once load rises — starting at 256 clients,
     // and using a 500 ms aggressive window instead of 5 s so that idle
     // keep-alive sockets are closed fast enough to reduce average latency under
     // load.
-    static constexpr size_t HIGH_LOAD_THRESHOLD = 64;
+    static constexpr size_t HIGH_LOAD_THRESHOLD = 256;
     static constexpr auto AGGRESSIVE_TIMEOUT = std::chrono::milliseconds{500};
 
     void adjustForLoad(size_t clientCount) {

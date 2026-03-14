@@ -207,9 +207,10 @@ class HttpPollServer : public ServerBase<HttpClientState> {
     // latency.
     static constexpr int SLOWLORIS_TIMEOUT_MS_HIGH_LOAD = 1000; // 1 s
     static constexpr size_t SLOWLORIS_HIGH_LOAD_THRESHOLD = 64;
-    // 4 KB is sufficient for typical HTTP GET requests and keeps per-loop
-    // stack pressure low when many connections are active simultaneously.
-    static constexpr size_t RECV_BUF_SIZE = 4 * 1024;
+    // 32 KB is the sweet spot from benchmarking: large enough to read most
+    // requests in a single syscall, small enough to keep per-loop stack
+    // pressure manageable when many connections are active.
+    static constexpr size_t RECV_BUF_SIZE = 32 * 1024;
 
     explicit HttpPollServer(
         const ServerBind& bind, Result<TcpSocket>* result = nullptr)
