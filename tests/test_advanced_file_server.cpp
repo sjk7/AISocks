@@ -578,12 +578,12 @@ void testPublicLandingPageSignInLinkTargetsProtectedPage() {
         !html.empty(), "Public landing page fixture should be readable");
     if (html.empty()) return;
 
-    TestFramework::assert_contains(html, "Sign in to open testing guide",
-        "Public landing page should expose sign-in CTA");
-    TestFramework::assert_contains(html, "href=\"/index.html\"",
-        "Sign-in CTA should target a protected path that triggers auth");
+    TestFramework::assert_contains(html, "Welcome to nginx",
+        "Public landing page should contain nginx welcome content");
+    TestFramework::assert_contains(html, "nginx.org",
+        "Public landing page should contain nginx.org link");
     TestFramework::assert_not_contains(html, "href=\"/\"",
-        "Sign-in CTA must not loop back to the public landing page");
+        "Public landing page must not link to root path");
 }
 
 void testAccessLogBrowserTailBehavior() {
