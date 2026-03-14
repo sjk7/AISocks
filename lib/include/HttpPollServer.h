@@ -97,12 +97,12 @@ struct HttpClientState {
         , requestScanPos(other.requestScanPos)
         , parsedRequest(other.parsedRequest)
         , peerAddress(other.peerAddress)
-    #ifdef AISOCKS_ENABLE_TLS
+#ifdef AISOCKS_ENABLE_TLS
         , tlsHandshakeDone(other.tlsHandshakeDone)
         , tlsWantsWrite(other.tlsWantsWrite)
         , tlsSession(other.tlsSession)
-    #endif
-     {
+#endif
+    {
         // If view pointed into the original's responseBuf, redirect into ours.
         if (!responseBuf.empty()
             && other.responseView.data() == other.responseBuf.data())
@@ -123,12 +123,12 @@ struct HttpClientState {
         , requestScanPos(other.requestScanPos)
         , parsedRequest(std::move(other.parsedRequest))
         , peerAddress(std::move(other.peerAddress))
-    #ifdef AISOCKS_ENABLE_TLS
+#ifdef AISOCKS_ENABLE_TLS
         , tlsHandshakeDone(other.tlsHandshakeDone)
         , tlsWantsWrite(other.tlsWantsWrite)
         , tlsSession(std::move(other.tlsSession))
-    #endif
-     {
+#endif
+    {
         // Fix up the view only if it was pointing into the moved-from buf.
         // After std::string move, responseBuf.data() == old
         // other.responseBuf.data() for heap-allocated strings, so the pointer
@@ -153,11 +153,11 @@ struct HttpClientState {
         requestScanPos = other.requestScanPos;
         parsedRequest = other.parsedRequest;
         peerAddress = other.peerAddress;
-    #ifdef AISOCKS_ENABLE_TLS
+#ifdef AISOCKS_ENABLE_TLS
         tlsHandshakeDone = other.tlsHandshakeDone;
         tlsWantsWrite = other.tlsWantsWrite;
         tlsSession = other.tlsSession;
-    #endif
+#endif
         // If view pointed into the original's responseBuf, redirect into ours.
         if (!responseBuf.empty()
             && other.responseView.data() == other.responseBuf.data())
@@ -180,11 +180,11 @@ struct HttpClientState {
         requestScanPos = other.requestScanPos;
         parsedRequest = std::move(other.parsedRequest);
         peerAddress = std::move(other.peerAddress);
-    #ifdef AISOCKS_ENABLE_TLS
+#ifdef AISOCKS_ENABLE_TLS
         tlsHandshakeDone = other.tlsHandshakeDone;
         tlsWantsWrite = other.tlsWantsWrite;
         tlsSession = std::move(other.tlsSession);
-    #endif
+#endif
         // Fix up the view only if it was pointing into the moved-from buf.
         if (!responseBuf.empty() && responseView.data() == responseBuf.data())
             responseView = responseBuf;
@@ -270,14 +270,12 @@ class HttpPollServer : public ServerBase<HttpClientState> {
     bool onAcceptFilter(const std::string& peerAddress) override;
 
     // TLS extension points. Defaults preserve current plain-socket behavior.
-    virtual bool isTlsMode(const HttpClientState& /*s*/) const {
-        return false;
-    }
+    virtual bool isTlsMode(const HttpClientState& /*s*/) const { return false; }
     virtual void onTlsClientConnected(TcpSocket& /*sock*/, HttpClientState& s) {
 #ifdef AISOCKS_ENABLE_TLS
         s.tlsHandshakeDone = true;
         s.tlsWantsWrite = false;
-    #else
+#else
         (void)s;
 #endif
     }
@@ -286,7 +284,7 @@ class HttpPollServer : public ServerBase<HttpClientState> {
 #ifdef AISOCKS_ENABLE_TLS
         s.tlsHandshakeDone = true;
         s.tlsWantsWrite = false;
-    #else
+#else
         (void)s;
 #endif
         return ServerResult::KeepConnection;
@@ -295,8 +293,8 @@ class HttpPollServer : public ServerBase<HttpClientState> {
         TcpSocket& sock, HttpClientState& /*s*/, void* buf, size_t len) {
         return sock.receive(buf, len);
     }
-    virtual int tlsWrite(TcpSocket& sock, HttpClientState& /*s*/,
-        const char* data, size_t len) {
+    virtual int tlsWrite(
+        TcpSocket& sock, HttpClientState& /*s*/, const char* data, size_t len) {
         return sock.sendChunked(data, len);
     }
 

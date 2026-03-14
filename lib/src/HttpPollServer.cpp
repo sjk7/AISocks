@@ -641,8 +641,8 @@ ServerResult HttpPollServer::onWritable(TcpSocket& sock, HttpClientState& s) {
             onResponseBegin(s);
         }
 
-        int sent = tlsWrite(sock, s,
-            s.responseView.data() + s.sent, s.responseView.size() - s.sent);
+        int sent = tlsWrite(sock, s, s.responseView.data() + s.sent,
+            s.responseView.size() - s.sent);
 
         if (sent > 0) {
             touchClient(sock, std::chrono::steady_clock::now());
