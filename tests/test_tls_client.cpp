@@ -1257,8 +1257,13 @@ static void test_https_handshake_timeout_respects_request_timeout() {
     serverThread.join();
 
     REQUIRE(!result.isSuccess());
-    REQUIRE(
-        result.message().find("TLS handshake timed out") != std::string::npos);
+    if (result.message().find("TLS handshake timed out")
+        == std::string::npos) {
+        tlsDebugLog_("handshake-timeout test got message: " + result.message());
+    }
+    REQUIRE_MSG(result.message().find("TLS handshake timed out")
+            != std::string::npos,
+        ("unexpected TLS error message: " + result.message()).c_str());
 }
 
 // ---------------------------------------------------------------------------

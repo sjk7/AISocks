@@ -446,6 +446,15 @@ class HttpClient {
         return false;
     }
 
+    static bool isLikelyTlsHandshakeTimeoutSysError_() {
+#ifdef _WIN32
+        const int err = WSAGetLastError();
+        return err == WSAETIMEDOUT || err == WSAEWOULDBLOCK;
+#else
+        return errno == ETIMEDOUT || errno == EAGAIN || errno == EWOULDBLOCK;
+#endif
+    }
+
     static bool tlsDebugEnabled_() {
         const char* envName = "AISOCKS_TLS_DEBUG";
 #ifdef _MSC_VER
@@ -733,8 +742,21 @@ class HttpClient {
                     const int e = sess->getLastErrorCode(r);
                     if (e == SSL_ERROR_WANT_READ || e == SSL_ERROR_WANT_WRITE)
                         continue;
-                    tlsSetupError = "TLS handshake failed: "
-                        + TlsOpenSsl::lastErrorString();
+
+                    const std::string opensslErr
+                        = TlsOpenSsl::lastErrorString();
+                    if (boundedRequest && isLikelyTlsHandshakeTimeoutSysError_()
+                        && (e == SSL_ERROR_SYSCALL || opensslErr.empty())) {
+                        tlsSetupError = "TLS handshake timed out";
+                        tlsDebugLog_("TLS handshake timeout host=" + host
+                            + " sslError=" + std::to_string(e)
+                            + " opensslErr="
+                            + (opensslErr.empty() ? std::string{"<empty>"}
+                                                   : opensslErr));
+                        return false;
+                    }
+
+                    tlsSetupError = "TLS handshake failed: " + opensslErr;
                     tlsDebugLog_(tlsSetupError + " host=" + host);
                     return false;
                 }
