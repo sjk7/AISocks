@@ -20,20 +20,20 @@ namespace aiSocks {
 
 namespace {
     bool tlsDebugEnabled_() {
-    const char* envName = "AISOCKS_TLS_DEBUG";
+        const char* envName = "AISOCKS_TLS_DEBUG";
 #ifdef _WIN32
-    char* value = nullptr;
-    size_t valueLen = 0;
-    if (_dupenv_s(&value, &valueLen, envName) != 0 || value == nullptr) {
-        return false;
-    }
+        char* value = nullptr;
+        size_t valueLen = 0;
+        if (_dupenv_s(&value, &valueLen, envName) != 0 || value == nullptr) {
+            return false;
+        }
 
-    const bool enabled = value[0] != '\0' && value[0] != '0';
-    std::free(value);
-    return enabled;
+        const bool enabled = value[0] != '\0' && value[0] != '0';
+        std::free(value);
+        return enabled;
 #else
-    const char* value = std::getenv(envName);
-    return value != nullptr && value[0] != '\0' && value[0] != '0';
+        const char* value = std::getenv(envName);
+        return value != nullptr && value[0] != '\0' && value[0] != '0';
 #endif
     }
 

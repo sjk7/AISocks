@@ -446,7 +446,7 @@ class HttpClient {
 
     static bool tlsDebugEnabled_() {
         const char* envName = "AISOCKS_TLS_DEBUG";
-    #ifdef _MSC_VER
+#ifdef _MSC_VER
         char* value = nullptr;
         size_t valueLen = 0;
         if (_dupenv_s(&value, &valueLen, envName) != 0 || value == nullptr) {
@@ -455,10 +455,10 @@ class HttpClient {
         const bool enabled = value[0] != '\0' && value[0] != '0';
         std::free(value);
         return enabled;
-    #else
+#else
         const char* value = std::getenv(envName);
         return value != nullptr && value[0] != '\0' && value[0] != '0';
-    #endif
+#endif
     }
 
     static void tlsDebugLog_(const std::string& msg) {
