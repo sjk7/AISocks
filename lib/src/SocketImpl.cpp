@@ -57,8 +57,11 @@ namespace {
 #if defined(_WIN32) && defined(AISOCKS_TESTING)
     static bool traceUnixCloseEnabled_() {
         static const bool enabled = []() {
-            const char* v = std::getenv("AISOCKS_TRACE_UNIX_CLOSE");
-            return v && v[0] != '\0' && v[0] != '0';
+            char buf[8] = {};
+            const DWORD n
+                = ::GetEnvironmentVariableA("AISOCKS_TRACE_UNIX_CLOSE", buf,
+                    static_cast<DWORD>(sizeof(buf)));
+            return n > 0 && buf[0] != '0';
         }();
         return enabled;
     }
