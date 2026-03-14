@@ -249,11 +249,9 @@ public:
     explicit MyServer(const ServerBind& b) : HttpPollServer(b) {}
 protected:
     void buildResponse(HttpClientState& s) override {
-        // Zero-copy: point responseView at a long-lived std::string.
-        // For dynamic content, write into s.responseBuf and set responseView = s.responseBuf.
-        static const std::string ok =
-            "HTTP/1.1 200 OK\r\nContent-Length: 6\r\n\r\nHello!";
-        s.responseView = ok;
+        // Ergonomic default: provide body only.
+        // Content-Type / Content-Length / Connection are filled automatically.
+        respondText(s, "Hello!\n");
     }
 };
 

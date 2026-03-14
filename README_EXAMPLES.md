@@ -31,6 +31,9 @@ cmake --build build-release --config RelWithDebInfo --parallel
 - Basic request parsing
 - Error handling with Result types
 
+Note: this example intentionally builds headers by hand. For the default
+ergonomic path (body-first, auto headers), prefer `server_launchpad.cpp`.
+
 ```bash
 ./build-release/low_level_http_server
 # Listening on 0.0.0.0:8080
@@ -70,6 +73,24 @@ cmake --build build-release --config RelWithDebInfo --parallel
 ./build-release/simple_file_server
 # Serving files from current directory on :8080
 # curl http://localhost:8080/README.md
+```
+
+#### `server_launchpad.cpp`
+**Purpose**: Minimal custom server blueprint showing both HTTP and HTTPS
+**Lines**: ~120
+**Features**:
+- Tiny plain HTTP custom server (override `buildResponse` only)
+- Tiny HTTPS custom server using `HttpsPollServer`
+- Side-by-side mode so users can see exactly what changes for TLS
+- Uses `respondText(...)` so users only provide body text; common headers are
+    generated automatically
+
+```bash
+# Plain HTTP mode
+./build-release/server_launchpad
+
+# TLS mode (when built with AISOCKS_ENABLE_TLS=ON)
+./build-release/server_launchpad --tls server-cert.pem server-key.pem
 ```
 
 #### `echo_client.cpp`

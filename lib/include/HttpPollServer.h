@@ -275,6 +275,27 @@ class HttpPollServer : public ServerBase<HttpClientState> {
         const char* contentType, const std::string& body,
         bool keepAlive = true);
 
+    // Convenience helpers for common responses.
+    // These auto-apply Connection based on s.closeAfterSend and populate both
+    // responseBuf and responseView.
+    static void setAutoResponse(HttpClientState& s, const char* statusLine,
+        const char* contentType, const std::string& body) {
+        s.responseBuf
+            = makeResponse(statusLine, contentType, body, !s.closeAfterSend);
+        s.responseView = s.responseBuf;
+    }
+
+    static void respondText(HttpClientState& s, const std::string& body,
+        const char* statusLine = "HTTP/1.1 200 OK",
+        const char* contentType = "text/plain; charset=utf-8") {
+        setAutoResponse(s, statusLine, contentType, body);
+    }
+
+    static void respondJson(HttpClientState& s, const std::string& body,
+        const char* statusLine = "HTTP/1.1 200 OK") {
+        setAutoResponse(s, statusLine, "application/json; charset=utf-8", body);
+    }
+
     void dispatchBuildResponse(HttpClientState& s);
 
     protected:

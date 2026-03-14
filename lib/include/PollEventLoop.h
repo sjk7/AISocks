@@ -75,10 +75,10 @@ class PollEventLoop {
         return stop_.load(std::memory_order_relaxed);
     }
 
-    // When true (the default), run() installs SIGINT/SIGTERM handlers that
-    // set the process-wide g_serverSignalStop flag and restores the previous
-    // handlers on return.  Set false for secondary servers (or servers on
-    // worker threads) that should be stopped via requestStop() only.
+    // When true (the default), run() ensures SIGINT/SIGTERM handlers are
+    // installed process-wide so serverHandleSignal can flip the shared stop
+    // flag. Set false for secondary servers (or servers on worker threads)
+    // that should be stopped via requestStop() only.
     void setHandleSignals(bool enable) noexcept { handleSignals_ = enable; }
     bool handlesSignals() const noexcept { return handleSignals_; }
 
@@ -97,32 +97,9 @@ class PollEventLoop {
         // caller wants a no-op run, they should check stopRequested() first.
         stop_.store(false, std::memory_order_relaxed);
 
-        // Install SIGINT/SIGTERM and restore them when run() returns.
-        //
-        // NOTE: g_serverSignalStop is a process-wide flag.  When two servers
-        // run concurrently and both have handleSignals_ == true, SIGINT stops
-        // both.  Use setHandleSignals(false) on secondary servers.
-        using SigHandler = void (*)(int);
-        SigHandler prevInt = SIG_DFL;
-        SigHandler prevTerm = SIG_DFL;
-        if (handleSignals_) {
-            prevInt = std::signal(SIGINT, serverHandleSignal);
-            prevTerm = std::signal(SIGTERM, serverHandleSignal);
-        }
-        // Restore whichever handler was installed *before* this run() call
-        // (SIG_DFL, SIG_IGN, or another handler).  Restoring SIG_DFL blindly
-        // would clobber a handler installed by the caller or a wrapper.
-        struct SigGuard {
-            bool active;
-            SigHandler pi;
-            SigHandler pt;
-            ~SigGuard() {
-                if (active) {
-                    std::signal(SIGINT, pi);
-                    std::signal(SIGTERM, pt);
-                }
-            }
-        } guard{handleSignals_, prevInt, prevTerm};
+        // Install process-wide handlers once. This avoids races when multiple
+        // servers run concurrently and enter/leave run() at different times.
+        if (handleSignals_) installSignalHandlers();
 
         while (true) {
             // Pre-wait stop checks: handles requestStop() arriving between

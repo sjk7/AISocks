@@ -157,6 +157,7 @@ if(BUILD_EXAMPLES)
         aiSocksPeerLogger       examples/peer_logger.cpp
         aiSocksGoogleClient     examples/google_client.cpp
         aiSocksSocketFactoryDemo examples/socket_factory_demo.cpp
+        server_launchpad        examples/server_launchpad.cpp
         low_level_http_server   examples/low_level_http_server.cpp
         simple_file_server      examples/simple_file_server.cpp
         advanced_file_server    examples/advanced_file_server.cpp
