@@ -22,7 +22,7 @@ on:
 # Cancel superseded runs on the same branch/PR to save runner minutes.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  cancel-in-progress: true
 
 jobs:
   preflight:
@@ -59,7 +59,6 @@ jobs:
             cxx: g++
             cmake_generator: Ninja
             build_type: Debug
-            enable_tls: "OFF"
             tier: fast
 
           # Linux — Clang
@@ -69,7 +68,6 @@ jobs:
             cxx: clang++
             cmake_generator: Ninja
             build_type: Debug
-            enable_tls: "OFF"
             tier: fast
 
           # ---------------------------------------------------------------
@@ -81,7 +79,6 @@ jobs:
             cxx: clang++
             cmake_generator: Ninja
             build_type: Debug
-            enable_tls: "OFF"
             tier: fast
 
           # ---------------------------------------------------------------
@@ -91,7 +88,6 @@ jobs:
             compiler: msvc
             cmake_generator: Ninja
             build_type: Debug
-            enable_tls: "OFF"
             tier: fast
 
           # Windows — Clang-cl (LLVM toolchain on Windows)
@@ -99,7 +95,6 @@ jobs:
             compiler: clang-cl
             cmake_generator: Ninja
             build_type: Debug
-            enable_tls: "OFF"
             tier: fast
             env:
               CC: clang-cl
@@ -114,7 +109,6 @@ jobs:
             cxx: g++
             cmake_generator: Ninja
             build_type: RelWithDebInfo
-            enable_tls: "OFF"
             tier: full
 
           - os: macos-latest
@@ -123,14 +117,12 @@ jobs:
             cxx: clang++
             cmake_generator: Ninja
             build_type: RelWithDebInfo
-            enable_tls: "OFF"
             tier: full
 
           - os: windows-latest
             compiler: msvc
             cmake_generator: Ninja
             build_type: RelWithDebInfo
-            enable_tls: "OFF"
             tier: full
 
           # ---------------------------------------------------------------
@@ -176,7 +168,6 @@ jobs:
             cxx: clang++
             cmake_generator: Ninja
             build_type: Debug
-            enable_tls: "OFF"
             sanitizer_flags: "-fsanitize=address,undefined -fno-omit-frame-pointer"
             asan_options: "detect_leaks=1:strict_string_checks=1:detect_stack_use_after_return=1"
             ubsan_options: "print_stacktrace=1:halt_on_error=1"
@@ -190,7 +181,6 @@ jobs:
             cxx: clang++
             cmake_generator: Ninja
             build_type: Debug
-            enable_tls: "OFF"
             sanitizer_flags: "-fsanitize=thread -fno-omit-frame-pointer"
             tsan_options: "halt_on_error=1:second_deadlock_stack=1"
             ctest_timeout: 180
@@ -202,6 +192,20 @@ jobs:
       # ------------------------------------------------------------------ #
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Set up sccache
+        uses: mozilla-actions/sccache-action@v0.0.9
+
+      - name: Enable sccache (GitHub Actions backend)
+        shell: bash
+        run: |
+          echo "SCCACHE_GHA_ENABLED=true" >> "$GITHUB_ENV"
+          echo "RUST_LOG=sccache=error" >> "$GITHUB_ENV"
+          echo "SCCACHE_CACHE_SIZE=15G" >> "$GITHUB_ENV"
+
+      - name: Show sccache stats (before)
+        shell: bash
+        run: sccache --show-stats || true
 
       # ------------------------------------------------------------------ #
       # 2. Install system dependencies                                      #
@@ -282,17 +286,14 @@ jobs:
           SANITIZER_FLAGS: ${{ matrix.sanitizer_flags }}
           ENABLE_TLS: ${{ matrix.enable_tls }}
         run: |
-          if [[ "$ENABLE_TLS" != "ON" && "$ENABLE_TLS" != "OFF" ]]; then
-            echo "Invalid matrix.enable_tls='$ENABLE_TLS' (expected ON or OFF)" >&2
-            exit 1
-          fi
           CMAKE_ARGS=(
             -S . -B build
             -G "${{ matrix.cmake_generator }}"
             -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
             -DBUILD_TESTS=ON
             -DBUILD_EXAMPLES=OFF
-            -DAISOCKS_ENABLE_TLS=${ENABLE_TLS}
+            -DCMAKE_C_COMPILER_LAUNCHER=sccache
+            -DCMAKE_CXX_COMPILER_LAUNCHER=sccache
           )
           if [[ "$RUNNER_OS" == "Windows" && "${{ matrix.build_type }}" == "RelWithDebInfo" ]]; then
             # Use CMake's MSVC debug-info knob to request /Z7 without passing
@@ -302,6 +303,9 @@ jobs:
             )
           fi
           if [[ "$ENABLE_TLS" == "ON" ]]; then
+            CMAKE_ARGS+=(
+              -DAISOCKS_ENABLE_TLS=ON
+            )
             if [[ "$RUNNER_OS" == "macOS" ]]; then
               OPENSSL_PREFIX="$(brew --prefix openssl@3)"
               CMAKE_ARGS+=(
@@ -428,6 +432,11 @@ jobs:
                 --no-compress-output \
                 --timeout ${{ matrix.ctest_timeout || 60 }} \
                 --parallel "$CTEST_PARALLEL"
+
+      - name: Show sccache stats (after)
+        if: always()
+        shell: bash
+        run: sccache --show-stats || true
 
       # ------------------------------------------------------------------ #
       # 6. Upload test results on failure                                   #
