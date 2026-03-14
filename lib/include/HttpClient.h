@@ -754,9 +754,9 @@ class HttpClient {
                     const std::string opensslErr
                         = TlsOpenSsl::lastErrorString();
                     const int sysErr = lastTlsHandshakeSysError_();
-                    const bool deadlineExpired
-                        = boundedRequest
-                        && (std::chrono::steady_clock::now() >= requestDeadline);
+                    const bool deadlineExpired = boundedRequest
+                        && (std::chrono::steady_clock::now()
+                            >= requestDeadline);
                     if (boundedRequest
                         && (deadlineExpired
                             || (isLikelyTlsHandshakeTimeoutSysError_(sysErr)
@@ -764,9 +764,8 @@ class HttpClient {
                                     || opensslErr.empty())))) {
                         tlsSetupError = "TLS handshake timed out";
                         tlsDebugLog_("TLS handshake timeout host=" + host
-                            + " sslError=" + std::to_string(e)
-                            + " sysErr=" + std::to_string(sysErr)
-                            + " opensslErr="
+                            + " sslError=" + std::to_string(e) + " sysErr="
+                            + std::to_string(sysErr) + " opensslErr="
                             + (opensslErr.empty() ? std::string{"<empty>"}
                                                   : opensslErr));
                         return false;
