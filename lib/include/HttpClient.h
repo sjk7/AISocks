@@ -20,6 +20,7 @@
 #include "SocketFactory.h"
 #include "SocketTypes.h"
 #include <charconv>
+#include <cerrno>
 #include <chrono>
 #include <cctype>
 #include <cstdio>
@@ -446,12 +447,19 @@ class HttpClient {
         return false;
     }
 
-    static bool isLikelyTlsHandshakeTimeoutSysError_() {
+    static int lastTlsHandshakeSysError_() {
 #ifdef _WIN32
-        const int err = WSAGetLastError();
+        return WSAGetLastError();
+#else
+        return errno;
+#endif
+    }
+
+    static bool isLikelyTlsHandshakeTimeoutSysError_(int err) {
+#ifdef _WIN32
         return err == WSAETIMEDOUT || err == WSAEWOULDBLOCK;
 #else
-        return errno == ETIMEDOUT || errno == EAGAIN || errno == EWOULDBLOCK;
+        return err == ETIMEDOUT || err == EAGAIN || err == EWOULDBLOCK;
 #endif
     }
 
@@ -745,14 +753,22 @@ class HttpClient {
 
                     const std::string opensslErr
                         = TlsOpenSsl::lastErrorString();
-                    if (boundedRequest && isLikelyTlsHandshakeTimeoutSysError_()
-                        && (e == SSL_ERROR_SYSCALL || opensslErr.empty())) {
+                    const int sysErr = lastTlsHandshakeSysError_();
+                    const bool deadlineExpired
+                        = boundedRequest
+                        && (std::chrono::steady_clock::now() >= requestDeadline);
+                    if (boundedRequest
+                        && (deadlineExpired
+                            || (isLikelyTlsHandshakeTimeoutSysError_(sysErr)
+                                && (e == SSL_ERROR_SYSCALL
+                                    || opensslErr.empty())))) {
                         tlsSetupError = "TLS handshake timed out";
                         tlsDebugLog_("TLS handshake timeout host=" + host
                             + " sslError=" + std::to_string(e)
+                            + " sysErr=" + std::to_string(sysErr)
                             + " opensslErr="
                             + (opensslErr.empty() ? std::string{"<empty>"}
-                                                   : opensslErr));
+                                                  : opensslErr));
                         return false;
                     }
 
