@@ -19,7 +19,7 @@ on:
       - "LICENSE*"
   workflow_dispatch:
 
-# Cancel superseded runs on the same branch/PR to save runner minutes.
+# Cancel superseded runs on the same branch/PR to save runner minutes (no-op touch).
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
