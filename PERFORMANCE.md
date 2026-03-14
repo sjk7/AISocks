@@ -3,7 +3,7 @@
 ## Test Environment
 
 - **Machine**: Apple Silicon (arm64), mains power
-- **Tool**: `wrk -t12 -d20s -H "Connection: keep-alive"`
+- **Tool**: [wrk](https://github.com/wg/wrk)
 - **Opponent**: nginx (worker_processes=auto)
 - **Build**: RelWithDebInfo
 - **Servers run sequentially** (nginx first, then ours)
@@ -12,8 +12,12 @@
 
 ## 1,000 Connections
 
-```
-wrk -t12 -c1000 -d20s -H "Connection: keep-alive"
+```bash
+# nginx
+wrk -t12 -c1000 -d20s -H "Connection: keep-alive" http://localhost:8082/public.html
+
+# advanced_file_server
+wrk -t12 -c1000 -d20s -H "Connection: keep-alive" http://localhost:8080/public.html
 ```
 
 | Metric | advanced_file_server (8080) | nginx (8082) | Winner |
@@ -28,8 +32,12 @@ wrk -t12 -c1000 -d20s -H "Connection: keep-alive"
 
 ## 10,000 Connections
 
-```
-wrk -t12 -c10000 -d20s -H "Connection: keep-alive"
+```bash
+# nginx
+wrk -t12 -c10000 -d20s -H "Connection: keep-alive" http://localhost:8082/public.html
+
+# advanced_file_server
+wrk -t12 -c10000 -d20s -H "Connection: keep-alive" http://localhost:8080/public.html
 ```
 
 | Metric | advanced_file_server (8080) | nginx (8082) | Winner |
