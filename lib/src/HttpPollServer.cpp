@@ -12,6 +12,10 @@
 #include <cstdio>
 #include <string>
 
+#ifdef AISOCKS_ENABLE_TLS
+#include <openssl/ssl.h>
+#endif
+
 namespace aiSocks {
 
 namespace {
@@ -617,6 +621,14 @@ ServerResult HttpPollServer::onReadable(TcpSocket& sock, HttpClientState& s) {
         } else if (n == 0) {
             return ServerResult::Disconnect;
         } else {
+#ifdef AISOCKS_ENABLE_TLS
+            if (isTlsMode(s) && s.tlsSession) {
+                const int tlsErr = s.tlsSession->getLastErrorCode(n);
+                if (tlsErr == SSL_ERROR_WANT_READ
+                    || tlsErr == SSL_ERROR_WANT_WRITE)
+                    break;
+            }
+#endif
             const auto err = sock.getLastError();
             if (err == SocketError::WouldBlock || err == SocketError::Timeout)
                 break;
