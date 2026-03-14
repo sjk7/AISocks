@@ -24,7 +24,7 @@
                 "CMAKE_BUILD_TYPE": "Debug",
                 "BUILD_EXAMPLES": "ON",
                 "BUILD_TESTS": "ON",
-                "AISOCKS_ENABLE_TLS": "OFF"
+                "AISOCKS_ENABLE_TLS": "ON"
             }
         },
         {
@@ -148,7 +148,8 @@
             },
             "cacheVariables": {
                 "BUILD_EXAMPLES": "ON",
-                "BUILD_TESTS": "ON"
+                "BUILD_TESTS": "ON",
+                "AISOCKS_ENABLE_TLS": "ON"
             }
         },
         {
@@ -177,6 +178,7 @@
                 "CMAKE_BUILD_TYPE": "Release",
                 "BUILD_EXAMPLES": "ON",
                 "BUILD_TESTS": "ON",
+                "AISOCKS_ENABLE_TLS": "ON",
                 "CMAKE_CROSSCOMPILING_EMULATOR": "/opt/homebrew/bin/wine"
             }
         },
@@ -223,6 +225,7 @@
                 "CMAKE_BUILD_TYPE": "Debug",
                 "BUILD_EXAMPLES": "ON",
                 "BUILD_TESTS": "ON",
+                "AISOCKS_ENABLE_TLS": "ON",
                 "CMAKE_CROSSCOMPILING_EMULATOR": "/opt/homebrew/bin/wine"
             }
         },

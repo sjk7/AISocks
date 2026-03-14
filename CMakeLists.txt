@@ -44,7 +44,7 @@ option(ENABLE_MSAN    "Enable MemorySanitizer"     OFF)
 option(ENABLE_UBSAN   "Enable UndefinedBehaviorSanitizer" OFF)
 option(ENABLE_TSAN    "Enable ThreadSanitizer"     OFF)
 option(ENABLE_COVERAGE "Enable Clang source-based code coverage" OFF)
-option(AISOCKS_ENABLE_TLS "Enable TLS/HTTPS support via OpenSSL" OFF)
+option(AISOCKS_ENABLE_TLS "Enable TLS/HTTPS support via OpenSSL" ON)
 
 if(AISOCKS_ENABLE_TLS)
     # Prefer shared OpenSSL to use system dynamic libraries.
