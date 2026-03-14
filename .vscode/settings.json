@@ -25,6 +25,10 @@
   "github-actions.workflows.pinned.workflows": [".github/workflows/ci.yml"],
   "github-actions.workflows.pinned.refresh.enabled": true,
   "github-actions.workflows.pinned.refresh.interval": 30,
+  "files.associations": {
+    ".github/workflows/*.yml": "yaml",
+    ".github/workflows/*.yaml": "yaml"
+  },
   "chat.tools.terminal.autoApprove": {
     "/^gh(\\s|$).*$": true,
     "/^git (status|diff|show\\b.*|log\\b.*|branch\\b.*|checkout\\b.*|switch\\b.*|restore\\b.*|add\\b.*|commit\\b.*|push\\b.*|pull\\b.*|fetch\\b.*|rebase\\b.*|merge\\b.*|tag\\b.*)$/": true,
