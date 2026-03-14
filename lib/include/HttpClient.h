@@ -549,13 +549,16 @@ class HttpClient {
             std::shared_ptr<TcpSocket> socket;
             bool reusedConnection = false;
             bool retriedReusedConnection = false;
+            const bool connectAsIpv6 = Socket::isValidIPv6(host);
             if (cachedSocket_ && cachedSocket_->isValid() && cachedHost_ == host
                 && cachedPort_.value() == port.value()) {
                 socket = cachedSocket_;
                 reusedConnection = true;
             } else {
                 ConnectArgs args{host, port, options_.connectTimeout};
-                auto socketResult = SocketFactory::createTcpClient(args);
+                auto socketResult = connectAsIpv6
+                    ? SocketFactory::createTcpClient(AddressFamily::IPv6, args)
+                    : SocketFactory::createTcpClient(args);
                 if (!socketResult.isSuccess()) {
                     return Result<HttpClientResponse>::failureOwned(
                         socketResult.error(),
@@ -733,8 +736,10 @@ class HttpClient {
                     clearCachedConnection_();
 
                     ConnectArgs retryArgs{host, port, options_.connectTimeout};
-                    auto retrySocketResult
-                        = SocketFactory::createTcpClient(retryArgs);
+                    auto retrySocketResult = connectAsIpv6
+                        ? SocketFactory::createTcpClient(
+                              AddressFamily::IPv6, retryArgs)
+                        : SocketFactory::createTcpClient(retryArgs);
                     if (!retrySocketResult.isSuccess()) {
                         return Result<HttpClientResponse>::failureOwned(
                             retrySocketResult.error(),

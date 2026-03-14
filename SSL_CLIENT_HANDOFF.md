@@ -28,6 +28,17 @@ Scope: HttpClient TLS client path
 
 ## Remaining SSL client work
 
+### Status snapshot (as of 2026-03-14)
+
+- [DONE] P0.2 trust-store API supports CA file/dir and deterministic invalid-path behavior.
+- [DONE] P1.4 SNI for IP literals is disabled; DNS hosts still send SNI.
+- [PARTIAL] P1.3 host normalization is in place (trailing-dot strip + robust IP literal checks); IDN policy remains.
+- [OPEN] P0.1 verifyCertificate default-policy decision.
+- [OPEN] P1.5 verify depth option.
+- [OPEN] P1.6 revocation strategy.
+- [OPEN] P2.7 SSL_CTX reuse.
+- [OPEN] P2.8 session resumption across new TCP connections.
+
 ### P0: Security posture defaults and API ergonomics
 
 1. Decide production default for verifyCertificate.
@@ -81,8 +92,8 @@ Scope: HttpClient TLS client path
 ## Remaining tests to add
 
 1. IPv6 hostname/IP verification paths
-- [::1] certificate SAN IP match succeeds with verify enabled.
-- mismatch for IPv6 IP literal fails.
+- [::1] certificate SAN IP match succeeds with verify enabled. [DONE]
+- mismatch for IPv6 IP literal fails. [DONE]
 
 2. CA source matrix tests
 - default system roots path behavior (environment-dependent, may need containerized fixture).
@@ -111,11 +122,10 @@ Scope: HttpClient TLS client path
 
 ## Suggested next implementation order
 
-1. Add CA directory support and behavior matrix tests.
-2. Apply host normalization + IPv6 verification tests.
-3. Decide and implement IP-literal SNI policy.
-4. Introduce reusable SSL_CTX in HttpClient instance.
-5. Revisit default verifyCertificate policy and update docs/changelog.
+1. Decide/document IDN-punycode policy and add corresponding tests.
+2. Introduce reusable SSL_CTX in HttpClient instance.
+3. Add configurable verify depth and tests.
+4. Revisit default verifyCertificate policy and update docs/changelog.
 
 ## Validation command set
 

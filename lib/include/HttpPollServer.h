@@ -217,6 +217,10 @@ class HttpPollServer : public ServerBase<HttpClientState> {
         : ServerBase<HttpClientState>(bind, AddressFamily::IPv4, result)
         , bind_(bind) {}
 
+    HttpPollServer(const ServerBind& bind, AddressFamily family,
+        Result<TcpSocket>* result = nullptr)
+        : ServerBase<HttpClientState>(bind, family, result), bind_(bind) {}
+
     // ---- security / observability hooks ---------------------------------
 
     // Attach an IpFilter.  The server does NOT take ownership; the caller

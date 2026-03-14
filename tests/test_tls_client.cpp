@@ -49,9 +49,10 @@ static std::string sourceRoot() {
 // ---------------------------------------------------------------------------
 class TestHttpsServer : public HttpPollServer {
     public:
-    explicit TestHttpsServer(
-        const std::string& certPath, const std::string& keyPath)
-        : HttpPollServer(ServerBind{"127.0.0.1", Port{0}}) {
+    explicit TestHttpsServer(const std::string& certPath,
+        const std::string& keyPath, const std::string& bindHost = "127.0.0.1",
+        AddressFamily family = AddressFamily::IPv4)
+        : HttpPollServer(ServerBind{bindHost, Port{0}}, family) {
         setHandleSignals(false);
 
         std::string err;
@@ -171,6 +172,13 @@ class TestHttpsServer : public HttpPollServer {
     std::string lastSniName_;
 };
 
+static bool hasIpv6Loopback_() {
+    auto srv = TcpSocket::createRaw(AddressFamily::IPv6);
+    if (!srv.setReuseAddress(true)) return false;
+    if (!srv.bind("::1", Port{0}) || !srv.listen(1)) return false;
+    return true;
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -275,7 +283,11 @@ static void test_https_verify_enabled_trusted_ca_and_matching_host() {
     server.requestStop();
     serverThread.join();
 
-    REQUIRE(result.isSuccess());
+    if (!result.isSuccess()) {
+        REQUIRE_MSG(false,
+            ("IPv6 verified request failed: " + result.message()).c_str());
+        return;
+    }
     REQUIRE(result.value().statusCode() == 200);
 }
 
@@ -505,6 +517,80 @@ static void test_https_dns_host_sends_sni() {
     REQUIRE(server.lastSniName() == "localhost");
 }
 
+static void test_https_verify_enabled_ipv6_san_match_succeeds() {
+    BEGIN_TEST("HttpClient HTTPS verify enabled succeeds for IPv6 SAN match");
+
+    if (!hasIpv6Loopback_()) {
+        REQUIRE_MSG(true, "SKIP - IPv6 loopback not available on this system");
+        return;
+    }
+
+    const std::string root = sourceRoot();
+    const std::string cert = root + "/tests/certs/test_cert_ipv6.pem";
+    const std::string key = root + "/tests/certs/test_key_ipv6.pem";
+
+    TestHttpsServer server{cert, key, "::1", AddressFamily::IPv6};
+    REQUIRE(server.tlsReady());
+
+    std::thread serverThread(
+        [&] { server.run(ClientLimit::Unlimited, Milliseconds{5}); });
+    server.waitReady();
+
+    HttpClient::Options opts;
+    opts.connectTimeout = Milliseconds{2000};
+    opts.requestTimeout = Milliseconds{2000};
+    opts.verifyCertificate = true;
+    opts.caCertFile = cert;
+    HttpClient client{opts};
+
+    const std::string url = "https://[::1]:"
+        + std::to_string(server.serverPort().value()) + "/ipv6-verified";
+    auto result = client.get(url);
+
+    server.requestStop();
+    serverThread.join();
+
+    REQUIRE(result.isSuccess());
+    REQUIRE(result.value().statusCode() == 200);
+}
+
+static void test_https_verify_enabled_ipv6_san_mismatch_fails() {
+    BEGIN_TEST("HttpClient HTTPS verify enabled fails for IPv6 SAN mismatch");
+
+    if (!hasIpv6Loopback_()) {
+        REQUIRE_MSG(true, "SKIP - IPv6 loopback not available on this system");
+        return;
+    }
+
+    const std::string root = sourceRoot();
+    const std::string cert = root + "/tests/certs/test_cert_ipv6_mismatch.pem";
+    const std::string key = root + "/tests/certs/test_key_ipv6_mismatch.pem";
+
+    TestHttpsServer server{cert, key, "::1", AddressFamily::IPv6};
+    REQUIRE(server.tlsReady());
+
+    std::thread serverThread(
+        [&] { server.run(ClientLimit::Unlimited, Milliseconds{5}); });
+    server.waitReady();
+
+    HttpClient::Options opts;
+    opts.connectTimeout = Milliseconds{2000};
+    opts.requestTimeout = Milliseconds{2000};
+    opts.verifyCertificate = true;
+    opts.caCertFile = cert;
+    HttpClient client{opts};
+
+    const std::string url = "https://[::1]:"
+        + std::to_string(server.serverPort().value()) + "/ipv6-mismatch";
+    auto result = client.get(url);
+
+    server.requestStop();
+    serverThread.join();
+
+    REQUIRE(!result.isSuccess());
+    REQUIRE(result.message().find("TLS setup") != std::string::npos);
+}
+
 static void test_https_cert_load_failure() {
     BEGIN_TEST("TestHttpsServer reports failure when cert files are missing");
 
@@ -544,6 +630,8 @@ int main() {
     test_https_verify_enabled_ca_file_plus_invalid_dir_fails_setup();
     test_https_ip_literal_does_not_send_sni();
     test_https_dns_host_sends_sni();
+    test_https_verify_enabled_ipv6_san_match_succeeds();
+    test_https_verify_enabled_ipv6_san_mismatch_fails();
 
     return test_summary();
 }
