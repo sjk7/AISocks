@@ -193,20 +193,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up sccache
-        uses: mozilla-actions/sccache-action@v0.0.9
-
-      - name: Enable sccache (GitHub Actions backend)
-        shell: bash
-        run: |
-          echo "SCCACHE_GHA_ENABLED=false" >> "$GITHUB_ENV"
-          echo "RUST_LOG=sccache=error" >> "$GITHUB_ENV"
-          echo "SCCACHE_CACHE_SIZE=15G" >> "$GITHUB_ENV"
-
-      - name: Show sccache stats (before)
-        shell: bash
-        run: sccache --show-stats || true
-
       # ------------------------------------------------------------------ #
       # 2. Install system dependencies                                      #
       # ------------------------------------------------------------------ #
@@ -292,8 +278,6 @@ jobs:
             -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
             -DBUILD_TESTS=ON
             -DBUILD_EXAMPLES=OFF
-            -DCMAKE_C_COMPILER_LAUNCHER=sccache
-            -DCMAKE_CXX_COMPILER_LAUNCHER=sccache
           )
           if [[ "$RUNNER_OS" == "Windows" && "${{ matrix.build_type }}" == "RelWithDebInfo" ]]; then
             # Use CMake's MSVC debug-info knob to request /Z7 without passing
@@ -432,11 +416,6 @@ jobs:
                 --no-compress-output \
                 --timeout ${{ matrix.ctest_timeout || 60 }} \
                 --parallel "$CTEST_PARALLEL"
-
-      - name: Show sccache stats (after)
-        if: always()
-        shell: bash
-        run: sccache --show-stats || true
 
       # ------------------------------------------------------------------ #
       # 6. Upload test results on failure                                   #
