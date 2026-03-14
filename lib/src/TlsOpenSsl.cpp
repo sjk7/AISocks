@@ -5,6 +5,7 @@
 // https://pvs-studio.com
 
 #include "TlsOpenSsl.h"
+#include "PathHelper.h"
 
 #ifdef AISOCKS_ENABLE_TLS
 
@@ -105,7 +106,7 @@ bool TlsContext::loadCertificateChain(const std::string& certPemPath,
 }
 
 bool TlsContext::configureVerifyPeer(bool verifyPeer, bool loadDefaultCaPaths,
-    const std::string& caFile, std::string* error) {
+    const std::string& caFile, const std::string& caDir, std::string* error) {
     if (!ctx_) {
         if (error) *error = "TLS context is not initialized";
         return false;
@@ -115,9 +116,26 @@ bool TlsContext::configureVerifyPeer(bool verifyPeer, bool loadDefaultCaPaths,
         ctx_, verifyPeer ? SSL_VERIFY_PEER : SSL_VERIFY_NONE, nullptr);
 
     if (verifyPeer) {
-        if (!caFile.empty()) {
-            if (SSL_CTX_load_verify_locations(ctx_, caFile.c_str(), nullptr)
-                != 1) {
+        if (!caFile.empty() && !PathHelper::exists(caFile)) {
+            if (error) *error = "CA file not found: " + caFile;
+            return false;
+        }
+        if (!caDir.empty()) {
+            if (!PathHelper::exists(caDir)) {
+                if (error) *error = "CA directory not found: " + caDir;
+                return false;
+            }
+            if (!PathHelper::isDirectory(caDir)) {
+                if (error) *error = "CA directory path is not a directory: " + caDir;
+                return false;
+            }
+        }
+
+        const char* caFileArg = caFile.empty() ? nullptr : caFile.c_str();
+        const char* caDirArg = caDir.empty() ? nullptr : caDir.c_str();
+
+        if (caFileArg || caDirArg) {
+            if (SSL_CTX_load_verify_locations(ctx_, caFileArg, caDirArg) != 1) {
                 if (error) *error = TlsOpenSsl::lastErrorString();
                 return false;
             }

@@ -330,6 +330,106 @@ static void test_https_verify_enabled_fails_for_untrusted_self_signed() {
     REQUIRE(result.message().find("TLS setup") != std::string::npos);
 }
 
+static void test_https_verify_enabled_invalid_ca_file_fails_setup() {
+    BEGIN_TEST(
+        "HttpClient HTTPS verify enabled fails setup for invalid CA file");
+
+    const std::string root = sourceRoot();
+    const std::string cert = root + "/tests/certs/test_cert.pem";
+    const std::string key = root + "/tests/certs/test_key.pem";
+
+    TestHttpsServer server{cert, key};
+    REQUIRE(server.tlsReady());
+
+    std::thread serverThread(
+        [&] { server.run(ClientLimit::Unlimited, Milliseconds{5}); });
+    server.waitReady();
+
+    HttpClient::Options opts;
+    opts.connectTimeout = Milliseconds{2000};
+    opts.requestTimeout = Milliseconds{2000};
+    opts.verifyCertificate = true;
+    opts.caCertFile = "/nonexistent/ca-bundle.pem";
+    HttpClient client{opts};
+
+    const std::string url = "https://127.0.0.1:"
+        + std::to_string(server.serverPort().value()) + "/invalid-ca-file";
+    auto result = client.get(url);
+
+    server.requestStop();
+    serverThread.join();
+
+    REQUIRE(!result.isSuccess());
+    REQUIRE(result.message().find("TLS setup") != std::string::npos);
+}
+
+static void test_https_verify_enabled_invalid_ca_dir_fails_setup() {
+    BEGIN_TEST(
+        "HttpClient HTTPS verify enabled fails setup for invalid CA dir");
+
+    const std::string root = sourceRoot();
+    const std::string cert = root + "/tests/certs/test_cert.pem";
+    const std::string key = root + "/tests/certs/test_key.pem";
+
+    TestHttpsServer server{cert, key};
+    REQUIRE(server.tlsReady());
+
+    std::thread serverThread(
+        [&] { server.run(ClientLimit::Unlimited, Milliseconds{5}); });
+    server.waitReady();
+
+    HttpClient::Options opts;
+    opts.connectTimeout = Milliseconds{2000};
+    opts.requestTimeout = Milliseconds{2000};
+    opts.verifyCertificate = true;
+    opts.caCertDir = "/nonexistent/ca-dir";
+    HttpClient client{opts};
+
+    const std::string url = "https://127.0.0.1:"
+        + std::to_string(server.serverPort().value()) + "/invalid-ca-dir";
+    auto result = client.get(url);
+
+    server.requestStop();
+    serverThread.join();
+
+    REQUIRE(!result.isSuccess());
+    REQUIRE(result.message().find("TLS setup") != std::string::npos);
+}
+
+static void test_https_verify_enabled_ca_file_plus_invalid_dir_fails_setup() {
+    BEGIN_TEST("HttpClient HTTPS verify enabled with CA file plus invalid CA "
+               "dir fails setup deterministically");
+
+    const std::string root = sourceRoot();
+    const std::string cert = root + "/tests/certs/test_cert.pem";
+    const std::string key = root + "/tests/certs/test_key.pem";
+
+    TestHttpsServer server{cert, key};
+    REQUIRE(server.tlsReady());
+
+    std::thread serverThread(
+        [&] { server.run(ClientLimit::Unlimited, Milliseconds{5}); });
+    server.waitReady();
+
+    HttpClient::Options opts;
+    opts.connectTimeout = Milliseconds{2000};
+    opts.requestTimeout = Milliseconds{2000};
+    opts.verifyCertificate = true;
+    opts.caCertFile = cert;
+    opts.caCertDir = "/nonexistent/ca-dir";
+    HttpClient client{opts};
+
+    const std::string url = "https://127.0.0.1:"
+        + std::to_string(server.serverPort().value()) + "/ca-file-plus-dir";
+    auto result = client.get(url);
+
+    server.requestStop();
+    serverThread.join();
+
+    REQUIRE(!result.isSuccess());
+    REQUIRE(result.message().find("TLS setup") != std::string::npos);
+}
+
 static void test_https_cert_load_failure() {
     BEGIN_TEST("TestHttpsServer reports failure when cert files are missing");
 
@@ -364,6 +464,9 @@ int main() {
     test_https_verify_enabled_trusted_ca_and_matching_host();
     test_https_verify_enabled_fails_on_wrong_hostname();
     test_https_verify_enabled_fails_for_untrusted_self_signed();
+    test_https_verify_enabled_invalid_ca_file_fails_setup();
+    test_https_verify_enabled_invalid_ca_dir_fails_setup();
+    test_https_verify_enabled_ca_file_plus_invalid_dir_fails_setup();
 
     return test_summary();
 }

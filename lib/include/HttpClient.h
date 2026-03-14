@@ -168,6 +168,12 @@ class HttpClient {
         /// Optional PEM trust bundle/file used when verifyCertificate is true.
         /// Empty means system default CA paths.
         std::string caCertFile;
+
+        /// Optional CA certificate directory used when verifyCertificate is
+        /// true. On OpenSSL, this should contain hash-named cert symlinks or
+        /// files created via c_rehash/openssl rehash.
+        /// Empty means no explicit CA directory.
+        std::string caCertDir;
 #endif
     };
 
@@ -581,7 +587,7 @@ class HttpClient {
                 if (!ctx) return false;
                 if (!ctx->configureVerifyPeer(options_.verifyCertificate,
                         options_.verifyCertificate, options_.caCertFile,
-                        &tlsSetupError)) {
+                        options_.caCertDir, &tlsSetupError)) {
                     return false;
                 }
                 auto sess
