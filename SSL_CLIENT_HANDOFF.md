@@ -34,7 +34,7 @@ Scope: HttpClient TLS client path
 - [DONE] P1.4 SNI for IP literals is disabled; DNS hosts still send SNI.
 - [DONE] P1.3 host normalization + IDN policy: trailing-dot strip, robust IP literal checks, and non-ASCII DNS host rejection with punycode guidance under verify mode.
 - [OPEN] P0.1 verifyCertificate default-policy decision.
-- [OPEN] P1.5 verify depth option.
+- [DONE] P1.5 verify depth option.
 - [OPEN] P1.6 revocation strategy.
 - [DONE] P2.7 SSL_CTX reuse per HttpClient instance.
 - [OPEN] P2.8 session resumption across new TCP connections.
@@ -45,6 +45,8 @@ Scope: HttpClient TLS client path
 - Current default is false for backward compatibility.
 - Security target should be true by default in production-facing call sites.
 - Suggested path: keep library default false for one release, add deprecation warning in docs/changelog, then flip to true in next major/minor with migration notes.
+- Current state: docs now explicitly recommend `verifyCertificate=true` in
+  production, but runtime default has not yet been flipped.
 
 2. Improve trust-store API beyond single file. [DONE]
 - CA directory support is implemented (`caCertDir`) with deterministic precheck
@@ -54,7 +56,7 @@ Scope: HttpClient TLS client path
 
 ### P1: Hostname verification edge hardening
 
-3. Normalize host before OpenSSL hostname checks. [PARTIAL]
+3. Normalize host before OpenSSL hostname checks. [DONE]
 - Done:
   - strip trailing dots before OpenSSL host/IP verify setup.
   - use robust IP literal detection via `Socket::isValidIPv4/isValidIPv6`.
@@ -69,7 +71,10 @@ Scope: HttpClient TLS client path
 ### P1: Verification depth and revocation
 
 5. Add configurable verify depth.
-- Expose verify depth in HttpClient options for private PKI chains with non-default depth requirements.
+- [DONE] `verifyDepth` is exposed in HttpClient options (`-1` = OpenSSL
+  default, `>=0` applies explicit depth).
+- Added test coverage for invalid depth validation and `verifyDepth=0`
+  success path with trusted leaf.
 
 6. Evaluate revocation strategy.
 - Not currently checking OCSP/CRL.
@@ -119,8 +124,7 @@ Scope: HttpClient TLS client path
 
 ## Suggested next implementation order
 
-1. Add configurable verify depth and tests.
-2. Revisit default verifyCertificate policy and update docs/changelog.
+1. Revisit default verifyCertificate policy and update docs/changelog.
 
 ## Validation command set
 

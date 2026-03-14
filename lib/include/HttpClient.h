@@ -174,6 +174,11 @@ class HttpClient {
         /// files created via c_rehash/openssl rehash.
         /// Empty means no explicit CA directory.
         std::string caCertDir;
+
+        /// Maximum certificate-chain verification depth when
+        /// verifyCertificate is true.
+        /// -1 keeps OpenSSL defaults.
+        int verifyDepth{-1};
 #endif
     };
 
@@ -560,6 +565,11 @@ class HttpClient {
                     SocketError::Unknown, "Invalid URL authority");
             }
 #ifdef AISOCKS_ENABLE_TLS
+            if (isHttps && options_.verifyCertificate
+                && options_.verifyDepth < -1) {
+                return Result<HttpClientResponse>::failure(
+                    SocketError::Unknown, "TLS verifyDepth must be -1 or >= 0");
+            }
             const std::string normalizedVerifyHost = normalizeTlsHost_(host);
             const bool normalizedVerifyHostIsIp
                 = isLikelyIpLiteral_(normalizedVerifyHost);
@@ -632,6 +642,10 @@ class HttpClient {
                     if (!verifyParam) {
                         tlsSetupError = "TLS verify parameter setup failed";
                         return false;
+                    }
+                    if (options_.verifyDepth >= 0) {
+                        X509_VERIFY_PARAM_set_depth(
+                            verifyParam, options_.verifyDepth);
                     }
 
                     const int hostSet = normalizedVerifyHostIsIp

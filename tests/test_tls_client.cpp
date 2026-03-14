@@ -649,6 +649,56 @@ static void test_https_verify_enabled_rejects_non_ascii_dns_host() {
     REQUIRE(result.message().find("punycode") != std::string::npos);
 }
 
+static void test_https_verify_depth_invalid_value_fails_early() {
+    BEGIN_TEST("HttpClient HTTPS verifyDepth < -1 fails with validation "
+               "error");
+
+    HttpClient::Options opts;
+    opts.connectTimeout = Milliseconds{2000};
+    opts.requestTimeout = Milliseconds{2000};
+    opts.verifyCertificate = true;
+    opts.verifyDepth = -2;
+    HttpClient client{opts};
+
+    auto result = client.get("https://127.0.0.1:1/");
+    REQUIRE(!result.isSuccess());
+    REQUIRE(result.message().find("verifyDepth") != std::string::npos);
+}
+
+static void test_https_verify_depth_zero_still_succeeds_for_self_signed_leaf() {
+    BEGIN_TEST("HttpClient HTTPS verifyDepth=0 succeeds for trusted "
+               "self-signed leaf cert");
+
+    const std::string root = sourceRoot();
+    const std::string cert = root + "/tests/certs/test_cert.pem";
+    const std::string key = root + "/tests/certs/test_key.pem";
+
+    TestHttpsServer server{cert, key};
+    REQUIRE(server.tlsReady());
+
+    std::thread serverThread(
+        [&] { server.run(ClientLimit::Unlimited, Milliseconds{5}); });
+    server.waitReady();
+
+    HttpClient::Options opts;
+    opts.connectTimeout = Milliseconds{2000};
+    opts.requestTimeout = Milliseconds{2000};
+    opts.verifyCertificate = true;
+    opts.caCertFile = cert;
+    opts.verifyDepth = 0;
+    HttpClient client{opts};
+
+    const std::string url = "https://127.0.0.1:"
+        + std::to_string(server.serverPort().value()) + "/verify-depth-0";
+    auto result = client.get(url);
+
+    server.requestStop();
+    serverThread.join();
+
+    REQUIRE(result.isSuccess());
+    REQUIRE(result.value().statusCode() == 200);
+}
+
 static void test_https_cert_load_failure() {
     BEGIN_TEST("TestHttpsServer reports failure when cert files are missing");
 
@@ -692,6 +742,8 @@ int main() {
     test_https_verify_enabled_ipv6_san_match_succeeds();
     test_https_verify_enabled_ipv6_san_mismatch_fails();
     test_https_verify_enabled_rejects_non_ascii_dns_host();
+    test_https_verify_depth_invalid_value_fails_early();
+    test_https_verify_depth_zero_still_succeeds_for_self_signed_leaf();
 
     return test_summary();
 }
