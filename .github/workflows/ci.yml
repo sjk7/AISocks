@@ -3,8 +3,20 @@ name: CI
 on:
   push:
     branches: ["main", "master", "secure"]
+    paths-ignore:
+      - "**/*.md"
+      - "docs/**"
+      - "html/**"
+      - ".gitignore"
+      - "LICENSE*"
   pull_request:
     branches: ["main", "master", "secure"]
+    paths-ignore:
+      - "**/*.md"
+      - "docs/**"
+      - "html/**"
+      - ".gitignore"
+      - "LICENSE*"
   workflow_dispatch:
 
 # Cancel superseded runs on the same branch/PR to save runner minutes.
@@ -47,6 +59,7 @@ jobs:
             cxx: g++
             cmake_generator: Ninja
             build_type: Debug
+            tier: fast
 
           # Linux — Clang
           - os: ubuntu-latest
@@ -55,6 +68,7 @@ jobs:
             cxx: clang++
             cmake_generator: Ninja
             build_type: Debug
+            tier: fast
 
           # ---------------------------------------------------------------
           # macOS — Apple Clang (Xcode toolchain)
@@ -65,6 +79,7 @@ jobs:
             cxx: clang++
             cmake_generator: Ninja
             build_type: Debug
+            tier: fast
 
           # ---------------------------------------------------------------
           # Windows — MSVC
@@ -73,12 +88,14 @@ jobs:
             compiler: msvc
             cmake_generator: Ninja
             build_type: Debug
+            tier: fast
 
           # Windows — Clang-cl (LLVM toolchain on Windows)
           - os: windows-latest
             compiler: clang-cl
             cmake_generator: Ninja
             build_type: Debug
+            tier: fast
             env:
               CC: clang-cl
               CXX: clang-cl
@@ -92,6 +109,7 @@ jobs:
             cxx: g++
             cmake_generator: Ninja
             build_type: RelWithDebInfo
+            tier: full
 
           - os: macos-latest
             compiler: apple-clang
@@ -99,11 +117,13 @@ jobs:
             cxx: clang++
             cmake_generator: Ninja
             build_type: RelWithDebInfo
+            tier: full
 
           - os: windows-latest
             compiler: msvc
             cmake_generator: Ninja
             build_type: RelWithDebInfo
+            tier: full
 
           # ---------------------------------------------------------------
           # TLS integration legs (exercise AISOCKS_ENABLE_TLS=ON tests)
@@ -116,6 +136,7 @@ jobs:
             build_type: RelWithDebInfo
             enable_tls: "ON"
             ctest_timeout: 120
+            tier: full
 
           - os: macos-latest
             compiler: apple-clang (tls)
@@ -125,6 +146,7 @@ jobs:
             build_type: RelWithDebInfo
             enable_tls: "ON"
             ctest_timeout: 120
+            tier: full
 
           - os: windows-latest
             compiler: msvc (tls)
@@ -132,6 +154,7 @@ jobs:
             build_type: RelWithDebInfo
             enable_tls: "ON"
             ctest_timeout: 120
+            tier: full
 
           # ---------------------------------------------------------------
           # Sanitizer legs — Linux/Clang, Debug
@@ -149,6 +172,7 @@ jobs:
             asan_options: "detect_leaks=1:strict_string_checks=1:detect_stack_use_after_return=1"
             ubsan_options: "print_stacktrace=1:halt_on_error=1"
             ctest_timeout: 120
+            tier: full
 
           # TSan
           - os: ubuntu-latest
@@ -160,6 +184,7 @@ jobs:
             sanitizer_flags: "-fsanitize=thread -fno-omit-frame-pointer"
             tsan_options: "halt_on_error=1:second_deadlock_stack=1"
             ctest_timeout: 180
+            tier: full
 
     steps:
       # ------------------------------------------------------------------ #
@@ -167,6 +192,19 @@ jobs:
       # ------------------------------------------------------------------ #
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Set up sccache
+        uses: mozilla-actions/sccache-action@v0.0.9
+
+      - name: Enable sccache (GitHub Actions backend)
+        shell: bash
+        run: |
+          echo "SCCACHE_GHA_ENABLED=true" >> "$GITHUB_ENV"
+          echo "RUST_LOG=sccache=error" >> "$GITHUB_ENV"
+
+      - name: Show sccache stats (before)
+        shell: bash
+        run: sccache --show-stats || true
 
       # ------------------------------------------------------------------ #
       # 2. Install system dependencies                                      #
@@ -229,7 +267,15 @@ jobs:
             -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
             -DBUILD_TESTS=ON
             -DBUILD_EXAMPLES=OFF
+            -DCMAKE_C_COMPILER_LAUNCHER=sccache
+            -DCMAKE_CXX_COMPILER_LAUNCHER=sccache
           )
+          if [[ "$RUNNER_OS" == "Windows" && "${{ matrix.build_type }}" == "RelWithDebInfo" ]]; then
+            CMAKE_ARGS+=(
+              "-DCMAKE_C_FLAGS_RELWITHDEBINFO=/O2 /Ob1 /DNDEBUG /Z7"
+              "-DCMAKE_CXX_FLAGS_RELWITHDEBINFO=/O2 /Ob1 /DNDEBUG /Z7"
+            )
+          fi
           if [[ "$ENABLE_TLS" == "ON" ]]; then
             CMAKE_ARGS+=(
               -DAISOCKS_ENABLE_TLS=ON
@@ -306,6 +352,7 @@ jobs:
       # that GitHub Actions can parse the results properly.
       - name: Build
         shell: bash
+        if: github.event_name != 'pull_request' || matrix.tier == 'fast'
         run: |
           cmake --build build \
             --parallel $(nproc 2>/dev/null || sysctl -n hw.logicalcpu 2>/dev/null || echo 4)
@@ -315,6 +362,7 @@ jobs:
       # ------------------------------------------------------------------ #
       - name: Run tests
         shell: bash
+        if: github.event_name != 'pull_request' || matrix.tier == 'fast'
         working-directory: build
         env:
           ASAN_OPTIONS: ${{ matrix.asan_options }}
@@ -342,6 +390,11 @@ jobs:
                 --no-compress-output \
                 --timeout ${{ matrix.ctest_timeout || 60 }} \
                 --parallel 4
+
+      - name: Show sccache stats (after)
+        if: always()
+        shell: bash
+        run: sccache --show-stats || true
 
       # ------------------------------------------------------------------ #
       # 6. Upload test results on failure                                   #
