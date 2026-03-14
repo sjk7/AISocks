@@ -26,6 +26,7 @@
 #include <atomic>
 #include <chrono>
 #include <condition_variable>
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <mutex>
@@ -34,6 +35,7 @@
 #include <sstream>
 #include <string>
 #include <thread>
+#include <vector>
 
 using namespace aiSocks;
 
@@ -177,6 +179,63 @@ class TestHttpsServer : public HttpPollServer {
     std::string lastSniName_;
 };
 
+class RedirectHttpsServer : public TestHttpsServer {
+    public:
+    RedirectHttpsServer(const std::string& certPath, const std::string& keyPath,
+        std::string location, const std::string& bindHost = "127.0.0.1",
+        AddressFamily family = AddressFamily::IPv4)
+        : TestHttpsServer(certPath, keyPath, bindHost, family)
+        , location_(std::move(location)) {}
+
+    protected:
+    void buildResponse(HttpClientState& s) override {
+        s.responseBuf = "HTTP/1.1 302 Found\r\n"
+                        "Location: "
+            + location_
+            + "\r\n"
+              "Content-Length: 0\r\n"
+              "Connection: close\r\n\r\n";
+        s.responseView = s.responseBuf;
+        requestsServed.fetch_add(1, std::memory_order_relaxed);
+    }
+
+    private:
+    std::string location_;
+};
+
+class TestHttpServer : public HttpPollServer {
+    public:
+    explicit TestHttpServer(const std::string& body = "Hello, HTTP!")
+        : HttpPollServer(ServerBind{"127.0.0.1", Port{0}}), body_(body) {
+        setHandleSignals(false);
+    }
+
+    void waitReady() {
+        std::unique_lock<std::mutex> lk(readyMtx_);
+        readyCv_.wait(lk, [this] { return ready_.load(); });
+    }
+
+    protected:
+    void onReady() override {
+        {
+            std::lock_guard<std::mutex> lk(readyMtx_);
+            ready_ = true;
+        }
+        readyCv_.notify_all();
+    }
+
+    void buildResponse(HttpClientState& s) override {
+        s.responseBuf = makeResponse("HTTP/1.1 200 OK", "text/plain", body_);
+        s.responseView = s.responseBuf;
+    }
+
+    private:
+    std::string body_;
+    std::atomic<bool> ready_{false};
+    std::mutex readyMtx_;
+    std::condition_variable readyCv_;
+};
+
 static bool hasIpv6Loopback_() {
     auto srv = TcpSocket::createRaw(AddressFamily::IPv6);
     if (!srv.setReuseAddress(true)) return false;
@@ -202,8 +261,8 @@ static bool copyFile_(const std::string& src, const std::string& dst) {
     return static_cast<bool>(out);
 }
 
-static bool createHashedCaDirFixture_(
-    const std::string& certPemPath, ScopedTempDir& out, std::string& err) {
+static bool appendHashedCaCert_(const std::string& certPemPath,
+    const std::filesystem::path& capathDir, std::string& err) {
     FILE* fp = std::fopen(certPemPath.c_str(), "rb");
     if (!fp) {
         err = "failed to open cert PEM for capath fixture";
@@ -220,6 +279,24 @@ static bool createHashedCaDirFixture_(
     const unsigned long hash = X509_subject_name_hash(cert);
     X509_free(cert);
 
+    for (int suffix = 0; suffix < 16; ++suffix) {
+        char hashFile[32] = {};
+        std::snprintf(hashFile, sizeof(hashFile), "%08lx.%d", hash, suffix);
+        const std::filesystem::path hashedCert = capathDir / hashFile;
+        if (std::filesystem::exists(hashedCert)) continue;
+        if (!copyFile_(certPemPath, hashedCert.string())) {
+            err = "failed to write hashed cert file in capath fixture";
+            return false;
+        }
+        return true;
+    }
+
+    err = "no free hash suffix available in capath fixture";
+    return false;
+}
+
+static bool createHashedCaDirFixture_(
+    const std::string& certPemPath, ScopedTempDir& out, std::string& err) {
     const auto now = std::chrono::steady_clock::now().time_since_epoch();
     std::ostringstream dirName;
     dirName << "aisocks-capath-" << now.count();
@@ -231,12 +308,30 @@ static bool createHashedCaDirFixture_(
         return false;
     }
 
-    char hashFile[32] = {};
-    std::snprintf(hashFile, sizeof(hashFile), "%08lx.0", hash);
-    const std::filesystem::path hashedCert = out.path / hashFile;
-    if (!copyFile_(certPemPath, hashedCert.string())) {
-        err = "failed to write hashed cert file in capath fixture";
+    return appendHashedCaCert_(certPemPath, out.path, err);
+}
+
+static bool createHashedCaDirFixtureForCerts_(
+    const std::vector<std::string>& certPemPaths, ScopedTempDir& out,
+    std::string& err) {
+    if (certPemPaths.empty()) {
+        err = "no cert paths provided for capath fixture";
         return false;
+    }
+
+    const auto now = std::chrono::steady_clock::now().time_since_epoch();
+    std::ostringstream dirName;
+    dirName << "aisocks-capath-multi-" << now.count();
+    out.path = std::filesystem::temp_directory_path() / dirName.str();
+
+    std::error_code ec;
+    if (!std::filesystem::create_directories(out.path, ec)) {
+        err = "failed to create capath fixture directory";
+        return false;
+    }
+
+    for (const auto& certPemPath : certPemPaths) {
+        if (!appendHashedCaCert_(certPemPath, out.path, err)) return false;
     }
 
     return true;
@@ -600,6 +695,116 @@ static void test_https_verify_enabled_ca_file_plus_valid_dir_succeeds() {
     REQUIRE(result.value().statusCode() == 200);
 }
 
+static void test_https_redirect_to_different_host_with_verify_enabled() {
+    BEGIN_TEST("HttpClient follows HTTPS redirect to different host with "
+               "verify enabled");
+
+    if (!hasIpv6Loopback_()) {
+        REQUIRE_MSG(true, "SKIP - IPv6 loopback not available on this system");
+        return;
+    }
+
+    const std::string root = sourceRoot();
+    const std::string certV4 = root + "/tests/certs/test_cert.pem";
+    const std::string keyV4 = root + "/tests/certs/test_key.pem";
+    const std::string certV6 = root + "/tests/certs/test_cert_ipv6.pem";
+    const std::string keyV6 = root + "/tests/certs/test_key_ipv6.pem";
+
+    ScopedTempDir capathFixture;
+    std::string fixtureErr;
+    REQUIRE(createHashedCaDirFixtureForCerts_(
+        {certV4, certV6}, capathFixture, fixtureErr));
+    if (!fixtureErr.empty()) {
+        REQUIRE_MSG(false, fixtureErr.c_str());
+        return;
+    }
+
+    TestHttpsServer target{certV6, keyV6, "::1", AddressFamily::IPv6};
+    REQUIRE(target.tlsReady());
+    std::thread targetThread(
+        [&] { target.run(ClientLimit::Unlimited, Milliseconds{5}); });
+    target.waitReady();
+
+    const std::string location = "https://[::1]:"
+        + std::to_string(target.serverPort().value()) + "/redirected-v6";
+
+    RedirectHttpsServer origin{certV4, keyV4, location};
+    REQUIRE(origin.tlsReady());
+    std::thread originThread(
+        [&] { origin.run(ClientLimit::Unlimited, Milliseconds{5}); });
+    origin.waitReady();
+
+    HttpClient::Options opts;
+    opts.connectTimeout = Milliseconds{2000};
+    opts.requestTimeout = Milliseconds{2000};
+    opts.verifyCertificate = true;
+    opts.caCertDir = capathFixture.path.string();
+    HttpClient client{opts};
+
+    const std::string url = "https://127.0.0.1:"
+        + std::to_string(origin.serverPort().value()) + "/start-redirect";
+    auto result = client.get(url);
+
+    origin.requestStop();
+    target.requestStop();
+    originThread.join();
+    targetThread.join();
+
+    REQUIRE(result.isSuccess());
+    if (!result.isSuccess()) return;
+    REQUIRE(result.value().statusCode() == 200);
+    REQUIRE(result.value().finalUrl == location);
+    REQUIRE(result.value().redirectChain.size() == 1);
+    REQUIRE(result.value().redirectChain.front() == location);
+}
+
+static void test_https_to_http_redirect_behavior() {
+    BEGIN_TEST("HttpClient follows HTTPS to HTTP redirect and reports final "
+               "URL chain");
+
+    const std::string root = sourceRoot();
+    const std::string cert = root + "/tests/certs/test_cert.pem";
+    const std::string key = root + "/tests/certs/test_key.pem";
+
+    TestHttpServer httpTarget{"Hello, downgrade!"};
+    std::thread httpThread(
+        [&] { httpTarget.run(ClientLimit::Unlimited, Milliseconds{5}); });
+    httpTarget.waitReady();
+
+    const std::string location = "http://127.0.0.1:"
+        + std::to_string(httpTarget.serverPort().value()) + "/downgraded";
+
+    RedirectHttpsServer origin{cert, key, location};
+    REQUIRE(origin.tlsReady());
+    std::thread originThread(
+        [&] { origin.run(ClientLimit::Unlimited, Milliseconds{5}); });
+    origin.waitReady();
+
+    HttpClient::Options opts;
+    opts.connectTimeout = Milliseconds{2000};
+    opts.requestTimeout = Milliseconds{2000};
+    opts.verifyCertificate = true;
+    opts.caCertFile = cert;
+    HttpClient client{opts};
+
+    const std::string url = "https://127.0.0.1:"
+        + std::to_string(origin.serverPort().value()) + "/start-downgrade";
+    auto result = client.get(url);
+
+    origin.requestStop();
+    httpTarget.requestStop();
+    originThread.join();
+    httpThread.join();
+
+    REQUIRE(result.isSuccess());
+    if (!result.isSuccess()) return;
+    REQUIRE(result.value().statusCode() == 200);
+    REQUIRE(result.value().finalUrl == location);
+    REQUIRE(result.value().redirectChain.size() == 1);
+    REQUIRE(result.value().redirectChain.front() == location);
+    REQUIRE(result.value().body().find("downgrade") != std::string_view::npos);
+}
+
 static void test_https_set_options_rebuilds_tls_context() {
     BEGIN_TEST("HttpClient setOptions rebuilds TLS context with new trust "
                "settings");
@@ -848,6 +1053,33 @@ static void test_https_verify_depth_zero_still_succeeds_for_self_signed_leaf() {
     REQUIRE(result.value().statusCode() == 200);
 }
 
+static void test_https_default_system_roots_smoke_gated() {
+    BEGIN_TEST("HttpClient HTTPS default system roots smoke test (gated)");
+
+    const char* gate = std::getenv("AISOCKS_RUN_SYSTEM_ROOT_TLS_TEST");
+    if (!gate || std::string_view(gate) != "1") {
+        REQUIRE_MSG(true,
+            "SKIP - set AISOCKS_RUN_SYSTEM_ROOT_TLS_TEST=1 to enable");
+        return;
+    }
+
+    HttpClient::Options opts;
+    opts.connectTimeout = Milliseconds{4000};
+    opts.requestTimeout = Milliseconds{8000};
+    opts.verifyCertificate = true;
+    HttpClient client{opts};
+
+    auto result = client.get("https://example.com/");
+    REQUIRE(result.isSuccess());
+    if (!result.isSuccess()) {
+        REQUIRE_MSG(false,
+            ("system roots smoke failed: " + result.message()).c_str());
+        return;
+    }
+    REQUIRE(result.value().statusCode() >= 200);
+    REQUIRE(result.value().statusCode() < 400);
+}
+
 static void test_https_cert_load_failure() {
     BEGIN_TEST("TestHttpsServer reports failure when cert files are missing");
 
@@ -887,6 +1119,8 @@ int main() {
     test_https_verify_enabled_ca_file_plus_invalid_dir_fails_setup();
     test_https_verify_enabled_ca_dir_only_succeeds();
     test_https_verify_enabled_ca_file_plus_valid_dir_succeeds();
+    test_https_redirect_to_different_host_with_verify_enabled();
+    test_https_to_http_redirect_behavior();
     test_https_set_options_rebuilds_tls_context();
     test_https_ip_literal_does_not_send_sni();
     test_https_dns_host_sends_sni();
@@ -895,6 +1129,7 @@ int main() {
     test_https_verify_enabled_rejects_non_ascii_dns_host();
     test_https_verify_depth_invalid_value_fails_early();
     test_https_verify_depth_zero_still_succeeds_for_self_signed_leaf();
+    test_https_default_system_roots_smoke_gated();
 
     return test_summary();
 }

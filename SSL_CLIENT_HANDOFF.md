@@ -42,6 +42,13 @@ Scope: HttpClient TLS client path
 - [DONE] CA source matrix positive cases:
   - CA directory-only success fixture using deterministic hashed capath temp dir.
   - valid file+dir success fixture.
+- [DONE] Redirect + TLS verification interaction coverage:
+  - HTTPS redirect to different host succeeds with verify enabled and explicit trust roots.
+  - HTTPS->HTTP downgrade follow behavior is explicitly tested and asserted.
+  - redirectChain/finalUrl assertions lock observable behavior.
+- [DONE] Default system-roots behavior test (gated):
+  - Added `AISOCKS_RUN_SYSTEM_ROOT_TLS_TEST=1` environment-gated smoke test.
+  - Default behavior is SKIP to keep CI deterministic and non-networked.
 
 ## Open Work
 
@@ -63,21 +70,12 @@ Scope: HttpClient TLS client path
 
 ## Remaining Tests
 
-- [OPEN][P2] Default system roots behavior test (environment-sensitive):
-  - Add gated smoke test enabled only when AISOCKS_RUN_SYSTEM_ROOT_TLS_TEST=1.
-  - Test expectation: known public endpoint succeeds with verifyCertificate=true and no explicit CA file/dir.
-  - Mark as skipped by default in CI to avoid network/env flakiness.
-- [OPEN][P3] Redirect + TLS verification interactions:
-  - Add HTTPS redirect to different host test with verify enabled and explicit trust roots.
-  - Add explicit HTTPS->HTTP redirect behavior test and lock current behavior with assertions.
-  - Include redirect-chain assertions to ensure host/scheme transitions are visible to callers.
+- No remaining TLS test gaps from this handoff plan.
 
 ## Next Iteration Order
 
-1. Implement P3 redirect/TLS interaction tests and document current downgrade behavior.
-2. Add P2 gated system-roots smoke test.
-3. Re-evaluate whether ITER-2 (session resumption across new TCP connections) should start in this branch or a follow-up branch.
-4. Finalize ITER-1 revocation scope text in docs before handoff close.
+1. Re-evaluate whether ITER-2 (session resumption across new TCP connections) should start in this branch or a follow-up branch.
+2. Finalize ITER-1 revocation scope text in docs before handoff close.
 
 ## Latest Validation
 
@@ -88,6 +86,14 @@ Scope: HttpClient TLS client path
 - Added guard in IPv6 SAN-match test to avoid abort-on-failure behavior and emit actionable failure text.
 - Re-ran `build-tls-relwithdebinfo/tests/test_tls_client`: 60 passed, 0 failed.
 - Ran non-SSL CMake suite via CTest (`build-relwithdebinfo`): all discovered tests passed (48/48).
+- Added and validated P3 redirect tests:
+  - `HttpClient follows HTTPS redirect to different host with verify enabled`
+  - `HttpClient follows HTTPS to HTTP redirect and reports final URL chain`
+- Added and validated gated P2 system-roots smoke test:
+  - `HttpClient HTTPS default system roots smoke test (gated)`
+  - default run behavior is SKIP unless `AISOCKS_RUN_SYSTEM_ROOT_TLS_TEST=1`.
+- Current TLS integration run: 76 passed, 0 failed.
+- Non-SSL CMake suite re-run via CTest (`build-relwithdebinfo`): all discovered tests passed.
 
 ## Current Key Touchpoints
 
