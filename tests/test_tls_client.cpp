@@ -455,6 +455,46 @@ static void test_https_verify_enabled_ca_file_plus_invalid_dir_fails_setup() {
     REQUIRE(result.message().find("TLS setup") != std::string::npos);
 }
 
+static void test_https_set_options_rebuilds_tls_context() {
+    BEGIN_TEST("HttpClient setOptions rebuilds TLS context with new trust "
+               "settings");
+
+    const std::string root = sourceRoot();
+    const std::string cert = root + "/tests/certs/test_cert.pem";
+    const std::string key = root + "/tests/certs/test_key.pem";
+
+    TestHttpsServer server{cert, key};
+    REQUIRE(server.tlsReady());
+
+    std::thread serverThread(
+        [&] { server.run(ClientLimit::Unlimited, Milliseconds{5}); });
+    server.waitReady();
+
+    HttpClient::Options opts;
+    opts.connectTimeout = Milliseconds{2000};
+    opts.requestTimeout = Milliseconds{2000};
+    opts.verifyCertificate = true;
+    opts.caCertFile = cert;
+    HttpClient client{opts};
+
+    const std::string url = "https://127.0.0.1:"
+        + std::to_string(server.serverPort().value()) + "/set-options";
+    auto first = client.get(url);
+    REQUIRE(first.isSuccess());
+
+    HttpClient::Options invalid = opts;
+    invalid.caCertFile = "/nonexistent/ca-bundle.pem";
+    client.setOptions(invalid);
+
+    auto second = client.get(url);
+
+    server.requestStop();
+    serverThread.join();
+
+    REQUIRE(!second.isSuccess());
+    REQUIRE(second.message().find("TLS setup") != std::string::npos);
+}
+
 static void test_https_ip_literal_does_not_send_sni() {
     BEGIN_TEST("HttpClient HTTPS with IP literal does not send SNI");
 
@@ -591,6 +631,24 @@ static void test_https_verify_enabled_ipv6_san_mismatch_fails() {
     REQUIRE(result.message().find("TLS setup") != std::string::npos);
 }
 
+static void test_https_verify_enabled_rejects_non_ascii_dns_host() {
+    BEGIN_TEST("HttpClient HTTPS verify enabled rejects non-ASCII DNS host; "
+               "requires punycode");
+
+    HttpClient::Options opts;
+    opts.connectTimeout = Milliseconds{2000};
+    opts.requestTimeout = Milliseconds{2000};
+    opts.verifyCertificate = true;
+    HttpClient client{opts};
+
+    const std::string host = "t\xC3\xA9st.invalid";
+    const std::string url = "https://" + host + "/idn";
+    auto result = client.get(url);
+
+    REQUIRE(!result.isSuccess());
+    REQUIRE(result.message().find("punycode") != std::string::npos);
+}
+
 static void test_https_cert_load_failure() {
     BEGIN_TEST("TestHttpsServer reports failure when cert files are missing");
 
@@ -628,10 +686,12 @@ int main() {
     test_https_verify_enabled_invalid_ca_file_fails_setup();
     test_https_verify_enabled_invalid_ca_dir_fails_setup();
     test_https_verify_enabled_ca_file_plus_invalid_dir_fails_setup();
+    test_https_set_options_rebuilds_tls_context();
     test_https_ip_literal_does_not_send_sni();
     test_https_dns_host_sends_sni();
     test_https_verify_enabled_ipv6_san_match_succeeds();
     test_https_verify_enabled_ipv6_san_mismatch_fails();
+    test_https_verify_enabled_rejects_non_ascii_dns_host();
 
     return test_summary();
 }

@@ -213,7 +213,13 @@ class HttpClient {
     }
 
     // Configuration
-    void setOptions(Options options) { options_ = std::move(options); }
+    void setOptions(Options options) {
+        options_ = std::move(options);
+        clearCachedConnection_();
+#ifdef AISOCKS_ENABLE_TLS
+        cachedClientTlsContext_.reset();
+#endif
+    }
     const Options& getOptions() const noexcept { return options_; }
 
     /// Resolve a Location header value against the base URL that produced it.
@@ -329,6 +335,7 @@ class HttpClient {
     std::shared_ptr<TcpSocket> cachedSocket_;
 #ifdef AISOCKS_ENABLE_TLS
     std::shared_ptr<TlsSession> cachedTlsSession_;
+    std::shared_ptr<TlsContext> cachedClientTlsContext_;
 #endif
 
     void clearCachedConnection_() noexcept {
@@ -421,6 +428,13 @@ class HttpClient {
 
     static bool isLikelyIpLiteral_(const std::string& host) {
         return Socket::isValidIPv4(host) || Socket::isValidIPv6(host);
+    }
+
+    static bool hasNonAsciiHostChar_(const std::string& host) {
+        for (unsigned char c : host) {
+            if (c > 0x7F) return true;
+        }
+        return false;
     }
 #endif
 
@@ -545,6 +559,18 @@ class HttpClient {
                 return Result<HttpClientResponse>::failure(
                     SocketError::Unknown, "Invalid URL authority");
             }
+#ifdef AISOCKS_ENABLE_TLS
+            const std::string normalizedVerifyHost = normalizeTlsHost_(host);
+            const bool normalizedVerifyHostIsIp
+                = isLikelyIpLiteral_(normalizedVerifyHost);
+            if (isHttps && options_.verifyCertificate
+                && !normalizedVerifyHostIsIp
+                && hasNonAsciiHostChar_(normalizedVerifyHost)) {
+                return Result<HttpClientResponse>::failure(SocketError::Unknown,
+                    "TLS DNS host contains non-ASCII characters; use "
+                    "punycode (A-label)");
+            }
+#endif
 
             std::shared_ptr<TcpSocket> socket;
             bool reusedConnection = false;
@@ -581,23 +607,25 @@ class HttpClient {
                 if (!isHttps) return true;
                 tlsSetupError.clear();
                 tlsSession.reset();
-                auto ctx = TlsContext::create(
-                    TlsContext::Mode::Client, &tlsSetupError);
-                if (!ctx) return false;
-                if (!ctx->configureVerifyPeer(options_.verifyCertificate,
-                        options_.verifyCertificate, options_.caCertFile,
-                        options_.caCertDir, &tlsSetupError)) {
-                    return false;
+                if (!cachedClientTlsContext_) {
+                    auto ctx = TlsContext::create(
+                        TlsContext::Mode::Client, &tlsSetupError);
+                    if (!ctx) return false;
+                    if (!ctx->configureVerifyPeer(options_.verifyCertificate,
+                            options_.verifyCertificate, options_.caCertFile,
+                            options_.caCertDir, &tlsSetupError)) {
+                        return false;
+                    }
+                    cachedClientTlsContext_
+                        = std::shared_ptr<TlsContext>(std::move(ctx));
                 }
-                auto sess
-                    = TlsSession::create(ctx->nativeHandle(), &tlsSetupError);
+                auto sess = TlsSession::create(
+                    cachedClientTlsContext_->nativeHandle(), &tlsSetupError);
                 if (!sess) return false;
                 if (!sess->attachSocket(
                         static_cast<int>(socket->getNativeHandle()),
                         &tlsSetupError))
                     return false;
-                const std::string verifyHost = normalizeTlsHost_(host);
-                const bool verifyHostIsIp = isLikelyIpLiteral_(verifyHost);
                 if (options_.verifyCertificate) {
                     X509_VERIFY_PARAM* verifyParam
                         = SSL_get0_param(sess->nativeHandle());
@@ -606,23 +634,23 @@ class HttpClient {
                         return false;
                     }
 
-                    const int hostSet = verifyHostIsIp
+                    const int hostSet = normalizedVerifyHostIsIp
                         ? X509_VERIFY_PARAM_set1_ip_asc(
-                              verifyParam, verifyHost.c_str())
+                              verifyParam, normalizedVerifyHost.c_str())
                         : X509_VERIFY_PARAM_set1_host(
-                              verifyParam, verifyHost.c_str(), 0);
+                              verifyParam, normalizedVerifyHost.c_str(), 0);
                     if (hostSet != 1) {
                         tlsSetupError = "TLS hostname verification setup "
                                         "failed for host: "
-                            + verifyHost;
+                            + normalizedVerifyHost;
                         return false;
                     }
                 }
                 // Set SNI hostname so virtual-hosted servers pick the right
                 // cert.
-                if (!verifyHost.empty() && !verifyHostIsIp)
+                if (!normalizedVerifyHost.empty() && !normalizedVerifyHostIsIp)
                     SSL_set_tlsext_host_name(
-                        sess->nativeHandle(), verifyHost.c_str());
+                        sess->nativeHandle(), normalizedVerifyHost.c_str());
                 sess->setConnectState();
                 for (;;) {
                     const int r = sess->handshake();

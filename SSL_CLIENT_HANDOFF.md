@@ -32,11 +32,11 @@ Scope: HttpClient TLS client path
 
 - [DONE] P0.2 trust-store API supports CA file/dir and deterministic invalid-path behavior.
 - [DONE] P1.4 SNI for IP literals is disabled; DNS hosts still send SNI.
-- [PARTIAL] P1.3 host normalization is in place (trailing-dot strip + robust IP literal checks); IDN policy remains.
+- [DONE] P1.3 host normalization + IDN policy: trailing-dot strip, robust IP literal checks, and non-ASCII DNS host rejection with punycode guidance under verify mode.
 - [OPEN] P0.1 verifyCertificate default-policy decision.
 - [OPEN] P1.5 verify depth option.
 - [OPEN] P1.6 revocation strategy.
-- [OPEN] P2.7 SSL_CTX reuse.
+- [DONE] P2.7 SSL_CTX reuse per HttpClient instance.
 - [OPEN] P2.8 session resumption across new TCP connections.
 
 ### P0: Security posture defaults and API ergonomics
@@ -58,9 +58,7 @@ Scope: HttpClient TLS client path
 - Done:
   - strip trailing dots before OpenSSL host/IP verify setup.
   - use robust IP literal detection via `Socket::isValidIPv4/isValidIPv6`.
-- Remaining:
-  - IDN/punycode handling policy (callers must pass punycode vs library conversion).
-  - add explicit IPv6 verification-path regression tests.
+- IDN/punycode policy: callers must pass punycode (A-label) hostnames when verification is enabled; non-ASCII DNS hosts are rejected with a clear error.
 
 4. SNI behavior for IP literals. [DONE]
 - SNI is now sent for DNS hosts only; skipped for IP literals.
@@ -80,9 +78,8 @@ Scope: HttpClient TLS client path
 ### P2: Performance and lifecycle cleanup
 
 7. Reuse client SSL_CTX across requests.
-- Current flow creates a new TLS context per new TLS connection in performRequest.
-- Reusing SSL_CTX per HttpClient instance would reduce overhead and centralize trust config.
-- Ensure thread-safety expectations are documented (HttpClient currently appears single-threaded by usage pattern).
+- [DONE] TLS context is reused per HttpClient instance and rebuilt when
+  `setOptions()` changes trust/verify settings.
 
 8. Session resumption policy.
 - Current keep-alive reuses live TLS session on same socket only.
@@ -122,10 +119,8 @@ Scope: HttpClient TLS client path
 
 ## Suggested next implementation order
 
-1. Decide/document IDN-punycode policy and add corresponding tests.
-2. Introduce reusable SSL_CTX in HttpClient instance.
-3. Add configurable verify depth and tests.
-4. Revisit default verifyCertificate policy and update docs/changelog.
+1. Add configurable verify depth and tests.
+2. Revisit default verifyCertificate policy and update docs/changelog.
 
 ## Validation command set
 
