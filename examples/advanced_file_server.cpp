@@ -309,156 +309,160 @@ class CustomFileServer : public HttpFileServer {
     private:
     File logFile_;
 
-bool isLocalClient(const std::string& peerAddress) const {
-    return peerAddress == "127.0.0.1" || peerAddress == "::1"
-        || peerAddress == "::ffff:127.0.0.1" || peerAddress == "localhost";
-}
-
-std::string readAccessLogTail(size_t maxLines) const {
-    std::FILE* file = std::fopen("access.log", "rb");
-    if (!file) return {};
-
-    if (std::fseek(file, 0, SEEK_END) != 0) {
-        std::fclose(file);
-        return {};
-    }
-    const long fileSize = std::ftell(file);
-    if (fileSize <= 0) {
-        std::fclose(file);
-        return {};
-    }
-    if (std::fseek(file, 0, SEEK_SET) != 0) {
-        std::fclose(file);
-        return {};
+    bool isLocalClient(const std::string& peerAddress) const {
+        return peerAddress == "127.0.0.1" || peerAddress == "::1"
+            || peerAddress == "::ffff:127.0.0.1" || peerAddress == "localhost";
     }
 
-    std::vector<char> bytes(static_cast<size_t>(fileSize));
-    const size_t bytesRead = std::fread(bytes.data(), 1, bytes.size(), file);
-    std::fclose(file);
-    if (bytesRead == 0) return {};
-    bytes.resize(bytesRead);
+    std::string readAccessLogTail(size_t maxLines) const {
+        std::FILE* file = std::fopen("access.log", "rb");
+        if (!file) return {};
 
-    std::string content(bytes.begin(), bytes.end());
-    std::vector<size_t> lineStarts;
-    lineStarts.reserve(64);
-    lineStarts.push_back(0);
-
-    for (size_t i = 0; i < content.size(); ++i) {
-        if (content[i] == '\n' && i + 1 < content.size()) {
-            lineStarts.push_back(i + 1);
+        if (std::fseek(file, 0, SEEK_END) != 0) {
+            std::fclose(file);
+            return {};
         }
+        const long fileSize = std::ftell(file);
+        if (fileSize <= 0) {
+            std::fclose(file);
+            return {};
+        }
+        if (std::fseek(file, 0, SEEK_SET) != 0) {
+            std::fclose(file);
+            return {};
+        }
+
+        std::vector<char> bytes(static_cast<size_t>(fileSize));
+        const size_t bytesRead
+            = std::fread(bytes.data(), 1, bytes.size(), file);
+        std::fclose(file);
+        if (bytesRead == 0) return {};
+        bytes.resize(bytesRead);
+
+        std::string content(bytes.begin(), bytes.end());
+        std::vector<size_t> lineStarts;
+        lineStarts.reserve(64);
+        lineStarts.push_back(0);
+
+        for (size_t i = 0; i < content.size(); ++i) {
+            if (content[i] == '\n' && i + 1 < content.size()) {
+                lineStarts.push_back(i + 1);
+            }
+        }
+
+        const size_t startIndex = (lineStarts.size() > maxLines)
+            ? (lineStarts.size() - maxLines)
+            : 0;
+        return content.substr(lineStarts[startIndex]);
     }
 
-    const size_t startIndex
-        = (lineStarts.size() > maxLines) ? (lineStarts.size() - maxLines) : 0;
-    return content.substr(lineStarts[startIndex]);
-}
+    void logRequest(const HttpRequest& request, const HttpClientState& state) {
+        (void)state; // Suppress unused parameter warning - available for future
+                     // enhancements
+        if (!logFile_.isOpen()) return;
 
-void logRequest(const HttpRequest& request, const HttpClientState& state) {
-    (void)state; // Suppress unused parameter warning - available for future
-                 // enhancements
-    if (!logFile_.isOpen()) return;
-
-    auto now = std::chrono::system_clock::now();
-    auto time_t = std::chrono::system_clock::to_time_t(now);
+        auto now = std::chrono::system_clock::now();
+        auto time_t = std::chrono::system_clock::to_time_t(now);
 
 #ifdef _WIN32
-    struct tm timeinfo = {};
-    localtime_s(&timeinfo, &time_t);
-    logFile_.printf("%04d-%02d-%02d %02d:%02d:%02d %s %s from client\n",
-        static_cast<int>(timeinfo.tm_year + 1900),
-        static_cast<int>(timeinfo.tm_mon + 1),
-        static_cast<int>(timeinfo.tm_mday), static_cast<int>(timeinfo.tm_hour),
-        static_cast<int>(timeinfo.tm_min), static_cast<int>(timeinfo.tm_sec),
-        request.method.c_str(), request.path.c_str());
+        struct tm timeinfo = {};
+        localtime_s(&timeinfo, &time_t);
+        logFile_.printf("%04d-%02d-%02d %02d:%02d:%02d %s %s from client\n",
+            static_cast<int>(timeinfo.tm_year + 1900),
+            static_cast<int>(timeinfo.tm_mon + 1),
+            static_cast<int>(timeinfo.tm_mday),
+            static_cast<int>(timeinfo.tm_hour),
+            static_cast<int>(timeinfo.tm_min),
+            static_cast<int>(timeinfo.tm_sec), request.method.c_str(),
+            request.path.c_str());
 #else
-    struct tm* timeinfo = localtime(&time_t);
-    logFile_.printf(
-        "%04d-%02d-%02d %02d:%02d:%02d %.*s %s from client\n", //-V111
-                                                               ////-V111
-        static_cast<int>(timeinfo->tm_year + 1900),
-        static_cast<int>(timeinfo->tm_mon + 1),
-        static_cast<int>(timeinfo->tm_mday),
-        static_cast<int>(timeinfo->tm_hour), static_cast<int>(timeinfo->tm_min),
-        static_cast<int>(timeinfo->tm_sec),
-        static_cast<int>(request.method.size()), request.method.data(),
-        request.path.c_str());
+        struct tm* timeinfo = localtime(&time_t);
+        logFile_.printf(
+            "%04d-%02d-%02d %02d:%02d:%02d %.*s %s from client\n", //-V111
+                                                                   ////-V111
+            static_cast<int>(timeinfo->tm_year + 1900),
+            static_cast<int>(timeinfo->tm_mon + 1),
+            static_cast<int>(timeinfo->tm_mday),
+            static_cast<int>(timeinfo->tm_hour),
+            static_cast<int>(timeinfo->tm_min),
+            static_cast<int>(timeinfo->tm_sec),
+            static_cast<int>(request.method.size()), request.method.data(),
+            request.path.c_str());
 #endif
-    logFile_.flush();
-}
-
-/// Returns true for paths that are served without authentication.
-bool isPublicPath(const std::string& path) const {
-    static const std::string publicPaths[] = {
-        "/public.html",
-    };
-    for (const auto& p : publicPaths) {
-        if (path == p) return true;
+        logFile_.flush();
     }
-    return false;
-}
 
-bool isAuthenticated(const HttpRequest& request) const {
-    // Simple basic authentication (username: admin, password: secret)
-    auto authIt = request.headers.find("authorization");
-    if (authIt == request.headers.end()) {
+    /// Returns true for paths that are served without authentication.
+    bool isPublicPath(const std::string& path) const {
+        static const std::string publicPaths[] = {
+            "/public.html",
+        };
+        for (const auto& p : publicPaths) {
+            if (path == p) return true;
+        }
         return false;
     }
 
-    const std::string_view auth = authIt->second;
-    if (auth.substr(0, 6) != "Basic ") {
-        return false;
+    bool isAuthenticated(const HttpRequest& request) const {
+        // Simple basic authentication (username: admin, password: secret)
+        auto authIt = request.headers.find("authorization");
+        if (authIt == request.headers.end()) {
+            return false;
+        }
+
+        const std::string_view auth = authIt->second;
+        if (auth.substr(0, 6) != "Basic ") {
+            return false;
+        }
+
+        // In a real implementation, you'd decode the Base64 credentials
+        // For this example, we'll just check for a specific token
+        return auth.substr(6) == "YWRtaW46c2VjcmV0"; // "admin:secret" in Base64
     }
 
-    // In a real implementation, you'd decode the Base64 credentials
-    // For this example, we'll just check for a specific token
-    return auth.substr(6) == "YWRtaW46c2VjcmV0"; // "admin:secret" in Base64
-}
+    void sendAuthRequired(HttpClientState& state) {
+        std::string htmlBody = generateErrorHtml(401, "Unauthorized",
+            "This server requires authentication. Please provide valid "
+            "credentials.");
 
-void sendAuthRequired(HttpClientState& state) {
-    std::string htmlBody = generateErrorHtml(401, "Unauthorized",
-        "This server requires authentication. Please provide valid "
-        "credentials.");
+        std::string response;
+        response.reserve(256 + htmlBody.size());
+        response.append("HTTP/1.1 401 Unauthorized\r\n");
+        response.append("Content-Type: text/html\r\nContent-Length: ");
+        response += std::to_string(htmlBody.size());
+        response.append(
+            "\r\nWWW-Authenticate: Basic realm=\"Secure Area\"\r\n\r\n");
+        response.append(htmlBody);
 
-    std::string response;
-    response.reserve(256 + htmlBody.size());
-    response.append("HTTP/1.1 401 Unauthorized\r\n");
-    response.append("Content-Type: text/html\r\nContent-Length: ");
-    response += std::to_string(htmlBody.size());
-    response.append(
-        "\r\nWWW-Authenticate: Basic realm=\"Secure Area\"\r\n\r\n");
-    response.append(htmlBody);
+        state.responseBuf = std::move(response);
+        state.responseView = state.responseBuf;
+    }
 
-    state.responseBuf = std::move(response);
-    state.responseView = state.responseBuf;
-}
+    std::string getCurrentTime() const {
+        auto now = std::chrono::system_clock::now();
+        auto time_t = std::chrono::system_clock::to_time_t(now);
 
-std::string getCurrentTime() const {
-    auto now = std::chrono::system_clock::now();
-    auto time_t = std::chrono::system_clock::to_time_t(now);
-
-    char buffer[32];
+        char buffer[32];
 #ifdef _WIN32
-    struct tm timeinfo = {};
-    localtime_s(&timeinfo, &time_t);
-    strftime(buffer, sizeof(buffer), "%Y-%m-%d %H:%M:%S", &timeinfo);
+        struct tm timeinfo = {};
+        localtime_s(&timeinfo, &time_t);
+        strftime(buffer, sizeof(buffer), "%Y-%m-%d %H:%M:%S", &timeinfo);
 #else
-    struct tm* timeinfo = localtime(&time_t);
-    strftime(buffer, sizeof(buffer), "%Y-%m-%d %H:%M:%S", timeinfo);
+        struct tm* timeinfo = localtime(&time_t);
+        strftime(buffer, sizeof(buffer), "%Y-%m-%d %H:%M:%S", timeinfo);
 #endif
 
-    return std::string(buffer);
-}
-
-std::string getFileExtension(const std::string& filePath) const {
-    size_t dotPos = filePath.find_last_of('.');
-    if (dotPos != std::string::npos && dotPos < filePath.length() - 1) {
-        return filePath.substr(dotPos);
+        return std::string(buffer);
     }
-    return "";
-}
-}
-;
+
+    std::string getFileExtension(const std::string& filePath) const {
+        size_t dotPos = filePath.find_last_of('.');
+        if (dotPos != std::string::npos && dotPos < filePath.length() - 1) {
+            return filePath.substr(dotPos);
+        }
+        return "";
+    }
+};
 int main(int argc, char* argv[]) {
 
     printf("%s", ServerStrings::HEADER);
@@ -535,7 +539,7 @@ int main(int argc, char* argv[]) {
     printf("%s%s\n", ServerStrings::SERVING_FROM, config.documentRoot.c_str());
     printf(ServerStrings::PUBLIC_PAGE, port);
 
-    server.run();
+    server.run(ClientLimit::Unlimited);
 
     printf("%s", ServerStrings::SERVER_STOPPED);
     printf("%s", ServerStrings::LOG_SAVED);
