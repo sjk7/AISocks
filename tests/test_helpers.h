@@ -21,6 +21,21 @@ static aiSocks::Stopwatch g_totalTimer;
 static aiSocks::Stopwatch g_testTimer;
 static std::string g_currentTest;
 
+#ifdef _MSC_VER
+#define REQUIRE(expr)                                                          \
+    __pragma(warning(push))                                                    \
+    __pragma(warning(disable : 4127))                                          \
+    do {                                                                       \
+        if (!(expr)) {                                                         \
+            fprintf(stderr, "  FAIL [%s:%d] %s\n", __FILE__, __LINE__, #expr); \
+            ++g_failed;                                                        \
+        } else {                                                               \
+            printf("  pass: %s\n", #expr);                                     \
+            ++g_passed;                                                        \
+        }                                                                      \
+    } while (0)                                                                \
+    __pragma(warning(pop))
+#else
 #define REQUIRE(expr)                                                          \
     do {                                                                       \
         if (!(expr)) {                                                         \
@@ -31,6 +46,7 @@ static std::string g_currentTest;
             ++g_passed;                                                        \
         }                                                                      \
     } while (0)
+#endif
 
 #define REQUIRE_MSG(expr, msg)                                                 \
     do {                                                                       \
