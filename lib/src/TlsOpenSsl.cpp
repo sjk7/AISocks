@@ -19,15 +19,28 @@
 namespace aiSocks {
 
 namespace {
-bool tlsDebugEnabled_() {
-    const char* v = std::getenv("AISOCKS_TLS_DEBUG");
-    return v != nullptr && v[0] != '\0' && v[0] != '0';
-}
+    bool tlsDebugEnabled_() {
+    const char* envName = "AISOCKS_TLS_DEBUG";
+#ifdef _WIN32
+    char* value = nullptr;
+    size_t valueLen = 0;
+    if (_dupenv_s(&value, &valueLen, envName) != 0 || value == nullptr) {
+        return false;
+    }
 
-void tlsDebugLog_(const std::string& msg) {
-    if (!tlsDebugEnabled_()) return;
-    std::fprintf(stderr, "[tls-debug] %s\n", msg.c_str());
-}
+    const bool enabled = value[0] != '\0' && value[0] != '0';
+    std::free(value);
+    return enabled;
+#else
+    const char* value = std::getenv(envName);
+    return value != nullptr && value[0] != '\0' && value[0] != '0';
+#endif
+    }
+
+    void tlsDebugLog_(const std::string& msg) {
+        if (!tlsDebugEnabled_()) return;
+        std::fprintf(stderr, "[tls-debug] %s\n", msg.c_str());
+    }
 } // namespace
 
 bool TlsOpenSsl::initialize() {
@@ -152,7 +165,7 @@ bool TlsContext::configureVerifyPeer(bool verifyPeer, bool loadDefaultCaPaths,
         if (caFileArg || caDirArg) {
             if (SSL_CTX_load_verify_locations(ctx_, caFileArg, caDirArg) != 1) {
                 tlsDebugLog_("SSL_CTX_load_verify_locations failed"
-                    " caFile="
+                             " caFile="
                     + (caFile.empty() ? std::string{"<empty>"} : caFile)
                     + " caDir="
                     + (caDir.empty() ? std::string{"<empty>"} : caDir));
