@@ -1217,5 +1217,48 @@ int main() {
         g_serverSignalStop.store(false);
     }
 
+    // -----------------------------------------------------------------------
+    // Latency tuning: verify the new constants are in effect
+    // -----------------------------------------------------------------------
+    BEGIN_TEST("KeepAlive: HIGH_LOAD_THRESHOLD is 64 (not 256)");
+    {
+        REQUIRE(KeepAliveTimeoutManager::HIGH_LOAD_THRESHOLD == 64);
+    }
+
+    BEGIN_TEST("KeepAlive: AGGRESSIVE_TIMEOUT is 500 ms (not 5000 ms)");
+    {
+        using ms = std::chrono::milliseconds;
+        REQUIRE(KeepAliveTimeoutManager::AGGRESSIVE_TIMEOUT == ms{500});
+    }
+
+    BEGIN_TEST("KeepAlive: adjustForLoad activates high-load at threshold 64");
+    {
+        KeepAliveTimeoutManager mgr;
+        mgr.setTimeout(std::chrono::milliseconds{30000});
+        // Below threshold — normal timeout unchanged
+        mgr.adjustForLoad(63);
+        REQUIRE(mgr.getTimeout() == std::chrono::milliseconds{30000});
+        // At threshold+1 — aggressive timeout kicks in
+        mgr.adjustForLoad(65);
+        REQUIRE(
+            mgr.getTimeout() == KeepAliveTimeoutManager::AGGRESSIVE_TIMEOUT);
+        // Drop back below threshold — normal timeout restored
+        mgr.adjustForLoad(10);
+        REQUIRE(mgr.getTimeout() == std::chrono::milliseconds{30000});
+    }
+
+    BEGIN_TEST("Slowloris: high-load constants are correct");
+    {
+        REQUIRE(HttpPollServer::SLOWLORIS_TIMEOUT_MS_HIGH_LOAD == 1000);
+        REQUIRE(HttpPollServer::SLOWLORIS_HIGH_LOAD_THRESHOLD == 64);
+        // Normal timeout is unchanged
+        REQUIRE(HttpPollServer::SLOWLORIS_TIMEOUT_MS == 5000);
+    }
+
+    BEGIN_TEST("RECV_BUF_SIZE: per-loop read buffer is 4 KB");
+    {
+        REQUIRE(HttpPollServer::RECV_BUF_SIZE == 4 * 1024);
+    }
+
     return test_summary();
 }

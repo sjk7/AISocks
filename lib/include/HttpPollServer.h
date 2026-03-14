@@ -201,7 +201,15 @@ struct HttpClientState {
 class HttpPollServer : public ServerBase<HttpClientState> {
     public:
     static constexpr size_t MAX_HEADER_SIZE = 8192;
-    static constexpr int SLOWLORIS_TIMEOUT_MS = 5000; // 5 s
+    static constexpr int SLOWLORIS_TIMEOUT_MS = 5000; // 5 s normal load
+    // Under high client load the slowloris window is tightened so stalled
+    // partial-request senders release their slots faster, reducing tail
+    // latency.
+    static constexpr int SLOWLORIS_TIMEOUT_MS_HIGH_LOAD = 1000; // 1 s
+    static constexpr size_t SLOWLORIS_HIGH_LOAD_THRESHOLD = 64;
+    // 4 KB is sufficient for typical HTTP GET requests and keeps per-loop
+    // stack pressure low when many connections are active simultaneously.
+    static constexpr size_t RECV_BUF_SIZE = 4 * 1024;
 
     explicit HttpPollServer(
         const ServerBind& bind, Result<TcpSocket>* result = nullptr)
@@ -301,8 +309,6 @@ class HttpPollServer : public ServerBase<HttpClientState> {
     private:
     IpFilter* ipFilter_{nullptr};
     AccessLogger* accessLogger_{nullptr};
-
-    static constexpr size_t RECV_BUF_SIZE = 64 * 1024;
     int slowlorisTimeoutMs_{SLOWLORIS_TIMEOUT_MS};
 
     ServerResult onReadable(TcpSocket& sock, HttpClientState& s) final;

@@ -515,7 +515,13 @@ ServerResult HttpPollServer::onReadable(TcpSocket& sock, HttpClientState& s) {
         // Clock is read once per loop iteration and reused by the timeout
         // check.
         const auto now = std::chrono::steady_clock::now();
-        if (isSlowlorisTimeout_(s, now, slowlorisTimeoutMs_))
+        // Use a tighter slowloris window under high load to shed stalled
+        // partial-request senders faster and reduce tail latency.
+        const int effectiveSlowloris
+            = (clientCount() > SLOWLORIS_HIGH_LOAD_THRESHOLD)
+            ? SLOWLORIS_TIMEOUT_MS_HIGH_LOAD
+            : slowlorisTimeoutMs_;
+        if (isSlowlorisTimeout_(s, now, effectiveSlowloris))
             return ServerResult::Disconnect;
 
         int n = tlsRead(sock, s, buf, sizeof(buf));
