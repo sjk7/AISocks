@@ -19,12 +19,6 @@ on:
       - "LICENSE*"
   workflow_dispatch:
 
-# Cancel superseded runs within the same event + branch/PR to save runner
-# minutes without making push and manual dispatch runs preempt each other.
-concurrency:
-  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
-
 jobs:
   preflight:
     name: Preflight / Event Diagnostics
@@ -202,7 +196,7 @@ jobs:
       # 1. Checkout                                                         #
       # ------------------------------------------------------------------ #
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       # ------------------------------------------------------------------ #
       # 2. Install system dependencies                                      #
