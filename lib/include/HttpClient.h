@@ -339,6 +339,7 @@ class HttpClient {
     Options options_;
     std::string cachedHost_;
     Port cachedPort_{80};
+    bool cachedIsHttps_{false};
     std::shared_ptr<TcpSocket> cachedSocket_;
 #ifdef AISOCKS_ENABLE_TLS
     std::shared_ptr<TlsSession> cachedTlsSession_;
@@ -347,6 +348,7 @@ class HttpClient {
 
     void clearCachedConnection_() noexcept {
         cachedSocket_.reset();
+        cachedIsHttps_ = false;
 #ifdef AISOCKS_ENABLE_TLS
         cachedTlsSession_.reset();
 #endif
@@ -611,7 +613,8 @@ class HttpClient {
             bool retriedReusedConnection = false;
             const bool connectAsIpv6 = Socket::isValidIPv6(host);
             if (cachedSocket_ && cachedSocket_->isValid() && cachedHost_ == host
-                && cachedPort_.value() == port.value()) {
+                && cachedPort_.value() == port.value()
+                && cachedIsHttps_ == isHttps) {
                 socket = cachedSocket_;
                 reusedConnection = true;
             } else {
@@ -744,7 +747,7 @@ class HttpClient {
                 tlsSession = std::move(sess);
                 return true;
             };
-            if (reusedConnection && cachedTlsSession_) {
+            if (reusedConnection && isHttps && cachedTlsSession_) {
                 tlsSession = cachedTlsSession_;
             } else if (!setupTlsForCurrentSocket()) {
                 return Result<HttpClientResponse>::failureOwned(
@@ -979,6 +982,7 @@ class HttpClient {
                                 if (!requestWantsClose) {
                                     cachedHost_ = host;
                                     cachedPort_ = port;
+                                    cachedIsHttps_ = isHttps;
                                     cachedSocket_ = socket;
 #ifdef AISOCKS_ENABLE_TLS
                                     cachedTlsSession_ = tlsSession;
@@ -1014,6 +1018,7 @@ class HttpClient {
                             if (!requestWantsClose) {
                                 cachedHost_ = host;
                                 cachedPort_ = port;
+                                cachedIsHttps_ = isHttps;
                                 cachedSocket_ = socket;
 #ifdef AISOCKS_ENABLE_TLS
                                 cachedTlsSession_ = tlsSession;

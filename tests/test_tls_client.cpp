@@ -487,6 +487,49 @@ static void test_https_client_multiple_requests_keep_alive() {
     REQUIRE(server.requestsServed.load() == 3);
 }
 
+static void test_https_cache_is_not_reused_for_http_same_host_port() {
+    BEGIN_TEST("HttpClient does not reuse HTTPS cached connection for HTTP on "
+               "same host and port");
+
+    const std::string root = sourceRoot();
+    const std::string cert = root + "/tests/certs/test_cert.pem";
+    const std::string key = root + "/tests/certs/test_key.pem";
+
+    TestHttpsServer server{cert, key};
+    REQUIRE(server.tlsReady());
+
+    std::thread serverThread(
+        [&] { server.run(ClientLimit::Unlimited, Milliseconds{5}); });
+    server.waitReady();
+
+    HttpClient::Options opts;
+    opts.connectTimeout = Milliseconds{1200};
+    opts.requestTimeout = Milliseconds{1200};
+    opts.verifyCertificate = false;
+    HttpClient client{opts};
+
+    const std::string hostPort
+        = "127.0.0.1:" + std::to_string(server.serverPort().value());
+
+    auto httpsResult = client.get("https://" + hostPort + "/first");
+    REQUIRE(httpsResult.isSuccess());
+    if (!httpsResult.isSuccess()) {
+        server.requestStop();
+        serverThread.join();
+        return;
+    }
+
+    auto httpResult = client.get("http://" + hostPort + "/plain-after-https");
+
+    server.requestStop();
+    serverThread.join();
+
+    // If HTTP reused the cached HTTPS socket/session, this would incorrectly
+    // succeed against the TLS server. Correct behavior is a failed plain-HTTP
+    // request to a TLS-only endpoint.
+    REQUIRE(!httpResult.isSuccess());
+}
+
 static void test_https_verify_enabled_trusted_ca_and_matching_host() {
     BEGIN_TEST("HttpClient HTTPS verify enabled succeeds with trusted cert and "
                "matching host");
@@ -1192,6 +1235,7 @@ int main() {
     test_https_wrong_port_fails();
     test_https_client_basic_get();
     test_https_client_multiple_requests_keep_alive();
+    test_https_cache_is_not_reused_for_http_same_host_port();
     test_https_verify_enabled_trusted_ca_and_matching_host();
     test_https_verify_enabled_fails_on_wrong_hostname();
     test_https_verify_enabled_fails_for_untrusted_self_signed();
