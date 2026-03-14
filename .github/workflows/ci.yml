@@ -270,14 +270,19 @@ jobs:
           CC: ${{ matrix.cc }}
           CXX: ${{ matrix.cxx }}
           SANITIZER_FLAGS: ${{ matrix.sanitizer_flags }}
-          ENABLE_TLS: ${{ matrix.enable_tls }}
+          ENABLE_TLS: ${{ matrix.enable_tls || 'OFF' }}
         run: |
+          if [[ "$ENABLE_TLS" != "ON" && "$ENABLE_TLS" != "OFF" ]]; then
+            echo "Invalid matrix.enable_tls='$ENABLE_TLS' (expected ON or OFF)" >&2
+            exit 1
+          fi
           CMAKE_ARGS=(
             -S . -B build
             -G "${{ matrix.cmake_generator }}"
             -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
             -DBUILD_TESTS=ON
             -DBUILD_EXAMPLES=OFF
+            -DAISOCKS_ENABLE_TLS=${ENABLE_TLS}
           )
           if [[ "$RUNNER_OS" == "Windows" && "${{ matrix.build_type }}" == "RelWithDebInfo" ]]; then
             # Use CMake's MSVC debug-info knob to request /Z7 without passing
@@ -287,9 +292,6 @@ jobs:
             )
           fi
           if [[ "$ENABLE_TLS" == "ON" ]]; then
-            CMAKE_ARGS+=(
-              -DAISOCKS_ENABLE_TLS=ON
-            )
             if [[ "$RUNNER_OS" == "macOS" ]]; then
               OPENSSL_PREFIX="$(brew --prefix openssl@3)"
               CMAKE_ARGS+=(
