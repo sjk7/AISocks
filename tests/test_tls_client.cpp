@@ -49,8 +49,8 @@ static std::string sourceRoot() {
 // ---------------------------------------------------------------------------
 class TestHttpsServer : public HttpPollServer {
     public:
-    explicit TestHttpsServer(const std::string& certPath,
-        const std::string& keyPath)
+    explicit TestHttpsServer(
+        const std::string& certPath, const std::string& keyPath)
         : HttpPollServer(ServerBind{"127.0.0.1", Port{0}}) {
         setHandleSignals(false);
 
@@ -81,8 +81,8 @@ class TestHttpsServer : public HttpPollServer {
     }
 
     void buildResponse(HttpClientState& s) override {
-        s.responseBuf = makeResponse(
-            "HTTP/1.1 200 OK", "text/plain", "Hello, HTTPS!");
+        s.responseBuf
+            = makeResponse("HTTP/1.1 200 OK", "text/plain", "Hello, HTTPS!");
         s.responseView = s.responseBuf;
         requestsServed.fetch_add(1, std::memory_order_relaxed);
     }
@@ -93,14 +93,12 @@ class TestHttpsServer : public HttpPollServer {
         return ctx_ != nullptr;
     }
 
-    void onTlsClientConnected(
-        TcpSocket& sock, HttpClientState& s) override {
+    void onTlsClientConnected(TcpSocket& sock, HttpClientState& s) override {
         if (!ctx_) return;
         std::string err;
         auto sess = TlsSession::create(ctx_->nativeHandle(), &err);
         if (!sess) return;
-        if (!sess->attachSocket(
-                static_cast<int>(sock.getNativeHandle()), &err))
+        if (!sess->attachSocket(static_cast<int>(sock.getNativeHandle()), &err))
             return;
         sess->setAcceptState();
         s.tlsSession = std::move(sess);
@@ -129,14 +127,14 @@ class TestHttpsServer : public HttpPollServer {
         return ServerResult::Disconnect;
     }
 
-    int tlsRead(TcpSocket& /*sock*/, HttpClientState& s,
-        void* buf, size_t len) override {
+    int tlsRead(TcpSocket& /*sock*/, HttpClientState& s, void* buf,
+        size_t len) override {
         if (!s.tlsSession) return -1;
         return s.tlsSession->read(buf, static_cast<int>(len));
     }
 
-    int tlsWrite(TcpSocket& /*sock*/, HttpClientState& s,
-        const char* data, size_t len) override {
+    int tlsWrite(TcpSocket& /*sock*/, HttpClientState& s, const char* data,
+        size_t len) override {
         if (!s.tlsSession) return 0;
         size_t done = 0;
         while (done < len) {
@@ -147,8 +145,7 @@ class TestHttpsServer : public HttpPollServer {
                 continue;
             }
             const int e = s.tlsSession->getLastErrorCode(n);
-            if (e == SSL_ERROR_WANT_WRITE || e == SSL_ERROR_WANT_READ)
-                continue;
+            if (e == SSL_ERROR_WANT_WRITE || e == SSL_ERROR_WANT_READ) continue;
             break;
         }
         return static_cast<int>(done);
@@ -170,7 +167,7 @@ static void test_https_client_basic_get() {
 
     const std::string root = sourceRoot();
     const std::string cert = root + "/tests/certs/test_cert.pem";
-    const std::string key  = root + "/tests/certs/test_key.pem";
+    const std::string key = root + "/tests/certs/test_key.pem";
 
     TestHttpsServer server{cert, key};
     REQUIRE(server.tlsReady());
@@ -194,16 +191,18 @@ static void test_https_client_basic_get() {
 
     REQUIRE(result.isSuccess());
     REQUIRE(result.value().statusCode() == 200);
-    REQUIRE(result.value().body().find("Hello, HTTPS!") != std::string_view::npos);
+    REQUIRE(
+        result.value().body().find("Hello, HTTPS!") != std::string_view::npos);
     REQUIRE(server.requestsServed.load() == 1);
 }
 
 static void test_https_client_multiple_requests_keep_alive() {
-    BEGIN_TEST("HttpClient HTTPS keep-alive reuses TLS session across requests");
+    BEGIN_TEST(
+        "HttpClient HTTPS keep-alive reuses TLS session across requests");
 
     const std::string root = sourceRoot();
     const std::string cert = root + "/tests/certs/test_cert.pem";
-    const std::string key  = root + "/tests/certs/test_key.pem";
+    const std::string key = root + "/tests/certs/test_key.pem";
 
     TestHttpsServer server{cert, key};
     REQUIRE(server.tlsReady());
@@ -218,8 +217,8 @@ static void test_https_client_multiple_requests_keep_alive() {
     opts.verifyCertificate = false;
     HttpClient client{opts};
 
-    const std::string base = "https://127.0.0.1:"
-        + std::to_string(server.serverPort().value());
+    const std::string base
+        = "https://127.0.0.1:" + std::to_string(server.serverPort().value());
 
     auto r1 = client.get(base + "/first");
     auto r2 = client.get(base + "/second");
@@ -253,7 +252,8 @@ static void test_https_wrong_port_fails() {
     // Port 1 is almost certainly refused on any machine.
     auto result = client.get("https://127.0.0.1:1/");
     REQUIRE(!result.isSuccess());
-    REQUIRE(result.message().find("HTTPS is not supported") == std::string::npos);
+    REQUIRE(
+        result.message().find("HTTPS is not supported") == std::string::npos);
 }
 
 // ---------------------------------------------------------------------------
@@ -270,6 +270,8 @@ int main() {
 
 #else // !AISOCKS_ENABLE_TLS
 
-int main() { return 0; /* nothing to test without TLS */ }
+int main() {
+    return 0; /* nothing to test without TLS */
+}
 
 #endif // AISOCKS_ENABLE_TLS

@@ -492,7 +492,8 @@ static void test_https_scheme_rejected() {
     REQUIRE(!result.isSuccess());
     REQUIRE(
         result.message().find("HTTPS is not supported") != std::string::npos);
-#endif // !AISOCKS_ENABLE_TLS — HTTPS is supported in TLS builds; tested separately
+#endif // !AISOCKS_ENABLE_TLS — HTTPS is supported in TLS builds; tested
+       // separately
 }
 
 static void test_redirect_to_https_is_rejected() {

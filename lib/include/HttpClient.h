@@ -423,8 +423,8 @@ class HttpClient {
         return false;
     }
 
-    static bool parseAuthority_(
-        const std::string& authority, std::string& hostOut, Port& portOut,
+    static bool parseAuthority_(const std::string& authority,
+        std::string& hostOut, Port& portOut,
         Port defaultPort = Port{uint16_t{80}}) {
         hostOut.clear();
         portOut = defaultPort;
@@ -554,8 +554,8 @@ class HttpClient {
                 if (!isHttps) return true;
                 tlsSetupError.clear();
                 tlsSession.reset();
-                auto ctx
-                    = TlsContext::create(TlsContext::Mode::Client, &tlsSetupError);
+                auto ctx = TlsContext::create(
+                    TlsContext::Mode::Client, &tlsSetupError);
                 if (!ctx) return false;
                 ctx->configureVerifyPeer(options_.verifyCertificate,
                     options_.verifyCertificate, &tlsSetupError);
@@ -566,9 +566,11 @@ class HttpClient {
                         static_cast<int>(socket->getNativeHandle()),
                         &tlsSetupError))
                     return false;
-                // Set SNI hostname so virtual-hosted servers pick the right cert.
+                // Set SNI hostname so virtual-hosted servers pick the right
+                // cert.
                 if (!host.empty())
-                    SSL_set_tlsext_host_name(sess->nativeHandle(), host.c_str());
+                    SSL_set_tlsext_host_name(
+                        sess->nativeHandle(), host.c_str());
                 sess->setConnectState();
                 for (;;) {
                     const int r = sess->handshake();
