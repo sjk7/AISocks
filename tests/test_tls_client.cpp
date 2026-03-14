@@ -233,6 +233,103 @@ static void test_https_client_multiple_requests_keep_alive() {
     REQUIRE(server.requestsServed.load() == 3);
 }
 
+static void test_https_verify_enabled_trusted_ca_and_matching_host() {
+    BEGIN_TEST("HttpClient HTTPS verify enabled succeeds with trusted cert and "
+               "matching host");
+
+    const std::string root = sourceRoot();
+    const std::string cert = root + "/tests/certs/test_cert.pem";
+    const std::string key = root + "/tests/certs/test_key.pem";
+
+    TestHttpsServer server{cert, key};
+    REQUIRE(server.tlsReady());
+
+    std::thread serverThread(
+        [&] { server.run(ClientLimit::Unlimited, Milliseconds{5}); });
+    server.waitReady();
+
+    HttpClient::Options opts;
+    opts.connectTimeout = Milliseconds{2000};
+    opts.requestTimeout = Milliseconds{2000};
+    opts.verifyCertificate = true;
+    opts.caCertFile = cert;
+    HttpClient client{opts};
+
+    const std::string url = "https://127.0.0.1:"
+        + std::to_string(server.serverPort().value()) + "/verified";
+    auto result = client.get(url);
+
+    server.requestStop();
+    serverThread.join();
+
+    REQUIRE(result.isSuccess());
+    REQUIRE(result.value().statusCode() == 200);
+}
+
+static void test_https_verify_enabled_fails_on_wrong_hostname() {
+    BEGIN_TEST("HttpClient HTTPS verify enabled fails for hostname mismatch");
+
+    const std::string root = sourceRoot();
+    const std::string cert = root + "/tests/certs/test_cert.pem";
+    const std::string key = root + "/tests/certs/test_key.pem";
+
+    TestHttpsServer server{cert, key};
+    REQUIRE(server.tlsReady());
+
+    std::thread serverThread(
+        [&] { server.run(ClientLimit::Unlimited, Milliseconds{5}); });
+    server.waitReady();
+
+    HttpClient::Options opts;
+    opts.connectTimeout = Milliseconds{2000};
+    opts.requestTimeout = Milliseconds{2000};
+    opts.verifyCertificate = true;
+    opts.caCertFile = cert;
+    HttpClient client{opts};
+
+    const std::string url = "https://localhost:"
+        + std::to_string(server.serverPort().value()) + "/wrong-host";
+    auto result = client.get(url);
+
+    server.requestStop();
+    serverThread.join();
+
+    REQUIRE(!result.isSuccess());
+    REQUIRE(!result.message().empty());
+}
+
+static void test_https_verify_enabled_fails_for_untrusted_self_signed() {
+    BEGIN_TEST(
+        "HttpClient HTTPS verify enabled fails for untrusted self-signed cert");
+
+    const std::string root = sourceRoot();
+    const std::string cert = root + "/tests/certs/test_cert.pem";
+    const std::string key = root + "/tests/certs/test_key.pem";
+
+    TestHttpsServer server{cert, key};
+    REQUIRE(server.tlsReady());
+
+    std::thread serverThread(
+        [&] { server.run(ClientLimit::Unlimited, Milliseconds{5}); });
+    server.waitReady();
+
+    HttpClient::Options opts;
+    opts.connectTimeout = Milliseconds{2000};
+    opts.requestTimeout = Milliseconds{2000};
+    opts.verifyCertificate = true;
+    HttpClient client{opts};
+
+    const std::string url = "https://127.0.0.1:"
+        + std::to_string(server.serverPort().value()) + "/untrusted";
+    auto result = client.get(url);
+
+    server.requestStop();
+    serverThread.join();
+
+    REQUIRE(!result.isSuccess());
+    REQUIRE(result.message().find("TLS setup") != std::string::npos);
+}
+
 static void test_https_cert_load_failure() {
     BEGIN_TEST("TestHttpsServer reports failure when cert files are missing");
 
@@ -264,6 +361,9 @@ int main() {
     test_https_wrong_port_fails();
     test_https_client_basic_get();
     test_https_client_multiple_requests_keep_alive();
+    test_https_verify_enabled_trusted_ca_and_matching_host();
+    test_https_verify_enabled_fails_on_wrong_hostname();
+    test_https_verify_enabled_fails_for_untrusted_self_signed();
 
     return test_summary();
 }

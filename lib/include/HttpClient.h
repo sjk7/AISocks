@@ -30,6 +30,7 @@
 #ifdef AISOCKS_ENABLE_TLS
 #include "TlsOpenSsl.h"
 #include <openssl/ssl.h>
+#include <openssl/x509v3.h>
 #endif
 
 namespace aiSocks {
@@ -163,6 +164,10 @@ class HttpClient {
         /// Verify the server TLS certificate chain against system CA paths.
         /// Default: false (phase 1). Set to true in production for security.
         bool verifyCertificate{false};
+
+        /// Optional PEM trust bundle/file used when verifyCertificate is true.
+        /// Empty means system default CA paths.
+        std::string caCertFile;
 #endif
     };
 
@@ -400,6 +405,23 @@ class HttpClient {
         return false;
     }
 
+#ifdef AISOCKS_ENABLE_TLS
+    static bool isLikelyIpLiteral_(const std::string& host) {
+        if (host.empty()) return false;
+        if (host.find(':') != std::string::npos) return true;
+
+        bool hasDot = false;
+        for (char c : host) {
+            if (c == '.') {
+                hasDot = true;
+                continue;
+            }
+            if (c < '0' || c > '9') return false;
+        }
+        return hasDot;
+    }
+#endif
+
     static bool headerHasTokenCI_(const HeaderMap& headers,
         std::string_view name, std::string_view token) {
         auto equalsCI = [](std::string_view a, std::string_view b) {
@@ -557,8 +579,11 @@ class HttpClient {
                 auto ctx = TlsContext::create(
                     TlsContext::Mode::Client, &tlsSetupError);
                 if (!ctx) return false;
-                ctx->configureVerifyPeer(options_.verifyCertificate,
-                    options_.verifyCertificate, &tlsSetupError);
+                if (!ctx->configureVerifyPeer(options_.verifyCertificate,
+                        options_.verifyCertificate, options_.caCertFile,
+                        &tlsSetupError)) {
+                    return false;
+                }
                 auto sess
                     = TlsSession::create(ctx->nativeHandle(), &tlsSetupError);
                 if (!sess) return false;
@@ -566,6 +591,26 @@ class HttpClient {
                         static_cast<int>(socket->getNativeHandle()),
                         &tlsSetupError))
                     return false;
+                if (options_.verifyCertificate) {
+                    X509_VERIFY_PARAM* verifyParam
+                        = SSL_get0_param(sess->nativeHandle());
+                    if (!verifyParam) {
+                        tlsSetupError = "TLS verify parameter setup failed";
+                        return false;
+                    }
+
+                    const int hostSet = isLikelyIpLiteral_(host)
+                        ? X509_VERIFY_PARAM_set1_ip_asc(
+                              verifyParam, host.c_str())
+                        : X509_VERIFY_PARAM_set1_host(
+                              verifyParam, host.c_str(), 0);
+                    if (hostSet != 1) {
+                        tlsSetupError = "TLS hostname verification setup "
+                                        "failed for host: "
+                            + host;
+                        return false;
+                    }
+                }
                 // Set SNI hostname so virtual-hosted servers pick the right
                 // cert.
                 if (!host.empty())
@@ -581,6 +626,25 @@ class HttpClient {
                     tlsSetupError = "TLS handshake failed: "
                         + TlsOpenSsl::lastErrorString();
                     return false;
+                }
+                if (options_.verifyCertificate) {
+                    X509* peerCert
+                        = SSL_get_peer_certificate(sess->nativeHandle());
+                    if (!peerCert) {
+                        tlsSetupError = "TLS handshake succeeded but peer "
+                                        "certificate is missing";
+                        return false;
+                    }
+                    X509_free(peerCert);
+
+                    const long verifyResult
+                        = SSL_get_verify_result(sess->nativeHandle());
+                    if (verifyResult != X509_V_OK) {
+                        tlsSetupError = "TLS certificate verification failed: "
+                            + std::string(
+                                X509_verify_cert_error_string(verifyResult));
+                        return false;
+                    }
                 }
                 tlsSession = std::move(sess);
                 return true;

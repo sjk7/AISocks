@@ -43,8 +43,8 @@ class TlsContext {
     bool loadCertificateChain(const std::string& certPemPath,
         const std::string& keyPemPath, std::string* error = nullptr);
 
-    bool configureVerifyPeer(
-        bool verifyPeer, bool loadDefaultCaPaths, std::string* error = nullptr);
+    bool configureVerifyPeer(bool verifyPeer, bool loadDefaultCaPaths,
+        const std::string& caFile = {}, std::string* error = nullptr);
 
     ssl_ctx_st* nativeHandle() const noexcept { return ctx_; }
     Mode mode() const noexcept { return mode_; }

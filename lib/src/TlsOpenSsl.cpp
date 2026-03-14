@@ -104,8 +104,8 @@ bool TlsContext::loadCertificateChain(const std::string& certPemPath,
     return true;
 }
 
-bool TlsContext::configureVerifyPeer(
-    bool verifyPeer, bool loadDefaultCaPaths, std::string* error) {
+bool TlsContext::configureVerifyPeer(bool verifyPeer, bool loadDefaultCaPaths,
+    const std::string& caFile, std::string* error) {
     if (!ctx_) {
         if (error) *error = "TLS context is not initialized";
         return false;
@@ -114,9 +114,18 @@ bool TlsContext::configureVerifyPeer(
     SSL_CTX_set_verify(
         ctx_, verifyPeer ? SSL_VERIFY_PEER : SSL_VERIFY_NONE, nullptr);
 
-    if (loadDefaultCaPaths && SSL_CTX_set_default_verify_paths(ctx_) != 1) {
-        if (error) *error = TlsOpenSsl::lastErrorString();
-        return false;
+    if (verifyPeer) {
+        if (!caFile.empty()) {
+            if (SSL_CTX_load_verify_locations(ctx_, caFile.c_str(), nullptr)
+                != 1) {
+                if (error) *error = TlsOpenSsl::lastErrorString();
+                return false;
+            }
+        } else if (loadDefaultCaPaths
+            && SSL_CTX_set_default_verify_paths(ctx_) != 1) {
+            if (error) *error = TlsOpenSsl::lastErrorString();
+            return false;
+        }
     }
 
     return true;
