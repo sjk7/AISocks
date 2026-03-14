@@ -21,6 +21,8 @@
 #include "SocketTypes.h"
 #include <chrono>
 #include <cctype>
+#include <cstdio>
+#include <cstdlib>
 #include <functional>
 #include <memory>
 #include <string>
@@ -441,6 +443,16 @@ class HttpClient {
         }
         return false;
     }
+
+    static bool tlsDebugEnabled_() {
+        const char* v = std::getenv("AISOCKS_TLS_DEBUG");
+        return v != nullptr && v[0] != '\0' && v[0] != '0';
+    }
+
+    static void tlsDebugLog_(const std::string& msg) {
+        if (!tlsDebugEnabled_()) return;
+        std::fprintf(stderr, "[tls-debug] %s\n", msg.c_str());
+    }
 #endif
 
     static bool headerHasTokenCI_(const HeaderMap& headers,
@@ -620,10 +632,18 @@ class HttpClient {
                 if (!cachedClientTlsContext_) {
                     auto ctx = TlsContext::create(
                         TlsContext::Mode::Client, &tlsSetupError);
-                    if (!ctx) return false;
+                    if (!ctx) {
+                        tlsDebugLog_("TlsContext::create failed: "
+                            + tlsSetupError + " host=" + host);
+                        return false;
+                    }
                     if (!ctx->configureVerifyPeer(options_.verifyCertificate,
                             options_.verifyCertificate, options_.caCertFile,
                             options_.caCertDir, &tlsSetupError)) {
+                        tlsDebugLog_("configureVerifyPeer failed: "
+                            + tlsSetupError + " host=" + host
+                            + " caFile=" + options_.caCertFile + " caDir="
+                            + options_.caCertDir);
                         return false;
                     }
                     cachedClientTlsContext_
@@ -631,16 +651,24 @@ class HttpClient {
                 }
                 auto sess = TlsSession::create(
                     cachedClientTlsContext_->nativeHandle(), &tlsSetupError);
-                if (!sess) return false;
+                if (!sess) {
+                    tlsDebugLog_("TlsSession::create failed: " + tlsSetupError
+                        + " host=" + host);
+                    return false;
+                }
                 if (!sess->attachSocket(
                         static_cast<int>(socket->getNativeHandle()),
-                        &tlsSetupError))
+                        &tlsSetupError)) {
+                    tlsDebugLog_("TlsSession::attachSocket failed: "
+                        + tlsSetupError + " host=" + host);
                     return false;
+                }
                 if (options_.verifyCertificate) {
                     X509_VERIFY_PARAM* verifyParam
                         = SSL_get0_param(sess->nativeHandle());
                     if (!verifyParam) {
                         tlsSetupError = "TLS verify parameter setup failed";
+                        tlsDebugLog_(tlsSetupError + " host=" + host);
                         return false;
                     }
                     if (options_.verifyDepth >= 0) {
@@ -657,6 +685,7 @@ class HttpClient {
                         tlsSetupError = "TLS hostname verification setup "
                                         "failed for host: "
                             + normalizedVerifyHost;
+                        tlsDebugLog_(tlsSetupError);
                         return false;
                     }
                 }
@@ -674,6 +703,7 @@ class HttpClient {
                         continue;
                     tlsSetupError = "TLS handshake failed: "
                         + TlsOpenSsl::lastErrorString();
+                    tlsDebugLog_(tlsSetupError + " host=" + host);
                     return false;
                 }
                 if (options_.verifyCertificate) {
@@ -682,6 +712,7 @@ class HttpClient {
                     if (!peerCert) {
                         tlsSetupError = "TLS handshake succeeded but peer "
                                         "certificate is missing";
+                        tlsDebugLog_(tlsSetupError + " host=" + host);
                         return false;
                     }
                     X509_free(peerCert);
@@ -692,9 +723,12 @@ class HttpClient {
                         tlsSetupError = "TLS certificate verification failed: "
                             + std::string(
                                 X509_verify_cert_error_string(verifyResult));
+                        tlsDebugLog_(tlsSetupError + " host=" + host);
                         return false;
                     }
                 }
+                tlsDebugLog_("TLS setup success host=" + host + " verify="
+                    + (options_.verifyCertificate ? "on" : "off"));
                 tlsSession = std::move(sess);
                 return true;
             };

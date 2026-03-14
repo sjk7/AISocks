@@ -323,11 +323,20 @@ jobs:
           ENABLE_TLS: ${{ matrix.enable_tls }}
         run: |
           if [[ "$RUNNER_OS" == "Windows" && "$ENABLE_TLS" == "ON" ]]; then
+            export AISOCKS_TLS_DEBUG=1
             OPENSSL_BIN="/c/Program Files/OpenSSL-Win64/bin"
             if [[ ! -d "$OPENSSL_BIN" ]]; then
               OPENSSL_BIN="/c/Program Files/OpenSSL/bin"
             fi
+            echo "[ci-debug] OPENSSL_BIN=$OPENSSL_BIN"
+            if [[ -d "$OPENSSL_BIN" ]]; then
+              echo "[ci-debug] OpenSSL bin contents:"
+              ls -la "$OPENSSL_BIN" || true
+            fi
             export PATH="$OPENSSL_BIN:$PATH"
+
+            echo "[ci-debug] Running focused verbose TLS test"
+            ctest -V -R test_tls_client --output-on-failure --timeout ${{ matrix.ctest_timeout || 60 }}
           fi
           ctest --output-on-failure \
                 --no-compress-output \

@@ -26,6 +26,7 @@
 #include <atomic>
 #include <chrono>
 #include <condition_variable>
+#include <cstdio>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
@@ -39,6 +40,16 @@
 
 using namespace aiSocks;
 
+static bool tlsDebugEnabled_() {
+    const char* v = std::getenv("AISOCKS_TLS_DEBUG");
+    return v != nullptr && v[0] != '\0' && v[0] != '0';
+}
+
+static void tlsDebugLog_(const std::string& msg) {
+    if (!tlsDebugEnabled_()) return;
+    std::fprintf(stderr, "[tls-debug] %s\n", msg.c_str());
+}
+
 // ---------------------------------------------------------------------------
 // Derive the source tree root from __FILE__ so cert paths are absolute and
 // work regardless of which directory CTest runs the binary from.
@@ -47,7 +58,14 @@ static std::string sourceRoot() {
     std::string path = std::filesystem::path(__FILE__).generic_string();
     const std::string marker = "/tests/test_tls_client.cpp";
     const size_t pos = path.rfind(marker);
-    if (pos != std::string::npos) return path.substr(0, pos);
+    if (pos != std::string::npos) {
+        const std::string root = path.substr(0, pos);
+        tlsDebugLog_("__FILE__=" + path);
+        tlsDebugLog_("sourceRoot=" + root);
+        return root;
+    }
+    tlsDebugLog_("__FILE__ marker not found, falling back to cwd. __FILE__="
+        + path);
     return ".";
 }
 
@@ -64,13 +82,26 @@ class TestHttpsServer : public HttpPollServer {
 
         std::string err;
         ctx_ = TlsContext::create(TlsContext::Mode::Server, &err);
-        if (!ctx_) return;
-        if (!ctx_->loadCertificateChain(certPath, keyPath, &err)) {
-            ctx_.reset();
+        if (!ctx_) {
+            tlsInitError_ = err.empty() ? "TlsContext::create failed" : err;
+            tlsDebugLog_("TlsContext::create failed: " + tlsInitError_);
+            return;
         }
+        if (!ctx_->loadCertificateChain(certPath, keyPath, &err)) {
+            tlsInitError_
+                = err.empty() ? "loadCertificateChain failed" : err;
+            tlsDebugLog_("loadCertificateChain failed: cert=" + certPath
+                + " key=" + keyPath + " error=" + tlsInitError_);
+            ctx_.reset();
+            return;
+        }
+
+        tlsDebugLog_("TLS server context initialized: cert=" + certPath
+            + " key=" + keyPath);
     }
 
     bool tlsReady() const noexcept { return ctx_ != nullptr; }
+    std::string tlsInitError() const { return tlsInitError_; }
 
     std::string lastSniName() const {
         std::lock_guard<std::mutex> lk(sniMtx_);
@@ -177,6 +208,7 @@ class TestHttpsServer : public HttpPollServer {
     std::condition_variable readyCv_;
     mutable std::mutex sniMtx_;
     std::string lastSniName_;
+    std::string tlsInitError_;
 };
 
 class RedirectHttpsServer : public TestHttpsServer {
@@ -372,7 +404,13 @@ static void test_https_client_basic_get() {
     const std::string cert = root + "/tests/certs/test_cert.pem";
     const std::string key = root + "/tests/certs/test_key.pem";
 
+    tlsDebugLog_("basic_get cert path=" + cert);
+    tlsDebugLog_("basic_get key path=" + key);
+
     TestHttpsServer server{cert, key};
+    if (!server.tlsReady()) {
+        tlsDebugLog_("basic_get tlsReady=false error=" + server.tlsInitError());
+    }
     REQUIRE(server.tlsReady());
 
     std::thread serverThread(

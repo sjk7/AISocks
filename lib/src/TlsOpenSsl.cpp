@@ -12,9 +12,23 @@
 #include <openssl/err.h>
 #include <openssl/ssl.h>
 
+#include <cstdlib>
+#include <cstdio>
 #include <mutex>
 
 namespace aiSocks {
+
+namespace {
+bool tlsDebugEnabled_() {
+    const char* v = std::getenv("AISOCKS_TLS_DEBUG");
+    return v != nullptr && v[0] != '\0' && v[0] != '0';
+}
+
+void tlsDebugLog_(const std::string& msg) {
+    if (!tlsDebugEnabled_()) return;
+    std::fprintf(stderr, "[tls-debug] %s\n", msg.c_str());
+}
+} // namespace
 
 bool TlsOpenSsl::initialize() {
     static std::once_flag once;
@@ -137,12 +151,24 @@ bool TlsContext::configureVerifyPeer(bool verifyPeer, bool loadDefaultCaPaths,
 
         if (caFileArg || caDirArg) {
             if (SSL_CTX_load_verify_locations(ctx_, caFileArg, caDirArg) != 1) {
+                tlsDebugLog_("SSL_CTX_load_verify_locations failed"
+                    " caFile="
+                    + (caFile.empty() ? std::string{"<empty>"} : caFile)
+                    + " caDir="
+                    + (caDir.empty() ? std::string{"<empty>"} : caDir));
                 if (error) *error = TlsOpenSsl::lastErrorString();
+                if (error) {
+                    tlsDebugLog_("OpenSSL error: " + *error);
+                }
                 return false;
             }
         } else if (loadDefaultCaPaths
             && SSL_CTX_set_default_verify_paths(ctx_) != 1) {
+            tlsDebugLog_("SSL_CTX_set_default_verify_paths failed");
             if (error) *error = TlsOpenSsl::lastErrorString();
+            if (error) {
+                tlsDebugLog_("OpenSSL error: " + *error);
+            }
             return false;
         }
     }
