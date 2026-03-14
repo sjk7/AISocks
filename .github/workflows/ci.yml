@@ -41,8 +41,8 @@ jobs:
     name: Build and Test
     runs-on: ${{ matrix.os }}
     env:
-      SCCACHE_GHA_ENABLED: "true"
       SCCACHE_CACHE_SIZE: "2G"
+      SCCACHE_DIR: ${{ github.workspace }}/.sccache
 
     strategy:
       fail-fast: false          # run all matrix legs even if one fails
