@@ -8,6 +8,7 @@
 // Skipped entirely on platforms without AF_UNIX support.
 
 #include "AISocksConfig.h"
+#include <cstdio>
 
 #ifdef AISOCKS_HAVE_UNIX_SOCKETS
 
@@ -20,7 +21,7 @@
 #include <vector>
 #include <string>
 #include <algorithm>
-#include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #ifdef _WIN32
 #include <windows.h>
@@ -56,13 +57,32 @@ static inline void sock_unlink(const char* p) {
 #endif
 }
 
+static bool traceUnixCloseEnabled() {
+    const char* v = std::getenv("AISOCKS_TRACE_UNIX_CLOSE");
+    return v && v[0] != '\0' && v[0] != '0';
+}
+
 // RAII unlink: removes the path on construction and destruction.
 struct ScopedUnlink {
     std::string path;
     explicit ScopedUnlink(const std::string& p) : path(p) {
         sock_unlink(p.c_str());
     }
-    ~ScopedUnlink() { sock_unlink(path.c_str()); }
+    ~ScopedUnlink() {
+#ifdef _WIN32
+        if (traceUnixCloseEnabled()) {
+            std::fprintf(stderr, "[trace] ScopedUnlink begin: %s\n", path.c_str());
+            std::fflush(stderr);
+        }
+#endif
+        sock_unlink(path.c_str());
+#ifdef _WIN32
+        if (traceUnixCloseEnabled()) {
+            std::fprintf(stderr, "[trace] ScopedUnlink end: %s\n", path.c_str());
+            std::fflush(stderr);
+        }
+#endif
+    }
 };
 
 // Wait for `flag` to become true, with a 2-second deadline.

@@ -10,7 +10,9 @@
 #include "Result.h"
 #include <atomic>
 #include <chrono>
+#include <cstdlib>
 #include <cstring>
+#include <cstdio>
 #include <future>
 #include <thread>
 #ifndef _WIN32
@@ -51,6 +53,16 @@ namespace {
                 std::chrono::milliseconds(kDnsGateSleepMs));
         }
     }
+
+#if defined(_WIN32) && defined(AISOCKS_TESTING)
+    static bool traceUnixCloseEnabled_() {
+        static const bool enabled = []() {
+            const char* v = std::getenv("AISOCKS_TRACE_UNIX_CLOSE");
+            return v && v[0] != '\0' && v[0] != '0';
+        }();
+        return enabled;
+    }
+#endif
 } // namespace
 
 // Platform-specific initialization
@@ -828,21 +840,66 @@ bool SocketImpl::setReceiveTimeout(Milliseconds timeout) {
 
 void SocketImpl::close() noexcept {
     if (isValid()) {
+#if defined(_WIN32) && defined(AISOCKS_TESTING)
+        const bool traceUnixClose = (addressFamily == AddressFamily::Unix)
+            && traceUnixCloseEnabled_();
+        if (traceUnixClose) {
+            std::fprintf(stderr,
+                "[trace] SocketImpl::close enter handle=%llu "
+                "shutdownCalled=%d\n",
+                static_cast<unsigned long long>(socketHandle),
+                shutdownCalled_ ? 1 : 0);
+            std::fflush(stderr);
+        }
+#endif
+
         // Only call ::shutdown() if the user hasn't already done so.
         // If shutdown(Write) was called for a deliberate half-close sequence,
         // a second shutdown(RDWR) here could interfere with the FIN exchange
         // or send an RST with SO_LINGER.
-        if (!shutdownCalled_) {
+        const bool shouldShutdown = !shutdownCalled_
 #ifdef _WIN32
+            // Windows AF_UNIX listener teardown can stall in shutdown().
+            // closesocket() is sufficient to release these handles.
+            && (addressFamily != AddressFamily::Unix)
+#endif
+            ;
+
+        if (shouldShutdown) {
+#ifdef _WIN32
+#if defined(AISOCKS_TESTING)
+            if (traceUnixClose) {
+                std::fprintf(stderr,
+                    "[trace] SocketImpl::close before shutdown(SD_BOTH) "
+                    "handle=%llu\n",
+                    static_cast<unsigned long long>(socketHandle));
+                std::fflush(stderr);
+            }
+#endif
             ::shutdown(socketHandle, SD_BOTH);
 #else
             ::shutdown(socketHandle, SHUT_RDWR);
 #endif
         }
 #ifdef _WIN32
+#if defined(AISOCKS_TESTING)
+        if (traceUnixClose) {
+            std::fprintf(stderr,
+                "[trace] SocketImpl::close before closesocket handle=%llu\n",
+                static_cast<unsigned long long>(socketHandle));
+            std::fflush(stderr);
+        }
+#endif
         closesocket(socketHandle);
 #else
         ::close(socketHandle);
+#endif
+#if defined(_WIN32) && defined(AISOCKS_TESTING)
+        if (traceUnixClose) {
+            std::fprintf(stderr, "[trace] SocketImpl::close done handle=%llu\n",
+                static_cast<unsigned long long>(socketHandle));
+            std::fflush(stderr);
+        }
 #endif
         socketHandle = INVALID_SOCKET_HANDLE;
         shutdownCalled_ = false;
