@@ -126,7 +126,8 @@ bool TlsContext::configureVerifyPeer(bool verifyPeer, bool loadDefaultCaPaths,
                 return false;
             }
             if (!PathHelper::isDirectory(caDir)) {
-                if (error) *error = "CA directory path is not a directory: " + caDir;
+                if (error)
+                    *error = "CA directory path is not a directory: " + caDir;
                 return false;
             }
         }
