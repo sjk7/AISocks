@@ -21,10 +21,7 @@
 #if defined(NTDDI_WIN10_RS4) && (NTDDI_VERSION >= NTDDI_WIN10_RS4)
 #if defined(__has_include)
 #if __has_include(<afunix.h>)
-#include <afunix.h>
-#if defined(AF_UNIX)
 #define AISOCKS_HAVE_UNIX_SOCKETS 1
-#endif
 #endif
 #endif
 #endif

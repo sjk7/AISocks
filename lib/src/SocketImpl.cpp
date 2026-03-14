@@ -519,7 +519,8 @@ bool SocketImpl::resolveAddress_(const std::string& address, Port port,
             const int64_t testDelay
                 = g_dnsTestDelayMs.load(std::memory_order_relaxed);
             if (testDelay > 0)
-                std::this_thread::sleep_for(std::chrono::milliseconds(testDelay));
+                std::this_thread::sleep_for(
+                    std::chrono::milliseconds(testDelay));
 #endif
             res->error = resolveToSockaddr(addr, p, af, st,
                 /*doDns=*/true, res->addr, res->addrLen, &res->gaiErr);
@@ -531,12 +532,13 @@ bool SocketImpl::resolveAddress_(const std::string& address, Port port,
         return false;
     }
 
-    const auto remainingMs = std::chrono::duration_cast<std::chrono::milliseconds>(
-                                 deadline - std::chrono::steady_clock::now())
-                                 .count();
+    const auto remainingMs
+        = std::chrono::duration_cast<std::chrono::milliseconds>(
+            deadline - std::chrono::steady_clock::now())
+              .count();
     if (remainingMs <= 0
         || dnsFut.wait_for(std::chrono::milliseconds(remainingMs))
-        == std::future_status::timeout) {
+            == std::future_status::timeout) {
 #ifdef _WIN32
         WSASetLastError(WSAETIMEDOUT);
 #else

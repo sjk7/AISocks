@@ -57,10 +57,12 @@ static inline void sock_unlink(const char* p) {
 #endif
 }
 
+#ifdef _WIN32
 static bool traceUnixCloseEnabled() {
     const char* v = std::getenv("AISOCKS_TRACE_UNIX_CLOSE");
     return v && v[0] != '\0' && v[0] != '0';
 }
+#endif
 
 // RAII unlink: removes the path on construction and destruction.
 struct ScopedUnlink {
@@ -71,14 +73,16 @@ struct ScopedUnlink {
     ~ScopedUnlink() {
 #ifdef _WIN32
         if (traceUnixCloseEnabled()) {
-            std::fprintf(stderr, "[trace] ScopedUnlink begin: %s\n", path.c_str());
+            std::fprintf(
+                stderr, "[trace] ScopedUnlink begin: %s\n", path.c_str());
             std::fflush(stderr);
         }
 #endif
         sock_unlink(path.c_str());
 #ifdef _WIN32
         if (traceUnixCloseEnabled()) {
-            std::fprintf(stderr, "[trace] ScopedUnlink end: %s\n", path.c_str());
+            std::fprintf(
+                stderr, "[trace] ScopedUnlink end: %s\n", path.c_str());
             std::fflush(stderr);
         }
 #endif
