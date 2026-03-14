@@ -395,16 +395,8 @@ jobs:
             BUILD_JOBS="$(nproc 2>/dev/null || sysctl -n hw.logicalcpu 2>/dev/null || echo 4)"
           fi
           echo "[ci] build parallel jobs=$BUILD_JOBS"
-
-          TARGETS=(aiSocksLib)
-          while IFS= read -r t; do
-            [[ -n "$t" ]] && TARGETS+=("$t")
-          done < <(ctest -N --test-dir build -C "${{ matrix.build_type }}" 2>/dev/null | sed -n 's/^  Test #[0-9]\+: \(.*\)$/\1/p')
-
-          echo "[ci] build targets: ${#TARGETS[@]}"
           cmake --build build \
-            --parallel "$BUILD_JOBS" \
-            --target "${TARGETS[@]}"
+            --parallel "$BUILD_JOBS"
 
       # ------------------------------------------------------------------ #
       # 5. Test                                                             #
