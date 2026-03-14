@@ -445,8 +445,20 @@ class HttpClient {
     }
 
     static bool tlsDebugEnabled_() {
-        const char* v = std::getenv("AISOCKS_TLS_DEBUG");
-        return v != nullptr && v[0] != '\0' && v[0] != '0';
+        const char* envName = "AISOCKS_TLS_DEBUG";
+    #ifdef _MSC_VER
+        char* value = nullptr;
+        size_t valueLen = 0;
+        if (_dupenv_s(&value, &valueLen, envName) != 0 || value == nullptr) {
+            return false;
+        }
+        const bool enabled = value[0] != '\0' && value[0] != '0';
+        std::free(value);
+        return enabled;
+    #else
+        const char* value = std::getenv(envName);
+        return value != nullptr && value[0] != '\0' && value[0] != '0';
+    #endif
     }
 
     static void tlsDebugLog_(const std::string& msg) {
@@ -640,10 +652,10 @@ class HttpClient {
                     if (!ctx->configureVerifyPeer(options_.verifyCertificate,
                             options_.verifyCertificate, options_.caCertFile,
                             options_.caCertDir, &tlsSetupError)) {
-                        tlsDebugLog_("configureVerifyPeer failed: "
-                            + tlsSetupError + " host=" + host
-                            + " caFile=" + options_.caCertFile + " caDir="
-                            + options_.caCertDir);
+                        tlsDebugLog_(
+                            "configureVerifyPeer failed: " + tlsSetupError
+                            + " host=" + host + " caFile=" + options_.caCertFile
+                            + " caDir=" + options_.caCertDir);
                         return false;
                     }
                     cachedClientTlsContext_
@@ -727,8 +739,8 @@ class HttpClient {
                         return false;
                     }
                 }
-                tlsDebugLog_("TLS setup success host=" + host + " verify="
-                    + (options_.verifyCertificate ? "on" : "off"));
+                tlsDebugLog_("TLS setup success host=" + host
+                    + " verify=" + (options_.verifyCertificate ? "on" : "off"));
                 tlsSession = std::move(sess);
                 return true;
             };

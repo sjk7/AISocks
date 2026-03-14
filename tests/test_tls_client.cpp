@@ -41,8 +41,20 @@
 using namespace aiSocks;
 
 static bool tlsDebugEnabled_() {
-    const char* v = std::getenv("AISOCKS_TLS_DEBUG");
-    return v != nullptr && v[0] != '\0' && v[0] != '0';
+    const char* envName = "AISOCKS_TLS_DEBUG";
+#ifdef _MSC_VER
+    char* value = nullptr;
+    size_t len = 0;
+    if (_dupenv_s(&value, &len, envName) != 0 || value == nullptr) {
+        return false;
+    }
+    const bool enabled = value[0] != '\0' && value[0] != '0';
+    std::free(value);
+    return enabled;
+#else
+    const char* value = std::getenv(envName);
+    return value != nullptr && value[0] != '\0' && value[0] != '0';
+#endif
 }
 
 static void tlsDebugLog_(const std::string& msg) {
@@ -64,8 +76,8 @@ static std::string sourceRoot() {
         tlsDebugLog_("sourceRoot=" + root);
         return root;
     }
-    tlsDebugLog_("__FILE__ marker not found, falling back to cwd. __FILE__="
-        + path);
+    tlsDebugLog_(
+        "__FILE__ marker not found, falling back to cwd. __FILE__=" + path);
     return ".";
 }
 
@@ -88,8 +100,7 @@ class TestHttpsServer : public HttpPollServer {
             return;
         }
         if (!ctx_->loadCertificateChain(certPath, keyPath, &err)) {
-            tlsInitError_
-                = err.empty() ? "loadCertificateChain failed" : err;
+            tlsInitError_ = err.empty() ? "loadCertificateChain failed" : err;
             tlsDebugLog_("loadCertificateChain failed: cert=" + certPath
                 + " key=" + keyPath + " error=" + tlsInitError_);
             ctx_.reset();
