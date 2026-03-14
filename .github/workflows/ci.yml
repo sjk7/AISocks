@@ -5,6 +5,7 @@ on:
     branches: ["main", "master", "secure"]
   pull_request:
     branches: ["main", "master", "secure"]
+  workflow_dispatch:
 
 # Cancel superseded runs on the same branch/PR to save runner minutes.
 concurrency:
@@ -12,7 +13,24 @@ concurrency:
   cancel-in-progress: ${{ github.ref != 'refs/heads/secure' }}
 
 jobs:
+  preflight:
+    name: Preflight / Event Diagnostics
+    runs-on: ubuntu-latest
+    steps:
+      - name: Print trigger context
+        run: |
+          echo "event_name=${{ github.event_name }}"
+          echo "ref=${{ github.ref }}"
+          echo "base_ref=${{ github.base_ref }}"
+          echo "head_ref=${{ github.head_ref }}"
+          echo "sha=${{ github.sha }}"
+
   build-and-test:
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'push' && contains(fromJson('["refs/heads/main","refs/heads/master","refs/heads/secure"]'), github.ref)) ||
+      (github.event_name == 'pull_request' && contains(fromJson('["main","master","secure"]'), github.base_ref))
+    needs: preflight
     name: ${{ matrix.os }} / ${{ matrix.compiler }} / ${{ matrix.build_type }}
     runs-on: ${{ matrix.os }}
 
