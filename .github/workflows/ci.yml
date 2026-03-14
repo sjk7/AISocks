@@ -22,7 +22,7 @@ on:
 # Cancel superseded runs on the same branch/PR to save runner minutes.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.ref != 'refs/heads/secure' }}
+  cancel-in-progress: true
 
 jobs:
   preflight:
@@ -37,21 +37,12 @@ jobs:
           echo "head_ref=${{ github.head_ref }}"
           echo "sha=${{ github.sha }}"
 
-  windows-priority-gate:
-    name: Windows Priority Gate
-    needs: preflight
-    runs-on: windows-latest
-    steps:
-      - name: Reserve Windows runner early
-        shell: bash
-        run: echo "Windows gate ready"
-
   build-and-test:
     if: |
       github.event_name == 'workflow_dispatch' ||
       (github.event_name == 'push' && contains(fromJson('["refs/heads/main","refs/heads/master","refs/heads/secure"]'), github.ref)) ||
       (github.event_name == 'pull_request' && contains(fromJson('["main","master","secure"]'), github.base_ref))
-    needs: [preflight, windows-priority-gate]
+    needs: preflight
     name: Build and Test
     runs-on: ${{ matrix.os }}
 
