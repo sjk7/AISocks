@@ -1,128 +1,102 @@
-# SSL Client Handoff (Remaining Work)
+# SSL Client Handoff (Current Context)
 
 Date: 2026-03-14
 Branch: secure
 Scope: HttpClient TLS client path
 
-## What is already done
+## Workflow Rule
 
-- HTTPS client path is implemented behind AISOCKS_ENABLE_TLS.
-- Strict verification is now wired when verifyCertificate=true:
-  - Chain verification via OpenSSL verify mode.
-  - Hostname/IP verification setup before handshake.
-  - Post-handshake verify-result check.
-  - Peer certificate presence check.
-- verifyCertificate=false behavior remains permissive and unchanged.
-- TLS integration tests cover:
-  - verify enabled + trusted custom CA + matching host succeeds.
-  - verify enabled + hostname mismatch fails.
-  - verify enabled + untrusted self-signed fails.
-- Trust-store API now supports CA file and/or CA directory:
-  - `caCertFile` only.
-  - `caCertDir` only.
-  - `caCertFile + caCertDir` together.
-  - neither (system defaults).
-- Deterministic trust-source setup checks are enforced before OpenSSL load:
-  - missing CA file is a setup error.
-  - missing or non-directory CA dir is a setup error.
+- Do not push until ALL tests pass, including non-SSL and TLS test suites.
 
-## Remaining SSL client work
+## Completed
 
-### Status snapshot (as of 2026-03-14)
+- [DONE] HTTPS client path behind AISOCKS_ENABLE_TLS.
+- [DONE] Strict verification path when verifyCertificate=true:
+  - chain verification.
+  - hostname/IP verification setup before handshake.
+  - post-handshake verify-result check.
+  - peer certificate presence check.
+- [DONE] Default TLS verification policy:
+  - HttpClient verifyCertificate now defaults to true.
+- [DONE] Trust-store configuration:
+  - caCertFile only.
+  - caCertDir only.
+  - caCertFile + caCertDir.
+  - deterministic invalid file/dir setup errors.
+- [DONE] Host verification hardening:
+  - trailing-dot hostname normalization.
+  - robust IP-literal detection.
+  - non-ASCII DNS host rejection with punycode guidance.
+- [DONE] SNI policy:
+  - DNS hosts send SNI.
+  - IP literals do not send SNI.
+- [DONE] Configurable verify depth:
+  - verifyDepth in options (`-1` OpenSSL default, `>=0` explicit depth).
+  - invalid depth validation.
+- [DONE] SSL_CTX reuse:
+  - reused per HttpClient instance.
+  - rebuilt on setOptions() change.
+- [DONE] IPv6 verification coverage:
+  - ::1 SAN match success.
+  - IPv6 SAN mismatch failure.
+- [DONE] CA source matrix positive cases:
+  - CA directory-only success fixture using deterministic hashed capath temp dir.
+  - valid file+dir success fixture.
 
-- [DONE] P0.2 trust-store API supports CA file/dir and deterministic invalid-path behavior.
-- [DONE] P1.4 SNI for IP literals is disabled; DNS hosts still send SNI.
-- [DONE] P1.3 host normalization + IDN policy: trailing-dot strip, robust IP literal checks, and non-ASCII DNS host rejection with punycode guidance under verify mode.
-- [DONE] P0.1 verifyCertificate default-policy decision.
-- [DONE] P1.5 verify depth option.
-- [OPEN] P1.6 revocation strategy.
-- [DONE] P2.7 SSL_CTX reuse per HttpClient instance.
-- [OPEN] P2.8 session resumption across new TCP connections.
+## Open Work
 
-### P0: Security posture defaults and API ergonomics
+- [OPEN][ITER-1] Revocation strategy (OCSP/CRL) scope decision and docs:
+  - Decision target for this branch: keep revocation checks OFF by default and document this explicitly.
+  - Add options shape proposal (no implementation yet):
+    - enableOcspStaplingCheck (best-effort),
+    - crlFile / crlDir,
+    - hardFailOnRevocationUnavailable.
+  - Document platform caveats (OpenSSL does not do full online revocation by default).
+  - Exit criteria: README + SANITIZERS/TEST docs describe threat model and operator expectations.
+- [OPEN][ITER-2] Session resumption across new TCP connections:
+  - Current behavior is unchanged: only keep-alive reuse on the same live socket.
+  - Planned implementation:
+    - per-HttpClient in-memory SSL session cache keyed by scheme+host+port.
+    - cache invalidation when setOptions() changes trust/verify knobs.
+    - conservative defaults (small bounded cache, no cross-process persistence).
+  - Exit criteria: second fresh TCP connection to same origin attempts resume, plus safe fallback on miss/failure.
 
-1. Decide production default for verifyCertificate.
-- [DONE] runtime default is now `verifyCertificate=true`.
+## Remaining Tests
 
-2. Improve trust-store API beyond single file. [DONE]
-- CA directory support is implemented (`caCertDir`) with deterministic precheck
-  errors for invalid file/dir inputs.
-- Remaining: add a positive CA-directory-only integration test fixture that is
-  portable across CI environments.
+- [OPEN][P2] Default system roots behavior test (environment-sensitive):
+  - Add gated smoke test enabled only when AISOCKS_RUN_SYSTEM_ROOT_TLS_TEST=1.
+  - Test expectation: known public endpoint succeeds with verifyCertificate=true and no explicit CA file/dir.
+  - Mark as skipped by default in CI to avoid network/env flakiness.
+- [OPEN][P3] Redirect + TLS verification interactions:
+  - Add HTTPS redirect to different host test with verify enabled and explicit trust roots.
+  - Add explicit HTTPS->HTTP redirect behavior test and lock current behavior with assertions.
+  - Include redirect-chain assertions to ensure host/scheme transitions are visible to callers.
 
-### P1: Hostname verification edge hardening
+## Next Iteration Order
 
-3. Normalize host before OpenSSL hostname checks. [DONE]
-- Done:
-  - strip trailing dots before OpenSSL host/IP verify setup.
-  - use robust IP literal detection via `Socket::isValidIPv4/isValidIPv6`.
-- IDN/punycode policy: callers must pass punycode (A-label) hostnames when verification is enabled; non-ASCII DNS hosts are rejected with a clear error.
+1. Implement P3 redirect/TLS interaction tests and document current downgrade behavior.
+2. Add P2 gated system-roots smoke test.
+3. Re-evaluate whether ITER-2 (session resumption across new TCP connections) should start in this branch or a follow-up branch.
+4. Finalize ITER-1 revocation scope text in docs before handoff close.
 
-4. SNI behavior for IP literals. [DONE]
-- SNI is now sent for DNS hosts only; skipped for IP literals.
-- Added integration coverage:
-  - DNS host path sends SNI.
-  - IP-literal host path does not send SNI.
+## Latest Validation
 
-### P1: Verification depth and revocation
+- Rebuilt and ran `build-tls-relwithdebinfo/tests/test_tls_client` after adding P1 tests.
+- New P1 tests passed:
+  - `HttpClient HTTPS verify enabled succeeds with CA dir only`
+  - `HttpClient HTTPS verify enabled succeeds with CA file plus valid CA dir`
+- Added guard in IPv6 SAN-match test to avoid abort-on-failure behavior and emit actionable failure text.
+- Re-ran `build-tls-relwithdebinfo/tests/test_tls_client`: 60 passed, 0 failed.
+- Ran non-SSL CMake suite via CTest (`build-relwithdebinfo`): all discovered tests passed (48/48).
 
-5. Add configurable verify depth.
-- [DONE] `verifyDepth` is exposed in HttpClient options (`-1` = OpenSSL
-  default, `>=0` applies explicit depth).
-- Added test coverage for invalid depth validation and `verifyDepth=0`
-  success path with trusted leaf.
+## Current Key Touchpoints
 
-6. Evaluate revocation strategy.
-- Not currently checking OCSP/CRL.
-- If threat model requires it, add optional revocation checks and document operational requirements.
+- lib/include/HttpClient.h
+- lib/include/TlsOpenSsl.h
+- lib/src/TlsOpenSsl.cpp
+- tests/test_tls_client.cpp
 
-### P2: Performance and lifecycle cleanup
-
-7. Reuse client SSL_CTX across requests.
-- [DONE] TLS context is reused per HttpClient instance and rebuilt when
-  `setOptions()` changes trust/verify settings.
-
-8. Session resumption policy.
-- Current keep-alive reuses live TLS session on same socket only.
-- No resumed handshakes across new TCP connections.
-- Optional future: OpenSSL client session cache/tickets per HttpClient instance.
-
-## Remaining tests to add
-
-1. IPv6 hostname/IP verification paths
-- [::1] certificate SAN IP match succeeds with verify enabled. [DONE]
-- mismatch for IPv6 IP literal fails. [DONE]
-
-2. CA source matrix tests
-- default system roots path behavior (environment-dependent, may need containerized fixture).
-- custom CA file invalid path produces clear setup error. [DONE]
-- custom CA dir invalid path produces clear setup error. [DONE]
-- file+dir with invalid dir fails setup deterministically. [DONE]
-- add portable positive directory-only and valid file+dir success tests.
-
-3. SNI policy tests
-- DNS host sends SNI and succeeds. [DONE]
-- IP literal path behavior after SNI policy decision remains compatible. [DONE]
-
-4. Redirect + TLS verification interactions
-- HTTPS redirect to different host with verify enabled (expected re-verify on new host).
-- HTTPS to HTTP downgrade handling policy remains explicit and tested.
-
-## Current key touchpoints
-
-- HttpClient TLS handshake and verify logic:
-  - lib/include/HttpClient.h
-- TLS context verify configuration:
-  - lib/include/TlsOpenSsl.h
-  - lib/src/TlsOpenSsl.cpp
-- TLS integration tests:
-  - tests/test_tls_client.cpp
-
-## Suggested next implementation order
-
-1. Revisit default verifyCertificate policy and update docs/changelog.
-
-## Validation command set
+## Validation Commands
 
 - cmake --preset tls-relwithdebinfo
 - cmake --build --preset tls-relwithdebinfo -j

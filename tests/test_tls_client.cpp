@@ -24,9 +24,14 @@
 #include "test_helpers.h"
 
 #include <atomic>
+#include <chrono>
 #include <condition_variable>
+#include <filesystem>
+#include <fstream>
 #include <mutex>
+#include <openssl/pem.h>
 #include <openssl/ssl.h>
+#include <sstream>
 #include <string>
 #include <thread>
 
@@ -176,6 +181,64 @@ static bool hasIpv6Loopback_() {
     auto srv = TcpSocket::createRaw(AddressFamily::IPv6);
     if (!srv.setReuseAddress(true)) return false;
     if (!srv.bind("::1", Port{0}) || !srv.listen(1)) return false;
+    return true;
+}
+
+struct ScopedTempDir {
+    std::filesystem::path path;
+    ~ScopedTempDir() {
+        if (path.empty()) return;
+        std::error_code ec;
+        std::filesystem::remove_all(path, ec);
+    }
+};
+
+static bool copyFile_(const std::string& src, const std::string& dst) {
+    std::ifstream in(src, std::ios::binary);
+    if (!in) return false;
+    std::ofstream out(dst, std::ios::binary | std::ios::trunc);
+    if (!out) return false;
+    out << in.rdbuf();
+    return static_cast<bool>(out);
+}
+
+static bool createHashedCaDirFixture_(
+    const std::string& certPemPath, ScopedTempDir& out, std::string& err) {
+    FILE* fp = std::fopen(certPemPath.c_str(), "rb");
+    if (!fp) {
+        err = "failed to open cert PEM for capath fixture";
+        return false;
+    }
+
+    X509* cert = PEM_read_X509(fp, nullptr, nullptr, nullptr);
+    std::fclose(fp);
+    if (!cert) {
+        err = "failed to parse cert PEM for capath fixture";
+        return false;
+    }
+
+    const unsigned long hash = X509_subject_name_hash(cert);
+    X509_free(cert);
+
+    const auto now = std::chrono::steady_clock::now().time_since_epoch();
+    std::ostringstream dirName;
+    dirName << "aisocks-capath-" << now.count();
+    out.path = std::filesystem::temp_directory_path() / dirName.str();
+
+    std::error_code ec;
+    if (!std::filesystem::create_directories(out.path, ec)) {
+        err = "failed to create capath fixture directory";
+        return false;
+    }
+
+    char hashFile[32] = {};
+    std::snprintf(hashFile, sizeof(hashFile), "%08lx.0", hash);
+    const std::filesystem::path hashedCert = out.path / hashFile;
+    if (!copyFile_(certPemPath, hashedCert.string())) {
+        err = "failed to write hashed cert file in capath fixture";
+        return false;
+    }
+
     return true;
 }
 
@@ -455,6 +518,88 @@ static void test_https_verify_enabled_ca_file_plus_invalid_dir_fails_setup() {
     REQUIRE(result.message().find("TLS setup") != std::string::npos);
 }
 
+static void test_https_verify_enabled_ca_dir_only_succeeds() {
+    BEGIN_TEST("HttpClient HTTPS verify enabled succeeds with CA dir only");
+
+    const std::string root = sourceRoot();
+    const std::string cert = root + "/tests/certs/test_cert.pem";
+    const std::string key = root + "/tests/certs/test_key.pem";
+
+    ScopedTempDir capathFixture;
+    std::string fixtureErr;
+    REQUIRE(createHashedCaDirFixture_(cert, capathFixture, fixtureErr));
+    if (!fixtureErr.empty()) {
+        REQUIRE_MSG(false, fixtureErr.c_str());
+        return;
+    }
+
+    TestHttpsServer server{cert, key};
+    REQUIRE(server.tlsReady());
+
+    std::thread serverThread(
+        [&] { server.run(ClientLimit::Unlimited, Milliseconds{5}); });
+    server.waitReady();
+
+    HttpClient::Options opts;
+    opts.connectTimeout = Milliseconds{2000};
+    opts.requestTimeout = Milliseconds{2000};
+    opts.verifyCertificate = true;
+    opts.caCertDir = capathFixture.path.string();
+    HttpClient client{opts};
+
+    const std::string url = "https://127.0.0.1:"
+        + std::to_string(server.serverPort().value()) + "/ca-dir-only";
+    auto result = client.get(url);
+
+    server.requestStop();
+    serverThread.join();
+
+    REQUIRE(result.isSuccess());
+    REQUIRE(result.value().statusCode() == 200);
+}
+
+static void test_https_verify_enabled_ca_file_plus_valid_dir_succeeds() {
+    BEGIN_TEST("HttpClient HTTPS verify enabled succeeds with CA file plus "
+               "valid CA dir");
+
+    const std::string root = sourceRoot();
+    const std::string cert = root + "/tests/certs/test_cert.pem";
+    const std::string key = root + "/tests/certs/test_key.pem";
+
+    ScopedTempDir capathFixture;
+    std::string fixtureErr;
+    REQUIRE(createHashedCaDirFixture_(cert, capathFixture, fixtureErr));
+    if (!fixtureErr.empty()) {
+        REQUIRE_MSG(false, fixtureErr.c_str());
+        return;
+    }
+
+    TestHttpsServer server{cert, key};
+    REQUIRE(server.tlsReady());
+
+    std::thread serverThread(
+        [&] { server.run(ClientLimit::Unlimited, Milliseconds{5}); });
+    server.waitReady();
+
+    HttpClient::Options opts;
+    opts.connectTimeout = Milliseconds{2000};
+    opts.requestTimeout = Milliseconds{2000};
+    opts.verifyCertificate = true;
+    opts.caCertFile = cert;
+    opts.caCertDir = capathFixture.path.string();
+    HttpClient client{opts};
+
+    const std::string url = "https://127.0.0.1:"
+        + std::to_string(server.serverPort().value()) + "/ca-file-plus-dir";
+    auto result = client.get(url);
+
+    server.requestStop();
+    serverThread.join();
+
+    REQUIRE(result.isSuccess());
+    REQUIRE(result.value().statusCode() == 200);
+}
+
 static void test_https_set_options_rebuilds_tls_context() {
     BEGIN_TEST("HttpClient setOptions rebuilds TLS context with new trust "
                "settings");
@@ -590,7 +735,11 @@ static void test_https_verify_enabled_ipv6_san_match_succeeds() {
     server.requestStop();
     serverThread.join();
 
-    REQUIRE(result.isSuccess());
+    if (!result.isSuccess()) {
+        REQUIRE_MSG(false,
+            ("IPv6 verified request failed: " + result.message()).c_str());
+        return;
+    }
     REQUIRE(result.value().statusCode() == 200);
 }
 
@@ -736,6 +885,8 @@ int main() {
     test_https_verify_enabled_invalid_ca_file_fails_setup();
     test_https_verify_enabled_invalid_ca_dir_fails_setup();
     test_https_verify_enabled_ca_file_plus_invalid_dir_fails_setup();
+    test_https_verify_enabled_ca_dir_only_succeeds();
+    test_https_verify_enabled_ca_file_plus_valid_dir_succeeds();
     test_https_set_options_rebuilds_tls_context();
     test_https_ip_literal_does_not_send_sni();
     test_https_dns_host_sends_sni();
