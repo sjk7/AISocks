@@ -271,9 +271,10 @@ jobs:
             -DCMAKE_CXX_COMPILER_LAUNCHER=sccache
           )
           if [[ "$RUNNER_OS" == "Windows" && "${{ matrix.build_type }}" == "RelWithDebInfo" ]]; then
+            # Use CMake's MSVC debug-info knob to request /Z7 without passing
+            # raw /-style flags through Git Bash argument conversion.
             CMAKE_ARGS+=(
-              "-DCMAKE_C_FLAGS_RELWITHDEBINFO=/O2 /Ob1 /DNDEBUG /Z7"
-              "-DCMAKE_CXX_FLAGS_RELWITHDEBINFO=/O2 /Ob1 /DNDEBUG /Z7"
+              "-DCMAKE_MSVC_DEBUG_INFORMATION_FORMAT=Embedded"
             )
           fi
           if [[ "$ENABLE_TLS" == "ON" ]]; then
