@@ -126,6 +126,13 @@ jobs:
             enable_tls: "ON"
             ctest_timeout: 120
 
+          - os: windows-latest
+            compiler: msvc (tls)
+            cmake_generator: Ninja
+            build_type: RelWithDebInfo
+            enable_tls: "ON"
+            ctest_timeout: 120
+
           # ---------------------------------------------------------------
           # Sanitizer legs — Linux/Clang, Debug
           # ASan and UBSan are incompatible with TSan; keep them separate.
@@ -192,6 +199,12 @@ jobs:
         with:
           args: install ninja -y
 
+      - name: Install OpenSSL (Windows TLS)
+        if: runner.os == 'Windows' && matrix.enable_tls == 'ON'
+        uses: crazy-max/ghaction-chocolatey@v3
+        with:
+          args: install openssl -y
+
       # Set up MSVC compiler environment (cl.exe, link.exe in PATH)
       - name: Set up MSVC environment
         if: matrix.compiler == 'msvc'
@@ -226,6 +239,14 @@ jobs:
               CMAKE_ARGS+=(
                 "-DOPENSSL_ROOT_DIR=$OPENSSL_PREFIX"
               )
+            elif [[ "$RUNNER_OS" == "Windows" ]]; then
+              OPENSSL_ROOT_DIR_WIN="/c/Program Files/OpenSSL-Win64"
+              if [[ ! -d "$OPENSSL_ROOT_DIR_WIN" ]]; then
+                OPENSSL_ROOT_DIR_WIN="/c/Program Files/OpenSSL"
+              fi
+              CMAKE_ARGS+=(
+                "-DOPENSSL_ROOT_DIR=$OPENSSL_ROOT_DIR_WIN"
+              )
             fi
           fi
           if [[ -n "$SANITIZER_FLAGS" ]]; then
@@ -259,7 +280,15 @@ jobs:
           ASAN_OPTIONS: ${{ matrix.asan_options }}
           UBSAN_OPTIONS: ${{ matrix.ubsan_options }}
           TSAN_OPTIONS: ${{ matrix.tsan_options }}
+          ENABLE_TLS: ${{ matrix.enable_tls }}
         run: |
+          if [[ "$RUNNER_OS" == "Windows" && "$ENABLE_TLS" == "ON" ]]; then
+            OPENSSL_BIN="/c/Program Files/OpenSSL-Win64/bin"
+            if [[ ! -d "$OPENSSL_BIN" ]]; then
+              OPENSSL_BIN="/c/Program Files/OpenSSL/bin"
+            fi
+            export PATH="$OPENSSL_BIN:$PATH"
+          fi
           ctest --output-on-failure \
                 --no-compress-output \
                 --timeout ${{ matrix.ctest_timeout || 60 }} \
