@@ -199,7 +199,7 @@ jobs:
       - name: Enable sccache (GitHub Actions backend)
         shell: bash
         run: |
-          echo "SCCACHE_GHA_ENABLED=true" >> "$GITHUB_ENV"
+          echo "SCCACHE_GHA_ENABLED=false" >> "$GITHUB_ENV"
           echo "RUST_LOG=sccache=error" >> "$GITHUB_ENV"
           echo "SCCACHE_CACHE_SIZE=15G" >> "$GITHUB_ENV"
 
