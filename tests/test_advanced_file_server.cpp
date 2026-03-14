@@ -514,7 +514,8 @@ void testCacheHitsOnRepeatedRequest() {
         HttpClientState state;
         state.request = request;
         server.buildResponse(state);
-        std::string status = BehavioralTestHelper::extractStatus(state.responseBuf);
+        std::string status
+            = BehavioralTestHelper::extractStatus(state.responseBuf);
         TestFramework::assert_contains(
             status, "200", "First request should be served successfully");
     }
@@ -531,13 +532,14 @@ void testCacheHitsOnRepeatedRequest() {
         HttpClientState state;
         state.request = request;
         server.buildResponse(state);
-        std::string status = BehavioralTestHelper::extractStatus(state.responseBuf);
+        std::string status
+            = BehavioralTestHelper::extractStatus(state.responseBuf);
         TestFramework::assert_contains(
             status, "200", "Second request should be served successfully");
     }
 
-    TestFramework::assert_true(
-        server.cacheHits() == 1, "Second request must be a cache hit (no disk read)");
+    TestFramework::assert_true(server.cacheHits() == 1,
+        "Second request must be a cache hit (no disk read)");
 
     // Third request — still from cache.
     {

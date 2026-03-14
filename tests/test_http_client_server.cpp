@@ -482,7 +482,7 @@ static void test_interim_100_response_is_ignored() {
 
 static void test_https_scheme_rejected() {
     BEGIN_TEST("HttpClient rejects direct https URLs with explicit error");
-
+#ifndef AISOCKS_ENABLE_TLS
     HttpClient::Options opts;
     opts.connectTimeout = Milliseconds{150};
     opts.requestTimeout = Milliseconds{150};
@@ -492,11 +492,12 @@ static void test_https_scheme_rejected() {
     REQUIRE(!result.isSuccess());
     REQUIRE(
         result.message().find("HTTPS is not supported") != std::string::npos);
+#endif // !AISOCKS_ENABLE_TLS — HTTPS is supported in TLS builds; tested separately
 }
 
 static void test_redirect_to_https_is_rejected() {
     BEGIN_TEST("HttpClient rejects redirects to https URLs");
-
+#ifndef AISOCKS_ENABLE_TLS
     RedirectToHttpsServer server;
     std::thread serverThread(
         [&] { server.run(ClientLimit::Unlimited, Milliseconds{1}); });
@@ -514,6 +515,7 @@ static void test_redirect_to_https_is_rejected() {
     REQUIRE(!result.isSuccess());
     REQUIRE(
         result.message().find("HTTPS is not supported") != std::string::npos);
+#endif // !AISOCKS_ENABLE_TLS — redirect-to-HTTPS is supported in TLS builds
 }
 
 static void test_resolve_url_relative_redirects() {

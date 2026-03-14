@@ -1,0 +1,275 @@
+// This is an independent project of an individual developer. Dear PVS-Studio,
+// please check it.
+
+// PVS-Studio Static Code Analyzer for C, C++, C#, and Java:
+// https://pvs-studio.com
+
+// TLS integration tests: HttpClient (HTTPS) talking to a self-signed
+// HttpsPollServer in-process.
+//
+// These tests require AISOCKS_ENABLE_TLS=ON and the test certificate pair
+// generated at tests/certs/test_cert.pem + tests/certs/test_key.pem.
+//
+// Server architecture:
+//   TestHttpsServer derives from HttpPollServer and overrides the four TLS
+//   virtual hooks (isTlsMode, onTlsClientConnected, doTlsHandshakeStep,
+//   tlsRead, tlsWrite) to add per-connection OpenSSL sessions without
+//   touching the poller or framing layers.
+
+#ifdef AISOCKS_ENABLE_TLS
+
+#include "HttpClient.h"
+#include "HttpPollServer.h"
+#include "TlsOpenSsl.h"
+#include "test_helpers.h"
+
+#include <atomic>
+#include <condition_variable>
+#include <mutex>
+#include <openssl/ssl.h>
+#include <string>
+#include <thread>
+
+using namespace aiSocks;
+
+// ---------------------------------------------------------------------------
+// Derive the source tree root from __FILE__ so cert paths are absolute and
+// work regardless of which directory CTest runs the binary from.
+// ---------------------------------------------------------------------------
+static std::string sourceRoot() {
+    std::string path = __FILE__;
+    const std::string marker = "/tests/test_tls_client.cpp";
+    const size_t pos = path.rfind(marker);
+    if (pos != std::string::npos) path.resize(pos);
+    return path;
+}
+
+// ---------------------------------------------------------------------------
+// TestHttpsServer — HttpPollServer with TLS hooks wired to OpenSSL sessions.
+// ---------------------------------------------------------------------------
+class TestHttpsServer : public HttpPollServer {
+    public:
+    explicit TestHttpsServer(const std::string& certPath,
+        const std::string& keyPath)
+        : HttpPollServer(ServerBind{"127.0.0.1", Port{0}}) {
+        setHandleSignals(false);
+
+        std::string err;
+        ctx_ = TlsContext::create(TlsContext::Mode::Server, &err);
+        if (!ctx_) return;
+        if (!ctx_->loadCertificateChain(certPath, keyPath, &err)) {
+            ctx_.reset();
+        }
+    }
+
+    bool tlsReady() const noexcept { return ctx_ != nullptr; }
+
+    void waitReady() {
+        std::unique_lock<std::mutex> lk(readyMtx_);
+        readyCv_.wait(lk, [this] { return ready_.load(); });
+    }
+
+    std::atomic<int> requestsServed{0};
+
+    protected:
+    void onReady() override {
+        {
+            std::lock_guard<std::mutex> lk(readyMtx_);
+            ready_ = true;
+        }
+        readyCv_.notify_all();
+    }
+
+    void buildResponse(HttpClientState& s) override {
+        s.responseBuf = makeResponse(
+            "HTTP/1.1 200 OK", "text/plain", "Hello, HTTPS!");
+        s.responseView = s.responseBuf;
+        requestsServed.fetch_add(1, std::memory_order_relaxed);
+    }
+
+    // ---- TLS hooks -------------------------------------------------------
+
+    bool isTlsMode(const HttpClientState& /*s*/) const override {
+        return ctx_ != nullptr;
+    }
+
+    void onTlsClientConnected(
+        TcpSocket& sock, HttpClientState& s) override {
+        if (!ctx_) return;
+        std::string err;
+        auto sess = TlsSession::create(ctx_->nativeHandle(), &err);
+        if (!sess) return;
+        if (!sess->attachSocket(
+                static_cast<int>(sock.getNativeHandle()), &err))
+            return;
+        sess->setAcceptState();
+        s.tlsSession = std::move(sess);
+        s.tlsHandshakeDone = false;
+        s.tlsWantsWrite = false;
+    }
+
+    ServerResult doTlsHandshakeStep(
+        TcpSocket& /*sock*/, HttpClientState& s) override {
+        if (!s.tlsSession) return ServerResult::Disconnect;
+        const int r = s.tlsSession->handshake();
+        if (r == 1) {
+            s.tlsHandshakeDone = true;
+            s.tlsWantsWrite = false;
+            return ServerResult::KeepConnection;
+        }
+        const int e = s.tlsSession->getLastErrorCode(r);
+        if (e == SSL_ERROR_WANT_READ) {
+            s.tlsWantsWrite = false;
+            return ServerResult::KeepConnection;
+        }
+        if (e == SSL_ERROR_WANT_WRITE) {
+            s.tlsWantsWrite = true;
+            return ServerResult::KeepConnection;
+        }
+        return ServerResult::Disconnect;
+    }
+
+    int tlsRead(TcpSocket& /*sock*/, HttpClientState& s,
+        void* buf, size_t len) override {
+        if (!s.tlsSession) return -1;
+        return s.tlsSession->read(buf, static_cast<int>(len));
+    }
+
+    int tlsWrite(TcpSocket& /*sock*/, HttpClientState& s,
+        const char* data, size_t len) override {
+        if (!s.tlsSession) return 0;
+        size_t done = 0;
+        while (done < len) {
+            int n = s.tlsSession->write(
+                data + done, static_cast<int>(len - done));
+            if (n > 0) {
+                done += static_cast<size_t>(n);
+                continue;
+            }
+            const int e = s.tlsSession->getLastErrorCode(n);
+            if (e == SSL_ERROR_WANT_WRITE || e == SSL_ERROR_WANT_READ)
+                continue;
+            break;
+        }
+        return static_cast<int>(done);
+    }
+
+    private:
+    std::unique_ptr<TlsContext> ctx_;
+    std::atomic<bool> ready_{false};
+    std::mutex readyMtx_;
+    std::condition_variable readyCv_;
+};
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
+
+static void test_https_client_basic_get() {
+    BEGIN_TEST("HttpClient HTTPS GET returns 200 OK with correct body");
+
+    const std::string root = sourceRoot();
+    const std::string cert = root + "/tests/certs/test_cert.pem";
+    const std::string key  = root + "/tests/certs/test_key.pem";
+
+    TestHttpsServer server{cert, key};
+    REQUIRE(server.tlsReady());
+
+    std::thread serverThread(
+        [&] { server.run(ClientLimit::Unlimited, Milliseconds{5}); });
+    server.waitReady();
+
+    HttpClient::Options opts;
+    opts.connectTimeout = Milliseconds{2000};
+    opts.requestTimeout = Milliseconds{2000};
+    opts.verifyCertificate = false; // self-signed cert in test
+    HttpClient client{opts};
+
+    const std::string url = "https://127.0.0.1:"
+        + std::to_string(server.serverPort().value()) + "/hello";
+    auto result = client.get(url);
+
+    server.requestStop();
+    serverThread.join();
+
+    REQUIRE(result.isSuccess());
+    REQUIRE(result.value().statusCode() == 200);
+    REQUIRE(result.value().body().find("Hello, HTTPS!") != std::string_view::npos);
+    REQUIRE(server.requestsServed.load() == 1);
+}
+
+static void test_https_client_multiple_requests_keep_alive() {
+    BEGIN_TEST("HttpClient HTTPS keep-alive reuses TLS session across requests");
+
+    const std::string root = sourceRoot();
+    const std::string cert = root + "/tests/certs/test_cert.pem";
+    const std::string key  = root + "/tests/certs/test_key.pem";
+
+    TestHttpsServer server{cert, key};
+    REQUIRE(server.tlsReady());
+
+    std::thread serverThread(
+        [&] { server.run(ClientLimit::Unlimited, Milliseconds{5}); });
+    server.waitReady();
+
+    HttpClient::Options opts;
+    opts.connectTimeout = Milliseconds{2000};
+    opts.requestTimeout = Milliseconds{2000};
+    opts.verifyCertificate = false;
+    HttpClient client{opts};
+
+    const std::string base = "https://127.0.0.1:"
+        + std::to_string(server.serverPort().value());
+
+    auto r1 = client.get(base + "/first");
+    auto r2 = client.get(base + "/second");
+    auto r3 = client.get(base + "/third");
+
+    server.requestStop();
+    serverThread.join();
+
+    REQUIRE(r1.isSuccess());
+    REQUIRE(r2.isSuccess());
+    REQUIRE(r3.isSuccess());
+    REQUIRE(server.requestsServed.load() == 3);
+}
+
+static void test_https_cert_load_failure() {
+    BEGIN_TEST("TestHttpsServer reports failure when cert files are missing");
+
+    TestHttpsServer server{"/nonexistent/cert.pem", "/nonexistent/key.pem"};
+    REQUIRE(!server.tlsReady());
+}
+
+static void test_https_wrong_port_fails() {
+    BEGIN_TEST("HttpClient HTTPS to refused port returns connection failure");
+
+    HttpClient::Options opts;
+    opts.connectTimeout = Milliseconds{200};
+    opts.requestTimeout = Milliseconds{200};
+    opts.verifyCertificate = false;
+    HttpClient client{opts};
+
+    // Port 1 is almost certainly refused on any machine.
+    auto result = client.get("https://127.0.0.1:1/");
+    REQUIRE(!result.isSuccess());
+    REQUIRE(result.message().find("HTTPS is not supported") == std::string::npos);
+}
+
+// ---------------------------------------------------------------------------
+// main
+// ---------------------------------------------------------------------------
+int main() {
+    test_https_cert_load_failure();
+    test_https_wrong_port_fails();
+    test_https_client_basic_get();
+    test_https_client_multiple_requests_keep_alive();
+
+    return test_summary();
+}
+
+#else // !AISOCKS_ENABLE_TLS
+
+int main() { return 0; /* nothing to test without TLS */ }
+
+#endif // AISOCKS_ENABLE_TLS

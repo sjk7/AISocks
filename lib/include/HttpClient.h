@@ -27,6 +27,11 @@
 #include <string_view>
 #include <vector>
 
+#ifdef AISOCKS_ENABLE_TLS
+#include "TlsOpenSsl.h"
+#include <openssl/ssl.h>
+#endif
+
 namespace aiSocks {
 
 // ---------------------------------------------------------------------------
@@ -153,6 +158,12 @@ class HttpClient {
         /// HttpClient.  Called after the old socket closes and before the new
         /// TCP connection opens.  nullptr (default) = no notifications.
         IRedirectListener* redirectListener{nullptr};
+
+#ifdef AISOCKS_ENABLE_TLS
+        /// Verify the server TLS certificate chain against system CA paths.
+        /// Default: false (phase 1). Set to true in production for security.
+        bool verifyCertificate{false};
+#endif
     };
 
     explicit HttpClient(Options options = Options{})
@@ -305,6 +316,16 @@ class HttpClient {
     std::string cachedHost_;
     Port cachedPort_{80};
     std::shared_ptr<TcpSocket> cachedSocket_;
+#ifdef AISOCKS_ENABLE_TLS
+    std::shared_ptr<TlsSession> cachedTlsSession_;
+#endif
+
+    void clearCachedConnection_() noexcept {
+        cachedSocket_.reset();
+#ifdef AISOCKS_ENABLE_TLS
+        cachedTlsSession_.reset();
+#endif
+    }
 
     static bool hasTokenCI_(std::string_view field, std::string_view token) {
         auto trim = [](std::string_view s) {
@@ -403,9 +424,10 @@ class HttpClient {
     }
 
     static bool parseAuthority_(
-        const std::string& authority, std::string& hostOut, Port& portOut) {
+        const std::string& authority, std::string& hostOut, Port& portOut,
+        Port defaultPort = Port{uint16_t{80}}) {
         hostOut.clear();
-        portOut = Port{80};
+        portOut = defaultPort;
         if (authority.empty()) return false;
 
         if (authority.front() == '[') {
@@ -475,14 +497,17 @@ class HttpClient {
             for (char& c : scheme)
                 c = static_cast<char>(
                     std::tolower(static_cast<unsigned char>(c)));
-            if (scheme != "http") {
-                if (scheme == "https") {
-                    return Result<HttpClientResponse>::failure(
-                        SocketError::Unknown, "HTTPS is not supported");
-                }
+            const bool isHttps = (scheme == "https");
+            if (!isHttps && scheme != "http") {
                 return Result<HttpClientResponse>::failureOwned(
                     SocketError::Unknown, "Unsupported URL scheme: " + scheme);
             }
+#ifndef AISOCKS_ENABLE_TLS
+            if (isHttps) {
+                return Result<HttpClientResponse>::failure(
+                    SocketError::Unknown, "HTTPS is not supported");
+            }
+#endif
 
             std::string remaining = currentUrl.substr(schemeEnd + 3);
             size_t pathStart = remaining.find('/');
@@ -490,8 +515,9 @@ class HttpClient {
 
             const std::string authority = remaining.substr(0, pathStart);
             std::string host;
-            Port port{80};
-            if (!parseAuthority_(authority, host, port)) {
+            const Port defaultPort{isHttps ? uint16_t{443} : uint16_t{80}};
+            Port port{defaultPort};
+            if (!parseAuthority_(authority, host, port, defaultPort)) {
                 return Result<HttpClientResponse>::failure(
                     SocketError::Unknown, "Invalid URL authority");
             }
@@ -516,6 +542,85 @@ class HttpClient {
                 socket = std::make_shared<TcpSocket>(
                     std::move(socketResult.value()));
             }
+
+#ifdef AISOCKS_ENABLE_TLS
+            // Per-iteration TLS state and helpers.
+            std::shared_ptr<TlsSession> tlsSession;
+            std::string tlsSetupError;
+            // Creates a fresh TLS client session for the current socket and
+            // performs the blocking handshake.  Captures socket by reference
+            // so it can be reused after an inline retry reconnect.
+            auto setupTlsForCurrentSocket = [&]() -> bool {
+                if (!isHttps) return true;
+                tlsSetupError.clear();
+                tlsSession.reset();
+                auto ctx
+                    = TlsContext::create(TlsContext::Mode::Client, &tlsSetupError);
+                if (!ctx) return false;
+                ctx->configureVerifyPeer(options_.verifyCertificate,
+                    options_.verifyCertificate, &tlsSetupError);
+                auto sess
+                    = TlsSession::create(ctx->nativeHandle(), &tlsSetupError);
+                if (!sess) return false;
+                if (!sess->attachSocket(
+                        static_cast<int>(socket->getNativeHandle()),
+                        &tlsSetupError))
+                    return false;
+                // Set SNI hostname so virtual-hosted servers pick the right cert.
+                if (!host.empty())
+                    SSL_set_tlsext_host_name(sess->nativeHandle(), host.c_str());
+                sess->setConnectState();
+                for (;;) {
+                    const int r = sess->handshake();
+                    if (r == 1) break;
+                    const int e = sess->getLastErrorCode(r);
+                    if (e == SSL_ERROR_WANT_READ || e == SSL_ERROR_WANT_WRITE)
+                        continue;
+                    tlsSetupError = "TLS handshake failed: "
+                        + TlsOpenSsl::lastErrorString();
+                    return false;
+                }
+                tlsSession = std::move(sess);
+                return true;
+            };
+            if (reusedConnection && cachedTlsSession_) {
+                tlsSession = cachedTlsSession_;
+            } else if (!setupTlsForCurrentSocket()) {
+                return Result<HttpClientResponse>::failureOwned(
+                    SocketError::Unknown, "TLS setup: " + tlsSetupError);
+            }
+            auto ioBound_sendAll = [&](const char* d, size_t len) -> bool {
+                if (tlsSession) {
+                    size_t done = 0;
+                    while (done < len) {
+                        int n = tlsSession->write(
+                            d + done, static_cast<int>(len - done));
+                        if (n > 0) {
+                            done += static_cast<size_t>(n);
+                            continue;
+                        }
+                        const int e = tlsSession->getLastErrorCode(n);
+                        if (e == SSL_ERROR_WANT_WRITE
+                            || e == SSL_ERROR_WANT_READ)
+                            continue;
+                        return false;
+                    }
+                    return true;
+                }
+                return socket->sendAll(d, len);
+            };
+            auto ioBound_recv = [&](void* buf, int sz) -> int {
+                if (tlsSession) return tlsSession->read(buf, sz);
+                return socket->receive(buf, sz);
+            };
+#else
+            auto ioBound_sendAll = [&](const char* d, size_t len) -> bool {
+                return socket->sendAll(d, len);
+            };
+            auto ioBound_recv = [&](void* buf, int sz) -> int {
+                return socket->receive(buf, sz);
+            };
+#endif
 
             const bool boundedRequest = options_.requestTimeout.count > 0;
             const auto requestDeadline = std::chrono::steady_clock::now()
@@ -544,7 +649,7 @@ class HttpClient {
                     options_.defaultHeaders, "Connection", "close");
             if (requestWantsClose) {
                 // Honor explicit close semantics across this client instance.
-                cachedSocket_.reset();
+                clearCachedConnection_();
             }
 
             // Add body for POST/PUT
@@ -553,9 +658,9 @@ class HttpClient {
             }
 
             std::string request = requestBuilder.build();
-            if (!socket->sendAll(request.data(), request.size())) {
+            if (!ioBound_sendAll(request.data(), request.size())) {
                 if (reusedConnection) {
-                    cachedSocket_.reset();
+                    clearCachedConnection_();
 
                     ConnectArgs retryArgs{host, port, options_.connectTimeout};
                     auto retrySocketResult
@@ -571,9 +676,16 @@ class HttpClient {
                     socket = std::make_shared<TcpSocket>(
                         std::move(retrySocketResult.value()));
                     reusedConnection = false;
+#ifdef AISOCKS_ENABLE_TLS
+                    if (!setupTlsForCurrentSocket()) {
+                        return Result<HttpClientResponse>::failureOwned(
+                            SocketError::Unknown,
+                            "TLS setup (retry): " + tlsSetupError);
+                    }
+#endif
                 }
 
-                if (!socket->sendAll(request.data(), request.size())) {
+                if (!ioBound_sendAll(request.data(), request.size())) {
                     return Result<HttpClientResponse>::failureOwned(
                         socket->getLastError(),
                         "Failed to send request to " + currentUrl + " - "
@@ -658,7 +770,7 @@ class HttpClient {
                     socket->setReceiveTimeout(Milliseconds{remainingMs});
                 }
 
-                int n = socket->receive(buffer, sizeof(buffer));
+                int n = ioBound_recv(buffer, sizeof(buffer));
                 if (n < 0) {
                     const auto err = socket->getLastError();
                     if (err == SocketError::Timeout
@@ -666,7 +778,7 @@ class HttpClient {
                         return Result<HttpClientResponse>::failure(
                             SocketError::Timeout, "Request timed out");
                     if (reusedConnection && !retriedReusedConnection) {
-                        cachedSocket_.reset();
+                        clearCachedConnection_();
                         retriedReusedConnection = true;
                         --redirectCount;
                         continue;
@@ -685,7 +797,7 @@ class HttpClient {
 
                 if (state == HttpResponseParser::State::Error) {
                     if (reusedConnection && !retriedReusedConnection) {
-                        cachedSocket_.reset();
+                        clearCachedConnection_();
                         retriedReusedConnection = true;
                         --redirectCount;
                         continue;
@@ -705,14 +817,17 @@ class HttpClient {
                                     cachedHost_ = host;
                                     cachedPort_ = port;
                                     cachedSocket_ = socket;
+#ifdef AISOCKS_ENABLE_TLS
+                                    cachedTlsSession_ = tlsSession;
+#endif
                                 } else {
-                                    cachedSocket_.reset();
+                                    clearCachedConnection_();
                                 }
                             } else {
-                                cachedSocket_.reset();
+                                clearCachedConnection_();
                             }
                         } else {
-                            cachedSocket_.reset();
+                            clearCachedConnection_();
                         }
                         return finalResult;
                     }
@@ -737,14 +852,17 @@ class HttpClient {
                                 cachedHost_ = host;
                                 cachedPort_ = port;
                                 cachedSocket_ = socket;
+#ifdef AISOCKS_ENABLE_TLS
+                                cachedTlsSession_ = tlsSession;
+#endif
                             } else {
-                                cachedSocket_.reset();
+                                clearCachedConnection_();
                             }
                         } else {
-                            cachedSocket_.reset();
+                            clearCachedConnection_();
                         }
                     } else {
-                        cachedSocket_.reset();
+                        clearCachedConnection_();
                     }
                     return finalResult;
                 }
@@ -754,12 +872,12 @@ class HttpClient {
             // Connection closed before response was complete.
             if (!redirectDetected) {
                 if (reusedConnection && !retriedReusedConnection) {
-                    cachedSocket_.reset();
+                    clearCachedConnection_();
                     retriedReusedConnection = true;
                     --redirectCount;
                     continue;
                 }
-                cachedSocket_.reset();
+                clearCachedConnection_();
                 return Result<HttpClientResponse>::failure(
                     SocketError::ConnectionReset, "Incomplete response");
             }

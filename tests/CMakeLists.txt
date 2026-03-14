@@ -56,6 +56,11 @@ if(ALLOW_SLOW_TESTS)
     message(STATUS "Slow tests enabled: test_timeout_heap will be built")
 endif()
 
+# TLS integration tests — only when the TLS feature flag is on.
+if(AISOCKS_ENABLE_TLS)
+    list(APPEND TEST_SOURCES test_tls_client)
+endif()
+
 # On macOS with Homebrew LLVM, the compiler's libc++ headers may reference
 # symbols (e.g. __hash_memory) not present in Apple's system libc++.
 # Detect and link against Homebrew LLVM's own libc++ when available.
