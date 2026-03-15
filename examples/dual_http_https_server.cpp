@@ -1,8 +1,6 @@
 // dual_http_https_server.cpp
 // Example: Run both HTTP and HTTPS servers in one process using aiSocks
 
-
-
 #include "HttpFileServer.h"
 #ifdef AISOCKS_ENABLE_TLS
 #include "HttpsFileServer.h"
@@ -16,16 +14,20 @@ using namespace aiSocks;
 int main(int argc, char** argv) {
     std::string wwwRoot = "./www";
     uint16_t httpPort = 8080;
+#ifdef AISOCKS_ENABLE_TLS
     uint16_t httpsPort = 8443;
+#endif
     if (argc > 1) {
         wwwRoot = argv[1];
     }
     if (argc > 2) {
         httpPort = static_cast<uint16_t>(std::stoi(argv[2]));
     }
+#ifdef AISOCKS_ENABLE_TLS
     if (argc > 3) {
         httpsPort = static_cast<uint16_t>(std::stoi(argv[3]));
     }
+#endif
 
     // Shared config for both servers
     HttpFileServer::Config config;
@@ -41,17 +43,16 @@ int main(int argc, char** argv) {
 
     // HTTP
     HttpFileServer httpServer(ServerBind{"0.0.0.0", Port{httpPort}}, config);
-    std::thread httpThread([&] {
-        httpServer.run(ClientLimit::Unlimited, Milliseconds{5});
-    });
+    std::thread httpThread(
+        [&] { httpServer.run(ClientLimit::Unlimited, Milliseconds{5}); });
 
 #ifdef AISOCKS_ENABLE_TLS
     // HTTPS
     TlsServerConfig tls{"server-cert.pem", "server-key.pem"};
-    HttpsFileServer httpsServer(ServerBind{"0.0.0.0", Port{httpsPort}}, config, tls);
-    std::thread httpsThread([&] {
-        httpsServer.run(ClientLimit::Unlimited, Milliseconds{5});
-    });
+    HttpsFileServer httpsServer(
+        ServerBind{"0.0.0.0", Port{httpsPort}}, config, tls);
+    std::thread httpsThread(
+        [&] { httpsServer.run(ClientLimit::Unlimited, Milliseconds{5}); });
 #endif
 
     httpThread.join();
