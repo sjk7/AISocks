@@ -140,9 +140,8 @@ static bool parseRequestLine_(std::string_view requestLine, HttpRequest& req) {
 
     // Reject embedded control bytes in request-line tokens.
     auto hasCtl = [](std::string_view s) {
-        return std::any_of(s.begin(), s.end(), [](unsigned char c) {
-            return c < 0x20 || c == 0x7f;
-        });
+        return std::any_of(s.begin(), s.end(),
+            [](unsigned char c) { return c < 0x20 || c == 0x7f; });
     };
     if (hasCtl(req.method) || hasCtl(req.version)) return false;
     if (req.version != "HTTP/1.0" && req.version != "HTTP/1.1") return false;

@@ -103,10 +103,10 @@ class SocketFactory {
     // -----------------------------------------------------------------------
 
     // Create a Unix stream server (bound and listening).
-    static Result<UnixSocket> createUnixServer(UnixPath path);
+    static Result<UnixSocket> createUnixServer(const UnixPath& path);
 
     // Create a connected Unix stream client.
-    static Result<UnixSocket> createUnixClient(UnixPath path);
+    static Result<UnixSocket> createUnixClient(const UnixPath& path);
 
 #ifndef _WIN32
     // Create a connected anonymous pair (no filesystem path needed).
