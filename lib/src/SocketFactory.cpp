@@ -236,7 +236,7 @@ Result<UdpSocket> SocketFactory::createUdpSocket(AddressFamily family) {
 }
 
 #ifdef AISOCKS_HAVE_UNIX_SOCKETS
-Result<UnixSocket> SocketFactory::createUnixServer(UnixPath path) {
+Result<UnixSocket> SocketFactory::createUnixServer(const UnixPath& path) {
     auto impl = std::make_unique<SocketImpl>(SocketType::TCP, AddressFamily::Unix);
     if (!impl->isValid()) {
         auto ctx = impl->getErrorContext();
@@ -256,7 +256,7 @@ Result<UnixSocket> SocketFactory::createUnixServer(UnixPath path) {
     return Result<UnixSocket>::success(UnixSocket(std::move(impl)));
 }
 
-Result<UnixSocket> SocketFactory::createUnixClient(UnixPath path) {
+Result<UnixSocket> SocketFactory::createUnixClient(const UnixPath& path) {
     auto impl = std::make_unique<SocketImpl>(SocketType::TCP, AddressFamily::Unix);
     if (!impl->isValid()) {
         auto ctx = impl->getErrorContext();

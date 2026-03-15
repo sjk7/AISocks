@@ -80,10 +80,8 @@ std::string buildErrorMessage(const char* description, int sysCode, bool isDns);
 //
 // SPECIAL-MEMBER RULES
 //   Copy ctor/assign  copies T via placement-new, or copies the four POD
-//                     fields.  cachedMessage_ is intentionally NOT copied —
-//                     unique_ptr has no copy constructor anyway, and it is
-//                     cheaper to rebuild lazily on the copy than to deep-copy
-//                     a string that may never be read.
+//                     fields.  If a cached error string already exists, it is
+//                     deep-copied so copied Results preserve message state.
 //   Move ctor/assign  moves T via placement-new, or moves the four POD fields.
 //                     cachedMessage_ is moved via unique_ptr's cheap pointer
 //                     swap — no string copy, no allocation.
@@ -97,7 +95,7 @@ template <typename T> class [[nodiscard]] Result {
     //   T may not be default-constructible (e.g. Endpoint requires an address).
     //   Declaring "T value_" would force default-construction even on the error
     //   path.  Raw bytes defer construction until we know we have a value.
-    alignas(T) unsigned char value_storage_[sizeof(T)];
+    alignas(T) unsigned char value_storage_[sizeof(T)]{};
 
     // WHY this field ordering?
     //   C++ lays out members in declaration order and inserts padding to
@@ -173,21 +171,19 @@ template <typename T> class [[nodiscard]] Result {
     // -----------------------------------------------------------------------
     // Copy
     //
-    // WHY not copy cachedMessage_?
-    //   unique_ptr is not copyable, so we physically cannot.  But even if we
-    //   could (via make_unique<string>(*other.cachedMessage_)), it would be
-    //   wasteful — in the common case the copy is never asked for its message,
-    //   and we would have paid for an allocation and a string copy for nothing.
-    //   Leaving cachedMessage_ null means it is built lazily on first access,
-    //   exactly as it was on the original.
+    // Preserve cached error-message state across copies when already built.
+    // This keeps copy semantics straightforward and avoids rebuilding the same
+    // message repeatedly in copied Results.
     // -----------------------------------------------------------------------
     Result(const Result& other)
         : error_(other.error_)
         , sysCode_(other.sysCode_)
         , has_value_(other.has_value_)
         , isDns_(other.isDns_)
-        , description_(other.description_) {
-        // cachedMessage_ intentionally left null — rebuilt lazily if needed
+        , description_(other.description_)
+        , cachedMessage_(other.cachedMessage_
+                  ? std::make_unique<std::string>(*other.cachedMessage_)
+                  : nullptr) {
         if (has_value_) new (value_storage_) T(other.value_ref());
     }
 
@@ -382,14 +378,16 @@ template <> class [[nodiscard]] Result<void> {
         , has_error_(true) {}
 
     // Copy — must be user-defined because unique_ptr<string> is not copyable.
-    // cachedMessage_ is left null intentionally: rebuilt lazily on first access
-    // (see the equivalent comment in Result<T>::copy constructor above).
+    // If a cached message already exists, preserve it by deep-copying.
     Result(const Result& other)
         : error_(other.error_)
         , description_(other.description_)
         , sysCode_(other.sysCode_)
         , isDns_(other.isDns_)
-        , has_error_(other.has_error_) {}
+        , has_error_(other.has_error_)
+        , cachedMessage_(other.cachedMessage_
+                  ? std::make_unique<std::string>(*other.cachedMessage_)
+                  : nullptr) {}
 
     Result& operator=(const Result& other) {
         if (this != &other) {
