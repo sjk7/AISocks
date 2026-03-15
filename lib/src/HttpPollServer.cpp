@@ -5,9 +5,11 @@
 #include "HttpPollServer.h"
 
 #include "BuildInfo.h"
+#include "FileIO.h"
 #include "HttpParserUtils.h"
 #include "HttpRequest.h"
 #include "HttpResponse.h"
+#include <algorithm>
 #include <charconv>
 #include <cctype>
 #include <cstdio>
@@ -352,9 +354,13 @@ bool HttpPollServer::onAcceptFilter(const std::string& peerAddress) {
 void HttpPollServer::onResponseSent(HttpClientState& s) {
     if (!accessLogger_) return;
     const std::string requestLine = AccessLogger::extractRequestLine(s.request);
-    const int statusCode = AccessLogger::extractStatusCode(s.responseView);
-    accessLogger_->log(
-        s.peerAddress, requestLine, statusCode, s.responseView.size());
+    const int statusCode = (s.responseStatusCode != 0)
+        ? s.responseStatusCode
+        : AccessLogger::extractStatusCode(s.responseView);
+    const size_t bytesSent = (s.responseBytesPlanned != 0)
+        ? s.responseBytesPlanned
+        : s.responseView.size();
+    accessLogger_->log(s.peerAddress, requestLine, statusCode, bytesSent);
 }
 
 ServerResult HttpPollServer::onError(TcpSocket& sock, HttpClientState& /*s*/) {
@@ -432,6 +438,20 @@ std::string HttpPollServer::makeResponse(const char* statusLine,
         .body(body)
         .keepAlive(keepAlive)
         .build();
+}
+
+void HttpPollServer::setStreamedFileResponse(HttpClientState& s,
+    std::string headerBlock, std::shared_ptr<File> file, size_t fileSize) {
+    s.responseBuf = std::move(headerBlock);
+    s.responseView = s.responseBuf;
+    s.sent = 0;
+
+    s.streamingFile = std::move(file);
+    s.streamingRemaining = fileSize;
+    s.streamingBodyActive = (s.streamingFile != nullptr) && (fileSize > 0);
+
+    s.responseStatusCode = AccessLogger::extractStatusCode(s.responseView);
+    s.responseBytesPlanned = s.responseView.size() + fileSize;
 }
 
 // HTTP/1.0 defaults to close; HTTP/1.1 defaults to keep-alive (RFC 7230 §6.3).
@@ -684,6 +704,11 @@ ServerResult HttpPollServer::onWritable(TcpSocket& sock, HttpClientState& s) {
 
         if (!s.responseStarted && !s.interimResponse) {
             s.responseStarted = true;
+            if (s.responseStatusCode == 0)
+                s.responseStatusCode
+                    = AccessLogger::extractStatusCode(s.responseView);
+            if (s.responseBytesPlanned == 0)
+                s.responseBytesPlanned = s.responseView.size();
             onResponseBegin(s);
         }
 
@@ -701,6 +726,33 @@ ServerResult HttpPollServer::onWritable(TcpSocket& sock, HttpClientState& s) {
         }
 
         if (s.sent < s.responseView.size()) return ServerResult::KeepConnection;
+
+        if (s.streamingBodyActive) {
+            if (!s.streamingFile || !s.streamingFile->isOpen())
+                return ServerResult::Disconnect;
+
+            if (s.streamingRemaining == 0) {
+                s.streamingBodyActive = false;
+                s.streamingFile.reset();
+            } else {
+                const size_t toRead = std::min(
+                    s.streamingChunkBuf.size(), s.streamingRemaining);
+                const size_t got = s.streamingFile->read(
+                    s.streamingChunkBuf.data(), 1, toRead);
+                if (got == 0) return ServerResult::Disconnect;
+
+                s.streamingRemaining -= got;
+                s.responseView
+                    = std::string_view(s.streamingChunkBuf.data(), got);
+                s.sent = 0;
+
+                if (s.streamingRemaining == 0) {
+                    s.streamingBodyActive = false;
+                    s.streamingFile.reset();
+                }
+                continue;
+            }
+        }
 
         if (s.interimResponse) {
             s.responseView = {};
@@ -746,8 +798,13 @@ void HttpPollServer::resetAfterSend_(HttpClientState& s) {
     s.queuedRequest.clear();
     s.responseView = {};
     s.responseBuf.clear();
+    s.streamingBodyActive = false;
+    s.streamingFile.reset();
+    s.streamingRemaining = 0;
     s.parsedRequest = HttpRequest{};
     s.sent = 0;
+    s.responseStatusCode = 0;
+    s.responseBytesPlanned = 0;
     s.responseStarted = false;
     s.closeAfterSend = false;
     s.expectContinueSent = false;

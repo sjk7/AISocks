@@ -11,42 +11,31 @@ Current branch status as of 2026-03-14:
 
 ### 1. HttpFileServer large-file hot path
 
-Status: Not complete
+Status: Implemented
 
-What remains:
-- Reduce large-response copy and allocation cost.
-- Avoid building one monolithic header+body string for large files.
-- Decide on one of:
-  - streamed header + file body
-  - sendfile-based path
-  - threshold-based hybrid
+Implemented:
+- Threshold-based hybrid path retained.
+- Large-file GET responses now send headers first and stream the file body in fixed-size chunks from the server write loop (no monolithic header+body allocation).
+- Small files still use existing in-memory/cache path.
 
 Current evidence:
-- HttpFileServer still reads file content into memory and builds a single response buffer.
-- See lib/src/HttpFileServer.cpp.
+- Streamed response wiring and write-loop support: `lib/include/HttpPollServer.h`, `lib/src/HttpPollServer.cpp`.
+- Large-file server path now uses streamed file response setup: `lib/src/HttpFileServer.cpp`.
+- Regression test coverage (large-file hot path): `tests/test_advanced_file_server.cpp` (`testLargeFileBypassesCacheForHotPath`).
 
-Suggested acceptance criteria:
-- Small-file behavior stays unchanged.
-- HEAD and keep-alive behavior remain correct.
-- Large-file path has focused tests and/or benchmark evidence.
+Behavioral notes:
+- HEAD semantics are preserved (headers only, with correct `Content-Length`).
+- Keep-alive behavior remains unchanged.
 
 ### 2. Dedicated HTTPS server types
 
-Status: Optional design item, not implemented
-
-What remains:
-- Decide whether the codebase actually wants explicit HttpsPollServer and HttpsFileServer types.
+Status: Implemented
 
 Current state:
-- TLS support is implemented via HttpPollServer TLS hooks rather than separate concrete HTTPS server classes.
-- Tests already cover TLS server/client behavior using hook-based server implementations.
-
-Decision needed:
-- If named HTTPS server types are part of the intended public API, implement them.
-- If the hook-based design is the intended API, this item can be dropped permanently.
+- Named HTTPS server types are present: `HttpsPollServer` and `HttpsFileServer`.
+- TLS support still uses HttpPollServer hook points under those concrete HTTPS wrappers.
 
 ## Deletable Once
 
 This file can be deleted once:
-- the HttpFileServer large-file path decision is implemented or explicitly deferred elsewhere, and
-- the dedicated HTTPS server type question is either implemented or intentionally closed.
+- the above status notes are no longer needed as historical context.

@@ -14,6 +14,7 @@
 #include <cstdint>
 #include <ctime>
 #include <map>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -351,22 +352,26 @@ void HttpFileServer::handleFileRequest(HttpClientState& state,
 
     if (!cacheEligible && fdInfo.size >= kLargeDirectReadThresholdBytes) {
         std::string response;
-        response.reserve(512 + fdInfo.size);
+        response.reserve(512);
         appendOkHeaders(response, filePath, fdInfo.size, fileInfo.lastModified,
             fileInfo.etag, config_);
 
-        const size_t headerSize = response.size();
-        response.resize(headerSize + fdInfo.size);
-        const size_t bytesRead
-            = file.read(response.data() + headerSize, 1, fdInfo.size);
-        if (bytesRead != fdInfo.size) {
+        const bool headOnly = (request.method == "HEAD");
+        if (headOnly) {
+            state.responseBuf = std::move(response);
+            state.responseView = state.responseBuf;
+            return;
+        }
+
+        auto streamFile = std::make_shared<File>(std::move(file));
+        if (!streamFile || !streamFile->isOpen()) {
             sendError(
                 state, 500, "Internal Server Error", "Failed to read file");
             return;
         }
 
-        state.responseBuf = std::move(response);
-        state.responseView = state.responseBuf;
+        setStreamedFileResponse(
+            state, std::move(response), std::move(streamFile), fdInfo.size);
         return;
     }
 

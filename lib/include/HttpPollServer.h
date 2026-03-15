@@ -25,6 +25,7 @@
 #include "HttpRequest.h"
 #include "IpFilter.h"
 #include "ServerBase.h"
+#include <array>
 #include <chrono>
 #include <memory>
 #include <string>
@@ -35,6 +36,8 @@
 #endif
 
 namespace aiSocks {
+
+class File;
 
 // ---------------------------------------------------------------------------
 // Per-connection HTTP state
@@ -51,7 +54,15 @@ struct HttpClientState {
     // and responseView points into it.
     std::string_view responseView;
     std::string responseBuf;
+    // Large-body streaming path: send responseView first (headers), then file
+    // data in fixed-size chunks from streamingChunkBuf.
+    bool streamingBodyActive{false};
+    std::shared_ptr<File> streamingFile;
+    size_t streamingRemaining{0};
+    std::array<char, 64 * 1024> streamingChunkBuf{};
     size_t sent{0};
+    int responseStatusCode{0};
+    size_t responseBytesPlanned{0};
     std::chrono::steady_clock::time_point startTime{};
     bool responseStarted{false}; // true once onResponseBegin has been called
     bool closeAfterSend{false}; // set by keep-alive negotiation
@@ -88,7 +99,13 @@ struct HttpClientState {
         , queuedRequest(other.queuedRequest)
         , responseView(other.responseView)
         , responseBuf(other.responseBuf)
+        , streamingBodyActive(other.streamingBodyActive)
+        , streamingFile(other.streamingFile)
+        , streamingRemaining(other.streamingRemaining)
+        , streamingChunkBuf(other.streamingChunkBuf)
         , sent(other.sent)
+        , responseStatusCode(other.responseStatusCode)
+        , responseBytesPlanned(other.responseBytesPlanned)
         , startTime(other.startTime)
         , responseStarted(other.responseStarted)
         , closeAfterSend(other.closeAfterSend)
@@ -114,7 +131,13 @@ struct HttpClientState {
         , queuedRequest(std::move(other.queuedRequest))
         , responseView(other.responseView)
         , responseBuf(std::move(other.responseBuf))
+        , streamingBodyActive(other.streamingBodyActive)
+        , streamingFile(std::move(other.streamingFile))
+        , streamingRemaining(other.streamingRemaining)
+        , streamingChunkBuf(other.streamingChunkBuf)
         , sent(other.sent)
+        , responseStatusCode(other.responseStatusCode)
+        , responseBytesPlanned(other.responseBytesPlanned)
         , startTime(other.startTime)
         , responseStarted(other.responseStarted)
         , closeAfterSend(other.closeAfterSend)
@@ -136,6 +159,10 @@ struct HttpClientState {
         if (!responseBuf.empty() && responseView.data() == responseBuf.data())
             responseView = responseBuf;
         other.responseView = {};
+        other.streamingBodyActive = false;
+        other.streamingRemaining = 0;
+        other.responseStatusCode = 0;
+        other.responseBytesPlanned = 0;
     }
 
     HttpClientState& operator=(const HttpClientState& other) {
@@ -144,7 +171,13 @@ struct HttpClientState {
         queuedRequest = other.queuedRequest;
         responseView = other.responseView;
         responseBuf = other.responseBuf;
+        streamingBodyActive = other.streamingBodyActive;
+        streamingFile = other.streamingFile;
+        streamingRemaining = other.streamingRemaining;
+        streamingChunkBuf = other.streamingChunkBuf;
         sent = other.sent;
+        responseStatusCode = other.responseStatusCode;
+        responseBytesPlanned = other.responseBytesPlanned;
         startTime = other.startTime;
         responseStarted = other.responseStarted;
         closeAfterSend = other.closeAfterSend;
@@ -171,7 +204,13 @@ struct HttpClientState {
         queuedRequest = std::move(other.queuedRequest);
         responseView = other.responseView;
         responseBuf = std::move(other.responseBuf);
+        streamingBodyActive = other.streamingBodyActive;
+        streamingFile = std::move(other.streamingFile);
+        streamingRemaining = other.streamingRemaining;
+        streamingChunkBuf = other.streamingChunkBuf;
         sent = other.sent;
+        responseStatusCode = other.responseStatusCode;
+        responseBytesPlanned = other.responseBytesPlanned;
         startTime = other.startTime;
         responseStarted = other.responseStarted;
         closeAfterSend = other.closeAfterSend;
@@ -189,6 +228,10 @@ struct HttpClientState {
         if (!responseBuf.empty() && responseView.data() == responseBuf.data())
             responseView = responseBuf;
         other.responseView = {};
+        other.streamingBodyActive = false;
+        other.streamingRemaining = 0;
+        other.responseStatusCode = 0;
+        other.responseBytesPlanned = 0;
         return *this;
     }
 
@@ -276,6 +319,11 @@ class HttpPollServer : public ServerBase<HttpClientState> {
     static std::string makeResponse(const char* statusLine,
         const char* contentType, const std::string& body,
         bool keepAlive = true);
+
+    // Configure a response that sends `headerBlock` first, then streams
+    // `fileSize` bytes from `file` in fixed-size chunks.
+    static void setStreamedFileResponse(HttpClientState& s,
+        std::string headerBlock, std::shared_ptr<File> file, size_t fileSize);
 
     // Convenience helpers for common responses.
     // These auto-apply Connection based on s.closeAfterSend and populate both

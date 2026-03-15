@@ -734,8 +734,8 @@ void testLargeFileBypassesCacheForHotPath() {
         status, "200", "Large file should be served successfully");
     TestFramework::assert_equals(std::to_string(300 * 1024), contentLength,
         "Large file should return expected Content-Length");
-    TestFramework::assert_true(body.size() == 300 * 1024,
-        "Large file response body should include all bytes");
+    TestFramework::assert_true(body.empty(),
+        "Large file buildResponse path should stage headers and stream body");
     TestFramework::assert_true(server.cacheSize() == 0,
         "Large file should bypass cache insertion on hot path");
 }
