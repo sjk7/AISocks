@@ -165,6 +165,7 @@ if(BUILD_EXAMPLES)
         unix_throughput         examples/unix_throughput.cpp
         http_client_example      examples/http_client_example.cpp
         test_efficiency          test_efficiency.cpp
+        dual_http_https_server   examples/dual_http_https_server.cpp
     )
     list(LENGTH _EXAMPLES _len)
     math(EXPR _last "${_len} - 2")

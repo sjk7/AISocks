@@ -482,6 +482,23 @@
             "configuration": "RelWithDebInfo",
             "targets": [ "unix_throughput" ]
         }
+        ,
+        {
+            "name": "windows-advanced-file-server-tls",
+            "inherits": "base-build",
+            "configurePreset": "windows-debug",
+            "displayName": "Build advanced_file_server (Windows TLS)",
+            "configuration": "Debug",
+            "targets": [ "advanced_file_server" ]
+        },
+        {
+            "name": "windows-advanced-file-server-tls-release",
+            "inherits": "base-build",
+            "configurePreset": "windows-debug",
+            "displayName": "Build advanced_file_server (Windows TLS Release w/ Symbols)",
+            "configuration": "RelWithDebInfo",
+            "targets": [ "advanced_file_server" ]
+        }
     ],
     "testPresets": [
         {

@@ -1,4 +1,5 @@
 // This is an independent project of an individual developer. Dear PVS-Studio,
+
 // please check it.
 
 // PVS-Studio Static Code Analyzer for C, C++, C#, and Java:
@@ -336,8 +337,14 @@ class CustomFileServer : public HttpFileServer {
     std::string readAccessLogTail(size_t maxLines) const {
         if (maxLines == 0) return {};
 
+
+    #ifdef _MSC_VER
+        std::FILE* file = nullptr;
+        if (fopen_s(&file, "access.log", "rb") != 0 || !file) return {};
+    #else
         std::FILE* file = std::fopen("access.log", "rb");
         if (!file) return {};
+    #endif
 
         if (std::fseek(file, 0, SEEK_END) != 0) {
             std::fclose(file);
