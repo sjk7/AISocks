@@ -37,6 +37,18 @@
             }
         },
         {
+            "name": "fast-dev",
+            "inherits": "base",
+            "displayName": "Fast Dev (Debug, tests only)",
+            "binaryDir": "${sourceDir}/build-fastdev",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "BUILD_EXAMPLES": "OFF",
+                "BUILD_TESTS": "ON",
+                "AISOCKS_ENABLE_TLS": "ON"
+            }
+        },
+        {
             "name": "msan-debug",
             "inherits": "base",
             "displayName": "MemorySanitizer Debug",
@@ -257,6 +269,12 @@
             "inherits": "base-build",
             "configurePreset": "build_mac_arm_tls",
             "displayName": "Build build_mac_arm_tls"
+        },
+        {
+            "name": "fast-dev",
+            "inherits": "base-build",
+            "configurePreset": "fast-dev",
+            "displayName": "Build Fast Dev"
         },
         {
             "name": "msan-debug",
@@ -487,6 +505,18 @@
             "name": "build_mac_arm_tls",
             "configurePreset": "build_mac_arm_tls",
             "displayName": "build_mac_arm_tls"
+        },
+        {
+            "name": "fast-dev",
+            "configurePreset": "fast-dev",
+            "displayName": "Fast Dev Tests",
+            "execution": {
+                "jobs": 8,
+                "noTestsAction": "error"
+            },
+            "output": {
+                "outputOnFailure": true
+            }
         },
         {
             "name": "coverage",

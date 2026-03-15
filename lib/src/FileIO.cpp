@@ -95,12 +95,12 @@ bool File::open(const char* filename, const char* mode) {
 #else
     // For read-only opens, avoid following a final-path symlink to reduce
     // TOCTOU exposure when serving files from untrusted paths.
+#ifdef O_NOFOLLOW
     const bool hasWrite = (mode && strchr(mode, 'w') != nullptr);
     const bool hasAppend = (mode && strchr(mode, 'a') != nullptr);
     const bool hasPlus = (mode && strchr(mode, '+') != nullptr);
     const bool readOnly = !hasWrite && !hasAppend && !hasPlus;
 
-#ifdef O_NOFOLLOW
     if (readOnly) {
         const int fd = ::open(filename, O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
         if (fd >= 0) {

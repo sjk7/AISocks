@@ -234,8 +234,10 @@ class HttpPollServer : public ServerBase<HttpClientState> {
     // SLOWLORIS_TIMEOUT_MS)
     void setSlowlorisTimeout(int ms) { slowlorisTimeoutMs_ = ms; }
 
+    // Wrapper around ServerBase::run to add shutdown logging/flushing
+    // behavior in HttpPollServer.
     void run(ClientLimit maxClients = ClientLimit::Default,
-        Milliseconds timeout = Milliseconds{-1});
+        Milliseconds timeout = Milliseconds{-1}) override;
 
     static void printBuildInfo();
 

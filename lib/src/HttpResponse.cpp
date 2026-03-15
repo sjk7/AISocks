@@ -290,8 +290,8 @@ HttpResponseParser::State HttpResponseParser::processChunked_() {
 
         // Parse hex chunk size (chunk-extensions stripped inside
         // parseChunkSize_)
-        const std::string_view sizeLine(
-            bodyBuf_.data() + chunkScanPos_, crlfPos - chunkScanPos_);
+        const std::string_view sizeLine = std::string_view(bodyBuf_).substr(
+            chunkScanPos_, crlfPos - chunkScanPos_);
         size_t chunkSize = 0;
         if (!parseChunkSize_(sizeLine, chunkSize)) {
             markError_();
@@ -422,11 +422,10 @@ HttpResponseParser::State HttpResponseParser::feedEof() {
     if (bodyMode_ == BodyMode::ConnectionClose) {
         response_.body_ = std::move(bodyBuf_);
         markComplete_();
-    } else if (bodyMode_ == BodyMode::Chunked) {
-        // Truncated chunked response
-        markError_();
     } else {
-        // ContentLength not satisfied
+        // Non-ConnectionClose responses must be complete before EOF.
+        // Reaching EOF here indicates truncated chunked body or
+        // unsatisfied Content-Length.
         markError_();
     }
     return state_;

@@ -7,6 +7,7 @@
 #include "BuildInfo.h"
 #include "HttpParserUtils.h"
 #include "HttpRequest.h"
+#include "HttpResponse.h"
 #include <charconv>
 #include <cctype>
 #include <cstdio>
@@ -35,9 +36,9 @@ namespace {
         std::string_view value, size_t& out, bool& overflow) {
         overflow = false;
         if (value.empty()) return false;
-        for (char ch : value) {
-            if (ch < '0' || ch > '9') return false;
-        }
+        if (!std::all_of(value.begin(), value.end(),
+                [](char ch) { return ch >= '0' && ch <= '9'; }))
+            return false;
         unsigned long long parsed = 0;
         auto [ptr, ec] = std::from_chars(
             value.data(), value.data() + value.size(), parsed);
@@ -153,12 +154,37 @@ namespace {
             return false;
 
         bool expect100Continue = false;
-        detail::parseHeaderFields(
-            headerSection, firstNL, [&](std::string key, std::string_view val) {
+        detail::parseHeaderFields(headerSection, firstNL,
+            [&](const std::string& key, std::string_view val) {
                 if (key == "expect" && ciTokenPresent_(val, "100-continue"))
                     expect100Continue = true;
             });
         return expect100Continue;
+    }
+
+    static bool parseStatusLine_(std::string_view statusLine, int& codeOut,
+        std::string_view& reasonOut) {
+        const size_t firstSpace = statusLine.find(' ');
+        if (firstSpace == std::string_view::npos) return false;
+        const size_t codeStart = firstSpace + 1;
+        if (codeStart >= statusLine.size()) return false;
+
+        const size_t secondSpace = statusLine.find(' ', codeStart);
+        const std::string_view codeStr = secondSpace == std::string_view::npos
+            ? statusLine.substr(codeStart)
+            : statusLine.substr(codeStart, secondSpace - codeStart);
+
+        int code = 0;
+        auto [ptr, ec] = std::from_chars(
+            codeStr.data(), codeStr.data() + codeStr.size(), code);
+        if (ec != std::errc{} || ptr != codeStr.data() + codeStr.size())
+            return false;
+
+        codeOut = code;
+        reasonOut = secondSpace == std::string_view::npos
+            ? std::string_view{}
+            : statusLine.substr(secondSpace + 1);
+        return true;
     }
 
     static RequestFrameStatus inspectRequestFrame_(std::string_view req,
@@ -191,7 +217,7 @@ namespace {
 
         if (firstNL != std::string_view::npos) {
             detail::parseHeaderFields(headerSection, firstNL,
-                [&](std::string key, std::string_view val) {
+                [&](const std::string& key, std::string_view val) {
                     if (key == "transfer-encoding") {
                         if (!transferEncodingValue.empty())
                             transferEncodingValue.append(",");
@@ -391,19 +417,21 @@ static bool consumeRequestMessage_(
 
 std::string HttpPollServer::makeResponse(const char* statusLine,
     const char* contentType, const std::string& body, bool keepAlive) {
-    std::string r;
-    r.reserve(256 + body.size());
-    r += statusLine;
-    r += "\r\nContent-Type: ";
-    r += contentType;
-    r += "\r\nContent-Length: ";
-    char lenBuf[20];
-    snprintf(lenBuf, sizeof(lenBuf), "%zu", body.size());
-    r += lenBuf;
-    r += keepAlive ? "\r\nConnection: keep-alive\r\n\r\n"
-                   : "\r\nConnection: close\r\n\r\n";
-    r += body;
-    return r;
+    int code = 200;
+    std::string_view reason = "OK";
+    const std::string_view statusLineView
+        = statusLine ? std::string_view(statusLine) : std::string_view{};
+    if (!statusLine || !parseStatusLine_(statusLineView, code, reason)) {
+        code = 500;
+        reason = "Internal Server Error";
+    }
+
+    return HttpResponse::builder()
+        .status(code, reason)
+        .contentType(contentType ? contentType : "text/plain; charset=utf-8")
+        .body(body)
+        .keepAlive(keepAlive)
+        .build();
 }
 
 // HTTP/1.0 defaults to close; HTTP/1.1 defaults to keep-alive (RFC 7230 §6.3).

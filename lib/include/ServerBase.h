@@ -200,7 +200,7 @@ template <typename ClientData> class ServerBase {
     // stopped, either because maxClients was reached or you stopped
     // externally). Or via the thread-safe stop_ flag or if anything returns
     // ServerResult::StopServer from one of the, or if CTRL+C is detected.
-    void run(ClientLimit maxClients = ClientLimit::Default,
+    virtual void run(ClientLimit maxClients = ClientLimit::Default,
         Milliseconds timeout = poll_min) {
         runFailed_.store(false, std::memory_order_relaxed); // reset for re-use
         if (!isValid()) {
@@ -426,7 +426,7 @@ template <typename ClientData> class ServerBase {
         fprintf(stderr,
             "[ServerBase] warning: poller.add failed for accepted fd %zu"
             " (peer %s) — connection dropped\n",
-            fd, peerAddr.c_str());
+            (size_t)fd, peerAddr.c_str());
     }
 
     // Called when poller.wait() returns with no ready events, i.e. a
