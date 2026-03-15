@@ -1,282 +1,294 @@
 {
-  "version": "2.0.0",
-  "tasks": [
-    {
-      "label": "Build test_http_poll_server",
-      "type": "shell",
-      "command": "cmake",
-      "args": [
-        "--build",
-        "build_Mac_arm",
-        "--target",
-        "test_http_poll_server",
-        "--config",
-        "Debug"
-      ],
-      "group": {
-        "kind": "build"
-      },
-      "presentation": {
-        "echo": true,
-        "reveal": "always"
-      }
-    },
-    {
-      "label": "Build advanced_file_server",
-      "type": "shell",
-      "command": "cmake",
-      "args": [
-        "--build",
-        "build_Mac_arm",
-        "--target",
-        "advanced_file_server",
-        "--config",
-        "Debug"
-      ],
-      "group": {
-        "kind": "build"
-      },
-      "presentation": {
-        "echo": true,
-        "reveal": "always"
-      }
-    },
-    {
-      "label": "Build unix_throughput (Windows Debug)",
-      "type": "shell",
-      "command": "cmake",
-      "args": [
-        "--build",
-        "build",
-        "--target",
-        "unix_throughput",
-        "--config",
-        "Debug"
-      ],
-      "group": {
-        "kind": "build"
-      },
-      "presentation": {
-        "echo": true,
-        "reveal": "always"
-      }
-    },
-    {
-      "label": "Build unix_throughput (Windows RelWithDebInfo)",
-      "type": "shell",
-      "command": "cmake",
-      "args": [
-        "--build",
-        "build",
-        "--target",
-        "unix_throughput",
-        "--config",
-        "RelWithDebInfo"
-      ],
-      "group": {
-        "kind": "build"
-      },
-      "presentation": {
-        "echo": true,
-        "reveal": "always"
-      }
-    },
-    {
-      "label": "Build advanced_file_server (RelWithDebInfo)",
-      "type": "shell",
-      "command": "cmake",
-      "args": [
-        "--build",
-        "build-relwithdebinfo",
-        "--target",
-        "advanced_file_server"
-      ],
-      "group": {
-        "kind": "build"
-      },
-      "presentation": {
-        "echo": true,
-        "reveal": "always"
-      }
-    },
-    {
-      "label": "Docker: Build msan-arm64 image",
-      "type": "shell",
-      "command": "docker",
-      "args": [
-        "build",
-        "--platform",
-        "linux/arm64",
-        "-t",
-        "aisocks-msan-arm64",
-        "-f",
-        "Dockerfile.msan-arm64",
-        "."
-      ],
-      "group": "build",
-      "presentation": {
-        "echo": true,
-        "reveal": "always"
-      }
-    },
-    {
-      "label": "Docker: Extract msan binaries",
-      "type": "shell",
-      "command": "docker",
-      "args": [
-        "run",
-        "--rm",
-        "--platform",
-        "linux/arm64",
-        "-v",
-        "${workspaceFolder}/build-msan:/out",
-        "aisocks-msan-arm64",
-        "cp",
-        "-r",
-        "/workspace/build-msan/.",
-        "/out/"
-      ],
-      "group": "build",
-      "presentation": {
-        "echo": true,
-        "reveal": "always"
-      }
-    },
-    {
-      "label": "Docker: Start lldb-server for test_http_poll_server",
-      "type": "shell",
-      "command": "docker",
-      "args": [
-        "run",
-        "--rm",
-        "--name",
-        "aisocks-debug",
-        "--platform",
-        "linux/arm64",
-        "--cap-add=SYS_PTRACE",
-        "--security-opt",
-        "seccomp=unconfined",
-        "-p",
-        "1234:1234",
-        "aisocks-msan-arm64",
-        "bash",
-        "-c",
-        "MSAN_OPTIONS=halt_on_error=0 lldb-server gdbserver 0.0.0.0:1234 -- /workspace/build-msan/tests/test_http_poll_server & LLDB=$!; until grep -q 04D2 /proc/net/tcp6 /proc/net/tcp 2>/dev/null; do sleep 0.1; done; echo lldb-server ready; wait $LLDB"
-      ],
-      "isBackground": true,
-      "dependsOn": [
-        "Docker: Extract msan binaries"
-      ],
-      "dependsOrder": "sequence",
-      "problemMatcher": {
-        "pattern": {
-          "regexp": "."
-        },
-        "background": {
-          "activeOnStart": true,
-          "beginsPattern": ".",
-          "endsPattern": "lldb-server ready"
-        }
-      },
-      "presentation": {
-        "echo": true,
-        "reveal": "always"
-      }
-    },
-    {
-      "label": "Docker: Start lldb-server for advanced_file_server",
-      "type": "shell",
-      "command": "docker",
-      "args": [
-        "run",
-        "--rm",
-        "--name",
-        "aisocks-debug",
-        "--platform",
-        "linux/arm64",
-        "--cap-add=SYS_PTRACE",
-        "--security-opt",
-        "seccomp=unconfined",
-        "-p",
-        "1234:1234",
-        "aisocks-msan-arm64",
-        "bash",
-        "-c",
-        "MSAN_OPTIONS=halt_on_error=0 lldb-server gdbserver 0.0.0.0:1234 -- /workspace/build-msan/advanced_file_server & LLDB=$!; until grep -q 04D2 /proc/net/tcp6 /proc/net/tcp 2>/dev/null; do sleep 0.1; done; echo lldb-server ready; wait $LLDB"
-      ],
-      "isBackground": true,
-      "dependsOn": [
-        "Docker: Extract msan binaries"
-      ],
-      "dependsOrder": "sequence",
-      "problemMatcher": {
-        "pattern": {
-          "regexp": "."
-        },
-        "background": {
-          "activeOnStart": true,
-          "beginsPattern": ".",
-          "endsPattern": "lldb-server ready"
-        }
-      },
-      "presentation": {
-        "echo": true,
-        "reveal": "always"
-      }
-    },
-    {
-      "label": "Docker: Kill debug container",
-      "type": "shell",
-      "command": "docker",
-      "args": [
-        "rm",
-        "-f",
-        "aisocks-debug"
-      ],
-      "presentation": {
-        "reveal": "silent"
-      },
-      "problemMatcher": []
-    },
-    {
-      "label": "Build http_client_example",
-      "type": "shell",
-      "command": "cmake",
-      "args": [
-        "--build",
-        "build-relwithdebinfo",
-        "--target",
-        "http_client_example",
-        "--config",
-        "Debug"
-      ],
-      "group": {
-        "kind": "build"
-      },
-      "presentation": {
-        "echo": true,
-        "reveal": "always"
-      }
-    },
-    {
-      "label": "Build test_efficiency",
-      "type": "shell",
-      "command": "cmake",
-      "args": [
-        "--build",
-        "build-relwithdebinfo",
-        "--target",
-        "test_efficiency",
-        "--config",
-        "Debug"
-      ],
-      "group": {
-        "kind": "build"
-      },
-      "presentation": {
-        "echo": true,
-        "reveal": "always"
-      }
-    }
-  ]
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Build test_http_poll_server",
+			"type": "shell",
+			"command": "cmake",
+			"args": [
+				"--build",
+				"build_Mac_arm",
+				"--target",
+				"test_http_poll_server",
+				"--config",
+				"Debug"
+			],
+			"group": {
+				"kind": "build"
+			},
+			"presentation": {
+				"echo": true,
+				"reveal": "always"
+			}
+		},
+		{
+			"label": "Build advanced_file_server",
+			"type": "shell",
+			"command": "cmake",
+			"args": [
+				"--build",
+				"build_Mac_arm",
+				"--target",
+				"advanced_file_server",
+				"--config",
+				"Debug"
+			],
+			"group": {
+				"kind": "build"
+			},
+			"presentation": {
+				"echo": true,
+				"reveal": "always"
+			}
+		},
+		{
+			"label": "Build unix_throughput (Windows Debug)",
+			"type": "shell",
+			"command": "cmake",
+			"args": [
+				"--build",
+				"build",
+				"--target",
+				"unix_throughput",
+				"--config",
+				"Debug"
+			],
+			"group": {
+				"kind": "build"
+			},
+			"presentation": {
+				"echo": true,
+				"reveal": "always"
+			}
+		},
+		{
+			"label": "Build unix_throughput (Windows RelWithDebInfo)",
+			"type": "shell",
+			"command": "cmake",
+			"args": [
+				"--build",
+				"build",
+				"--target",
+				"unix_throughput",
+				"--config",
+				"RelWithDebInfo"
+			],
+			"group": {
+				"kind": "build"
+			},
+			"presentation": {
+				"echo": true,
+				"reveal": "always"
+			}
+		},
+		{
+			"label": "Build advanced_file_server (RelWithDebInfo)",
+			"type": "shell",
+			"command": "cmake",
+			"args": [
+				"--build",
+				"build-relwithdebinfo",
+				"--target",
+				"advanced_file_server"
+			],
+			"group": {
+				"kind": "build"
+			},
+			"presentation": {
+				"echo": true,
+				"reveal": "always"
+			}
+		},
+		{
+			"label": "Docker: Build msan-arm64 image",
+			"type": "shell",
+			"command": "docker",
+			"args": [
+				"build",
+				"--platform",
+				"linux/arm64",
+				"-t",
+				"aisocks-msan-arm64",
+				"-f",
+				"Dockerfile.msan-arm64",
+				"."
+			],
+			"group": "build",
+			"presentation": {
+				"echo": true,
+				"reveal": "always"
+			}
+		},
+		{
+			"label": "Docker: Extract msan binaries",
+			"type": "shell",
+			"command": "docker",
+			"args": [
+				"run",
+				"--rm",
+				"--platform",
+				"linux/arm64",
+				"-v",
+				"${workspaceFolder}/build-msan:/out",
+				"aisocks-msan-arm64",
+				"cp",
+				"-r",
+				"/workspace/build-msan/.",
+				"/out/"
+			],
+			"group": "build",
+			"presentation": {
+				"echo": true,
+				"reveal": "always"
+			}
+		},
+		{
+			"label": "Docker: Start lldb-server for test_http_poll_server",
+			"type": "shell",
+			"command": "docker",
+			"args": [
+				"run",
+				"--rm",
+				"--name",
+				"aisocks-debug",
+				"--platform",
+				"linux/arm64",
+				"--cap-add=SYS_PTRACE",
+				"--security-opt",
+				"seccomp=unconfined",
+				"-p",
+				"1234:1234",
+				"aisocks-msan-arm64",
+				"bash",
+				"-c",
+				"MSAN_OPTIONS=halt_on_error=0 lldb-server gdbserver 0.0.0.0:1234 -- /workspace/build-msan/tests/test_http_poll_server & LLDB=$!; until grep -q 04D2 /proc/net/tcp6 /proc/net/tcp 2>/dev/null; do sleep 0.1; done; echo lldb-server ready; wait $LLDB"
+			],
+			"isBackground": true,
+			"dependsOn": [
+				"Docker: Extract msan binaries"
+			],
+			"dependsOrder": "sequence",
+			"problemMatcher": {
+				"pattern": {
+					"regexp": "."
+				},
+				"background": {
+					"activeOnStart": true,
+					"beginsPattern": ".",
+					"endsPattern": "lldb-server ready"
+				}
+			},
+			"presentation": {
+				"echo": true,
+				"reveal": "always"
+			}
+		},
+		{
+			"label": "Docker: Start lldb-server for advanced_file_server",
+			"type": "shell",
+			"command": "docker",
+			"args": [
+				"run",
+				"--rm",
+				"--name",
+				"aisocks-debug",
+				"--platform",
+				"linux/arm64",
+				"--cap-add=SYS_PTRACE",
+				"--security-opt",
+				"seccomp=unconfined",
+				"-p",
+				"1234:1234",
+				"aisocks-msan-arm64",
+				"bash",
+				"-c",
+				"MSAN_OPTIONS=halt_on_error=0 lldb-server gdbserver 0.0.0.0:1234 -- /workspace/build-msan/advanced_file_server & LLDB=$!; until grep -q 04D2 /proc/net/tcp6 /proc/net/tcp 2>/dev/null; do sleep 0.1; done; echo lldb-server ready; wait $LLDB"
+			],
+			"isBackground": true,
+			"dependsOn": [
+				"Docker: Extract msan binaries"
+			],
+			"dependsOrder": "sequence",
+			"problemMatcher": {
+				"pattern": {
+					"regexp": "."
+				},
+				"background": {
+					"activeOnStart": true,
+					"beginsPattern": ".",
+					"endsPattern": "lldb-server ready"
+				}
+			},
+			"presentation": {
+				"echo": true,
+				"reveal": "always"
+			}
+		},
+		{
+			"label": "Docker: Kill debug container",
+			"type": "shell",
+			"command": "docker",
+			"args": [
+				"rm",
+				"-f",
+				"aisocks-debug"
+			],
+			"presentation": {
+				"reveal": "silent"
+			},
+			"problemMatcher": []
+		},
+		{
+			"label": "Build http_client_example",
+			"type": "shell",
+			"command": "cmake",
+			"args": [
+				"--build",
+				"build-relwithdebinfo",
+				"--target",
+				"http_client_example",
+				"--config",
+				"Debug"
+			],
+			"group": {
+				"kind": "build"
+			},
+			"presentation": {
+				"echo": true,
+				"reveal": "always"
+			}
+		},
+		{
+			"label": "Build test_efficiency",
+			"type": "shell",
+			"command": "cmake",
+			"args": [
+				"--build",
+				"build-relwithdebinfo",
+				"--target",
+				"test_efficiency",
+				"--config",
+				"Debug"
+			],
+			"group": {
+				"kind": "build"
+			},
+			"presentation": {
+				"echo": true,
+				"reveal": "always"
+			}
+		},
+		{
+			"label": "Run broad ctest suite",
+			"type": "shell",
+			"command": "ctest",
+			"args": [
+				"--test-dir",
+				"build-relwithdebinfo",
+				"--output-on-failure"
+			],
+			"isBackground": false,
+			"group": "test"
+		}
+	]
 }

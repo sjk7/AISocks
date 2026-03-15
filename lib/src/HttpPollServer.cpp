@@ -673,8 +673,10 @@ ServerResult HttpPollServer::onReadable(TcpSocket& sock, HttpClientState& s) {
             if (isTlsMode(s) && s.tlsSession) {
                 const int tlsErr = s.tlsSession->getLastErrorCode(n);
                 if (tlsErr == SSL_ERROR_WANT_READ
-                    || tlsErr == SSL_ERROR_WANT_WRITE)
+                    || tlsErr == SSL_ERROR_WANT_WRITE) {
+                    setClientWritable(sock, tlsErr == SSL_ERROR_WANT_WRITE);
                     break;
+                }
             }
 #endif
             const auto err = sock.getLastError();
@@ -719,6 +721,16 @@ ServerResult HttpPollServer::onWritable(TcpSocket& sock, HttpClientState& s) {
             touchClient(sock, std::chrono::steady_clock::now());
             s.sent += static_cast<size_t>(sent);
         } else {
+#ifdef AISOCKS_ENABLE_TLS
+            if (isTlsMode(s) && s.tlsSession) {
+                const int tlsErr = s.tlsSession->getLastErrorCode(sent);
+                if (tlsErr == SSL_ERROR_WANT_READ
+                    || tlsErr == SSL_ERROR_WANT_WRITE) {
+                    setClientWritable(sock, tlsErr == SSL_ERROR_WANT_WRITE);
+                    return ServerResult::KeepConnection;
+                }
+            }
+#endif
             const auto err = sock.getLastError();
             if (err == SocketError::WouldBlock || err == SocketError::Timeout)
                 return ServerResult::KeepConnection;

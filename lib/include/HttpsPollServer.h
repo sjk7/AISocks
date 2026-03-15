@@ -94,22 +94,7 @@ class HttpsPollServer : public HttpPollServer {
     int tlsWrite(TcpSocket& /*sock*/, HttpClientState& s, const char* data,
         size_t len) override {
         if (!s.tlsSession) return 0;
-
-        size_t done = 0;
-        while (done < len) {
-            int n = s.tlsSession->write(
-                data + done, static_cast<int>(len - done));
-            if (n > 0) {
-                done += static_cast<size_t>(n);
-                continue;
-            }
-
-            const int e = s.tlsSession->getLastErrorCode(n);
-            if (e == SSL_ERROR_WANT_READ || e == SSL_ERROR_WANT_WRITE) continue;
-            break;
-        }
-
-        return static_cast<int>(done);
+        return s.tlsSession->write(data, static_cast<int>(len));
     }
 
     private:

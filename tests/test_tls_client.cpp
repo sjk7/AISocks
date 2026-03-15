@@ -19,6 +19,7 @@
 #ifdef AISOCKS_ENABLE_TLS
 
 #include "HttpClient.h"
+#include "HttpsFileServer.h"
 #include "HttpPollServer.h"
 #include "TlsOpenSsl.h"
 #include "test_helpers.h"
@@ -35,6 +36,7 @@
 #include <openssl/ssl.h>
 #include <sstream>
 #include <string>
+#include <string_view>
 #include <thread>
 #include <vector>
 
@@ -197,19 +199,7 @@ class TestHttpsServer : public HttpPollServer {
     int tlsWrite(TcpSocket& /*sock*/, HttpClientState& s, const char* data,
         size_t len) override {
         if (!s.tlsSession) return 0;
-        size_t done = 0;
-        while (done < len) {
-            int n = s.tlsSession->write(
-                data + done, static_cast<int>(len - done));
-            if (n > 0) {
-                done += static_cast<size_t>(n);
-                continue;
-            }
-            const int e = s.tlsSession->getLastErrorCode(n);
-            if (e == SSL_ERROR_WANT_WRITE || e == SSL_ERROR_WANT_READ) continue;
-            break;
-        }
-        return static_cast<int>(done);
+        return s.tlsSession->write(data, static_cast<int>(len));
     }
 
     private:
@@ -279,6 +269,34 @@ class TestHttpServer : public HttpPollServer {
     std::condition_variable readyCv_;
 };
 
+class TestHttpsFileServer : public HttpsFileServer {
+    public:
+    TestHttpsFileServer(const ServerBind& bind, const Config& config,
+        const TlsServerConfig& tls)
+        : HttpsFileServer(bind, config, tls) {
+        setHandleSignals(false);
+    }
+
+    void waitReady() {
+        std::unique_lock<std::mutex> lk(readyMtx_);
+        readyCv_.wait(lk, [this] { return ready_.load(); });
+    }
+
+    protected:
+    void onReady() override {
+        {
+            std::lock_guard<std::mutex> lk(readyMtx_);
+            ready_ = true;
+        }
+        readyCv_.notify_all();
+    }
+
+    private:
+    std::atomic<bool> ready_{false};
+    std::mutex readyMtx_;
+    std::condition_variable readyCv_;
+};
+
 static bool hasIpv6Loopback_() {
     auto srv = TcpSocket::createRaw(AddressFamily::IPv6);
     if (!srv.setReuseAddress(true)) return false;
@@ -302,6 +320,22 @@ static bool copyFile_(const std::string& src, const std::string& dst) {
     if (!out) return false;
     out << in.rdbuf();
     return static_cast<bool>(out);
+}
+
+static bool writeFileWithByte_(
+    const std::string& path, size_t size, char fillByte) {
+    std::ofstream out(path, std::ios::binary | std::ios::trunc);
+    if (!out) return false;
+
+    std::vector<char> chunk(64 * 1024, fillByte);
+    size_t remaining = size;
+    while (remaining > 0) {
+        const size_t toWrite = std::min(remaining, chunk.size());
+        out.write(chunk.data(), static_cast<std::streamsize>(toWrite));
+        if (!out) return false;
+        remaining -= toWrite;
+    }
+    return true;
 }
 
 static FILE* openFileReadBinary_(const std::string& path) {
@@ -401,6 +435,64 @@ static bool createHashedCaDirFixtureForCerts_(
         if (!appendHashedCaCert_(certPemPath, out.path, err)) return false;
     }
 
+    return true;
+}
+
+static bool writeAllTls_(SSL* ssl, const char* data, size_t len) {
+    size_t sent = 0;
+    while (sent < len) {
+        const int n = SSL_write(ssl, data + sent, static_cast<int>(len - sent));
+        if (n <= 0) return false;
+        sent += static_cast<size_t>(n);
+    }
+    return true;
+}
+
+static bool sendTlsRequestWithoutReading_(Port port, std::string_view target,
+    Milliseconds holdFor, std::string& err) {
+    std::string initErr;
+    auto ctx = TlsContext::create(TlsContext::Mode::Client, &initErr);
+    if (!ctx) {
+        err = initErr.empty() ? "failed to create TLS client context" : initErr;
+        return false;
+    }
+
+    TcpSocket client = TcpSocket::createRaw(AddressFamily::IPv4);
+    if (!client.connect("127.0.0.1", port)) {
+        err = "slow client failed to connect";
+        return false;
+    }
+
+    std::string sessErr;
+    auto session = TlsSession::create(ctx->nativeHandle(), &sessErr);
+    if (!session) {
+        err = sessErr.empty() ? "failed to create TLS session" : sessErr;
+        return false;
+    }
+    if (!session->attachSocket(
+            static_cast<int>(client.getNativeHandle()), &sessErr)) {
+        err = sessErr.empty() ? "failed to attach TLS session to socket"
+                              : sessErr;
+        return false;
+    }
+
+    session->setConnectState();
+    const int hs = session->handshake();
+    if (hs != 1) {
+        err = "slow client TLS handshake failed";
+        return false;
+    }
+
+    std::string request = "GET ";
+    request += target.empty() ? "/" : std::string(target);
+    request += " HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n";
+    if (!writeAllTls_(
+            session->nativeHandle(), request.data(), request.size())) {
+        err = "slow client failed to send HTTPS request";
+        return false;
+    }
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(holdFor.count));
     return true;
 }
 
@@ -1265,6 +1357,133 @@ static void test_https_handshake_timeout_respects_request_timeout() {
         ("unexpected TLS error message: " + result.message()).c_str());
 }
 
+static void test_https_slow_reader_does_not_starve_other_clients() {
+    BEGIN_TEST("HTTPS slow reader does not starve concurrent clients");
+
+    const std::string root = sourceRoot();
+    const std::string cert = root + "/tests/certs/test_cert.pem";
+    const std::string key = root + "/tests/certs/test_key.pem";
+
+    class LargeBodyHttpsServer : public TestHttpsServer {
+        public:
+        LargeBodyHttpsServer(
+            const std::string& certPath, const std::string& keyPath)
+            : TestHttpsServer(certPath, keyPath), body_(4 * 1024 * 1024, 'x') {}
+
+        protected:
+        void buildResponse(HttpClientState& s) override {
+            s.responseBuf
+                = makeResponse("HTTP/1.1 200 OK", "text/plain", body_, false);
+            s.responseView = s.responseBuf;
+            requestsServed.fetch_add(1, std::memory_order_relaxed);
+        }
+
+        private:
+        std::string body_;
+    };
+
+    LargeBodyHttpsServer server{cert, key};
+    REQUIRE(server.tlsReady());
+
+    std::thread serverThread(
+        [&] { server.run(ClientLimit::Unlimited, Milliseconds{5}); });
+    server.waitReady();
+
+    std::string slowErr;
+    std::thread slowClient([&] {
+        (void)sendTlsRequestWithoutReading_(
+            server.serverPort(), "/slow-writer", Milliseconds{350}, slowErr);
+    });
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+
+    HttpClient::Options opts;
+    opts.connectTimeout = Milliseconds{1200};
+    opts.requestTimeout = Milliseconds{1200};
+    opts.verifyCertificate = false;
+    HttpClient client{opts};
+
+    const std::string url = "https://127.0.0.1:"
+        + std::to_string(server.serverPort().value()) + "/fast-client";
+    auto fastResult = client.get(url);
+
+    slowClient.join();
+    server.requestStop();
+    serverThread.join();
+
+    REQUIRE_MSG(slowErr.empty(), slowErr.c_str());
+    REQUIRE_MSG(fastResult.isSuccess(),
+        ("concurrent fast request failed: " + fastResult.message()).c_str());
+    if (!fastResult.isSuccess()) return;
+    REQUIRE(fastResult.value().statusCode() == 200);
+}
+
+static void test_https_file_server_slow_reader_does_not_starve_other_clients() {
+    BEGIN_TEST(
+        "HttpsFileServer slow reader does not starve concurrent clients");
+
+    const std::string root = sourceRoot();
+    const std::string cert = root + "/tests/certs/test_cert.pem";
+    const std::string key = root + "/tests/certs/test_key.pem";
+
+    ScopedTempDir docRoot;
+    const auto now = std::chrono::steady_clock::now().time_since_epoch();
+    std::ostringstream dirName;
+    dirName << "aisocks-https-file-starve-" << now.count();
+    docRoot.path = std::filesystem::temp_directory_path() / dirName.str();
+    std::error_code ec;
+    REQUIRE(std::filesystem::create_directories(docRoot.path, ec));
+
+    const std::string largePath = (docRoot.path / "large.bin").string();
+    const std::string smallPath = (docRoot.path / "small.txt").string();
+    REQUIRE(writeFileWithByte_(largePath, 4 * 1024 * 1024, 'z'));
+    REQUIRE(writeFileWithByte_(smallPath, 32, 'a'));
+
+    HttpFileServer::Config cfg;
+    cfg.documentRoot = docRoot.path.string();
+    cfg.indexFile = "small.txt";
+
+    TlsServerConfig tls;
+    tls.certChainFile = cert;
+    tls.privateKeyFile = key;
+
+    TestHttpsFileServer server{ServerBind{"127.0.0.1", Port{0}}, cfg, tls};
+    REQUIRE(server.tlsReady());
+
+    std::thread serverThread(
+        [&] { server.run(ClientLimit::Unlimited, Milliseconds{5}); });
+    server.waitReady();
+
+    std::string slowErr;
+    std::thread slowClient([&] {
+        (void)sendTlsRequestWithoutReading_(
+            server.serverPort(), "/large.bin", Milliseconds{350}, slowErr);
+    });
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+
+    HttpClient::Options opts;
+    opts.connectTimeout = Milliseconds{1200};
+    opts.requestTimeout = Milliseconds{1200};
+    opts.verifyCertificate = false;
+    HttpClient client{opts};
+
+    const std::string url = "https://127.0.0.1:"
+        + std::to_string(server.serverPort().value()) + "/small.txt";
+    auto fastResult = client.get(url);
+
+    slowClient.join();
+    server.requestStop();
+    serverThread.join();
+
+    REQUIRE_MSG(slowErr.empty(), slowErr.c_str());
+    REQUIRE_MSG(fastResult.isSuccess(),
+        ("file-server concurrent fast request failed: " + fastResult.message())
+            .c_str());
+    if (!fastResult.isSuccess()) return;
+    REQUIRE(fastResult.value().statusCode() == 200);
+}
+
 // ---------------------------------------------------------------------------
 // main
 // ---------------------------------------------------------------------------
@@ -1272,6 +1491,8 @@ int main() {
     test_https_cert_load_failure();
     test_https_wrong_port_fails();
     test_https_handshake_timeout_respects_request_timeout();
+    test_https_slow_reader_does_not_starve_other_clients();
+    test_https_file_server_slow_reader_does_not_starve_other_clients();
     test_https_client_basic_get();
     test_https_client_multiple_requests_keep_alive();
     test_https_cache_is_not_reused_for_http_same_host_port();
