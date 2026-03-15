@@ -144,8 +144,8 @@ Result<TcpSocket> SocketFactory::createTcpClient(
     TcpSocket socket(std::move(impl));
 
     if (!socket.connect(config.address, config.port, config.connectTimeout)) {
-        return Result<TcpSocket>::failureOwned(socket.getLastError(),
-            socket.getErrorMessage());
+        return Result<TcpSocket>::failureOwned(
+            socket.getLastError(), socket.getErrorMessage());
     }
 
     return Result<TcpSocket>::success(std::move(socket));
@@ -237,7 +237,8 @@ Result<UdpSocket> SocketFactory::createUdpSocket(AddressFamily family) {
 
 #ifdef AISOCKS_HAVE_UNIX_SOCKETS
 Result<UnixSocket> SocketFactory::createUnixServer(const UnixPath& path) {
-    auto impl = std::make_unique<SocketImpl>(SocketType::TCP, AddressFamily::Unix);
+    auto impl
+        = std::make_unique<SocketImpl>(SocketType::TCP, AddressFamily::Unix);
     if (!impl->isValid()) {
         auto ctx = impl->getErrorContext();
         return Result<UnixSocket>::failure(impl->getLastError(),
@@ -246,18 +247,21 @@ Result<UnixSocket> SocketFactory::createUnixServer(const UnixPath& path) {
     if (!impl->bind(path.value(), Port{0})) {
         auto ctx = impl->getErrorContext();
         return Result<UnixSocket>::failure(impl->getLastError(),
-            ctx.description ? ctx.description : "bind() failed", ctx.sysCode, false);
+            ctx.description ? ctx.description : "bind() failed", ctx.sysCode,
+            false);
     }
     if (!impl->listen(128)) {
         auto ctx = impl->getErrorContext();
         return Result<UnixSocket>::failure(impl->getLastError(),
-            ctx.description ? ctx.description : "listen() failed", ctx.sysCode, false);
+            ctx.description ? ctx.description : "listen() failed", ctx.sysCode,
+            false);
     }
     return Result<UnixSocket>::success(UnixSocket(std::move(impl)));
 }
 
 Result<UnixSocket> SocketFactory::createUnixClient(const UnixPath& path) {
-    auto impl = std::make_unique<SocketImpl>(SocketType::TCP, AddressFamily::Unix);
+    auto impl
+        = std::make_unique<SocketImpl>(SocketType::TCP, AddressFamily::Unix);
     if (!impl->isValid()) {
         auto ctx = impl->getErrorContext();
         return Result<UnixSocket>::failure(impl->getLastError(),
@@ -266,27 +270,29 @@ Result<UnixSocket> SocketFactory::createUnixClient(const UnixPath& path) {
     if (!impl->connect(path.value(), Port{0}, defaultConnectTimeout)) {
         auto ctx = impl->getErrorContext();
         return Result<UnixSocket>::failure(impl->getLastError(),
-            ctx.description ? ctx.description : "connect() failed", ctx.sysCode, false);
+            ctx.description ? ctx.description : "connect() failed", ctx.sysCode,
+            false);
     }
     return Result<UnixSocket>::success(UnixSocket(std::move(impl)));
 }
 
 #ifndef _WIN32
-std::pair<Result<UnixSocket>, Result<UnixSocket>> SocketFactory::createUnixPair() {
+std::pair<Result<UnixSocket>, Result<UnixSocket>>
+SocketFactory::createUnixPair() {
     int fds[2];
     if (::socketpair(AF_UNIX, SOCK_STREAM, 0, fds) != 0) {
         int e = errno;
-        return {
-            Result<UnixSocket>::failure(SocketError::CreateFailed, "socketpair() failed", e, false),
-            Result<UnixSocket>::failure(SocketError::CreateFailed, "socketpair() failed", e, false)
-        };
+        return {Result<UnixSocket>::failure(
+                    SocketError::CreateFailed, "socketpair() failed", e, false),
+            Result<UnixSocket>::failure(
+                SocketError::CreateFailed, "socketpair() failed", e, false)};
     }
-    auto implA = std::make_unique<SocketImpl>(fds[0], SocketType::TCP, AddressFamily::Unix);
-    auto implB = std::make_unique<SocketImpl>(fds[1], SocketType::TCP, AddressFamily::Unix);
-    return {
-        Result<UnixSocket>::success(UnixSocket(std::move(implA))),
-        Result<UnixSocket>::success(UnixSocket(std::move(implB)))
-    };
+    auto implA = std::make_unique<SocketImpl>(
+        fds[0], SocketType::TCP, AddressFamily::Unix);
+    auto implB = std::make_unique<SocketImpl>(
+        fds[1], SocketType::TCP, AddressFamily::Unix);
+    return {Result<UnixSocket>::success(UnixSocket(std::move(implA))),
+        Result<UnixSocket>::success(UnixSocket(std::move(implB)))};
 }
 #endif // !_WIN32
 #endif // AISOCKS_HAVE_UNIX_SOCKETS
