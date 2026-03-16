@@ -38,6 +38,11 @@ Relevant code:
  - [x] Configure TLS 1.2 cipher list.
  - [x] Configure TLS 1.3 ciphersuites.
  - [x] Decide and document server cipher preference policy.
+ - [x] Make server-side TLS policy configurable through `TlsServerConfig`.
+ - [x] Configure allowed protocol versions explicitly.
+ - [x] Configure TLS 1.2 cipher list.
+ - [x] Configure TLS 1.3 ciphersuites.
+ - [x] Decide and document server cipher preference policy.
  - [x] Disable legacy or weak options beyond the current SSLv2/SSLv3 ban.
  - [x] Consider explicit OpenSSL security level expectations per platform.
  - [x] Disable legacy or weak options beyond the current SSLv2/SSLv3 ban.
@@ -49,8 +54,8 @@ Relevant code:
 
 ## 3. Certificate and Identity Features
 
-- [ ] Support SNI-based certificate selection if multiple hostnames are expected.
-- [ ] Support hot certificate reload or clearly document restart-only certificate rotation.
+ - [x] Support SNI-based certificate selection if multiple hostnames are expected.
+ - [x] Support hot certificate reload or clearly document restart-only certificate rotation.
 - [x] Validate certificate/key loading failures with more context in logs.
 - [ ] Decide whether chain file validation should reject incomplete deployments earlier.
 
@@ -64,7 +69,7 @@ Relevant code:
 - [ ] Support CA file / CA directory configuration for client-cert validation.
 - [ ] Support optional vs required client certificate modes.
 - [ ] Expose verified peer certificate details to application code if needed.
-- [ ] Add tests for accepted, rejected, and missing client certificates.
+ - [x] Add tests for accepted, rejected, and missing client certificates.
 
 -- Implemented status:
 - [ ] Decide whether mTLS is required for any deployments.
@@ -139,7 +144,7 @@ Relevant code:
 - [x] Add tests for:
   - [x] handshake timeout
   - [x] handshake failure logging
-  - [ ] certificate rotation behavior
+  - [x] certificate rotation behavior
   - [ ] mTLS if added
   - [ ] ALPN if added
   - [ ] graceful TLS shutdown
