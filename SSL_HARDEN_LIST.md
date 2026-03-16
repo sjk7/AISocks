@@ -4,20 +4,20 @@ Status target: internet-facing production deployment of `HttpsPollServer`
 
 ## 1. TLS Handshake Hardening
 
-- [ ] Add an explicit TLS handshake timeout separate from HTTP slowloris protection.
-- [ ] Ensure stalled handshakes are dropped promptly even before any HTTP bytes arrive.
-- [ ] Log handshake failures with actionable OpenSSL error details.
+- [x] Add an explicit TLS handshake timeout separate from HTTP slowloris protection.
+- [x] Ensure stalled handshakes are dropped promptly even before any HTTP bytes arrive.
+- [x] Log handshake failures with actionable OpenSSL error details.
 - [ ] Add tests for:
-  - [ ] client connects and never completes TLS handshake
-  - [ ] repeated `SSL_ERROR_WANT_READ` / `SSL_ERROR_WANT_WRITE`
-  - [ ] handshake timeout under idle and loaded conditions
+  - [x] client connects and never completes TLS handshake
+  - [x] repeated `SSL_ERROR_WANT_READ` / `SSL_ERROR_WANT_WRITE`
+  - [x] handshake timeout under idle and loaded conditions
  - [x] Add an explicit TLS handshake timeout separate from HTTP slowloris protection.
  - [x] Ensure stalled handshakes are dropped promptly even before any HTTP bytes arrive.
  - [x] Log handshake failures with actionable OpenSSL error details.
  - [x] Add tests for:
    - [x] client connects and never completes TLS handshake
-   - [ ] repeated `SSL_ERROR_WANT_READ` / `SSL_ERROR_WANT_WRITE`
-   - [ ] handshake timeout under idle and loaded conditions
+  - [x] repeated `SSL_ERROR_WANT_READ` / `SSL_ERROR_WANT_WRITE`
+  - [x] handshake timeout under idle and loaded conditions
 
 Relevant code:
 - [lib/include/HttpsPollServer.h](lib/include/HttpsPollServer.h#L46)
@@ -51,7 +51,7 @@ Relevant code:
 
 - [ ] Support SNI-based certificate selection if multiple hostnames are expected.
 - [ ] Support hot certificate reload or clearly document restart-only certificate rotation.
-- [ ] Validate certificate/key loading failures with more context in logs.
+- [x] Validate certificate/key loading failures with more context in logs.
 - [ ] Decide whether chain file validation should reject incomplete deployments earlier.
 
 Relevant code:
@@ -135,15 +135,15 @@ Relevant code:
 
 ## 11. Testing Gaps
 
-- [ ] Add server-focused TLS tests, not only client integration tests.
-- [ ] Add tests for:
-  - [ ] handshake timeout
-  - [ ] handshake failure logging
+- [x] Add server-focused TLS tests, not only client integration tests.
+- [x] Add tests for:
+  - [x] handshake timeout
+  - [x] handshake failure logging
   - [ ] certificate rotation behavior
   - [ ] mTLS if added
   - [ ] ALPN if added
   - [ ] graceful TLS shutdown
-  - [ ] concurrent hostile connection patterns
+  - [x] concurrent hostile connection patterns
 - [ ] Run these in CI with TLS enabled on all supported platforms.
 
 Current evidence:

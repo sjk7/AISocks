@@ -60,6 +60,7 @@ endif()
 # TLS integration tests — only when the TLS feature flag is on.
 if(AISOCKS_ENABLE_TLS)
     list(APPEND TEST_SOURCES test_tls_client)
+    list(APPEND TEST_SOURCES test_tls_handshake_under_load)
 endif()
 
 # On macOS with Homebrew LLVM, the compiler's libc++ headers may reference
