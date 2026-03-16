@@ -40,6 +40,8 @@ Relevant code:
  - [x] Decide and document server cipher preference policy.
  - [ ] Disable legacy or weak options beyond the current SSLv2/SSLv3 ban.
  - [ ] Consider explicit OpenSSL security level expectations per platform.
+ - [x] Disable legacy or weak options beyond the current SSLv2/SSLv3 ban.
+ - [ ] Consider explicit OpenSSL security level expectations per platform.
 
 Relevant code:
 - [lib/src/TlsOpenSsl.cpp](lib/src/TlsOpenSsl.cpp#L103)
