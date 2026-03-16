@@ -38,6 +38,8 @@ struct TlsServerConfig {
     std::string caFile;
     std::string caDir;
     int verifyDepth{-1};
+    // Optional OpenSSL security level (negative = leave OpenSSL defaults).
+    int securityLevel{-1};
     TlsServerConfig() = default;
     TlsServerConfig(const std::string& cert, const std::string& key)
         : certChainFile(cert), privateKeyFile(key) {}
@@ -91,10 +93,22 @@ class HttpsPollServer : public HttpPollServer {
 
         const int r = s.tlsSession->handshake();
         if (r == 1) {
+            // Handshake completed; capture peer cert subject and ensure a
+            // client certificate was presented when operating in Require
+            // mTLS mode.
+            const std::string peerSubj = s.tlsSession->getPeerCertificateSubject();
+            if (tlsRequirePeerCert_ && peerSubj.empty()) {
+                const std::string opensslErr = TlsOpenSsl::lastErrorString();
+                std::fprintf(stderr,
+                    "[tls] client cert required but none presented sslErr=%s\n",
+                    opensslErr.empty() ? "<empty>" : opensslErr.c_str());
+                return ServerResult::Disconnect;
+            }
+
             s.tlsHandshakeDone = true;
             s.tlsWantsWrite = false;
             // Capture peer cert subject for application access.
-            s.peerCertSubject = s.tlsSession->getPeerCertificateSubject();
+            s.peerCertSubject = peerSubj;
             return ServerResult::KeepConnection;
         }
 
@@ -149,20 +163,41 @@ class HttpsPollServer : public HttpPollServer {
     }
 
     private:
+    // Whether server requires a client certificate (mTLS require mode).
+    bool tlsRequirePeerCert_{false};
     void initTls_(const TlsServerConfig& tls) {
         tlsInitError_.clear();
 
         if (tls.certChainFile.empty() || tls.privateKeyFile.empty()) {
             tlsInitError_
                 = "TLS certChainFile/privateKeyFile must be non-empty";
+            std::fprintf(stderr,
+                "[tls][init] failed reason=%s cert=%s key=%s\n",
+                tlsInitError_.c_str(),
+                tls.certChainFile.empty() ? "<empty>"
+                                          : tls.certChainFile.c_str(),
+                tls.privateKeyFile.empty() ? "<empty>"
+                                           : tls.privateKeyFile.c_str());
             return;
         }
 
         auto ctx = TlsContext::create(TlsContext::Mode::Server, &tlsInitError_);
-        if (!ctx) return;
+        if (!ctx) {
+            std::fprintf(stderr, "[tls][init] create failed reason=%s\n",
+                tlsInitError_.empty() ? "<empty>" : tlsInitError_.c_str());
+            return;
+        }
 
         if (!ctx->loadCertificateChain(
                 tls.certChainFile, tls.privateKeyFile, &tlsInitError_)) {
+            std::fprintf(stderr,
+                "[tls][init] loadCertificateChain failed reason=%s cert=%s "
+                "key=%s\n",
+                tlsInitError_.empty() ? "<empty>" : tlsInitError_.c_str(),
+                tls.certChainFile.empty() ? "<empty>"
+                                          : tls.certChainFile.c_str(),
+                tls.privateKeyFile.empty() ? "<empty>"
+                                           : tls.privateKeyFile.c_str());
             return;
         }
 
@@ -171,10 +206,20 @@ class HttpsPollServer : public HttpPollServer {
             std::string policyErr;
             if (!ctx->configureServerPolicy(tls.tls12CipherList,
                     tls.tls13CipherSuites, tls.minProtoVersion,
-                    tls.maxProtoVersion, tls.preferServerCiphers, &policyErr)) {
+                    tls.maxProtoVersion, tls.preferServerCiphers,
+                    tls.securityLevel, &policyErr)) {
                 tlsInitError_ = policyErr.empty()
                     ? "configureServerPolicy failed"
                     : policyErr;
+                std::fprintf(stderr,
+                    "[tls][init] configureServerPolicy failed reason=%s "
+                    "ciphers12=%s ciphers13=%s\n",
+                    tlsInitError_.c_str(),
+                    tls.tls12CipherList.empty() ? "<default>"
+                                                : tls.tls12CipherList.c_str(),
+                    tls.tls13CipherSuites.empty()
+                        ? "<default>"
+                        : tls.tls13CipherSuites.c_str());
                 return;
             }
         }
@@ -183,28 +228,31 @@ class HttpsPollServer : public HttpPollServer {
 
         // Configure client certificate verification if requested.
         if (tls.clientAuth != TlsServerConfig::ClientAuthMode::None) {
-            bool verifyPeer = tls.clientAuth != TlsServerConfig::ClientAuthMode::None;
+            bool verifyPeer
+                = tls.clientAuth != TlsServerConfig::ClientAuthMode::None;
             bool loadDefaults = tls.caFile.empty() && tls.caDir.empty();
             std::string verErr;
-                if (!ctx->configureVerifyPeer(verifyPeer, loadDefaults, tls.caFile,
+            if (!ctx->configureVerifyPeer(verifyPeer, loadDefaults, tls.caFile,
                     tls.caDir,
                     tls.clientAuth == TlsServerConfig::ClientAuthMode::Require,
                     tls.verifyDepth, &verErr)) {
-                tlsInitError_ = verErr.empty() ? "configureVerifyPeer failed" : verErr;
+                tlsInitError_
+                    = verErr.empty() ? "configureVerifyPeer failed" : verErr;
+                std::fprintf(stderr,
+                    "[tls][init] configureVerifyPeer failed reason=%s "
+                    "caFile=%s caDir=%s\n",
+                    tlsInitError_.c_str(),
+                    tls.caFile.empty() ? "<empty>" : tls.caFile.c_str(),
+                    tls.caDir.empty() ? "<empty>" : tls.caDir.c_str());
                 return;
             }
 
             if (tls.clientAuth == TlsServerConfig::ClientAuthMode::Require) {
-                // Require client certificate; SSL_CTX_set_verify flags are
-                // already set by configureVerifyPeer but `FAIL_IF_NO_PEER_CERT`
-                // behavior is controlled per-SSL_VERIFY configuration. For
-                // OpenSSL this is achieved by SSL_VERIFY_PEER |
-                // SSL_VERIFY_FAIL_IF_NO_PEER_CERT when setting verify mode.
-                // The helper sets SSL_VERIFY_PEER; require behavior can be
-                // enforced via a callback if available. For simplicity ensure
-                // verify depth is set and rely on the verify mode above.
+                // Remember that the server requires a client cert so the
+                // handshake completion step can explicitly enforce presence
+                // of a peer certificate and disconnect if none was presented.
+                tlsRequirePeerCert_ = true;
             }
-
         }
 
         tlsContext_ = std::move(ctx);

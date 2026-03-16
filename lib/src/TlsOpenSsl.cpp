@@ -102,8 +102,24 @@ std::unique_ptr<TlsContext> TlsContext::create(Mode mode, std::string* error) {
         return nullptr;
     }
 
-    SSL_CTX_set_options(ctx, SSL_OP_NO_SSLv2 | SSL_OP_NO_SSLv3);
+    unsigned long opts = SSL_OP_NO_SSLv2 | SSL_OP_NO_SSLv3;
+#ifdef SSL_OP_NO_COMPRESSION
+    opts |= SSL_OP_NO_COMPRESSION;
+#endif
+#ifdef SSL_OP_NO_TLSv1
+    opts |= SSL_OP_NO_TLSv1;
+#endif
+#ifdef SSL_OP_NO_TLSv1_1
+    opts |= SSL_OP_NO_TLSv1_1;
+#endif
+    SSL_CTX_set_options(ctx, opts);
     SSL_CTX_set_min_proto_version(ctx, TLS1_2_VERSION);
+
+#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+    // Prefer a conservative security level (2) where OpenSSL supports it.
+    // Level 2 disables known-weak ciphers and enforces reasonable defaults.
+    SSL_CTX_set_security_level(ctx, 2);
+#endif
 
     return std::unique_ptr<TlsContext>(new TlsContext(ctx, mode));
 }
@@ -135,15 +151,16 @@ bool TlsContext::loadCertificateChain(const std::string& certPemPath,
 }
 
 bool TlsContext::configureVerifyPeer(bool verifyPeer, bool loadDefaultCaPaths,
-    const std::string& caFile, const std::string& caDir,
-    bool failIfNoPeerCert, int verifyDepth, std::string* error) {
+    const std::string& caFile, const std::string& caDir, bool failIfNoPeerCert,
+    int verifyDepth, std::string* error) {
     if (!ctx_) {
         if (error) *error = "TLS context is not initialized";
         return false;
     }
 
     int verifyMode = verifyPeer ? SSL_VERIFY_PEER : SSL_VERIFY_NONE;
-    if (verifyPeer && failIfNoPeerCert) verifyMode |= SSL_VERIFY_FAIL_IF_NO_PEER_CERT;
+    if (verifyPeer && failIfNoPeerCert)
+        verifyMode |= SSL_VERIFY_FAIL_IF_NO_PEER_CERT;
     SSL_CTX_set_verify(ctx_, verifyMode, nullptr);
 
     if (verifyPeer) {
@@ -224,11 +241,15 @@ std::string TlsSession::getPeerCertificateSubject() const {
 
 bool TlsContext::configureServerPolicy(const std::string& tls12CipherList,
     const std::string& tls13CipherSuites, int minProto, int maxProto,
-    bool preferServerCiphers, std::string* error) {
+    bool preferServerCiphers, int securityLevel, std::string* error) {
     if (!ctx_) {
         if (error) *error = "TLS context is not initialized";
         return false;
     }
+
+    // Silence unused-parameter warnings on platforms without
+    // SSL_CTX_set_security_level support.
+    (void)securityLevel;
 
 #if OPENSSL_VERSION_NUMBER >= 0x10101000L
     if (minProto > 0) SSL_CTX_set_min_proto_version(ctx_, minProto);
@@ -259,6 +280,12 @@ bool TlsContext::configureServerPolicy(const std::string& tls12CipherList,
         SSL_CTX_set_options(ctx_, SSL_OP_CIPHER_SERVER_PREFERENCE);
 #endif
     }
+
+#ifdef SSL_CTX_set_security_level
+    if (securityLevel >= 0) {
+        SSL_CTX_set_security_level(ctx_, securityLevel);
+    }
+#endif
 
     return true;
 }

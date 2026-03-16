@@ -58,6 +58,18 @@ class HttpsFileServer : public HttpFileServer {
 
         const int r = s.tlsSession->handshake();
         if (r == 1) {
+            // If server requires a client certificate, ensure one was
+            // presented.
+            if (tlsRequirePeerCert_) {
+                const std::string peer = s.tlsSession->getPeerCertificateSubject();
+                if (peer.empty()) {
+                    const std::string opensslErr = TlsOpenSsl::lastErrorString();
+                    std::fprintf(stderr, "[tls] client cert required but none presented sslErr=%s\n",
+                        opensslErr.empty() ? "<empty>" : opensslErr.c_str());
+                    return ServerResult::Disconnect;
+                }
+            }
+
             s.tlsHandshakeDone = true;
             s.tlsWantsWrite = false;
             return ServerResult::KeepConnection;
@@ -110,11 +122,29 @@ class HttpsFileServer : public HttpFileServer {
             return;
         }
 
+        // Configure client certificate verification when requested.
+        if (tls.clientAuth != TlsServerConfig::ClientAuthMode::None) {
+            bool verifyPeer = tls.clientAuth != TlsServerConfig::ClientAuthMode::None;
+            bool loadDefaults = tls.caFile.empty() && tls.caDir.empty();
+            std::string verErr;
+            if (!ctx->configureVerifyPeer(verifyPeer, loadDefaults, tls.caFile,
+                    tls.caDir, tls.clientAuth == TlsServerConfig::ClientAuthMode::Require,
+                    tls.verifyDepth, &verErr)) {
+                tlsInitError_ = verErr.empty() ? "configureVerifyPeer failed" : verErr;
+                return;
+            }
+
+            if (tls.clientAuth == TlsServerConfig::ClientAuthMode::Require) {
+                tlsRequirePeerCert_ = true;
+            }
+        }
+
         tlsContext_ = std::move(ctx);
     }
 
     std::unique_ptr<TlsContext> tlsContext_;
     std::string tlsInitError_;
+    bool tlsRequirePeerCert_{false};
 };
 
 } // namespace aiSocks

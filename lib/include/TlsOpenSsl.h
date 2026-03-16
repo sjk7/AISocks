@@ -57,7 +57,7 @@ class TlsContext {
     bool configureServerPolicy(const std::string& tls12CipherList = {},
         const std::string& tls13CipherSuites = {}, int minProto = 0,
         int maxProto = 0, bool preferServerCiphers = false,
-        std::string* error = nullptr);
+        int securityLevel = -1, std::string* error = nullptr);
 
     private:
     explicit TlsContext(ssl_ctx_st* ctx, Mode mode) noexcept
