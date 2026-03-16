@@ -93,9 +93,16 @@ Relevant docs:
 ## 6. ALPN and Protocol Negotiation
 
 - [ ] Decide whether HTTP/1.1-only is acceptable.
-- [ ] If yes, explicitly document ALPN behavior or lack of ALPN.
-- [ ] If no, implement ALPN negotiation.
-- [ ] Add tests for clients that expect negotiated protocol behavior.
+- [x] If yes, explicitly document ALPN behavior or lack of ALPN.
+- [x] If no, implement ALPN negotiation.
+- [x] Add tests for clients that expect negotiated protocol behavior.
+
+Implemented details:
+
+- **Server config:** `TlsServerConfig::alpnProtocols` allows listing server-preferred ALPN protocols in preference order. See [lib/include/HttpsPollServer.h](lib/include/HttpsPollServer.h#L19).
+- **Server behavior:** ALPN is applied to the `SSL_CTX` via `TlsContext::setAlpnProtocols` and the server selects a protocol according to server preference. See [lib/src/TlsOpenSsl.cpp](lib/src/TlsOpenSsl.cpp#L1-L120).
+- **Client behavior:** Clients may advertise ALPN via `TlsSession::setAlpnProtocols()` before handshake.
+- **Tests:** Added `tests/test_tls_alpn.cpp` which asserts that the negotiated ALPN value matches server preference when client offers multiple protocols.
 
 ## 7. TLS Shutdown Semantics
 

@@ -17,6 +17,8 @@
 #include <cstdlib>
 #include <cstdio>
 #include <mutex>
+#include <vector>
+#include <cstring>
 
 namespace aiSocks {
 
@@ -45,6 +47,46 @@ namespace {
     }
 } // namespace
 
+// ALPN support: store per-SSL_CTX vector<string> via ex_data index.
+static int alpn_ex_index() {
+    static int idx = -1;
+    if (idx == -1) {
+#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+        idx = SSL_CTX_get_ex_new_index(0, nullptr, nullptr, nullptr, nullptr);
+#else
+        idx = SSL_CTX_get_ex_new_index(0, nullptr, nullptr, nullptr, nullptr);
+#endif
+    }
+    return idx;
+}
+
+static int alpn_select_cb(SSL* /*ssl*/, const unsigned char** out,
+    unsigned char* outlen, const unsigned char* in, unsigned int inlen,
+    void* arg) {
+    if (!arg) return SSL_TLSEXT_ERR_NOACK;
+    auto* serverList = static_cast<std::vector<std::string>*>(arg);
+    // For each server-preferred protocol, check if client offered it.
+    for (const auto& proto : *serverList) {
+        const unsigned char* cur = in;
+        unsigned int rem = inlen;
+        while (rem > 0) {
+            unsigned int plen = static_cast<unsigned int>(*cur);
+            ++cur;
+            if (plen <= rem - 1) {
+                if (plen == proto.size()
+                    && std::memcmp(cur, proto.data(), plen) == 0) {
+                    *out = cur;
+                    *outlen = static_cast<unsigned char>(plen);
+                    return SSL_TLSEXT_ERR_OK;
+                }
+            }
+            cur += plen;
+            rem -= (1 + plen);
+        }
+    }
+    return SSL_TLSEXT_ERR_NOACK;
+}
+
 bool TlsOpenSsl::initialize() {
     static std::once_flag once;
     static bool initialized = true;
@@ -71,7 +113,12 @@ std::string TlsOpenSsl::lastErrorString() {
 }
 
 TlsContext::~TlsContext() {
-    if (ctx_) SSL_CTX_free(ctx_);
+    if (ctx_) {
+        // Free any ALPN protocol list attached to this ctx via ex_data.
+        void* ex = SSL_CTX_get_ex_data(ctx_, alpn_ex_index());
+        if (ex) delete static_cast<std::vector<std::string>*>(ex);
+        SSL_CTX_free(ctx_);
+    }
 }
 
 TlsContext::TlsContext(TlsContext&& other) noexcept
@@ -313,8 +360,32 @@ bool TlsContext::configureServerPolicy(const std::string& tls12CipherList,
         SSL_CTX_set_security_level(ctx_, securityLevel);
     }
 #endif
-
     return true;
+}
+
+bool TlsContext::setAlpnProtocols(
+    const std::vector<std::string>& alpn, std::string* error) {
+    if (!ctx_) {
+        if (error) *error = "TLS context is not initialized";
+        return false;
+    }
+
+    if (alpn.empty()) return true;
+
+#if defined(SSL_CTRL_SET_TLSEXT_HOSTNAME) || defined(OPENSSL_NO_TLS1_3)
+    auto* vec = new std::vector<std::string>(alpn);
+    if (SSL_CTX_set_ex_data(ctx_, alpn_ex_index(), vec) != 1) {
+        delete vec;
+        if (error) *error = "SSL_CTX_set_ex_data failed";
+        return false;
+    }
+    SSL_CTX_set_alpn_select_cb(ctx_, alpn_select_cb, vec);
+    return true;
+#else
+    (void)alpn;
+    if (error) *error = "ALPN unsupported on this OpenSSL build";
+    return false;
+#endif
 }
 
 TlsSession::~TlsSession() {
@@ -389,6 +460,39 @@ int TlsSession::write(const void* src, int size) {
 int TlsSession::getLastErrorCode(int ioResult) const {
     if (!ssl_) return SSL_ERROR_SSL;
     return SSL_get_error(ssl_, ioResult);
+}
+
+bool TlsSession::setAlpnProtocols(
+    const std::vector<std::string>& protocols, std::string* error) {
+    if (!ssl_) {
+        if (error) *error = "TLS session is not initialized";
+        return false;
+    }
+
+    std::string wire;
+    for (const auto& p : protocols) {
+        if (p.empty() || p.size() > 255) {
+            if (error) *error = "ALPN protocol name invalid/too long";
+            return false;
+        }
+        wire.push_back(static_cast<char>(p.size()));
+        wire.append(p);
+    }
+
+#if defined(SSL_set_alpn_protos)
+    const int rc = SSL_set_alpn_protos(ssl_,
+        reinterpret_cast<const unsigned char*>(wire.data()),
+        static_cast<unsigned int>(wire.size()));
+    if (rc != 0) {
+        if (error) *error = TlsOpenSsl::lastErrorString();
+        return false;
+    }
+    return true;
+#else
+    (void)wire;
+    if (error) *error = "ALPN unsupported on this OpenSSL build";
+    return false;
+#endif
 }
 
 } // namespace aiSocks

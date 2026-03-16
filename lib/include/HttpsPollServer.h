@@ -33,6 +33,8 @@ struct TlsServerConfig {
     // Handshake timeout in milliseconds (0 == disabled). Separate from
     // HTTP slowloris protection.
     int handshakeTimeoutMs{5000};
+    // ALPN protocols in server preference order (e.g. {"h2", "http/1.1"}).
+    std::vector<std::string> alpnProtocols;
     // mTLS / client auth options
     ClientAuthMode clientAuth{ClientAuthMode::None};
     std::string caFile;
@@ -96,7 +98,8 @@ class HttpsPollServer : public HttpPollServer {
             // Handshake completed; capture peer cert subject and ensure a
             // client certificate was presented when operating in Require
             // mTLS mode.
-            const std::string peerSubj = s.tlsSession->getPeerCertificateSubject();
+            const std::string peerSubj
+                = s.tlsSession->getPeerCertificateSubject();
             if (tlsRequirePeerCert_ && peerSubj.empty()) {
                 const std::string opensslErr = TlsOpenSsl::lastErrorString();
                 std::fprintf(stderr,
@@ -221,6 +224,19 @@ class HttpsPollServer : public HttpPollServer {
                         ? "<default>"
                         : tls.tls13CipherSuites.c_str());
                 return;
+            }
+
+            // Configure ALPN protocols, if provided.
+            if (!tls.alpnProtocols.empty()) {
+                std::string alpnErr;
+                if (!ctx->setAlpnProtocols(tls.alpnProtocols, &alpnErr)) {
+                    tlsInitError_
+                        = alpnErr.empty() ? "setAlpnProtocols failed" : alpnErr;
+                    std::fprintf(stderr,
+                        "[tls][init] setAlpnProtocols failed reason=%s\n",
+                        tlsInitError_.c_str());
+                    return;
+                }
             }
         }
 

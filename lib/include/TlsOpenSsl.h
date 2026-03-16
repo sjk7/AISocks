@@ -8,6 +8,7 @@
 
 #include <memory>
 #include <string>
+#include <vector>
 
 #ifdef AISOCKS_ENABLE_TLS
 
@@ -59,6 +60,10 @@ class TlsContext {
         int maxProto = 0, bool preferServerCiphers = false,
         int securityLevel = -1, std::string* error = nullptr);
 
+    // Configure server-side ALPN protocols (server preference order).
+    bool setAlpnProtocols(
+        const std::vector<std::string>& alpn, std::string* error = nullptr);
+
     private:
     explicit TlsContext(ssl_ctx_st* ctx, Mode mode) noexcept
         : ctx_(ctx), mode_(mode) {}
@@ -94,6 +99,11 @@ class TlsSession {
     // If a peer certificate was presented by the remote, return a short
     // human-readable subject string. Returns empty string if no peer cert.
     std::string getPeerCertificateSubject() const;
+
+    // Client-side: set ALPN protocols this client will advertise (order
+    // matters - first entry is preferred). Call before `handshake()`.
+    bool setAlpnProtocols(const std::vector<std::string>& protocols,
+        std::string* error = nullptr);
 
     ssl_st* nativeHandle() const noexcept { return ssl_; }
 
