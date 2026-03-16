@@ -30,7 +30,8 @@ void test_tls_observability_verify_peer_ca_missing() {
     // configureVerifyPeer should fail when a CA file is specified but does
     // not exist; error string should be set accordingly.
     std::string verr;
-    bool ok = ctx->configureVerifyPeer(true, false, "no-such-ca.pem", "", true, -1, &verr);
+    bool ok = ctx->configureVerifyPeer(
+        true, false, "no-such-ca.pem", "", true, -1, &verr);
     REQUIRE(!ok);
     REQUIRE(!verr.empty());
 }

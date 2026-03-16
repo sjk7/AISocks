@@ -61,10 +61,14 @@ class HttpsFileServer : public HttpFileServer {
             // If server requires a client certificate, ensure one was
             // presented.
             if (tlsRequirePeerCert_) {
-                const std::string peer = s.tlsSession->getPeerCertificateSubject();
+                const std::string peer
+                    = s.tlsSession->getPeerCertificateSubject();
                 if (peer.empty()) {
-                    const std::string opensslErr = TlsOpenSsl::lastErrorString();
-                    std::fprintf(stderr, "[tls] client cert required but none presented sslErr=%s\n",
+                    const std::string opensslErr
+                        = TlsOpenSsl::lastErrorString();
+                    std::fprintf(stderr,
+                        "[tls] client cert required but none presented "
+                        "sslErr=%s\n",
                         opensslErr.empty() ? "<empty>" : opensslErr.c_str());
                     return ServerResult::Disconnect;
                 }
@@ -122,15 +126,59 @@ class HttpsFileServer : public HttpFileServer {
             return;
         }
 
+        // Optional: enforce that the cert chain file contains more than one
+        // certificate (leaf + issuer(s)) when configured to do so. This is a
+        // cheap check that counts PEM certificates in the provided file and
+        // helps detect incomplete deployments early.
+        if (tls.requireFullChain) {
+            int count = 0;
+            File f;
+            if (!f.open(tls.certChainFile.c_str(), "rb")) {
+                tlsInitError_ = "failed to open cert chain file for "
+                                "requireFullChain check";
+                std::fprintf(stderr,
+                    "[tls][init] requireFullChain failed cert=%s open failed\n",
+                    tls.certChainFile.c_str());
+                return;
+            }
+            const std::vector<char> contents = f.readAll();
+            if (contents.empty()) {
+                tlsInitError_ = "certificate chain file appears empty";
+                std::fprintf(stderr,
+                    "[tls][init] requireFullChain failed cert=%s empty\n",
+                    tls.certChainFile.c_str());
+                return;
+            }
+            const std::string s(contents.begin(), contents.end());
+            size_t pos = 0;
+            while (true) {
+                pos = s.find("-----BEGIN CERTIFICATE-----", pos);
+                if (pos == std::string::npos) break;
+                ++count;
+                pos += 24; // advance past the match
+            }
+            if (count < 2) {
+                tlsInitError_
+                    = "certificate chain file does not contain full chain";
+                std::fprintf(stderr,
+                    "[tls][init] requireFullChain failed cert=%s count=%d\n",
+                    tls.certChainFile.c_str(), count);
+                return;
+            }
+        }
+
         // Configure client certificate verification when requested.
         if (tls.clientAuth != TlsServerConfig::ClientAuthMode::None) {
-            bool verifyPeer = tls.clientAuth != TlsServerConfig::ClientAuthMode::None;
+            bool verifyPeer
+                = tls.clientAuth != TlsServerConfig::ClientAuthMode::None;
             bool loadDefaults = tls.caFile.empty() && tls.caDir.empty();
             std::string verErr;
             if (!ctx->configureVerifyPeer(verifyPeer, loadDefaults, tls.caFile,
-                    tls.caDir, tls.clientAuth == TlsServerConfig::ClientAuthMode::Require,
+                    tls.caDir,
+                    tls.clientAuth == TlsServerConfig::ClientAuthMode::Require,
                     tls.verifyDepth, &verErr)) {
-                tlsInitError_ = verErr.empty() ? "configureVerifyPeer failed" : verErr;
+                tlsInitError_
+                    = verErr.empty() ? "configureVerifyPeer failed" : verErr;
                 return;
             }
 

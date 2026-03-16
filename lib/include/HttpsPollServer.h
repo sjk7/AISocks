@@ -13,6 +13,7 @@
 #include <openssl/ssl.h>
 #include <memory>
 #include <string>
+#include "FileIO.h"
 
 namespace aiSocks {
 
@@ -40,6 +41,10 @@ struct TlsServerConfig {
     std::string caFile;
     std::string caDir;
     int verifyDepth{-1};
+    // If true, require the configured certChainFile to contain a full
+    // certificate chain (leaf + at least one issuer cert). Default false
+    // to preserve current behavior.
+    bool requireFullChain{false};
     // Optional OpenSSL security level (negative = leave OpenSSL defaults).
     int securityLevel{-1};
     TlsServerConfig() = default;
@@ -203,6 +208,45 @@ class HttpsPollServer : public HttpPollServer {
                                            : tls.privateKeyFile.c_str());
             return;
         }
+
+            // Optional: enforce that the cert chain file contains more than one
+            // certificate (leaf + issuer(s)) when configured to do so. This is a
+            // cheap check that counts PEM certificates in the provided file and
+            // helps detect incomplete deployments early.
+            if (tls.requireFullChain) {
+                int count = 0;
+                File f;
+                if (!f.open(tls.certChainFile.c_str(), "rb")) {
+                    tlsInitError_ = "failed to open cert chain file for requireFullChain check";
+                    std::fprintf(stderr,
+                        "[tls][init] requireFullChain failed cert=%s open failed\n",
+                        tls.certChainFile.c_str());
+                    return;
+                }
+                const std::vector<char> contents = f.readAll();
+                if (contents.empty()) {
+                    tlsInitError_ = "certificate chain file appears empty";
+                    std::fprintf(stderr,
+                        "[tls][init] requireFullChain failed cert=%s empty\n",
+                        tls.certChainFile.c_str());
+                    return;
+                }
+                const std::string s(contents.begin(), contents.end());
+                size_t pos = 0;
+                while (true) {
+                    pos = s.find("-----BEGIN CERTIFICATE-----", pos);
+                    if (pos == std::string::npos) break;
+                    ++count;
+                    pos += 24; // advance past the match
+                }
+                if (count < 2) {
+                    tlsInitError_ = "certificate chain file does not contain full chain";
+                    std::fprintf(stderr,
+                        "[tls][init] requireFullChain failed cert=%s count=%d\n",
+                        tls.certChainFile.c_str(), count);
+                    return;
+                }
+            }
 
         // Apply optional server policy (ciphers, proto range, server prefs).
         {
