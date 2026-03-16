@@ -259,6 +259,33 @@ bool TlsContext::configureServerPolicy(const std::string& tls12CipherList,
     (void)maxProto;
 #endif
 
+    // When a max proto is explicitly requested, also proactively disable
+    // newer protocol versions via OpenSSL options where available. This
+    // provides a robust fallback for OpenSSL builds where set_max_proto
+    // semantics vary or when TLS1.3 is enabled by default.
+    if (maxProto > 0) {
+#ifdef SSL_OP_NO_TLSv1_3
+        if (maxProto < TLS1_3_VERSION) {
+            SSL_CTX_set_options(ctx_, SSL_OP_NO_TLSv1_3);
+        }
+#endif
+#ifdef SSL_OP_NO_TLSv1_2
+        if (maxProto < TLS1_2_VERSION) {
+            SSL_CTX_set_options(ctx_, SSL_OP_NO_TLSv1_2);
+        }
+#endif
+#ifdef SSL_OP_NO_TLSv1_1
+        if (maxProto < TLS1_1_VERSION) {
+            SSL_CTX_set_options(ctx_, SSL_OP_NO_TLSv1_1);
+        }
+#endif
+#ifdef SSL_OP_NO_TLSv1
+        if (maxProto < TLS1_VERSION) {
+            SSL_CTX_set_options(ctx_, SSL_OP_NO_TLSv1);
+        }
+#endif
+    }
+
     if (!tls13CipherSuites.empty()) {
 #if defined(SSL_CTX_set_ciphersuites)
         if (SSL_CTX_set_ciphersuites(ctx_, tls13CipherSuites.c_str()) != 1) {

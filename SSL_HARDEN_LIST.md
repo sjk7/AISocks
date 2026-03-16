@@ -26,27 +26,29 @@ Relevant code:
 
 ## 2. Server TLS Policy
 
-- [ ] Make server-side TLS policy configurable through `TlsServerConfig`.
-- [ ] Configure allowed protocol versions explicitly.
-- [ ] Configure TLS 1.2 cipher list.
-- [ ] Configure TLS 1.3 ciphersuites.
-- [ ] Decide and document server cipher preference policy.
+- [x] Make server-side TLS policy configurable through `TlsServerConfig`.
+- [x] Configure allowed protocol versions explicitly.
+- [x] Configure TLS 1.2 cipher list.
+- [x] Configure TLS 1.3 ciphersuites.
+- [x] Decide and document server cipher preference policy.
 - [x] Disable legacy or weak options beyond the current SSLv2/SSLv3 ban.
 - [x] Consider explicit OpenSSL security level expectations per platform.
- - [x] Make server-side TLS policy configurable through `TlsServerConfig`.
- - [x] Configure allowed protocol versions explicitly.
- - [x] Configure TLS 1.2 cipher list.
- - [x] Configure TLS 1.3 ciphersuites.
- - [x] Decide and document server cipher preference policy.
- - [x] Make server-side TLS policy configurable through `TlsServerConfig`.
- - [x] Configure allowed protocol versions explicitly.
- - [x] Configure TLS 1.2 cipher list.
- - [x] Configure TLS 1.3 ciphersuites.
- - [x] Decide and document server cipher preference policy.
- - [x] Disable legacy or weak options beyond the current SSLv2/SSLv3 ban.
- - [x] Consider explicit OpenSSL security level expectations per platform.
- - [x] Disable legacy or weak options beyond the current SSLv2/SSLv3 ban.
- - [x] Consider explicit OpenSSL security level expectations per platform.
+
+Defaults and configuration notes:
+
+- **Default minimum protocol:** TLS1.2 (`TLS1_2_VERSION`) is enforced by default.
+- **Cipher lists:** OpenSSL defaults are used unless overridden via `TlsServerConfig::tls12CipherList` and `TlsServerConfig::tls13CipherSuites`.
+- **Server cipher preference:** `TlsServerConfig::preferServerCiphers` defaults to `true` (server preference enabled).
+- **Security level:** A conservative OpenSSL security level (`2`) is set where the platform supports `SSL_CTX_set_security_level`.
+
+Configuration entry points:
+
+- `TlsServerConfig` (see [lib/include/HttpsPollServer.h](lib/include/HttpsPollServer.h#L19)) — fields for protocol range, ciphers, and preference.
+- `TlsContext::configureServerPolicy` (see [lib/src/TlsOpenSsl.cpp](lib/src/TlsOpenSsl.cpp#L103)) — applies the TLS policy to the OpenSSL `SSL_CTX`.
+
+If you want explicit assertions in tests that negotiation yields a particular cipher/protocol pair, we can add a runtime integration test that asserts the negotiated protocol/cipher between a configured server `TlsContext` and a client session.
+
+Action taken: added `tests/test_tls_policy_negotiation.cpp` which starts an `HttpsFileServer` configured for TLS1.2 and a specific TLS1.2 cipher, then verifies negotiated protocol and cipher from a client handshake.
 
 Relevant code:
 - [lib/src/TlsOpenSsl.cpp](lib/src/TlsOpenSsl.cpp#L103)
