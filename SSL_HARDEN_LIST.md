@@ -110,6 +110,9 @@ Implemented details:
 - [ ] Implement orderly TLS shutdown where appropriate.
 - [ ] Confirm behavior on keep-alive close, server stop, timeout, and error paths.
 - [ ] Add tests for clean TLS close vs abrupt disconnect.
+ - [x] Implement orderly TLS shutdown where appropriate.
+ - [x] Confirm behavior on keep-alive close, server stop, timeout, and error paths.
+ - [x] Add tests for clean TLS close vs abrupt disconnect.
 
 ## 8. Session Resumption and Tickets
 
@@ -157,7 +160,7 @@ Relevant code:
   - [x] certificate rotation behavior
   - [ ] mTLS if added
   - [ ] ALPN if added
-  - [ ] graceful TLS shutdown
+  - [x] graceful TLS shutdown
   - [x] concurrent hostile connection patterns
 - [ ] Run these in CI with TLS enabled on all supported platforms.
 
