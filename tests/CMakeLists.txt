@@ -118,20 +118,22 @@ if(NOT APPLE)
 endif()
 
 foreach(TEST_NAME ${TEST_SOURCES})
-    add_executable(${TEST_NAME} ${TEST_NAME}.cpp)
-    if(MSVC AND AISOCKS_ENABLE_TLS AND TEST_NAME STREQUAL "test_tls_client")
-        target_sources(${TEST_NAME} PRIVATE openssl_applink.cpp)
-    endif()
-    target_link_libraries(${TEST_NAME} PRIVATE aiSocksLib)
-    target_compile_definitions(${TEST_NAME} PRIVATE AISOCKS_TESTING=1)
-    target_include_directories(${TEST_NAME} PRIVATE
-        ${CMAKE_CURRENT_SOURCE_DIR}
-        ${CMAKE_SOURCE_DIR}/lib/include
-    )
-    if(NOT APPLE)
-        target_precompile_headers(${TEST_NAME} REUSE_FROM test_pch_host)
-    endif()
-    add_test(NAME ${TEST_NAME} COMMAND ${TEST_NAME})
+    set(TEST_SRC "${CMAKE_CURRENT_SOURCE_DIR}/${TEST_NAME}.cpp")
+    add_executable(${TEST_NAME} ${TEST_SRC})
+        if(MSVC AND AISOCKS_ENABLE_TLS AND TEST_NAME STREQUAL "test_tls_client")
+            target_sources(${TEST_NAME} PRIVATE openssl_applink.cpp)
+        endif()
+        target_link_libraries(${TEST_NAME} PRIVATE aiSocksLib)
+        target_compile_definitions(${TEST_NAME} PRIVATE AISOCKS_TESTING=1)
+        target_include_directories(${TEST_NAME} PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}
+            ${CMAKE_SOURCE_DIR}/lib/include
+        )
+        if(NOT APPLE)
+            target_precompile_headers(${TEST_NAME} REUSE_FROM test_pch_host)
+        endif()
+        add_test(NAME ${TEST_NAME} COMMAND ${TEST_NAME})
+    
     # Under Wine (cross-compiling), each process incurs ~10s startup overhead;
     # triple the default timeout so no test is falsely killed by ctest.
     if(CMAKE_CROSSCOMPILING)
