@@ -64,6 +64,14 @@ Relevant code:
 - [ ] Expose verified peer certificate details to application code if needed.
 - [ ] Add tests for accepted, rejected, and missing client certificates.
 
+-- Implemented status:
+- [ ] Decide whether mTLS is required for any deployments.
+- [x] If yes, add configurable client certificate verification.
+- [x] Support CA file / CA directory configuration for client-cert validation.
+- [x] Support optional vs required client certificate modes.
+- [x] Expose verified peer certificate details to application code if needed.
+- [ ] Add tests for accepted, rejected, and missing client certificates.
+
 ## 5. Revocation and Trust Model
 
 - [ ] Decide whether revocation checking is required in-process.
