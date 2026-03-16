@@ -19,6 +19,11 @@ namespace aiSocks {
 struct TlsServerConfig {
     std::string certChainFile;
     std::string privateKeyFile;
+    enum class ClientAuthMode {
+        None,
+        Optional,
+        Require,
+    };
     // Optional server policy controls
     int minProtoVersion{TLS1_2_VERSION};
     int maxProtoVersion{0}; // 0 == leave OpenSSL default
@@ -28,6 +33,11 @@ struct TlsServerConfig {
     // Handshake timeout in milliseconds (0 == disabled). Separate from
     // HTTP slowloris protection.
     int handshakeTimeoutMs{5000};
+    // mTLS / client auth options
+    ClientAuthMode clientAuth{ClientAuthMode::None};
+    std::string caFile;
+    std::string caDir;
+    int verifyDepth{-1};
     TlsServerConfig() = default;
     TlsServerConfig(const std::string& cert, const std::string& key)
         : certChainFile(cert), privateKeyFile(key) {}
@@ -83,6 +93,8 @@ class HttpsPollServer : public HttpPollServer {
         if (r == 1) {
             s.tlsHandshakeDone = true;
             s.tlsWantsWrite = false;
+            // Capture peer cert subject for application access.
+            s.peerCertSubject = s.tlsSession->getPeerCertificateSubject();
             return ServerResult::KeepConnection;
         }
 
@@ -168,6 +180,32 @@ class HttpsPollServer : public HttpPollServer {
         }
 
         tlsHandshakeTimeoutMs_ = tls.handshakeTimeoutMs;
+
+        // Configure client certificate verification if requested.
+        if (tls.clientAuth != TlsServerConfig::ClientAuthMode::None) {
+            bool verifyPeer = tls.clientAuth != TlsServerConfig::ClientAuthMode::None;
+            bool loadDefaults = tls.caFile.empty() && tls.caDir.empty();
+            std::string verErr;
+                if (!ctx->configureVerifyPeer(verifyPeer, loadDefaults, tls.caFile,
+                    tls.caDir,
+                    tls.clientAuth == TlsServerConfig::ClientAuthMode::Require,
+                    tls.verifyDepth, &verErr)) {
+                tlsInitError_ = verErr.empty() ? "configureVerifyPeer failed" : verErr;
+                return;
+            }
+
+            if (tls.clientAuth == TlsServerConfig::ClientAuthMode::Require) {
+                // Require client certificate; SSL_CTX_set_verify flags are
+                // already set by configureVerifyPeer but `FAIL_IF_NO_PEER_CERT`
+                // behavior is controlled per-SSL_VERIFY configuration. For
+                // OpenSSL this is achieved by SSL_VERIFY_PEER |
+                // SSL_VERIFY_FAIL_IF_NO_PEER_CERT when setting verify mode.
+                // The helper sets SSL_VERIFY_PEER; require behavior can be
+                // enforced via a callback if available. For simplicity ensure
+                // verify depth is set and rely on the verify mode above.
+            }
+
+        }
 
         tlsContext_ = std::move(ctx);
     }

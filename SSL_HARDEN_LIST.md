@@ -11,6 +11,13 @@ Status target: internet-facing production deployment of `HttpsPollServer`
   - [ ] client connects and never completes TLS handshake
   - [ ] repeated `SSL_ERROR_WANT_READ` / `SSL_ERROR_WANT_WRITE`
   - [ ] handshake timeout under idle and loaded conditions
+ - [x] Add an explicit TLS handshake timeout separate from HTTP slowloris protection.
+ - [x] Ensure stalled handshakes are dropped promptly even before any HTTP bytes arrive.
+ - [x] Log handshake failures with actionable OpenSSL error details.
+ - [x] Add tests for:
+   - [x] client connects and never completes TLS handshake
+   - [ ] repeated `SSL_ERROR_WANT_READ` / `SSL_ERROR_WANT_WRITE`
+   - [ ] handshake timeout under idle and loaded conditions
 
 Relevant code:
 - [lib/include/HttpsPollServer.h](lib/include/HttpsPollServer.h#L46)
@@ -26,6 +33,13 @@ Relevant code:
 - [ ] Decide and document server cipher preference policy.
 - [ ] Disable legacy or weak options beyond the current SSLv2/SSLv3 ban.
 - [ ] Consider explicit OpenSSL security level expectations per platform.
+ - [x] Make server-side TLS policy configurable through `TlsServerConfig`.
+ - [x] Configure allowed protocol versions explicitly.
+ - [x] Configure TLS 1.2 cipher list.
+ - [x] Configure TLS 1.3 ciphersuites.
+ - [x] Decide and document server cipher preference policy.
+ - [ ] Disable legacy or weak options beyond the current SSLv2/SSLv3 ban.
+ - [ ] Consider explicit OpenSSL security level expectations per platform.
 
 Relevant code:
 - [lib/src/TlsOpenSsl.cpp](lib/src/TlsOpenSsl.cpp#L103)
@@ -88,7 +102,7 @@ Relevant docs:
 - [ ] Add structured logging for:
   - [ ] TLS init failure
   - [ ] certificate load failure
-  - [ ] handshake failure
+  - [x] handshake failure
   - [ ] protocol/cipher negotiated
   - [ ] client-cert verification result if enabled
 - [ ] Add counters/metrics for:

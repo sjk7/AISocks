@@ -674,7 +674,8 @@ class HttpClient {
                     }
                     if (!ctx->configureVerifyPeer(options_.verifyCertificate,
                             options_.verifyCertificate, options_.caCertFile,
-                            options_.caCertDir, &tlsSetupError)) {
+                            options_.caCertDir, false, options_.verifyDepth,
+                            &tlsSetupError)) {
                         tlsDebugLog_(
                             "configureVerifyPeer failed: " + tlsSetupError
                             + " host=" + host + " caFile=" + options_.caCertFile

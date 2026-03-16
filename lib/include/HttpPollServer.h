@@ -81,6 +81,8 @@ struct HttpClientState {
     // Remote address populated by HttpPollServer::onClientConnected().
     // Available in buildResponse() and onResponseSent().
     std::string peerAddress;
+    // Peer certificate subject (if client presented a cert). Empty otherwise.
+    std::string peerCertSubject;
 
 #ifdef AISOCKS_ENABLE_TLS
     // TLS state is present only in TLS-enabled builds.
@@ -114,6 +116,7 @@ struct HttpClientState {
         , requestScanPos(other.requestScanPos)
         , parsedRequest(other.parsedRequest)
         , peerAddress(other.peerAddress)
+        , peerCertSubject(other.peerCertSubject)
 #ifdef AISOCKS_ENABLE_TLS
         , tlsHandshakeDone(other.tlsHandshakeDone)
         , tlsWantsWrite(other.tlsWantsWrite)
@@ -146,6 +149,7 @@ struct HttpClientState {
         , requestScanPos(other.requestScanPos)
         , parsedRequest(std::move(other.parsedRequest))
         , peerAddress(std::move(other.peerAddress))
+        , peerCertSubject(std::move(other.peerCertSubject))
 #ifdef AISOCKS_ENABLE_TLS
         , tlsHandshakeDone(other.tlsHandshakeDone)
         , tlsWantsWrite(other.tlsWantsWrite)

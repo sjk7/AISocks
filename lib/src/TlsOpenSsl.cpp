@@ -11,6 +11,8 @@
 
 #include <openssl/err.h>
 #include <openssl/ssl.h>
+#include <openssl/x509.h>
+#include <openssl/crypto.h>
 
 #include <cstdlib>
 #include <cstdio>
@@ -133,14 +135,16 @@ bool TlsContext::loadCertificateChain(const std::string& certPemPath,
 }
 
 bool TlsContext::configureVerifyPeer(bool verifyPeer, bool loadDefaultCaPaths,
-    const std::string& caFile, const std::string& caDir, std::string* error) {
+    const std::string& caFile, const std::string& caDir,
+    bool failIfNoPeerCert, int verifyDepth, std::string* error) {
     if (!ctx_) {
         if (error) *error = "TLS context is not initialized";
         return false;
     }
 
-    SSL_CTX_set_verify(
-        ctx_, verifyPeer ? SSL_VERIFY_PEER : SSL_VERIFY_NONE, nullptr);
+    int verifyMode = verifyPeer ? SSL_VERIFY_PEER : SSL_VERIFY_NONE;
+    if (verifyPeer && failIfNoPeerCert) verifyMode |= SSL_VERIFY_FAIL_IF_NO_PEER_CERT;
+    SSL_CTX_set_verify(ctx_, verifyMode, nullptr);
 
     if (verifyPeer) {
         if (!caFile.empty() && !PathHelper::exists(caFile)) {
@@ -184,9 +188,38 @@ bool TlsContext::configureVerifyPeer(bool verifyPeer, bool loadDefaultCaPaths,
             }
             return false;
         }
+
+        if (verifyDepth >= 0) {
+            SSL_CTX_set_verify_depth(ctx_, verifyDepth);
+        }
     }
 
     return true;
+}
+
+std::string TlsSession::getPeerCertificateSubject() const {
+    if (!ssl_) return {};
+#if defined(OPENSSL_IS_BORINGSSL)
+    // BoringSSL may not support X509_NAME_oneline; keep behavior simple.
+    X509* cert = SSL_get_peer_certificate(ssl_);
+    if (!cert) return {};
+    char buf[256] = {};
+    X509_NAME* name = X509_get_subject_name(cert);
+    if (name) X509_NAME_oneline(name, buf, sizeof(buf));
+    X509_free(cert);
+    return std::string(buf);
+#else
+    X509* cert = SSL_get_peer_certificate(ssl_);
+    if (!cert) return {};
+    char* cstr = X509_NAME_oneline(X509_get_subject_name(cert), nullptr, 0);
+    std::string subj;
+    if (cstr) {
+        subj = std::string(cstr);
+        OPENSSL_free(cstr);
+    }
+    X509_free(cert);
+    return subj;
+#endif
 }
 
 bool TlsContext::configureServerPolicy(const std::string& tls12CipherList,

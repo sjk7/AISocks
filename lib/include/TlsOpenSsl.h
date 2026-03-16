@@ -45,6 +45,7 @@ class TlsContext {
 
     bool configureVerifyPeer(bool verifyPeer, bool loadDefaultCaPaths,
         const std::string& caFile = {}, const std::string& caDir = {},
+        bool failIfNoPeerCert = false, int verifyDepth = -1,
         std::string* error = nullptr);
 
     ssl_ctx_st* nativeHandle() const noexcept { return ctx_; }
@@ -89,6 +90,10 @@ class TlsSession {
     int write(const void* src, int size);
 
     int getLastErrorCode(int ioResult) const;
+
+    // If a peer certificate was presented by the remote, return a short
+    // human-readable subject string. Returns empty string if no peer cert.
+    std::string getPeerCertificateSubject() const;
 
     ssl_st* nativeHandle() const noexcept { return ssl_; }
 
