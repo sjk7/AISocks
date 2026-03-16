@@ -90,8 +90,8 @@ void test_tls_server_peer_subject() {
     const std::string repoRoot = repoRootFromFile(__FILE__);
     const std::string serverCert = repoRoot + "/tests/certs/test_cert.pem";
     const std::string serverKey = repoRoot + "/tests/certs/test_key.pem";
-    const std::string clientCert = repoRoot + "/tests/certs/test_cert.pem";
-    const std::string clientKey = repoRoot + "/tests/certs/test_key.pem";
+    const std::string clientCert = repoRoot + "/tests/certs/test_cert_local.pem";
+    const std::string clientKey = repoRoot + "/tests/certs/test_key_local.pem";
 
     // 1) Require client cert, present -> server echoes non-empty subject
     {
