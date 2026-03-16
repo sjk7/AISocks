@@ -1484,6 +1484,66 @@ static void test_https_file_server_slow_reader_does_not_starve_other_clients() {
     REQUIRE(fastResult.value().statusCode() == 200);
 }
 
+static void test_https_server_handshake_timeout_drops_stalled_clients() {
+    BEGIN_TEST("HTTPS server drops clients that never complete TLS handshake");
+
+    const std::string root = sourceRoot();
+    const std::string cert = root + "/tests/certs/test_cert.pem";
+    const std::string key = root + "/tests/certs/test_key.pem";
+
+    // Minimal document root for the file server.
+    ScopedTempDir docRoot;
+    docRoot.path
+        = std::filesystem::temp_directory_path() / "aisocks-tls-timeout";
+    std::error_code ec;
+    REQUIRE(std::filesystem::create_directories(docRoot.path, ec));
+    const std::string indexPath = (docRoot.path / "index.html").string();
+    {
+        std::ofstream out(indexPath);
+        out << "hello";
+    }
+
+    HttpFileServer::Config cfg;
+    cfg.documentRoot = docRoot.path.string();
+    cfg.indexFile = "index.html";
+
+    TlsServerConfig tls;
+    tls.certChainFile = cert;
+    tls.privateKeyFile = key;
+    tls.handshakeTimeoutMs = 120; // short timeout for test
+
+    TestHttpsFileServer server{ServerBind{"127.0.0.1", Port{0}}, cfg, tls};
+    REQUIRE(server.tlsReady());
+
+    std::thread serverThread(
+        [&] { server.run(ClientLimit::Unlimited, Milliseconds{5}); });
+    server.waitReady();
+
+    // Connect a raw TCP client but do not complete TLS handshake.
+    ConnectArgs args;
+    args.address = "127.0.0.1";
+    args.port = server.serverPort();
+    args.connectTimeout = Milliseconds{500};
+
+    auto clientRes = SocketFactory::createTcpClient(args);
+    REQUIRE(clientRes.isSuccess());
+    TcpSocket client = std::move(clientRes.value());
+    client.setReceiveTimeout(Milliseconds{500});
+
+    // Wait longer than the server handshake timeout.
+    std::this_thread::sleep_for(std::chrono::milliseconds(300));
+
+    char buf[8];
+    int n = client.receive(buf, sizeof(buf));
+    // Expect the server to have closed the connection (recv==0) or an error
+    // indicating the socket was closed.
+    REQUIRE(n <= 0);
+
+    client.close();
+    server.requestStop();
+    serverThread.join();
+}
+
 // ---------------------------------------------------------------------------
 // main
 // ---------------------------------------------------------------------------
@@ -1493,6 +1553,7 @@ int main() {
     test_https_handshake_timeout_respects_request_timeout();
     test_https_slow_reader_does_not_starve_other_clients();
     test_https_file_server_slow_reader_does_not_starve_other_clients();
+    test_https_server_handshake_timeout_drops_stalled_clients();
     test_https_client_basic_get();
     test_https_client_multiple_requests_keep_alive();
     test_https_cache_is_not_reused_for_http_same_host_port();

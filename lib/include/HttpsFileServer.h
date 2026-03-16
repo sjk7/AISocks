@@ -49,6 +49,7 @@ class HttpsFileServer : public HttpFileServer {
         s.tlsSession = std::move(session);
         s.tlsHandshakeDone = false;
         s.tlsWantsWrite = false;
+        s.startTime = std::chrono::steady_clock::now();
     }
 
     ServerResult doTlsHandshakeStep(
@@ -72,6 +73,10 @@ class HttpsFileServer : public HttpFileServer {
             return ServerResult::KeepConnection;
         }
 
+        // Surface OpenSSL error for debugging.
+        const std::string opensslErr = TlsOpenSsl::lastErrorString();
+        std::fprintf(stderr, "[tls] handshake failed sslErr=%s sslCode=%d\n",
+            opensslErr.empty() ? "<empty>" : opensslErr.c_str(), e);
         return ServerResult::Disconnect;
     }
 

@@ -50,6 +50,14 @@ class TlsContext {
     ssl_ctx_st* nativeHandle() const noexcept { return ctx_; }
     Mode mode() const noexcept { return mode_; }
 
+    // Configure server-side policy (ciphersuites, protocol range, server
+    // cipher preference). All arguments are optional; empty/zero values are
+    // treated as "leave OpenSSL defaults".
+    bool configureServerPolicy(const std::string& tls12CipherList = {},
+        const std::string& tls13CipherSuites = {}, int minProto = 0,
+        int maxProto = 0, bool preferServerCiphers = false,
+        std::string* error = nullptr);
+
     private:
     explicit TlsContext(ssl_ctx_st* ctx, Mode mode) noexcept
         : ctx_(ctx), mode_(mode) {}

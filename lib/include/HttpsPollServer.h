@@ -19,6 +19,18 @@ namespace aiSocks {
 struct TlsServerConfig {
     std::string certChainFile;
     std::string privateKeyFile;
+    // Optional server policy controls
+    int minProtoVersion{TLS1_2_VERSION};
+    int maxProtoVersion{0}; // 0 == leave OpenSSL default
+    std::string tls12CipherList; // OpenSSL cipher list format for TLS1.2
+    std::string tls13CipherSuites; // OpenSSL 1.1.1+ TLS1.3 comma-separated list
+    bool preferServerCiphers{true};
+    // Handshake timeout in milliseconds (0 == disabled). Separate from
+    // HTTP slowloris protection.
+    int handshakeTimeoutMs{5000};
+    TlsServerConfig() = default;
+    TlsServerConfig(const std::string& cert, const std::string& key)
+        : certChainFile(cert), privateKeyFile(key) {}
 };
 
 class HttpsPollServer : public HttpPollServer {
@@ -59,6 +71,8 @@ class HttpsPollServer : public HttpPollServer {
         s.tlsSession = std::move(session);
         s.tlsHandshakeDone = false;
         s.tlsWantsWrite = false;
+        // Start handshake timer independent of HTTP slowloris timer.
+        s.startTime = std::chrono::steady_clock::now();
     }
 
     ServerResult doTlsHandshakeStep(
@@ -82,6 +96,31 @@ class HttpsPollServer : public HttpPollServer {
             return ServerResult::KeepConnection;
         }
 
+        // Check handshake timeout (separate from HTTP header timeout).
+        if (tlsHandshakeTimeoutMs_ > 0) {
+            const auto now = std::chrono::steady_clock::now();
+            const auto elapsed
+                = std::chrono::duration_cast<std::chrono::milliseconds>(
+                    now - s.startTime)
+                      .count();
+            if (elapsed > tlsHandshakeTimeoutMs_) {
+                // Log detailed OpenSSL error if available.
+                const std::string opensslErr = TlsOpenSsl::lastErrorString();
+                std::fprintf(stderr,
+                    "[tls] handshake timeout after %lld ms sslErr=%s\n",
+                    static_cast<long long>(elapsed),
+                    opensslErr.empty() ? "<empty>" : opensslErr.c_str());
+                return ServerResult::Disconnect;
+            }
+        }
+
+        // Non-retry TLS error -> disconnect. Surface OpenSSL details to logs.
+        {
+            const std::string opensslErr = TlsOpenSsl::lastErrorString();
+            std::fprintf(stderr,
+                "[tls] handshake failed sslErr=%s sslCode=%d\n",
+                opensslErr.empty() ? "<empty>" : opensslErr.c_str(), e);
+        }
         return ServerResult::Disconnect;
     }
 
@@ -115,11 +154,27 @@ class HttpsPollServer : public HttpPollServer {
             return;
         }
 
+        // Apply optional server policy (ciphers, proto range, server prefs).
+        {
+            std::string policyErr;
+            if (!ctx->configureServerPolicy(tls.tls12CipherList,
+                    tls.tls13CipherSuites, tls.minProtoVersion,
+                    tls.maxProtoVersion, tls.preferServerCiphers, &policyErr)) {
+                tlsInitError_ = policyErr.empty()
+                    ? "configureServerPolicy failed"
+                    : policyErr;
+                return;
+            }
+        }
+
+        tlsHandshakeTimeoutMs_ = tls.handshakeTimeoutMs;
+
         tlsContext_ = std::move(ctx);
     }
 
     std::unique_ptr<TlsContext> tlsContext_;
     std::string tlsInitError_;
+    int tlsHandshakeTimeoutMs_{5000};
 };
 
 } // namespace aiSocks

@@ -189,6 +189,47 @@ bool TlsContext::configureVerifyPeer(bool verifyPeer, bool loadDefaultCaPaths,
     return true;
 }
 
+bool TlsContext::configureServerPolicy(const std::string& tls12CipherList,
+    const std::string& tls13CipherSuites, int minProto, int maxProto,
+    bool preferServerCiphers, std::string* error) {
+    if (!ctx_) {
+        if (error) *error = "TLS context is not initialized";
+        return false;
+    }
+
+#if OPENSSL_VERSION_NUMBER >= 0x10101000L
+    if (minProto > 0) SSL_CTX_set_min_proto_version(ctx_, minProto);
+    if (maxProto > 0) SSL_CTX_set_max_proto_version(ctx_, maxProto);
+#else
+    (void)minProto;
+    (void)maxProto;
+#endif
+
+    if (!tls13CipherSuites.empty()) {
+#if defined(SSL_CTX_set_ciphersuites)
+        if (SSL_CTX_set_ciphersuites(ctx_, tls13CipherSuites.c_str()) != 1) {
+            if (error) *error = TlsOpenSsl::lastErrorString();
+            return false;
+        }
+#endif
+    }
+
+    if (!tls12CipherList.empty()) {
+        if (SSL_CTX_set_cipher_list(ctx_, tls12CipherList.c_str()) != 1) {
+            if (error) *error = TlsOpenSsl::lastErrorString();
+            return false;
+        }
+    }
+
+    if (preferServerCiphers) {
+#ifdef SSL_OP_CIPHER_SERVER_PREFERENCE
+        SSL_CTX_set_options(ctx_, SSL_OP_CIPHER_SERVER_PREFERENCE);
+#endif
+    }
+
+    return true;
+}
+
 TlsSession::~TlsSession() {
     if (ssl_) SSL_free(ssl_);
 }
