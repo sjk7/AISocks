@@ -18,7 +18,8 @@ static std::string repoRootFromFile(const char* file) {
     return ".";
 }
 
-// Helper to perform a raw TLS client handshake, optionally presenting a client cert.
+// Helper to perform a raw TLS client handshake, optionally presenting a client
+// cert.
 static bool do_client_handshake(int port, bool presentClientCert,
     const std::string& clientCert = {}, const std::string& clientKey = {}) {
     ConnectArgs args;
@@ -34,12 +35,19 @@ static bool do_client_handshake(int port, bool presentClientCert,
     if (!ctx) return false;
     auto sess = TlsSession::create(ctx->nativeHandle(), &err);
     if (!sess) return false;
-    if (!sess->attachSocket(static_cast<int>(sock.getNativeHandle()), &err)) return false;
+    if (!sess->attachSocket(static_cast<int>(sock.getNativeHandle()), &err))
+        return false;
 
     if (presentClientCert) {
         // Present the client certificate on the SSL object directly.
-        if (SSL_use_certificate_file(sess->nativeHandle(), clientCert.c_str(), SSL_FILETYPE_PEM) != 1) return false;
-        if (SSL_use_PrivateKey_file(sess->nativeHandle(), clientKey.c_str(), SSL_FILETYPE_PEM) != 1) return false;
+        if (SSL_use_certificate_file(
+                sess->nativeHandle(), clientCert.c_str(), SSL_FILETYPE_PEM)
+            != 1)
+            return false;
+        if (SSL_use_PrivateKey_file(
+                sess->nativeHandle(), clientKey.c_str(), SSL_FILETYPE_PEM)
+            != 1)
+            return false;
     }
 
     sess->setConnectState();
@@ -85,10 +93,12 @@ void test_tls_mtls_accept_reject() {
 
         HttpsFileServer server{ServerBind{"127.0.0.1", Port{0}}, cfg, tls};
         REQUIRE(server.tlsReady());
-        std::thread serverThread([&] { server.run(ClientLimit::Unlimited, Milliseconds{5}); });
+        std::thread serverThread(
+            [&] { server.run(ClientLimit::Unlimited, Milliseconds{5}); });
         std::this_thread::sleep_for(std::chrono::milliseconds(50));
 
-        bool ok = do_client_handshake(server.serverPort().value(), true, clientCert, clientKey);
+        bool ok = do_client_handshake(
+            server.serverPort().value(), true, clientCert, clientKey);
         REQUIRE(ok);
 
         server.requestStop();
@@ -108,7 +118,8 @@ void test_tls_mtls_accept_reject() {
 
         HttpsFileServer server{ServerBind{"127.0.0.1", Port{0}}, cfg, tls};
         REQUIRE(server.tlsReady());
-        std::thread serverThread([&] { server.run(ClientLimit::Unlimited, Milliseconds{5}); });
+        std::thread serverThread(
+            [&] { server.run(ClientLimit::Unlimited, Milliseconds{5}); });
         std::this_thread::sleep_for(std::chrono::milliseconds(50));
 
         bool ok = do_client_handshake(server.serverPort().value(), false);
@@ -118,7 +129,8 @@ void test_tls_mtls_accept_reject() {
         serverThread.join();
     }
 
-    // 3) Server optional client auth: missing cert -> handshake OK, peer subject empty
+    // 3) Server optional client auth: missing cert -> handshake OK, peer
+    // subject empty
     {
         HttpFileServer::Config cfg;
         cfg.documentRoot = ".";
@@ -131,7 +143,8 @@ void test_tls_mtls_accept_reject() {
 
         HttpsFileServer server{ServerBind{"127.0.0.1", Port{0}}, cfg, tls};
         REQUIRE(server.tlsReady());
-        std::thread serverThread([&] { server.run(ClientLimit::Unlimited, Milliseconds{5}); });
+        std::thread serverThread(
+            [&] { server.run(ClientLimit::Unlimited, Milliseconds{5}); });
         std::this_thread::sleep_for(std::chrono::milliseconds(50));
 
         bool ok = do_client_handshake(server.serverPort().value(), false);

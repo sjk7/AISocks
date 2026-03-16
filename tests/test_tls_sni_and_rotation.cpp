@@ -38,7 +38,8 @@ void test_tls_sni_and_rotation() {
     const std::string cert2 = repoRoot + "/tests/certs/test_cert_ipv6.pem";
     const std::string key2 = repoRoot + "/tests/certs/test_key_ipv6.pem";
 
-    auto get_server_cert_subject = [&](const std::string& cert, const std::string& key) -> std::string {
+    auto get_server_cert_subject
+        = [&](const std::string& cert, const std::string& key) -> std::string {
         TlsServerConfig tls;
         tls.certChainFile = cert;
         tls.privateKeyFile = key;
@@ -46,7 +47,8 @@ void test_tls_sni_and_rotation() {
         HttpsFileServer server{ServerBind{"127.0.0.1", Port{0}}, cfg, tls};
         REQUIRE(server.tlsReady());
 
-        std::thread serverThread([&] { server.run(ClientLimit::Unlimited, Milliseconds{5}); });
+        std::thread serverThread(
+            [&] { server.run(ClientLimit::Unlimited, Milliseconds{5}); });
         std::this_thread::sleep_for(std::chrono::milliseconds(50));
 
         // Create client TCP socket
@@ -63,7 +65,8 @@ void test_tls_sni_and_rotation() {
         REQUIRE(ctx);
         auto sess = TlsSession::create(ctx->nativeHandle(), &err);
         REQUIRE(sess);
-        REQUIRE(sess->attachSocket(static_cast<int>(sock.getNativeHandle()), &err));
+        REQUIRE(
+            sess->attachSocket(static_cast<int>(sock.getNativeHandle()), &err));
 
         // Set SNI to a distinct hostname
         const char* sniName = "example.test.local";
@@ -74,7 +77,10 @@ void test_tls_sni_and_rotation() {
         bool ok = false;
         for (;;) {
             int r = sess->handshake();
-            if (r == 1) { ok = true; break; }
+            if (r == 1) {
+                ok = true;
+                break;
+            }
             int e = sess->getLastErrorCode(r);
             if (e == SSL_ERROR_WANT_READ || e == SSL_ERROR_WANT_WRITE) continue;
             break;

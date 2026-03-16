@@ -41,19 +41,22 @@ void test_tls_error_strings() {
         REQUIRE(ctx);
 
         std::string badErr;
-        bool ok = ctx->loadCertificateChain("/nonexistent/cert.pem", "/nonexistent/key.pem", &badErr);
+        bool ok = ctx->loadCertificateChain(
+            "/nonexistent/cert.pem", "/nonexistent/key.pem", &badErr);
         REQUIRE(!ok);
         REQUIRE(!badErr.empty());
     }
 
-    // Sad path: verify peer with missing CA file should fail with descriptive error
+    // Sad path: verify peer with missing CA file should fail with descriptive
+    // error
     {
         std::string err;
         auto ctx = TlsContext::create(TlsContext::Mode::Server, &err);
         REQUIRE(ctx);
 
         std::string verErr;
-        bool ok = ctx->configureVerifyPeer(true, false, "/nonexistent/ca.pem", "", false, -1, &verErr);
+        bool ok = ctx->configureVerifyPeer(
+            true, false, "/nonexistent/ca.pem", "", false, -1, &verErr);
         REQUIRE(!ok);
         REQUIRE(!verErr.empty());
     }
