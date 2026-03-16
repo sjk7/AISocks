@@ -50,7 +50,15 @@ done
 
 # Deduplicate
 if [[ ${#LEAKED_FILES[@]} -gt 0 ]]; then
-    mapfile -t LEAKED_FILES < <(printf '%s\n' "${LEAKED_FILES[@]}" | sort -u)
+    if declare -F mapfile >/dev/null || type mapfile >/dev/null 2>&1; then
+        mapfile -t LEAKED_FILES < <(printf '%s\n' "${LEAKED_FILES[@]}" | sort -u)
+    else
+        # macOS ships Bash 3.2 by default, which does not provide mapfile.
+        LEAKED_FILES=()
+        while IFS= read -r line; do
+            [[ -n "$line" ]] && LEAKED_FILES+=("$line")
+        done < <(printf '%s\n' "${LEAKED_FILES[@]}" | sort -u)
+    fi
 fi
 
 if [[ ${#LEAKED_FILES[@]} -gt 0 ]]; then
