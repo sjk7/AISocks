@@ -61,6 +61,10 @@ endif()
 if(AISOCKS_ENABLE_TLS)
     list(APPEND TEST_SOURCES test_tls_client)
     list(APPEND TEST_SOURCES test_tls_handshake_under_load)
+    list(APPEND TEST_SOURCES test_tls_policy_basic)
+    list(APPEND TEST_SOURCES test_tls_sni_and_rotation)
+    list(APPEND TEST_SOURCES test_tls_mtls_accept_reject)
+    list(APPEND TEST_SOURCES test_tls_error_strings)
 endif()
 
 # On macOS with Homebrew LLVM, the compiler's libc++ headers may reference
