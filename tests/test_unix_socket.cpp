@@ -91,11 +91,25 @@ struct ScopedUnlink {
     }
 };
 
-// Wait for `flag` to become true, with a 2-second deadline.
+// Wait for `flag` to become true, with a platform-specific deadline.
 static void waitReady(const std::atomic<bool>& flag) {
+#ifdef _WIN32
+    // Windows Unix sockets can be slower, use longer timeout
+    auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
+#else
     auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(2);
-    while (!flag && std::chrono::steady_clock::now() < deadline)
+#endif
+    while (!flag && std::chrono::steady_clock::now() < deadline) {
         std::this_thread::sleep_for(std::chrono::milliseconds(5));
+    }
+    
+#ifdef _WIN32
+    // Debug output for Windows
+    if (!flag) {
+        std::fprintf(stderr, "[DEBUG] waitReady timed out waiting for flag to become true\n");
+        std::fflush(stderr);
+    }
+#endif
 }
 
 int main() {
@@ -115,26 +129,50 @@ int main() {
 
     BEGIN_TEST("createUnixClient connects and exchanges a short message");
     {
+#ifdef _WIN32
+        std::fprintf(stderr, "[DEBUG] Starting client connection test\n");
+        std::fflush(stderr);
+#endif
         ScopedUnlink guard(kSockPath);
         auto srvResult = SocketFactory::createUnixServer(UnixPath{kSockPath});
         REQUIRE(srvResult.isSuccess());
 
         std::atomic<bool> ready{false};
         std::thread serverThread([&]() {
+#ifdef _WIN32
+            std::fprintf(stderr, "[DEBUG] Server thread started\n");
+            std::fflush(stderr);
+#endif
             ready = true;
             auto client = srvResult.value().accept();
+#ifdef _WIN32
+            std::fprintf(stderr, "[DEBUG] Server accept returned %s\n", client ? "success" : "nullptr");
+            std::fflush(stderr);
+#endif
             if (client) {
                 const char msg[] = "hello";
                 client->sendAll(msg, sizeof(msg) - 1);
+#ifdef _WIN32
+                std::fprintf(stderr, "[DEBUG] Server sent message\n");
+                std::fflush(stderr);
+#endif
             }
         });
 
         waitReady(ready);
+#ifdef _WIN32
+        std::fprintf(stderr, "[DEBUG] Creating client connection\n");
+        std::fflush(stderr);
+#endif
         auto cliResult = SocketFactory::createUnixClient(UnixPath{kSockPath});
         REQUIRE(cliResult.isSuccess());
 
         char buf[16] = {};
         bool ok = cliResult.value().receiveAll(buf, 5);
+#ifdef _WIN32
+        std::fprintf(stderr, "[DEBUG] Client receiveAll returned %s\n", ok ? "success" : "failure");
+        std::fflush(stderr);
+#endif
         REQUIRE(ok);
         REQUIRE(std::string(buf, 5) == "hello");
 
@@ -170,6 +208,10 @@ int main() {
     BEGIN_TEST(
         "Large payload (1 MB) transferred exactly via sendAll/receiveAll");
     {
+#ifdef _WIN32
+        std::fprintf(stderr, "[DEBUG] Starting large payload test\n");
+        std::fflush(stderr);
+#endif
         ScopedUnlink guard(kSockPath);
         auto srvResult = SocketFactory::createUnixServer(UnixPath{kSockPath});
         REQUIRE(srvResult.isSuccess());
@@ -178,18 +220,40 @@ int main() {
         std::atomic<bool> ready{false};
 
         std::thread serverThread([&]() {
+#ifdef _WIN32
+            std::fprintf(stderr, "[DEBUG] Large payload server thread started\n");
+            std::fflush(stderr);
+#endif
             ready = true;
             auto client = srvResult.value().accept();
-            if (client) client->sendAll(payload.data(), payload.size());
+#ifdef _WIN32
+            std::fprintf(stderr, "[DEBUG] Large payload server accept returned %s\n", client ? "success" : "nullptr");
+            std::fflush(stderr);
+#endif
+            if (client) {
+                client->sendAll(payload.data(), payload.size());
+#ifdef _WIN32
+                std::fprintf(stderr, "[DEBUG] Large payload server sent %zu bytes\n", payload.size());
+                std::fflush(stderr);
+#endif
+            }
         });
 
         waitReady(ready);
+#ifdef _WIN32
+        std::fprintf(stderr, "[DEBUG] Large payload creating client connection\n");
+        std::fflush(stderr);
+#endif
         auto cliResult = SocketFactory::createUnixClient(UnixPath{kSockPath});
         REQUIRE(cliResult.isSuccess());
 
         std::vector<char> buf(payload.size(), 0);
         bool ok = cliResult.value().receiveAll(buf.data(), payload.size());
         serverThread.join();
+#ifdef _WIN32
+        std::fprintf(stderr, "[DEBUG] Large payload client receiveAll returned %s\n", ok ? "success" : "failure");
+        std::fflush(stderr);
+#endif
 
         REQUIRE(ok);
         REQUIRE(std::equal(buf.begin(), buf.end(), payload.begin()));
@@ -197,6 +261,10 @@ int main() {
 
     BEGIN_TEST("Echo: client sends, server echoes back, client verifies");
     {
+#ifdef _WIN32
+        std::fprintf(stderr, "[DEBUG] Starting echo test\n");
+        std::fflush(stderr);
+#endif
         ScopedUnlink guard(kSockPath);
         auto srvResult = SocketFactory::createUnixServer(UnixPath{kSockPath});
         REQUIRE(srvResult.isSuccess());
@@ -205,16 +273,32 @@ int main() {
         std::atomic<bool> ready{false};
 
         std::thread serverThread([&]() {
+#ifdef _WIN32
+            std::fprintf(stderr, "[DEBUG] Echo server thread started\n");
+            std::fflush(stderr);
+#endif
             ready = true;
             auto client = srvResult.value().accept();
+#ifdef _WIN32
+            std::fprintf(stderr, "[DEBUG] Echo server accept returned %s\n", client ? "success" : "nullptr");
+            std::fflush(stderr);
+#endif
             if (client) {
                 char echoBuf[64] = {};
                 int r = client->receive(echoBuf, sizeof(echoBuf) - 1);
                 if (r > 0) client->send(echoBuf, static_cast<size_t>(r));
+#ifdef _WIN32
+                std::fprintf(stderr, "[DEBUG] Echo server received %d bytes and echoed back\n", r);
+                std::fflush(stderr);
+#endif
             }
         });
 
         waitReady(ready);
+#ifdef _WIN32
+        std::fprintf(stderr, "[DEBUG] Echo creating client connection\n");
+        std::fflush(stderr);
+#endif
         auto cliResult = SocketFactory::createUnixClient(UnixPath{kSockPath});
         REQUIRE(cliResult.isSuccess());
         auto& cli = cliResult.value();
@@ -225,6 +309,10 @@ int main() {
         char replyBuf[64] = {};
         int got = cli.receive(replyBuf, sizeof(replyBuf) - 1);
         serverThread.join();
+#ifdef _WIN32
+        std::fprintf(stderr, "[DEBUG] Echo client received %d bytes\n", got);
+        std::fflush(stderr);
+#endif
 
         REQUIRE(got == static_cast<int>(msg.size()));
         REQUIRE(std::string(replyBuf, static_cast<size_t>(got)) == msg);
@@ -232,6 +320,10 @@ int main() {
 
     BEGIN_TEST("Multiple sequential clients accepted by one server");
     {
+#ifdef _WIN32
+        std::fprintf(stderr, "[DEBUG] Starting multiple clients test\n");
+        std::fflush(stderr);
+#endif
         ScopedUnlink guard(kSockPath);
         auto srvResult = SocketFactory::createUnixServer(UnixPath{kSockPath});
         REQUIRE(srvResult.isSuccess());
@@ -241,18 +333,34 @@ int main() {
         std::atomic<int> accepted{0};
 
         std::thread serverThread([&]() {
+#ifdef _WIN32
+            std::fprintf(stderr, "[DEBUG] Multiple clients server thread started\n");
+            std::fflush(stderr);
+#endif
             ready = true;
             for (int i = 0; i < kClients; ++i) {
                 auto c = srvResult.value().accept();
+#ifdef _WIN32
+                std::fprintf(stderr, "[DEBUG] Multiple clients server accept %d returned %s\n", i, c ? "success" : "nullptr");
+                std::fflush(stderr);
+#endif
                 if (c) {
                     char token[4] = {};
                     if (c->receiveAll(token, 3)) ++accepted;
                 }
             }
+#ifdef _WIN32
+            std::fprintf(stderr, "[DEBUG] Multiple clients server accepted %d/%d clients\n", accepted.load(), kClients);
+            std::fflush(stderr);
+#endif
         });
 
         waitReady(ready);
         for (int i = 0; i < kClients; ++i) {
+#ifdef _WIN32
+            std::fprintf(stderr, "[DEBUG] Creating client %d\n", i);
+            std::fflush(stderr);
+#endif
             auto cliResult
                 = SocketFactory::createUnixClient(UnixPath{kSockPath});
             REQUIRE(cliResult.isSuccess());

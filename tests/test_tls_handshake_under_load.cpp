@@ -5,8 +5,10 @@
 
 #include <chrono>
 #include <fstream>
+#include <sys/stat.h>
 #include <thread>
 #include <vector>
+#include <filesystem>
 
 using namespace aiSocks;
 
@@ -15,7 +17,7 @@ void test_https_server_handshake_timeout_under_load() {
 
     // Create a minimal document root
     const std::string docRoot = "./test_tmp_docroot";
-    std::filesystem::create_directories(docRoot);
+    mkdir(docRoot.c_str(), 0755);
     std::ofstream out(docRoot + "/index.html");
     out << "hello";
     out.close();
@@ -25,7 +27,7 @@ void test_https_server_handshake_timeout_under_load() {
     cfg.indexFile = "index.html";
 
     // Derive repo root from __FILE__ so cert paths work regardless of CTest cwd
-    std::string filePath = std::filesystem::path(__FILE__).generic_string();
+    std::string filePath = __FILE__;
     const std::string marker = "/tests/";
     std::string repoRoot;
     const size_t pos = filePath.rfind(marker);
