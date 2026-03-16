@@ -32,16 +32,16 @@ Relevant code:
 - [ ] Configure TLS 1.3 ciphersuites.
 - [ ] Decide and document server cipher preference policy.
 - [ ] Disable legacy or weak options beyond the current SSLv2/SSLv3 ban.
-- [ ] Consider explicit OpenSSL security level expectations per platform.
+- [x] Consider explicit OpenSSL security level expectations per platform.
  - [x] Make server-side TLS policy configurable through `TlsServerConfig`.
  - [x] Configure allowed protocol versions explicitly.
  - [x] Configure TLS 1.2 cipher list.
  - [x] Configure TLS 1.3 ciphersuites.
  - [x] Decide and document server cipher preference policy.
  - [ ] Disable legacy or weak options beyond the current SSLv2/SSLv3 ban.
- - [ ] Consider explicit OpenSSL security level expectations per platform.
+ - [x] Consider explicit OpenSSL security level expectations per platform.
  - [x] Disable legacy or weak options beyond the current SSLv2/SSLv3 ban.
- - [ ] Consider explicit OpenSSL security level expectations per platform.
+ - [x] Consider explicit OpenSSL security level expectations per platform.
 
 Relevant code:
 - [lib/src/TlsOpenSsl.cpp](lib/src/TlsOpenSsl.cpp#L103)
