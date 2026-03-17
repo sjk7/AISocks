@@ -137,7 +137,12 @@ foreach(TEST_NAME ${TEST_SOURCES})
         if(NOT APPLE)
             target_precompile_headers(${TEST_NAME} REUSE_FROM test_pch_host)
         endif()
-        add_test(NAME ${TEST_NAME} COMMAND ${TEST_NAME})
+        if(TEST_NAME STREQUAL "test_tls_handshake_under_load")
+            add_test(NAME ${TEST_NAME} COMMAND ${TEST_NAME})
+            set_tests_properties(${TEST_NAME} PROPERTIES ENVIRONMENT "AISOCKS_SOURCE_DIR=${CMAKE_SOURCE_DIR}")
+        else()
+            add_test(NAME ${TEST_NAME} COMMAND ${TEST_NAME})
+        endif()
     
     # Under Wine (cross-compiling), each process incurs ~10s startup overhead;
     # triple the default timeout so no test is falsely killed by ctest.

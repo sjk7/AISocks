@@ -7,6 +7,8 @@
 #include <fstream>
 #include <thread>
 #include <openssl/ssl.h>
+ #include <filesystem>
+ #include <optional>
 
 using namespace aiSocks;
 
