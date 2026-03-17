@@ -1334,12 +1334,12 @@ static void test_https_handshake_timeout_respects_request_timeout() {
     std::thread serverThread([&] {
         auto client = listener.accept();
         if (!client) return;
-        std::this_thread::sleep_for(std::chrono::milliseconds{400});
+        std::this_thread::sleep_for(std::chrono::milliseconds{140});
     });
 
     HttpClient::Options opts;
     opts.connectTimeout = Milliseconds{500};
-    opts.requestTimeout = Milliseconds{120};
+    opts.requestTimeout = Milliseconds{60};
     opts.verifyCertificate = false;
     HttpClient client{opts};
 
@@ -1368,7 +1368,7 @@ static void test_https_slow_reader_does_not_starve_other_clients() {
         public:
         LargeBodyHttpsServer(
             const std::string& certPath, const std::string& keyPath)
-            : TestHttpsServer(certPath, keyPath), body_(4 * 1024 * 1024, 'x') {}
+            : TestHttpsServer(certPath, keyPath), body_(1024 * 1024, 'x') {}
 
         protected:
         void buildResponse(HttpClientState& s) override {
@@ -1392,10 +1392,10 @@ static void test_https_slow_reader_does_not_starve_other_clients() {
     std::string slowErr;
     std::thread slowClient([&] {
         (void)sendTlsRequestWithoutReading_(
-            server.serverPort(), "/slow-writer", Milliseconds{350}, slowErr);
+            server.serverPort(), "/slow-writer", Milliseconds{90}, slowErr);
     });
 
-    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
 
     HttpClient::Options opts;
     opts.connectTimeout = Milliseconds{1200};
@@ -1436,7 +1436,7 @@ static void test_https_file_server_slow_reader_does_not_starve_other_clients() {
 
     const std::string largePath = (docRoot.path / "large.bin").string();
     const std::string smallPath = (docRoot.path / "small.txt").string();
-    REQUIRE(writeFileWithByte_(largePath, 4 * 1024 * 1024, 'z'));
+    REQUIRE(writeFileWithByte_(largePath, 1024 * 1024, 'z'));
     REQUIRE(writeFileWithByte_(smallPath, 32, 'a'));
 
     HttpFileServer::Config cfg;
@@ -1457,10 +1457,10 @@ static void test_https_file_server_slow_reader_does_not_starve_other_clients() {
     std::string slowErr;
     std::thread slowClient([&] {
         (void)sendTlsRequestWithoutReading_(
-            server.serverPort(), "/large.bin", Milliseconds{350}, slowErr);
+            server.serverPort(), "/large.bin", Milliseconds{90}, slowErr);
     });
 
-    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
 
     HttpClient::Options opts;
     opts.connectTimeout = Milliseconds{1200};
@@ -1510,7 +1510,7 @@ static void test_https_server_handshake_timeout_drops_stalled_clients() {
     TlsServerConfig tls;
     tls.certChainFile = cert;
     tls.privateKeyFile = key;
-    tls.handshakeTimeoutMs = 120; // short timeout for test
+    tls.handshakeTimeoutMs = 60; // short timeout for test
 
     TestHttpsFileServer server{ServerBind{"127.0.0.1", Port{0}}, cfg, tls};
     REQUIRE(server.tlsReady());
@@ -1531,7 +1531,7 @@ static void test_https_server_handshake_timeout_drops_stalled_clients() {
     client.setReceiveTimeout(Milliseconds{500});
 
     // Wait longer than the server handshake timeout.
-    std::this_thread::sleep_for(std::chrono::milliseconds(300));
+    std::this_thread::sleep_for(std::chrono::milliseconds(120));
 
     char buf[8];
     int n = client.receive(buf, sizeof(buf));
