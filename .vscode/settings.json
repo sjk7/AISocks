@@ -6,6 +6,7 @@
   "cmake.defaultBuildType": "Debug",
   "cmake.showAdvanced": true,
   "cmake.useCMakePresets": "always",
+  "cmake.defaultConfigurePreset": "tls-windows-relwithdebinfo-ninja",
   "cmake.statusbar.advanced": {
     "target": "visible",
     "buildType": "visible",

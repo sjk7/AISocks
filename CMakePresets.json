@@ -196,6 +196,27 @@
             }
         },
         {
+            "name": "tls-windows-relwithdebinfo-ninja",
+            "displayName": "Windows RelWithDebInfo TLS (Ninja)",
+            "description": "Ninja, RelWithDebInfo, examples and tests on Windows with TLS enabled",
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/build-tls-relwithdebinfo",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+                "BUILD_EXAMPLES": "ON",
+                "BUILD_TESTS": "ON",
+                "AISOCKS_ENABLE_TLS": "ON",
+                "OPENSSL_ROOT_DIR": "C:/OpenSSL-Win64",
+                "CMAKE_C_COMPILER": "cl.exe",
+                "CMAKE_CXX_COMPILER": "cl.exe"
+            },
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Windows"
+            }
+        },
+        {
             "name": "mingw-release",
             "displayName": "MinGW-w64 Release (Wine)",
             "description": "Cross-compile for Windows x86-64 with MinGW-w64 in Release mode",
@@ -344,6 +365,12 @@
             "inherits": "base-build",
             "configurePreset": "tls-relwithdebinfo",
             "displayName": "Build TLS RelWithDebInfo"
+        },
+        {
+            "name": "tls-windows-relwithdebinfo-ninja",
+            "inherits": "base-build",
+            "configurePreset": "tls-windows-relwithdebinfo-ninja",
+            "displayName": "Build Windows RelWithDebInfo TLS (Ninja)"
         },
         {
             "name": "coverage",
