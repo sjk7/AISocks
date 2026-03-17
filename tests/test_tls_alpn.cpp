@@ -6,6 +6,10 @@
 #include <chrono>
 #include <fstream>
 #include <thread>
+#include <atomic>
+#include <mutex>
+#include <condition_variable>
+#include <filesystem>
 #include <openssl/ssl.h>
 
 using namespace aiSocks;
@@ -39,7 +43,7 @@ class TestHttpsFileServer : public HttpsFileServer {
 };
 
 static std::string repoRootFromFile(const char* file) {
-    std::string path = file;
+    std::string path = std::filesystem::path(file).generic_string();
     const std::string marker = "/tests/";
     const size_t pos = path.rfind(marker);
     if (pos != std::string::npos) return path.substr(0, pos);
@@ -70,6 +74,15 @@ void test_tls_alpn_selection() {
     tls.alpnProtocols = {"http/1.1", "h2"};
 
     TestHttpsFileServer server{ServerBind{"127.0.0.1", Port{0}}, cfg, tls};
+    if (!server.tlsReady()) {
+        const std::string initErr = server.tlsInitError();
+        if (initErr.find("ALPN unsupported") != std::string::npos) {
+            std::fprintf(stderr,
+                "ALPN unavailable on this OpenSSL build (server); skipping test\n");
+            std::remove("index.html");
+            return;
+        }
+    }
     REQUIRE(server.tlsReady());
     std::thread serverThread(
         [&] { server.run(ClientLimit::Unlimited, Milliseconds{5}); });
@@ -95,10 +108,16 @@ void test_tls_alpn_selection() {
     // client advertises http/1.1 then h2
     std::vector<std::string> clientAlpn = {"http/1.1", "h2"};
     if (!sess->setAlpnProtocols(clientAlpn, &err)) {
-        // If ALPN unsupported, skip test
+        // ALPN may be unavailable on some OpenSSL builds (CI/local). Treat
+        // that as a skip, not a failure.
         server.requestStop();
         serverThread.join();
-        REQUIRE_MSG(false, ("ALPN unsupported: " + err).c_str());
+        if (err.find("ALPN unsupported") != std::string::npos) {
+            std::fprintf(stderr, "ALPN unavailable on this OpenSSL build; skipping test\n");
+            std::remove("index.html");
+            return;
+        }
+        REQUIRE_MSG(false, ("Failed to set ALPN protocols: " + err).c_str());
         return;
     }
 
@@ -129,6 +148,7 @@ void test_tls_alpn_selection() {
     sock.close();
     server.requestStop();
     serverThread.join();
+    std::remove("index.html");
 }
 
 int main() {

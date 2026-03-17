@@ -60,6 +60,7 @@ endif()
 # TLS integration tests — only when the TLS feature flag is on.
 if(AISOCKS_ENABLE_TLS)
     list(APPEND TEST_SOURCES test_tls_client)
+    list(APPEND TEST_SOURCES test_tls_alpn)
     list(APPEND TEST_SOURCES test_tls_policy_basic)
     list(APPEND TEST_SOURCES test_tls_policy_negotiation)
     list(APPEND TEST_SOURCES test_tls_sni_and_rotation)

@@ -98,14 +98,14 @@ Relevant docs:
  - [x] Decide whether HTTP/1.1-only is acceptable. **HTTP/1.1 primary, ALPN optional.**
  - [x] If yes, explicitly document ALPN behavior or lack of ALPN.
  - [x] If no, implement ALPN negotiation.
- - [ ] Add tests for clients that expect negotiated protocol behavior. (blocked: ALPN unsupported on CI OpenSSL builds)
+ - [x] Add tests for clients that expect negotiated protocol behavior. (test runs when ALPN is available; auto-skips when OpenSSL lacks ALPN)
 
 Implemented details:
 
 - **Server config:** `TlsServerConfig::alpnProtocols` allows listing server-preferred ALPN protocols in preference order. See [lib/include/HttpsPollServer.h](lib/include/HttpsPollServer.h#L19).
 - **Server behavior:** ALPN is applied to the `SSL_CTX` via `TlsContext::setAlpnProtocols` and the server selects a protocol according to server preference. See [lib/src/TlsOpenSsl.cpp](lib/src/TlsOpenSsl.cpp#L1-L120).
 - **Client behavior:** Clients may advertise ALPN via `TlsSession::setAlpnProtocols()` before handshake.
-- **Tests:** ALPN tests skipped on CI because the OpenSSL build used does not support ALPN. ALPN behavior is documented above; integration tests can be added when running against an OpenSSL with ALPN support. Existing test infrastructure in [tests/test_tls_alpn.cpp](tests/test_tls_alpn.cpp) documents expected behavior.
+- **Tests:** [tests/test_tls_alpn.cpp](tests/test_tls_alpn.cpp) now auto-skips when ALPN is unavailable (`"ALPN unsupported on this OpenSSL build"`) and asserts negotiation behavior when ALPN is supported.
 
 ## 7. TLS Shutdown Semantics
 
