@@ -143,33 +143,38 @@ Relevant docs:
   - [x] handshake failure
   - [x] protocol/cipher negotiated (added to production logging)
   - [x] client-cert verification result if enabled
- [x] Add counters/metrics for:
+- [x] Add counters/metrics for:
   - [x] handshake success/failure counts
   - [x] timeout disconnects counts
   - [x] TLS protocol versions distribution
   - [x] ciphers negotiated distribution
- Test coverage in [tests/test_tls_observability.cpp](tests/test_tls_observability.cpp), [tests/test_tls_policy_negotiation.cpp](tests/test_tls_policy_negotiation.cpp), and [tests/test_tls_metrics.cpp](tests/test_tls_metrics.cpp).
+- [x] Ensure logs do not leak sensitive material. (no passwords/keys logged)
 
-**TODO:** Optionally export `TlsMetrics` to external telemetry backends (Prometheus/OpenTelemetry) at application layer.
+Implementation details:
 - Certificate load and handshake failures logged with actionable OpenSSL error strings.
 - Negotiated TLS protocol and cipher name logged after successful handshake.
 - Client certificate verification logged (if mTLS enabled).
-- Test coverage in [tests/test_tls_observability.cpp](tests/test_tls_observability.cpp) and [tests/test_tls_policy_negotiation.cpp](tests/test_tls_policy_negotiation.cpp).
+- Runtime TLS metrics are collected in `HttpsPollServer` via `TlsMetrics`:
+  - `handshakeSuccessCount`, `handshakeFailureCount`, `handshakeTimeoutCount`
+  - `protocolDistribution` map
+  - `cipherDistribution` map
+  - exposed through `HttpsPollServer::getTlsMetrics()`
+- Test coverage in [tests/test_tls_observability.cpp](tests/test_tls_observability.cpp), [tests/test_tls_policy_negotiation.cpp](tests/test_tls_policy_negotiation.cpp), and [tests/test_tls_metrics.cpp](tests/test_tls_metrics.cpp).
 
-**TODO:** Metrics/stats collection is application-level; consider adding hooks for handshake timing and protocol/cipher distribution.
+**TODO:** Optionally export `TlsMetrics` to external telemetry backends (Prometheus/OpenTelemetry) at application layer.
 
 ## 10. Abuse Resistance
 
 - [x] Review accept-path behavior under large numbers of stalled TLS connections. (handshake timeout enforced)
 - [x] Add limits or heuristics for handshake-phase resource abuse. (per-connection timeout + global accept backpressure)
 - [x] Confirm keep-alive timeout and slowloris settings are appropriate for public internet exposure.
-- [ ] Add load tests with hostile clients, not just normal traffic. (basic coverage exists; extended suite recommended)
+- [x] Add load tests with hostile clients, not just normal traffic.
 
 Implementation details:
 - **Handshake timeout:** Separate timeout (`handshakeTimeoutMs`) enforced even before HTTP bytes arrive. Default: 10 seconds.
 - **Accept backpressure:** Poller limits concurrent connection accept rate and pending connection buffer.
 - **Keep-alive timeout:** Configurable per connection; slowloris mitigation via body read timeout.
-- **Hostile client tests:** Partial coverage in [tests/test_security_malicious_clients.cpp](tests/test_security_malicious_clients.cpp).
+- **Hostile client tests:** Extended coverage in [tests/test_security_malicious_clients.cpp](tests/test_security_malicious_clients.cpp) and [tests/test_tls_hostile_load.cpp](tests/test_tls_hostile_load.cpp) (stalled TLS handshake load + valid client responsiveness).
 
 Relevant code:
 - [lib/include/HttpPollServer.h](lib/include/HttpPollServer.h#L246)
@@ -197,6 +202,7 @@ Test coverage:
 - [tests/test_tls_shutdown.cpp](tests/test_tls_shutdown.cpp)
 - [tests/test_tls_policy_negotiation.cpp](tests/test_tls_policy_negotiation.cpp)
 - [tests/test_security_malicious_clients.cpp](tests/test_security_malicious_clients.cpp)
+- [tests/test_tls_hostile_load.cpp](tests/test_tls_hostile_load.cpp)
 
 ## 12. Deployment Decision
 

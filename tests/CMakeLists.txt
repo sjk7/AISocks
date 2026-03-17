@@ -70,6 +70,7 @@ if(AISOCKS_ENABLE_TLS)
     list(APPEND TEST_SOURCES test_tls_server_peer_subject)
     list(APPEND TEST_SOURCES test_tls_chain_validation)
     list(APPEND TEST_SOURCES test_tls_metrics)
+    list(APPEND TEST_SOURCES test_tls_hostile_load)
 endif()
 
 # On macOS with Homebrew LLVM, the compiler's libc++ headers may reference
