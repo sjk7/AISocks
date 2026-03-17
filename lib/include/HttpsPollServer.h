@@ -69,6 +69,10 @@ class HttpsPollServer : public HttpPollServer {
     bool tlsReady() const noexcept { return tlsContext_ != nullptr; }
     const std::string& tlsInitError() const noexcept { return tlsInitError_; }
 
+    // Get TLS metrics collected during server operation (handshake stats,
+    // protocol/cipher distributions).
+    const TlsMetrics& getTlsMetrics() const noexcept { return tlsMetrics_; }
+
     protected:
     bool isTlsMode(const HttpClientState& /*s*/) const override {
         return tlsContext_ != nullptr;
@@ -113,6 +117,26 @@ class HttpsPollServer : public HttpPollServer {
                 return ServerResult::Disconnect;
             }
 
+            // Log negotiated protocol and cipher for observability.
+            const char* negotiatedProto = SSL_get_version(
+                static_cast<SSL*>(s.tlsSession->nativeHandle()));
+            const char* negotiatedCipher = SSL_get_cipher_name(
+                static_cast<SSL*>(s.tlsSession->nativeHandle()));
+            std::fprintf(stderr,
+                "[tls] handshake success protocol=%s cipher=%s peer_subject=%s\n",
+                negotiatedProto ? negotiatedProto : "<unknown>",
+                negotiatedCipher ? negotiatedCipher : "<unknown>",
+                peerSubj.empty() ? "<none>" : peerSubj.c_str());
+
+                // Record metrics.
+                ++tlsMetrics_.handshakeSuccessCount;
+                if (negotiatedProto) {
+                    ++tlsMetrics_.protocolDistribution[negotiatedProto];
+                }
+                if (negotiatedCipher) {
+                    ++tlsMetrics_.cipherDistribution[negotiatedCipher];
+                }
+
             s.tlsHandshakeDone = true;
             s.tlsWantsWrite = false;
             // Capture peer cert subject for application access.
@@ -144,6 +168,8 @@ class HttpsPollServer : public HttpPollServer {
                     "[tls] handshake timeout after %lld ms sslErr=%s\n",
                     static_cast<long long>(elapsed),
                     opensslErr.empty() ? "<empty>" : opensslErr.c_str());
+                    // Record timeout metric.
+                    ++tlsMetrics_.handshakeTimeoutCount;
                 return ServerResult::Disconnect;
             }
         }
@@ -154,6 +180,8 @@ class HttpsPollServer : public HttpPollServer {
             std::fprintf(stderr,
                 "[tls] handshake failed sslErr=%s sslCode=%d\n",
                 opensslErr.empty() ? "<empty>" : opensslErr.c_str(), e);
+                // Record failure metric.
+                ++tlsMetrics_.handshakeFailureCount;
         }
         return ServerResult::Disconnect;
     }
@@ -323,6 +351,7 @@ class HttpsPollServer : public HttpPollServer {
     std::unique_ptr<TlsContext> tlsContext_;
     std::string tlsInitError_;
     int tlsHandshakeTimeoutMs_{5000};
+    TlsMetrics tlsMetrics_;
 };
 
 } // namespace aiSocks

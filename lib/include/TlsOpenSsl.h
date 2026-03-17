@@ -9,6 +9,8 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <map>
+#include <cstdint>
 
 #ifdef AISOCKS_ENABLE_TLS
 
@@ -16,6 +18,17 @@ struct ssl_ctx_st;
 struct ssl_st;
 
 namespace aiSocks {
+
+// TLS handshake metrics collected across a server lifetime.
+struct TlsMetrics {
+    uint64_t handshakeSuccessCount{0};
+    uint64_t handshakeFailureCount{0};
+    uint64_t handshakeTimeoutCount{0};
+    // Distribution: protocol name -> count (e.g., "TLSv1.2", "TLSv1.3")
+    std::map<std::string, uint64_t> protocolDistribution;
+    // Distribution: cipher name -> count
+    std::map<std::string, uint64_t> cipherDistribution;
+};
 
 class TlsOpenSsl {
     public:
