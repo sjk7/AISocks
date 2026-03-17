@@ -485,12 +485,17 @@ int main() {
         waitReady(ready);
         auto cliResult = SocketFactory::createUnixClient(UnixPath{kSockPath});
         REQUIRE(cliResult.isSuccess());
+        REQUIRE(cliResult.value().setReceiveTimeout(Milliseconds{1000}));
 
         std::vector<char> buf(kWant, 0);
         bool ok = cliResult.value().receiveAll(buf.data(), kWant);
         serverThread.join();
 
         REQUIRE(!ok); // must fail — EOF before all bytes arrived
+        auto err = cliResult.value().getLastError();
+        REQUIRE(err == SocketError::ConnectionReset
+            || err == SocketError::Timeout
+            || err == SocketError::ReceiveFailed);
     }
 
     // -----------------------------------------------------------------------

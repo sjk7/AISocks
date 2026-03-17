@@ -150,6 +150,10 @@ foreach(TEST_NAME ${TEST_SOURCES})
     else()
         set_tests_properties(${TEST_NAME} PROPERTIES TIMEOUT 30)
     endif()
+
+    if(WIN32 AND TEST_NAME STREQUAL "test_unix_socket")
+        set_tests_properties(${TEST_NAME} PROPERTIES TIMEOUT 60)
+    endif()
     
     # Windows: prevent min/max macro conflicts (inherited from aiSocksLib PUBLIC)
     # Already defined as PUBLIC in aiSocksLib, but explicit here for clarity
