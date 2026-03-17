@@ -248,12 +248,27 @@ jobs:
             Write-Host "ninja already present"
           }
 
+      - name: Cache vcpkg packages (Windows TLS)
+        if: runner.os == 'Windows' && matrix.enable_tls == 'ON'
+        uses: actions/cache@v4
+        with:
+          path: |
+            vcpkg
+            ~/.cache/vcpkg
+          key: vcpkg-openssl-${{ runner.os }}-${{ hashFiles('.github/workflows/ci.yml') }}
+          restore-keys: |
+            vcpkg-openssl-${{ runner.os }}-
+
       - name: Bootstrap vcpkg (Windows TLS)
         if: runner.os == 'Windows' && matrix.enable_tls == 'ON'
         shell: bash
         run: |
-          git clone --depth=1 https://github.com/microsoft/vcpkg.git vcpkg
-          ./vcpkg/bootstrap-vcpkg.sh -disableMetrics
+          if [[ ! -d vcpkg ]]; then
+            git clone --depth=1 https://github.com/microsoft/vcpkg.git vcpkg
+            ./vcpkg/bootstrap-vcpkg.sh -disableMetrics
+          else
+            echo "[ci] vcpkg cache hit; skipping clone"
+          fi
 
       - name: Install OpenSSL via vcpkg (Windows TLS)
         if: runner.os == 'Windows' && matrix.enable_tls == 'ON'
