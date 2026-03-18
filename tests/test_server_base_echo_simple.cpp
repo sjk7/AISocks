@@ -16,6 +16,18 @@
 
 using namespace aiSocks;
 
+template <typename Condition>
+static bool waitForCondition(Condition&& condition,
+    std::chrono::milliseconds maxWait = std::chrono::milliseconds{800},
+    std::chrono::milliseconds interval = std::chrono::milliseconds{5}) {
+    const auto startTime = std::chrono::steady_clock::now();
+    while (std::chrono::steady_clock::now() - startTime < maxWait) {
+        if (condition()) return true;
+        std::this_thread::sleep_for(interval);
+    }
+    return false;
+}
+
 struct SimpleEchoState {
     std::string buf;
     bool disconnected{false};
@@ -74,14 +86,16 @@ class SimpleEchoServer : public ServerBase<SimpleEchoState> {
 int main() {
     printf("=== Simple Echo ServerBase Test ===\n");
 
-    BEGIN_TEST("Simple echo server with ClientLimit");
+    BEGIN_TEST("Echo server handles multiple clients and echoes payload");
     {
         SimpleEchoServer server(Port::any);
+        REQUIRE(server.isValid());
         Port port = Port::any;
         {
             auto ep = server.getSocket().getLocalEndpoint();
             port = ep.isSuccess() ? ep.value().port : Port::any;
         }
+        REQUIRE(port.value() > 0);
         std::atomic<bool> ready{false};
 
         // Start server with limited clients
@@ -94,47 +108,63 @@ int main() {
         while (!ready) //-V776 //-V1044
             std::this_thread::sleep_for(std::chrono::milliseconds{1});
 
-        // Connect one client
-        auto result = SocketFactory::createTcpClient(AddressFamily::IPv4,
+        // Connect two clients
+        auto result1 = SocketFactory::createTcpClient(AddressFamily::IPv4,
             ConnectArgs{"127.0.0.1", port, Milliseconds{1000}});
+        REQUIRE(result1.isSuccess());
+        auto client1 = std::make_unique<TcpSocket>(std::move(result1.value()));
 
-        REQUIRE(result.isSuccess());
-        auto client = std::make_unique<TcpSocket>(std::move(result.value()));
+        auto result2 = SocketFactory::createTcpClient(AddressFamily::IPv4,
+            ConnectArgs{"127.0.0.1", port, Milliseconds{1000}});
+        REQUIRE(result2.isSuccess());
+        auto client2 = std::make_unique<TcpSocket>(std::move(result2.value()));
 
-        // Make client non-blocking
-        client->setBlocking(false);
+        const bool acceptedTwo = waitForCondition([&]() {
+            return server.atomicClientCount_.load(std::memory_order_relaxed) == 2;
+        });
+        REQUIRE(acceptedTwo);
 
-        // Send some data
-        const char* msg = "Hello Echo!";
-        bool sent = client->send(msg, strlen(msg));
-        REQUIRE(sent);
+        auto echoRoundTrip = [](TcpSocket& client, const std::string& msg) {
+            REQUIRE(client.sendAll(msg.data(), msg.size()));
 
-        // Wait for echo with timeout
-        auto start = std::chrono::steady_clock::now();
-        const auto timeout = std::chrono::seconds{2};
-        char buf[256];
-        int received = 0;
-
-        while (received <= 0) {
-            received = client->receive(buf, sizeof(buf));
-            if (received > 0) break;
-
-            if (client->getLastError() != SocketError::WouldBlock) {
-                break; // Real error
+            const auto start = std::chrono::steady_clock::now();
+            const auto timeout = std::chrono::milliseconds{1200};
+            char buf[256];
+            int received = 0;
+            while (received <= 0
+                && std::chrono::steady_clock::now() - start < timeout) {
+                received = client.receive(buf, sizeof(buf));
+                if (received > 0) break;
+                if (client.getLastError() != SocketError::WouldBlock
+                    && client.getLastError() != SocketError::Timeout) {
+                    break;
+                }
+                std::this_thread::sleep_for(std::chrono::milliseconds{2});
             }
 
-            // Check timeout
-            if (std::chrono::steady_clock::now() - start > timeout) {
-                printf("Receive timeout\n");
-                break;
+            REQUIRE(received == static_cast<int>(msg.size()));
+            if (received > 0) {
+                REQUIRE(std::string(buf, static_cast<size_t>(received)) == msg);
             }
+        };
 
-            // Small sleep to prevent busy waiting
-            std::this_thread::sleep_for(std::chrono::milliseconds{1});
+        client1->setReceiveTimeout(Milliseconds{1000});
+        client2->setReceiveTimeout(Milliseconds{1000});
+        echoRoundTrip(*client1, "Hello Echo 1!");
+        echoRoundTrip(*client2, "Hello Echo 2!");
+
+        auto result3 = SocketFactory::createTcpClient(AddressFamily::IPv4,
+            ConnectArgs{"127.0.0.1", port, Milliseconds{200}});
+        std::unique_ptr<TcpSocket> client3;
+        if (result3.isSuccess()) {
+            client3 = std::make_unique<TcpSocket>(std::move(result3.value()));
         }
+        std::this_thread::sleep_for(std::chrono::milliseconds{80});
+        REQUIRE(server.atomicClientCount_.load(std::memory_order_relaxed) <= 2);
 
-        REQUIRE(received == static_cast<int>(strlen(msg)));
-        REQUIRE(std::string(buf, received) == msg);
+        client1.reset();
+        client2.reset();
+        client3.reset();
 
         // Stop server
         server.requestStop();

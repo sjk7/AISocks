@@ -30,7 +30,7 @@ using namespace aiSocks;
 
 // Helper: Wait for condition with timeout, reporting actual wait time
 template <typename Condition>
-static void waitForCondition([[maybe_unused]] const std::string& description,
+static bool waitForCondition([[maybe_unused]] const std::string& description,
     Condition&& condition,
     std::chrono::milliseconds maxWait = std::chrono::milliseconds{500},
     std::chrono::milliseconds interval = std::chrono::milliseconds{10}) {
@@ -44,7 +44,7 @@ static void waitForCondition([[maybe_unused]] const std::string& description,
                         waitTime)
                         .count());
             (void)waitTime;
-            return;
+            return true;
         }
         std::this_thread::sleep_for(interval);
     }
@@ -55,10 +55,12 @@ static void waitForCondition([[maybe_unused]] const std::string& description,
             waitTime)
             .count());
     (void)waitTime;
+    return false;
 }
 
 struct NoTimeoutState {
     bool dummy{false};
+    size_t bytesRead{0};
 };
 
 class NoTimeoutServer : public ServerBase<NoTimeoutState> {
@@ -80,12 +82,12 @@ class NoTimeoutServer : public ServerBase<NoTimeoutState> {
     }
 
     ServerResult onReadable(TcpSocket& sock, NoTimeoutState& s) override {
-        (void)s;
         char buf[256];
         int n = sock.receive(buf, sizeof(buf));
         if (n <= 0) {
             return ServerResult::Disconnect;
         }
+        s.bytesRead += static_cast<size_t>(n);
         return ServerResult::KeepConnection;
     }
 
@@ -106,16 +108,16 @@ class NoTimeoutServer : public ServerBase<NoTimeoutState> {
 int main() {
     printf("=== No Timeout ServerBase Test ===\n");
 
-    BEGIN_TEST("ServerBase without keep-alive timeout");
+    BEGIN_TEST("ServerBase keeps idle client alive when keep-alive timeout is unset");
     {
-        // Reset static stop flag to clean state between test runs
-        // (No longer needed with instance variable, but keep for compatibility)
         NoTimeoutServer server(Port::any);
+        REQUIRE(server.isValid());
         Port port = Port::any;
         {
             auto ep = server.getSocket().getLocalEndpoint();
             port = ep.isSuccess() ? ep.value().port : Port::any;
         }
+        REQUIRE(port.value() > 0);
         std::atomic<bool> ready{false};
 
         // Start server with limited clients
@@ -137,35 +139,32 @@ int main() {
         REQUIRE(result.isSuccess());
         auto client = std::make_unique<TcpSocket>(std::move(result.value()));
 
-        // Verify server accepted the client BEFORE requesting stop
-        waitForCondition("server to accept client",
+        const bool accepted = waitForCondition("server to accept client",
             [&]() { return server.atomicClientCount_.load() == 1; });
+        REQUIRE(accepted);
 
-        // Let server run briefly to verify no timeout disconnections
-        waitForCondition(
-            "server to run without timeout",
+        const bool stillConnected = waitForCondition(
+            "client remains connected without timeout",
             [&]() {
-                return server.atomicClientCount_.load()
-                    == 1; // Should stay connected
+                return server.atomicClientCount_.load() == 1;
             },
-            std::chrono::milliseconds{100}); // Short wait to verify no timeout
+            std::chrono::milliseconds{300},
+            std::chrono::milliseconds{15});
+        REQUIRE(stillConnected);
+
+        REQUIRE(client->sendAll("ping", 4));
+        const bool stillConnectedAfterTraffic = waitForCondition(
+            "client remains connected after traffic",
+            [&]() { return server.atomicClientCount_.load() == 1; },
+            std::chrono::milliseconds{300},
+            std::chrono::milliseconds{15});
+        REQUIRE(stillConnectedAfterTraffic);
 
         DLOG("Stopping server...\n");
 
-        // Stop server AFTER it has actually started and accepted a client
+        client.reset();
         server.requestStop();
-
-        // Wait for server to stop gracefully
-        waitForCondition(
-            "server to stop",
-            [&]() {
-                return true; // Server should stop quickly
-            },
-            std::chrono::milliseconds{100});
-
         DLOG("Server stopped successfully\n");
-
-        // CRITICAL: Wait for server thread to finish before destructor
         serverThread.join();
     }
 

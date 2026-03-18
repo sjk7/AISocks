@@ -30,7 +30,7 @@ using namespace aiSocks;
 
 // Helper: Wait for condition with timeout, reporting actual wait time
 template <typename Condition>
-static void waitForCondition([[maybe_unused]] const std::string& description,
+static bool waitForCondition([[maybe_unused]] const std::string& description,
     Condition&& condition,
     std::chrono::milliseconds maxWait = std::chrono::milliseconds{500},
     std::chrono::milliseconds interval = std::chrono::milliseconds{10}) {
@@ -44,7 +44,7 @@ static void waitForCondition([[maybe_unused]] const std::string& description,
                         waitTime)
                         .count());
             (void)waitTime;
-            return;
+            return true;
         }
         std::this_thread::sleep_for(interval);
     }
@@ -55,6 +55,7 @@ static void waitForCondition([[maybe_unused]] const std::string& description,
             waitTime)
             .count());
     (void)waitTime;
+    return false;
 }
 
 struct MinimalState {
@@ -68,6 +69,7 @@ class MinimalServer : public ServerBase<MinimalState> {
         : ServerBase<MinimalState>(ServerBind{"127.0.0.1", port, Backlog{5}}) {}
 
     std::atomic<size_t> atomicClientCount_{0};
+    std::atomic<int> readEvents_{0};
 
     protected:
     void onClientConnected(TcpSocket&, MinimalState& /*s*/) override {
@@ -78,8 +80,14 @@ class MinimalServer : public ServerBase<MinimalState> {
     }
 
     ServerResult onReadable(TcpSocket& sock, MinimalState& s) override {
-        (void)sock;
-        (void)s;
+        char buf[64];
+        const int n = sock.receive(buf, sizeof(buf));
+        if (n > 0) {
+            readEvents_.fetch_add(1, std::memory_order_relaxed);
+            s.buf.append(buf, static_cast<size_t>(n));
+        } else if (n < 0 && sock.getLastError() != SocketError::WouldBlock) {
+            return ServerResult::Disconnect;
+        }
         return ServerResult::KeepConnection;
     }
 
@@ -99,16 +107,17 @@ class MinimalServer : public ServerBase<MinimalState> {
 int main() {
     printf("=== Minimal ServerBase Test ===\n");
 
-    BEGIN_TEST("Minimal server with ClientLimit");
+    BEGIN_TEST("Minimal server enforces client tracking with ClientLimit");
     {
-        // Reset static stop flag to clean state between test runs
-        // (No longer needed with instance variable, but keep for compatibility)
         MinimalServer server(Port::any);
+        REQUIRE(server.isValid());
         Port port = Port::any;
         {
             auto ep = server.getSocket().getLocalEndpoint();
             port = ep.isSuccess() ? ep.value().port : Port::any;
         }
+        REQUIRE(port.value() > 0);
+
         std::atomic<bool> ready{false};
 
         // Start server with limited clients
@@ -121,32 +130,47 @@ int main() {
         while (!ready) //-V1044 //-V776
             std::this_thread::sleep_for(std::chrono::milliseconds{1});
 
-        // Connect a client to verify server works
-        auto result = SocketFactory::createTcpClient(AddressFamily::IPv4,
-            ConnectArgs{"127.0.0.1", port, Milliseconds{200}});
-        REQUIRE(result.isSuccess());
-        auto client = std::make_unique<TcpSocket>(std::move(result.value()));
+        auto result1 = SocketFactory::createTcpClient(AddressFamily::IPv4,
+            ConnectArgs{"127.0.0.1", port, Milliseconds{300}});
+        REQUIRE(result1.isSuccess());
+        auto client1 = std::make_unique<TcpSocket>(std::move(result1.value()));
 
-        // Verify server accepted the client before requesting stop
-        waitForCondition("server to accept client",
-            [&]() { return server.atomicClientCount_.load() == 1; });
+        auto result2 = SocketFactory::createTcpClient(AddressFamily::IPv4,
+            ConnectArgs{"127.0.0.1", port, Milliseconds{300}});
+        REQUIRE(result2.isSuccess());
+        auto client2 = std::make_unique<TcpSocket>(std::move(result2.value()));
+
+        const bool acceptedTwo = waitForCondition("server to accept two clients",
+            [&]() {
+                return server.atomicClientCount_.load(std::memory_order_relaxed)
+                    == 2;
+            });
+        REQUIRE(acceptedTwo);
+
+        auto result3 = SocketFactory::createTcpClient(AddressFamily::IPv4,
+            ConnectArgs{"127.0.0.1", port, Milliseconds{200}});
+        std::unique_ptr<TcpSocket> client3;
+        if (result3.isSuccess()) {
+            client3 = std::make_unique<TcpSocket>(std::move(result3.value()));
+        }
+
+        std::this_thread::sleep_for(std::chrono::milliseconds{80});
+        REQUIRE(server.atomicClientCount_.load(std::memory_order_relaxed) <= 2);
+
+        REQUIRE(client1->sendAll("minimal-read", 12));
+        const bool sawRead = waitForCondition("server onReadable fired", [&]() {
+            return server.readEvents_.load(std::memory_order_relaxed) > 0;
+        });
+        REQUIRE(sawRead);
 
         DLOG("Stopping server...\n");
 
-        // Stop server AFTER it has actually started and accepted a client
+        client1.reset();
+        client2.reset();
+        client3.reset();
+
         server.requestStop();
-
-        // Wait for server to stop (client goes out of scope)
-        waitForCondition(
-            "server to stop",
-            [&]() {
-                return true; // Server should stop quickly
-            },
-            std::chrono::milliseconds{100});
-
         DLOG("Server stopped successfully\n");
-
-        // CRITICAL: Wait for server thread to finish before destructor
         serverThread.join();
     }
 

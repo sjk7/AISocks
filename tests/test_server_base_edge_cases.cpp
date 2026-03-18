@@ -523,7 +523,9 @@ int main() {
         // Should shut down gracefully
         serverThread.join();
 
-        REQUIRE(true); // If we get here without deadlock, test passes
+        REQUIRE(server.totalMessagesReceived.load()
+            == static_cast<int>(clients.size()));
+        REQUIRE(server.errorCount.load() == 0);
     }
 
     // Test 8: Client limit of zero (should be treated as unlimited)
@@ -599,10 +601,13 @@ int main() {
         DLOG("DEBUG: Extra client %s\n",
             (extraClient ? "connected" : "rejected"));
 
+        // Hard invariant: active server-side clients must never exceed limit.
+        std::this_thread::sleep_for(std::chrono::milliseconds{20});
+        REQUIRE(server.atomicClientCount_.load() <= maxClients);
+        REQUIRE(server.errorCount.load() == 0);
+
         server.requestStop();
         serverThread.join();
-
-        REQUIRE(true); // Graceful handling is what matters
     }
 
     // Test 10: Polling timeout accuracy
