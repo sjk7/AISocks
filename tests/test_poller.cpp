@@ -97,8 +97,11 @@ static void test_poller_readable_on_connect() {
         clientDone = true;
     });
 
-    // wait() should fire within 50 ms once the client connects.
-    auto results = p.wait(Milliseconds{50});
+    // wait() should fire within 500 ms once the client connects.
+    // Use a generous timeout so thread scheduling jitter under load doesn't
+    // cause a spurious failure (the event fires immediately once the client
+    // connects, so the test is still fast on the happy path).
+    auto results = p.wait(Milliseconds{500});
     REQUIRE(!results.empty());
     if (!results.empty()) {
         REQUIRE(results[0].socket == &srv);

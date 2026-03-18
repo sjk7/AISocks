@@ -425,7 +425,7 @@ int main() {
             client->sendAll(msg, strlen(msg));
 
             // Wait just long enough for keep-alive to fire
-            std::this_thread::sleep_for(std::chrono::milliseconds{16});
+            std::this_thread::sleep_for(std::chrono::milliseconds{12});
 
             // Try to send another message
             bool sent = client->sendAll(msg, strlen(msg));
@@ -620,7 +620,7 @@ int main() {
         waitForServerReady(server);
 
         // Connect and send data quickly
-        auto client = connectClient(port, Milliseconds{120});
+        auto client = connectClient(port, Milliseconds{90});
         if (client) {
             client->setBlocking(true);
             client->setReceiveTimeout(Milliseconds{500});
@@ -661,7 +661,7 @@ int main() {
         waitForServerReady(server);
 
         // Sit quietly for a short period — server should be blocked in poller.
-        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        std::this_thread::sleep_for(std::chrono::milliseconds(6));
         REQUIRE(server.idleCallCount.load() == 0);
 
         // Connect and send data to prove the server is still alive.

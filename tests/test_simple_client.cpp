@@ -35,12 +35,12 @@ static std::pair<std::thread, Port> startEchoServer(int clients = 1) {
     }
     // SO_RCVTIMEO on the listener applies to accept() on POSIX, so the
     // thread won't block forever if the client never arrives.
-    res.value().setReceiveTimeout(Milliseconds{500});
+    res.value().setReceiveTimeout(Milliseconds{250});
     std::thread t([s = std::move(res.value()), clients]() mutable {
         for (int i = 0; i < clients; ++i) {
             auto conn = s.accept();
             if (!conn) continue;
-            conn->setReceiveTimeout(Milliseconds{300});
+            conn->setReceiveTimeout(Milliseconds{150});
             char buf[256]{};
             int n = conn->receive(buf, sizeof(buf) - 1);
             if (n > 0) conn->sendAll(buf, n);
@@ -164,7 +164,7 @@ int main() {
         } // closes socket → server's receive() returns, server thread exits
         srv.join();
 
-        SimpleClient bad(ConnectArgs{"127.0.0.1", Port{1}, Milliseconds{100}});
+        SimpleClient bad(ConnectArgs{"127.0.0.1", Port{1}, Milliseconds{60}});
         REQUIRE(!bad.isConnected());
         (void)bad.getLastError(); // must not crash on a disconnected client
     }

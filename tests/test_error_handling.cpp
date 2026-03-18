@@ -53,7 +53,7 @@ int main() {
 
         // Port 1 is almost certainly not listening
         bool connect_result
-            = s.connect("127.0.0.1", Port{1}, Milliseconds{100});
+            = s.connect("127.0.0.1", Port{1}, Milliseconds{60});
         REQUIRE(!connect_result);
         REQUIRE(s.getLastError() != SocketError::None);
     }
@@ -65,7 +65,7 @@ int main() {
         REQUIRE(result.isSuccess());
         auto& s = result.value();
 
-        (void)s.connect("127.0.0.1", Port{1}, Milliseconds{100}); // will fail
+        (void)s.connect("127.0.0.1", Port{1}, Milliseconds{60}); // will fail
         std::string msg = s.getErrorMessage();
         REQUIRE(!msg.empty());
     }
@@ -153,9 +153,9 @@ int main() {
     {
         // Test that the same type of error produces consistent error codes
         auto result1 = SocketFactory::createTcpClient(AddressFamily::IPv4,
-            ConnectArgs{"127.0.0.1", Port{1}, Milliseconds{100}});
+            ConnectArgs{"127.0.0.1", Port{1}, Milliseconds{60}});
         auto result2 = SocketFactory::createTcpClient(AddressFamily::IPv4,
-            ConnectArgs{"127.0.0.1", Port{2}, Milliseconds{100}});
+            ConnectArgs{"127.0.0.1", Port{2}, Milliseconds{60}});
 
         REQUIRE(result1.isError());
         REQUIRE(result2.isError());

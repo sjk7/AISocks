@@ -510,8 +510,8 @@ static void test_https_client_basic_get() {
     server.waitReady();
 
     HttpClient::Options opts;
-    opts.connectTimeout = Milliseconds{2000};
-    opts.requestTimeout = Milliseconds{2000};
+    opts.connectTimeout = Milliseconds{900};
+    opts.requestTimeout = Milliseconds{900};
     opts.verifyCertificate = false; // self-signed cert in test
     HttpClient client{opts};
 
@@ -1327,7 +1327,7 @@ static void test_https_handshake_timeout_respects_request_timeout() {
     });
 
     HttpClient::Options opts;
-    opts.connectTimeout = Milliseconds{300};
+    opts.connectTimeout = Milliseconds{200};
     opts.requestTimeout = Milliseconds{25};
     opts.verifyCertificate = false;
     HttpClient client{opts};
@@ -1511,15 +1511,15 @@ static void test_https_server_handshake_timeout_drops_stalled_clients() {
     ConnectArgs args;
     args.address = "127.0.0.1";
     args.port = server.serverPort();
-    args.connectTimeout = Milliseconds{500};
+    args.connectTimeout = Milliseconds{250};
 
     auto clientRes = SocketFactory::createTcpClient(args);
     REQUIRE(clientRes.isSuccess());
     TcpSocket client = std::move(clientRes.value());
-    client.setReceiveTimeout(Milliseconds{150});
+    client.setReceiveTimeout(Milliseconds{90});
 
     // Wait longer than the server handshake timeout.
-    std::this_thread::sleep_for(std::chrono::milliseconds(35));
+    std::this_thread::sleep_for(std::chrono::milliseconds(25));
 
     char buf[8];
     int n = client.receive(buf, sizeof(buf));
