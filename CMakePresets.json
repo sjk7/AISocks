@@ -618,7 +618,14 @@
             "name": "tls-windows-relwithdebinfo",
             "configurePreset": "tls-windows-debug",
             "configuration": "RelWithDebInfo",
-            "displayName": "Windows RelWithDebInfo TLS Tests"
+            "displayName": "Windows RelWithDebInfo TLS Tests",
+            "execution": {
+                "jobs": 8,
+                "noTestsAction": "error"
+            },
+            "output": {
+                "outputOnFailure": true
+            }
         },
         {
             "name": "mingw-debug",

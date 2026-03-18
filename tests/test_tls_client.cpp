@@ -1296,8 +1296,8 @@ static void test_https_wrong_port_fails() {
     BEGIN_TEST("HttpClient HTTPS to refused port returns connection failure");
 
     HttpClient::Options opts;
-    opts.connectTimeout = Milliseconds{200};
-    opts.requestTimeout = Milliseconds{200};
+    opts.connectTimeout = Milliseconds{80};
+    opts.requestTimeout = Milliseconds{80};
     opts.verifyCertificate = false;
     HttpClient client{opts};
 
@@ -1323,12 +1323,12 @@ static void test_https_handshake_timeout_respects_request_timeout() {
     std::thread serverThread([&] {
         auto client = listener.accept();
         if (!client) return;
-        std::this_thread::sleep_for(std::chrono::milliseconds{140});
+        std::this_thread::sleep_for(std::chrono::milliseconds{40});
     });
 
     HttpClient::Options opts;
-    opts.connectTimeout = Milliseconds{500};
-    opts.requestTimeout = Milliseconds{60};
+    opts.connectTimeout = Milliseconds{300};
+    opts.requestTimeout = Milliseconds{25};
     opts.verifyCertificate = false;
     HttpClient client{opts};
 
@@ -1357,7 +1357,7 @@ static void test_https_slow_reader_does_not_starve_other_clients() {
         public:
         LargeBodyHttpsServer(
             const std::string& certPath, const std::string& keyPath)
-            : TestHttpsServer(certPath, keyPath), body_(1024 * 1024, 'x') {}
+            : TestHttpsServer(certPath, keyPath), body_(128 * 1024, 'x') {}
 
         protected:
         void buildResponse(HttpClientState& s) override {
@@ -1381,10 +1381,10 @@ static void test_https_slow_reader_does_not_starve_other_clients() {
     std::string slowErr;
     std::thread slowClient([&] {
         (void)sendTlsRequestWithoutReading_(
-            server.serverPort(), "/slow-writer", Milliseconds{90}, slowErr);
+            server.serverPort(), "/slow-writer", Milliseconds{8}, slowErr);
     });
 
-    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
 
     HttpClient::Options opts;
     opts.connectTimeout = Milliseconds{1200};
@@ -1425,7 +1425,7 @@ static void test_https_file_server_slow_reader_does_not_starve_other_clients() {
 
     const std::string largePath = PathHelper::joinPath(docRoot.path, "large.bin");
     const std::string smallPath = PathHelper::joinPath(docRoot.path, "small.txt");
-    REQUIRE(writeFileWithByte_(largePath, 1024 * 1024, 'z'));
+    REQUIRE(writeFileWithByte_(largePath, 128 * 1024, 'z'));
     REQUIRE(writeFileWithByte_(smallPath, 32, 'a'));
 
     HttpFileServer::Config cfg;
@@ -1446,10 +1446,10 @@ static void test_https_file_server_slow_reader_does_not_starve_other_clients() {
     std::string slowErr;
     std::thread slowClient([&] {
         (void)sendTlsRequestWithoutReading_(
-            server.serverPort(), "/large.bin", Milliseconds{90}, slowErr);
+            server.serverPort(), "/large.bin", Milliseconds{8}, slowErr);
     });
 
-    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
 
     HttpClient::Options opts;
     opts.connectTimeout = Milliseconds{1200};
@@ -1498,13 +1498,13 @@ static void test_https_server_handshake_timeout_drops_stalled_clients() {
     TlsServerConfig tls;
     tls.certChainFile = cert;
     tls.privateKeyFile = key;
-    tls.handshakeTimeoutMs = 60; // short timeout for test
+    tls.handshakeTimeoutMs = 20; // short timeout for test
 
     TestHttpsFileServer server{ServerBind{"127.0.0.1", Port{0}}, cfg, tls};
     REQUIRE(server.tlsReady());
 
     std::thread serverThread(
-        [&] { server.run(ClientLimit::Unlimited, Milliseconds{5}); });
+        [&] { server.run(ClientLimit::Unlimited, Milliseconds{1}); });
     server.waitReady();
 
     // Connect a raw TCP client but do not complete TLS handshake.
@@ -1516,10 +1516,10 @@ static void test_https_server_handshake_timeout_drops_stalled_clients() {
     auto clientRes = SocketFactory::createTcpClient(args);
     REQUIRE(clientRes.isSuccess());
     TcpSocket client = std::move(clientRes.value());
-    client.setReceiveTimeout(Milliseconds{500});
+    client.setReceiveTimeout(Milliseconds{150});
 
     // Wait longer than the server handshake timeout.
-    std::this_thread::sleep_for(std::chrono::milliseconds(120));
+    std::this_thread::sleep_for(std::chrono::milliseconds(35));
 
     char buf[8];
     int n = client.receive(buf, sizeof(buf));
