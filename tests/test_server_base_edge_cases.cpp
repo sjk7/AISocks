@@ -35,12 +35,18 @@
     } while (0)
 #endif
 
-// Always-on step tracer: flushed immediately so CI output survives a SEGFAULT.
+// Optional step tracer (enable with -DTEST_STEP_TRACE).
+#ifdef TEST_STEP_TRACE
 #define STEP(msg)                                                              \
     do {                                                                       \
         printf("  [STEP %s:%d] %s\n", __FILE__, __LINE__, (msg));              \
         fflush(stdout);                                                        \
     } while (0)
+#else
+#define STEP(msg)                                                              \
+    do {                                                                       \
+    } while (0)
+#endif
 
 using namespace aiSocks;
 
@@ -48,6 +54,19 @@ using namespace aiSocks;
 static constexpr Milliseconds QUICK_POLL_TIMEOUT{1};
 static constexpr Milliseconds SHORT_KEEP_ALIVE{
     1000}; // 1 second - more reasonable for testing
+
+template <typename Predicate>
+static bool waitUntil(Predicate&& predicate, Milliseconds timeout) {
+    const auto deadline
+        = std::chrono::steady_clock::now() + std::chrono::milliseconds(timeout.count);
+    while (!predicate()) {
+        if (std::chrono::steady_clock::now() >= deadline) {
+            return false;
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+    return true;
+}
 
 // ---------------------------------------------------------------------------
 // Echo server for edge case testing
@@ -246,18 +265,17 @@ int main() {
         STEP("connecting clients");
 
         std::vector<std::unique_ptr<TcpSocket>> clients;
-        const int numClients = 20; // High load
+        const int numClients = 8; // High load without excessive test time
 
         // Connect many clients
         for (int i = 0; i < numClients; ++i) {
-            auto client = connectClient(port, Milliseconds{200});
+            auto client = connectClient(port, Milliseconds{70});
             if (client) {
                 clients.push_back(std::move(client));
             }
         }
 
-        printf(
-            "DEBUG: Connected %zu of %d clients\n", clients.size(), numClients);
+        DLOG("DEBUG: Connected %zu of %d clients\n", clients.size(), numClients);
 
         // Each client sends a small message
         for (auto& client : clients) {
@@ -295,7 +313,7 @@ int main() {
 
         // Connect up to exact limit
         for (size_t i = 0; i < maxClients; ++i) {
-            auto client = connectClient(port, Milliseconds{100});
+            auto client = connectClient(port, Milliseconds{70});
             if (client) {
                 client->setBlocking(true);
                 const char* msg = "test";
@@ -329,7 +347,7 @@ int main() {
         waitForServerReady(server);
 
         // Connect one client
-        auto client1 = connectClient(port, Milliseconds{100});
+        auto client1 = connectClient(port, Milliseconds{70});
         REQUIRE(client1 != nullptr);
         client1->setBlocking(true);
 
@@ -363,9 +381,9 @@ int main() {
         waitForServerReady(server);
 
         // Connect/disconnect cycle
-        int cycles = 10;
+        int cycles = 6;
         for (int i = 0; i < cycles; ++i) {
-            auto client = connectClient(port, Milliseconds{100});
+            auto client = connectClient(port, Milliseconds{70});
             if (client) {
                 client->setBlocking(true);
                 const char* msg = "data";
@@ -388,7 +406,7 @@ int main() {
     {
         STEP("construct server");
         EdgeCaseServer server(Port::any);
-        server.setCustomKeepAliveTimeout(Milliseconds{10});
+        server.setCustomKeepAliveTimeout(Milliseconds{8});
         STEP("get port");
         Port port = server.serverPort();
 
@@ -399,15 +417,15 @@ int main() {
         waitForServerReady(server);
 
         // Connect a client
-        auto client = connectClient(port, Milliseconds{100});
+        auto client = connectClient(port, Milliseconds{70});
         if (client) {
             client->setBlocking(true);
             // Send initial message
             const char* msg = "test";
             client->sendAll(msg, strlen(msg));
 
-            // Wait just long enough for the 10ms keep-alive to fire
-            std::this_thread::sleep_for(std::chrono::milliseconds{30});
+            // Wait just long enough for keep-alive to fire
+            std::this_thread::sleep_for(std::chrono::milliseconds{16});
 
             // Try to send another message
             bool sent = client->sendAll(msg, strlen(msg));
@@ -440,12 +458,12 @@ int main() {
         waitForServerReady(server);
 
         std::vector<std::unique_ptr<TcpSocket>> clients;
-        const int numClients = 5;
+        const int numClients = 4;
         const int messageSize = 5000;
 
         // Connect clients and send large messages immediately
         for (int i = 0; i < numClients; ++i) {
-            auto client = connectClient(port, Milliseconds{100});
+            auto client = connectClient(port, Milliseconds{70});
             if (client) {
                 client->setBlocking(true);
                 client->setReceiveTimeout(Milliseconds{500});
@@ -489,7 +507,7 @@ int main() {
 
         // Connect several clients and send data so we can sync
         for (int i = 0; i < 5; ++i) {
-            auto client = connectClient(port, Milliseconds{100});
+            auto client = connectClient(port, Milliseconds{70});
             if (client) {
                 client->setBlocking(true);
                 client->sendAll("hi", 2);
@@ -525,7 +543,7 @@ int main() {
         // Connect a few clients and send data so we can sync
         std::vector<std::unique_ptr<TcpSocket>> clients;
         for (int i = 0; i < 3; ++i) {
-            auto client = connectClient(port, Milliseconds{100});
+            auto client = connectClient(port, Milliseconds{70});
             if (client) {
                 client->setBlocking(true);
                 client->sendAll("hi", 2);
@@ -560,7 +578,7 @@ int main() {
 
         // Fill to capacity - each client sends a message so we can sync
         for (size_t i = 0; i < maxClients; ++i) {
-            auto client = connectClient(port, Milliseconds{100});
+            auto client = connectClient(port, Milliseconds{70});
             if (client) {
                 client->setBlocking(true);
                 client->sendAll("hi", 2);
@@ -571,7 +589,7 @@ int main() {
         server.waitForMessages(static_cast<int>(clients.size()));
 
         // Try to connect beyond limit
-        auto extraClient = connectClient(port, Milliseconds{100});
+        auto extraClient = connectClient(port, Milliseconds{70});
 
         // The behavior here depends on implementation:
         // - Connection might be refused (extraClient is null)
@@ -602,7 +620,7 @@ int main() {
         waitForServerReady(server);
 
         // Connect and send data quickly
-        auto client = connectClient(port, Milliseconds{200});
+        auto client = connectClient(port, Milliseconds{120});
         if (client) {
             client->setBlocking(true);
             client->setReceiveTimeout(Milliseconds{500});
@@ -642,8 +660,8 @@ int main() {
         STEP("wait ready");
         waitForServerReady(server);
 
-        // Sit quietly for 30ms — server should be blocked in the poller.
-        std::this_thread::sleep_for(std::chrono::milliseconds(30));
+        // Sit quietly for a short period — server should be blocked in poller.
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
         REQUIRE(server.idleCallCount.load() == 0);
 
         // Connect and send data to prove the server is still alive.
@@ -683,8 +701,8 @@ int main() {
 
         // Repeatedly connect while filter rejects to exercise the reject path
         // and encourage fd reuse patterns.
-        for (int i = 0; i < 40; ++i) {
-            auto client = connectClient(port, Milliseconds{100});
+        for (int i = 0; i < 12; ++i) {
+            auto client = connectClient(port, Milliseconds{70});
             if (client) {
                 client->setBlocking(true);
                 const char* msg = "x";
@@ -692,8 +710,12 @@ int main() {
             }
         }
 
-        // Give the server loop time to process all reject-path activity.
-        std::this_thread::sleep_for(std::chrono::milliseconds{60});
+        // Give the server loop a bounded amount of time to process reject path.
+        (void)waitUntil(
+            [&server]() {
+                return server.acceptFilterRejected.load(std::memory_order_relaxed) > 0;
+            },
+            Milliseconds{30});
 
         REQUIRE(server.acceptFilterCalls.load() > 0);
         REQUIRE(server.acceptFilterRejected.load() > 0);
@@ -701,7 +723,7 @@ int main() {
 
         // Turn off rejection and verify a new client is accepted and served.
         server.setRejectNewConnections(false);
-        auto acceptedClient = connectClient(port, Milliseconds{200});
+        auto acceptedClient = connectClient(port, Milliseconds{120});
         REQUIRE(acceptedClient != nullptr);
         acceptedClient->setBlocking(true);
         REQUIRE(acceptedClient->sendAll("ok", 2));

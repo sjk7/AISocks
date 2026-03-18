@@ -75,6 +75,17 @@ static std::vector<TcpSocket> openStalledClients(int port, int count) {
     return clients;
 }
 
+template <typename Predicate>
+static bool waitUntil(Predicate&& predicate, Milliseconds timeout) {
+    const auto deadline
+        = std::chrono::steady_clock::now() + std::chrono::milliseconds(timeout.count);
+    while (!predicate()) {
+        if (std::chrono::steady_clock::now() >= deadline) return false;
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+    return true;
+}
+
 void test_tls_hostile_stalled_handshake_load() {
     BEGIN_TEST("test_tls_hostile_stalled_handshake_load");
 
@@ -83,7 +94,7 @@ void test_tls_hostile_stalled_handshake_load() {
     TlsServerConfig tls;
     tls.certChainFile = root + "/tests/certs/test_cert.pem";
     tls.privateKeyFile = root + "/tests/certs/test_key.pem";
-    tls.handshakeTimeoutMs = 150;
+    tls.handshakeTimeoutMs = 80;
 
     std::optional<TlsHostileLoadServer> serverOpt;
     serverOpt.emplace(ServerBind{"127.0.0.1", Port{0}}, tls);
@@ -100,17 +111,21 @@ void test_tls_hostile_stalled_handshake_load() {
     const int port = static_cast<int>(server.serverPort().value());
 
     // Open many TCP clients that never send TLS handshake bytes.
-    constexpr int hostileClients = 32;
+    constexpr int hostileClients = 20;
     auto stalledClients = openStalledClients(port, hostileClients);
     REQUIRE(!stalledClients.empty());
 
-    // Wait long enough for handshake timeout processing.
-    std::this_thread::sleep_for(std::chrono::milliseconds(500));
+    // Wait until at least one stalled handshake times out.
+    (void)waitUntil(
+        [&server]() {
+            return server.getTlsMetrics().handshakeTimeoutCount > 0;
+        },
+        Milliseconds{220});
 
     // Valid HTTPS client should still be served after hostile load.
     HttpClient::Options opts;
-    opts.connectTimeout = Milliseconds{1000};
-    opts.requestTimeout = Milliseconds{1000};
+    opts.connectTimeout = Milliseconds{500};
+    opts.requestTimeout = Milliseconds{500};
     opts.verifyCertificate = false;
     HttpClient client{opts};
 

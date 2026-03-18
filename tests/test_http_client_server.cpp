@@ -229,8 +229,8 @@ struct ServerGuard {
     // Convenience: return an HttpClient pre-configured to talk to this server.
     HttpClient makeClient() {
         HttpClient::Options opts;
-        opts.connectTimeout = Milliseconds{500};
-        opts.requestTimeout = Milliseconds{500};
+        opts.connectTimeout = Milliseconds{250};
+        opts.requestTimeout = Milliseconds{250};
         return HttpClient{opts};
     }
 
@@ -289,8 +289,8 @@ static void test_invalid_host_returns_failure() {
     BEGIN_TEST("HttpClient GET to refused port returns failure");
 
     HttpClient::Options opts;
-    opts.connectTimeout = Milliseconds{150};
-    opts.requestTimeout = Milliseconds{150};
+    opts.connectTimeout = Milliseconds{80};
+    opts.requestTimeout = Milliseconds{80};
     HttpClient client{opts};
 
     auto result = client.get("http://127.0.0.1:1"); // port 1 should refuse
@@ -303,7 +303,7 @@ static void test_bad_dns_fails() {
 
     // .invalid is reserved by RFC 2606 and guaranteed never to resolve.
     HttpClient::Options opts;
-    opts.connectTimeout = Milliseconds{150};
+    opts.connectTimeout = Milliseconds{80};
     HttpClient client{opts};
 
     auto result = client.get("http://this.host.does.not.exist.invalid/");
@@ -323,8 +323,8 @@ static void test_connect_timeout_fails() {
     // "succeeds" and a request is sent, we do not block for the default
     // 60 s receive timeout.
     HttpClient::Options opts;
-    opts.connectTimeout = Milliseconds{150};
-    opts.requestTimeout = Milliseconds{150};
+    opts.connectTimeout = Milliseconds{80};
+    opts.requestTimeout = Milliseconds{80};
     HttpClient client{opts};
 
     auto result = client.get("http://192.0.2.1/");
@@ -346,8 +346,8 @@ static void test_request_timeout_fails() {
     server.waitReady();
 
     HttpClient::Options opts;
-    opts.connectTimeout = Milliseconds{500};
-    opts.requestTimeout = Milliseconds{150};
+    opts.connectTimeout = Milliseconds{250};
+    opts.requestTimeout = Milliseconds{80};
     auto result = HttpClient{opts}.get("http://127.0.0.1:"
         + std::to_string(server.serverPort().value()) + "/");
 
@@ -385,13 +385,13 @@ static void test_request_timeout_is_total_deadline() {
         const char* body = "hello";
         for (int i = 0; i < 5; ++i) {
             if (!client->sendAll(body + i, 1)) break;
-            std::this_thread::sleep_for(80ms);
+            std::this_thread::sleep_for(40ms);
         }
     });
 
     HttpClient::Options opts;
-    opts.connectTimeout = Milliseconds{500};
-    opts.requestTimeout = Milliseconds{150};
+    opts.connectTimeout = Milliseconds{250};
+    opts.requestTimeout = Milliseconds{80};
 
     auto result = HttpClient{opts}.get(
         "http://127.0.0.1:" + std::to_string(port.value()) + "/");
@@ -467,8 +467,8 @@ static void test_interim_100_response_is_ignored() {
     });
 
     HttpClient::Options opts;
-    opts.connectTimeout = Milliseconds{500};
-    opts.requestTimeout = Milliseconds{500};
+    opts.connectTimeout = Milliseconds{250};
+    opts.requestTimeout = Milliseconds{250};
     auto result = HttpClient{opts}.get(
         "http://127.0.0.1:" + std::to_string(port.value()) + "/");
 
@@ -484,8 +484,8 @@ static void test_https_scheme_rejected() {
     BEGIN_TEST("HttpClient rejects direct https URLs with explicit error");
 #ifndef AISOCKS_ENABLE_TLS
     HttpClient::Options opts;
-    opts.connectTimeout = Milliseconds{150};
-    opts.requestTimeout = Milliseconds{150};
+    opts.connectTimeout = Milliseconds{80};
+    opts.requestTimeout = Milliseconds{80};
     HttpClient client{opts};
 
     auto result = client.get("https://example.com/");
@@ -505,8 +505,8 @@ static void test_redirect_to_https_is_rejected() {
     server.waitReady();
 
     HttpClient::Options opts;
-    opts.connectTimeout = Milliseconds{500};
-    opts.requestTimeout = Milliseconds{500};
+    opts.connectTimeout = Milliseconds{250};
+    opts.requestTimeout = Milliseconds{250};
     auto result = HttpClient{opts}.get("http://127.0.0.1:"
         + std::to_string(server.serverPort().value()) + "/");
 
@@ -523,8 +523,8 @@ static void test_invalid_authority_port_rejected() {
     BEGIN_TEST("HttpClient rejects invalid authority ports with trailing junk");
 
     HttpClient::Options opts;
-    opts.connectTimeout = Milliseconds{200};
-    opts.requestTimeout = Milliseconds{200};
+    opts.connectTimeout = Milliseconds{100};
+    opts.requestTimeout = Milliseconds{100};
     HttpClient client{opts};
 
     auto ipv4 = client.get("http://127.0.0.1:80abc/");
@@ -576,8 +576,8 @@ static void test_keepalive_connection_reuse() {
     }
 
     HttpClient::Options opts;
-    opts.connectTimeout = Milliseconds{500};
-    opts.requestTimeout = Milliseconds{500};
+    opts.connectTimeout = Milliseconds{250};
+    opts.requestTimeout = Milliseconds{250};
     HttpClient client{opts};
     const std::string baseUrl
         = "http://127.0.0.1:" + std::to_string(server.serverPort().value());
@@ -616,8 +616,8 @@ static void test_connection_close_header_disables_reuse() {
     }
 
     HttpClient::Options opts;
-    opts.connectTimeout = Milliseconds{500};
-    opts.requestTimeout = Milliseconds{500};
+    opts.connectTimeout = Milliseconds{250};
+    opts.requestTimeout = Milliseconds{250};
     opts.setHeader("Connection", "close");
     HttpClient client{opts};
     const std::string baseUrl
