@@ -21,6 +21,7 @@
 #include "HttpClient.h"
 #include "HttpsFileServer.h"
 #include "HttpPollServer.h"
+#include "PathHelper.h"
 #include "TlsOpenSsl.h"
 #include "test_helpers.h"
 
@@ -29,7 +30,6 @@
 #include <condition_variable>
 #include <cstdio>
 #include <cstdlib>
-#include <filesystem>
 #include <fstream>
 #include <mutex>
 #include <openssl/bio.h>
@@ -70,7 +70,7 @@ static void tlsDebugLog_(const std::string& msg) {
 // work regardless of which directory CTest runs the binary from.
 // ---------------------------------------------------------------------------
 static std::string sourceRoot() {
-    std::string path = std::filesystem::path(__FILE__).generic_string();
+    std::string path = PathHelper::normalizePath(__FILE__);
     const std::string marker = "/tests/test_tls_client.cpp";
     const size_t pos = path.rfind(marker);
     if (pos != std::string::npos) {
@@ -306,11 +306,10 @@ static bool hasIpv6Loopback_() {
 }
 
 struct ScopedTempDir {
-    std::filesystem::path path;
+    std::string path;
     ~ScopedTempDir() {
         if (path.empty()) return;
-        std::error_code ec;
-        std::filesystem::remove_all(path, ec);
+        (void)PathHelper::removeAll(path);
     }
 };
 
@@ -354,7 +353,7 @@ static std::string getEnvValue_(const char* name) {
 }
 
 static bool appendHashedCaCert_(const std::string& certPemPath,
-    const std::filesystem::path& capathDir, std::string& err) {
+    const std::string& capathDir, std::string& err) {
     // Use BIO instead of FILE* to avoid OPENSSL_Uplink errors on Windows
     BIO* bio = BIO_new_file(certPemPath.c_str(), "rb");
     if (!bio) {
@@ -375,9 +374,9 @@ static bool appendHashedCaCert_(const std::string& certPemPath,
     for (int suffix = 0; suffix < 16; ++suffix) {
         char hashFile[32] = {};
         std::snprintf(hashFile, sizeof(hashFile), "%08lx.%d", hash, suffix);
-        const std::filesystem::path hashedCert = capathDir / hashFile;
-        if (std::filesystem::exists(hashedCert)) continue;
-        if (!copyFile_(certPemPath, hashedCert.string())) {
+        const std::string hashedCert = PathHelper::joinPath(capathDir, hashFile);
+        if (PathHelper::exists(hashedCert)) continue;
+        if (!copyFile_(certPemPath, hashedCert)) {
             err = "failed to write hashed cert file in capath fixture";
             return false;
         }
@@ -393,10 +392,9 @@ static bool createHashedCaDirFixture_(
     const auto now = std::chrono::steady_clock::now().time_since_epoch();
     std::ostringstream dirName;
     dirName << "aisocks-capath-" << now.count();
-    out.path = std::filesystem::temp_directory_path() / dirName.str();
+    out.path = PathHelper::joinPath(PathHelper::tempDirectory(), dirName.str());
 
-    std::error_code ec;
-    if (!std::filesystem::create_directories(out.path, ec)) {
+    if (!PathHelper::createDirectories(out.path)) {
         err = "failed to create capath fixture directory";
         return false;
     }
@@ -415,10 +413,9 @@ static bool createHashedCaDirFixtureForCerts_(
     const auto now = std::chrono::steady_clock::now().time_since_epoch();
     std::ostringstream dirName;
     dirName << "aisocks-capath-multi-" << now.count();
-    out.path = std::filesystem::temp_directory_path() / dirName.str();
+    out.path = PathHelper::joinPath(PathHelper::tempDirectory(), dirName.str());
 
-    std::error_code ec;
-    if (!std::filesystem::create_directories(out.path, ec)) {
+    if (!PathHelper::createDirectories(out.path)) {
         err = "failed to create capath fixture directory";
         return false;
     }
@@ -841,7 +838,7 @@ static void test_https_verify_enabled_ca_dir_only_succeeds() {
     opts.connectTimeout = Milliseconds{2000};
     opts.requestTimeout = Milliseconds{2000};
     opts.verifyCertificate = true;
-    opts.caCertDir = capathFixture.path.string();
+    opts.caCertDir = capathFixture.path;
     HttpClient client{opts};
 
     const std::string url = "https://127.0.0.1:"
@@ -885,7 +882,7 @@ static void test_https_verify_enabled_ca_file_plus_valid_dir_succeeds() {
     opts.requestTimeout = Milliseconds{2000};
     opts.verifyCertificate = true;
     opts.caCertFile = cert;
-    opts.caCertDir = capathFixture.path.string();
+    opts.caCertDir = capathFixture.path;
     HttpClient client{opts};
 
     const std::string url = "https://127.0.0.1:"
@@ -944,7 +941,7 @@ static void test_https_redirect_to_different_host_with_verify_enabled() {
     opts.connectTimeout = Milliseconds{2000};
     opts.requestTimeout = Milliseconds{2000};
     opts.verifyCertificate = true;
-    opts.caCertDir = capathFixture.path.string();
+    opts.caCertDir = capathFixture.path;
     HttpClient client{opts};
 
     const std::string url = "https://127.0.0.1:"
@@ -1422,17 +1419,17 @@ static void test_https_file_server_slow_reader_does_not_starve_other_clients() {
     const auto now = std::chrono::steady_clock::now().time_since_epoch();
     std::ostringstream dirName;
     dirName << "aisocks-https-file-starve-" << now.count();
-    docRoot.path = std::filesystem::temp_directory_path() / dirName.str();
-    std::error_code ec;
-    REQUIRE(std::filesystem::create_directories(docRoot.path, ec));
+    docRoot.path
+        = PathHelper::joinPath(PathHelper::tempDirectory(), dirName.str());
+    REQUIRE(PathHelper::createDirectories(docRoot.path));
 
-    const std::string largePath = (docRoot.path / "large.bin").string();
-    const std::string smallPath = (docRoot.path / "small.txt").string();
+    const std::string largePath = PathHelper::joinPath(docRoot.path, "large.bin");
+    const std::string smallPath = PathHelper::joinPath(docRoot.path, "small.txt");
     REQUIRE(writeFileWithByte_(largePath, 1024 * 1024, 'z'));
     REQUIRE(writeFileWithByte_(smallPath, 32, 'a'));
 
     HttpFileServer::Config cfg;
-    cfg.documentRoot = docRoot.path.string();
+    cfg.documentRoot = docRoot.path;
     cfg.indexFile = "small.txt";
 
     TlsServerConfig tls;
@@ -1485,18 +1482,17 @@ static void test_https_server_handshake_timeout_drops_stalled_clients() {
 
     // Minimal document root for the file server.
     ScopedTempDir docRoot;
-    docRoot.path
-        = std::filesystem::temp_directory_path() / "aisocks-tls-timeout";
-    std::error_code ec;
-    REQUIRE(std::filesystem::create_directories(docRoot.path, ec));
-    const std::string indexPath = (docRoot.path / "index.html").string();
+    docRoot.path = PathHelper::joinPath(PathHelper::tempDirectory(),
+        "aisocks-tls-timeout");
+    REQUIRE(PathHelper::createDirectories(docRoot.path));
+    const std::string indexPath = PathHelper::joinPath(docRoot.path, "index.html");
     {
         std::ofstream out(indexPath);
         out << "hello";
     }
 
     HttpFileServer::Config cfg;
-    cfg.documentRoot = docRoot.path.string();
+    cfg.documentRoot = docRoot.path;
     cfg.indexFile = "index.html";
 
     TlsServerConfig tls;

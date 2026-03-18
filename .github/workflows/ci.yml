@@ -37,12 +37,25 @@ jobs:
           echo "head_ref=${{ github.head_ref }}"
           echo "sha=${{ github.sha }}"
 
+  no-filesystem:
+    name: Policy / No std::filesystem
+    needs: preflight
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Enforce no std::filesystem policy
+        shell: bash
+        run: |
+          bash scripts/check_no_filesystem.sh
+
   build-and-test:
     if: |
       github.event_name == 'workflow_dispatch' ||
       (github.event_name == 'push' && contains(fromJson('["refs/heads/main","refs/heads/master","refs/heads/secure"]'), github.ref)) ||
       (github.event_name == 'pull_request' && contains(fromJson('["main","master","secure"]'), github.base_ref))
-    needs: preflight
+    needs: [preflight, no-filesystem]
     name: Build and Test
     runs-on: ${{ matrix.os }}
 

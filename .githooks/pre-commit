@@ -78,5 +78,25 @@ if [[ ${#LEAKED_FILES[@]} -gt 0 ]]; then
     exit 1
 fi
 
+# Block newly added std::filesystem usage in C/C++ sources.
+echo "Checking for std::filesystem usage in staged C/C++ changes..."
+FILESYSTEM_DIFF=$(git diff --cached --unified=0 -- '*.c' '*.cc' '*.cpp' '*.cxx' '*.h' '*.hh' '*.hpp' '*.hxx')
+if [[ -n "$FILESYSTEM_DIFF" ]]; then
+    FILESYSTEM_HITS=$(printf '%s\n' "$FILESYSTEM_DIFF" | grep -nE '^\+[^+].*(#[[:space:]]*include[[:space:]]*<filesystem>|std::filesystem)' || true)
+    if [[ -n "$FILESYSTEM_HITS" ]]; then
+        echo ""
+        echo "COMMIT BLOCKED: std::filesystem usage detected in staged C/C++ changes."
+        echo ""
+        echo "Use PathHelper/FileIO APIs instead (e.g., PathHelper::normalizePath,"
+        echo "PathHelper::createDirectories, PathHelper::removeAll, PathHelper::tempDirectory)."
+        echo ""
+        echo "Matching added lines (diff context):"
+        printf '%s\n' "$FILESYSTEM_HITS" | sed 's/^/  /'
+        echo ""
+        echo "To bypass this check (NOT RECOMMENDED): git commit --no-verify"
+        exit 1
+    fi
+fi
+
 echo "No personal information detected. Proceeding with commit."
 exit 0

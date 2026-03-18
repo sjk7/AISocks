@@ -9,6 +9,8 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <time.h>
+#include <cerrno>
+#include <cstdlib>
 
 #ifdef _WIN32
 #include <direct.h>
@@ -319,6 +321,115 @@ std::string PathHelper::joinPath(
     }
 
     return result + comp;
+}
+
+namespace {
+
+bool createDirectorySingle_(const std::string& path) {
+#ifdef _WIN32
+    if (_mkdir(path.c_str()) == 0) return true;
+    if (errno == EEXIST) return PathHelper::isDirectory(path);
+    return false;
+#else
+    if (mkdir(path.c_str(), 0755) == 0) return true;
+    if (errno == EEXIST) return PathHelper::isDirectory(path);
+    return false;
+#endif
+}
+
+bool removeFileOrSymlink_(const std::string& path) {
+#ifdef _WIN32
+    return DeleteFileA(path.c_str()) != 0;
+#else
+    return unlink(path.c_str()) == 0;
+#endif
+}
+
+bool removeDirectorySingle_(const std::string& path) {
+#ifdef _WIN32
+    return RemoveDirectoryA(path.c_str()) != 0;
+#else
+    return rmdir(path.c_str()) == 0;
+#endif
+}
+
+} // namespace
+
+bool PathHelper::createDirectories(const std::string& path) {
+    const std::string normalized = normalizePath(path);
+    if (normalized.empty()) return false;
+    if (exists(normalized)) return isDirectory(normalized);
+
+    std::string current;
+    size_t index = 0;
+
+    // Preserve Windows drive prefix (e.g., C:)
+    if (normalized.size() >= 2 && normalized[1] == ':') {
+        current = normalized.substr(0, 2);
+        index = 2;
+    }
+
+    // Preserve absolute root slash
+    if (index < normalized.size() && normalized[index] == '/') {
+        current += '/';
+        ++index;
+    }
+
+    while (index < normalized.size()) {
+        const size_t next = normalized.find('/', index);
+        const std::string_view component = (next == std::string::npos)
+            ? std::string_view(normalized).substr(index)
+            : std::string_view(normalized).substr(index, next - index);
+
+        if (!component.empty() && component != ".") {
+            if (!current.empty() && current.back() != '/') current += '/';
+            current.append(component.data(), component.size());
+            if (!exists(current) && !createDirectorySingle_(current)) {
+                return false;
+            }
+        }
+
+        if (next == std::string::npos) break;
+        index = next + 1;
+    }
+
+    return exists(normalized) && isDirectory(normalized);
+}
+
+bool PathHelper::removeAll(const std::string& path) {
+    const std::string normalized = normalizePath(path);
+    if (normalized.empty()) return false;
+    if (!exists(normalized)) return true;
+
+    const FileInfo info = getFileInfo(normalized);
+    if (!info.exists) return true;
+
+    if (info.isSymlink || !info.isDirectory) {
+        return removeFileOrSymlink_(normalized);
+    }
+
+    const std::vector<DirEntry> entries = listDirectory(normalized);
+    for (const DirEntry& entry : entries) {
+        const std::string child = joinPath(normalized, entry.name);
+        if (!removeAll(child)) return false;
+    }
+
+    return removeDirectorySingle_(normalized);
+}
+
+std::string PathHelper::tempDirectory() {
+#ifdef _WIN32
+    char buf[MAX_PATH] = {};
+    const DWORD len = GetTempPathA(MAX_PATH, buf);
+    if (len == 0 || len >= MAX_PATH) return ".";
+    return normalizePath(std::string(buf));
+#else
+    const char* tmpdir = std::getenv("TMPDIR");
+    if (tmpdir != nullptr && tmpdir[0] != '\0') {
+        return normalizePath(std::string(tmpdir));
+    }
+    return "/tmp";
+#endif
 }
 
 std::string PathHelper::normalizePathManual(const std::string& path) {

@@ -9,6 +9,7 @@
 // detection
 
 #include "PathHelper.h"
+#include "FileIO.h"
 #include "test_helpers.h"
 #include <string>
 #include <vector>
@@ -25,6 +26,13 @@
 #endif
 
 using namespace aiSocks;
+
+static bool createTextFile_(const std::string& path, const char* text) {
+    File f;
+    if (!f.open(path.c_str(), "wb")) return false;
+    if (!f.writeString(text)) return false;
+    return f.flush();
+}
 
 // Helper to create test directory structure
 static void setupTestDirs() {
@@ -360,6 +368,59 @@ int main() {
         REQUIRE(normalized.find("C:") != std::string::npos);
     }
 #endif
+
+    // Test 37: createDirectories - creates full nested tree
+    BEGIN_TEST("createDirectories: creates nested directory tree");
+    {
+        const std::string nested = "test_path_api_tmp/a/b/c";
+        REQUIRE(PathHelper::createDirectories(nested));
+        REQUIRE(PathHelper::exists(nested));
+        REQUIRE(PathHelper::isDirectory(nested));
+    }
+
+    // Test 38: createDirectories - idempotent when already exists
+    BEGIN_TEST("createDirectories: idempotent on existing directory");
+    {
+        const std::string existing = "test_path_api_tmp/a/b/c";
+        REQUIRE(PathHelper::createDirectories(existing));
+        REQUIRE(PathHelper::createDirectories(existing));
+    }
+
+    // Test 39: tempDirectory - returns existing directory
+    BEGIN_TEST("tempDirectory: returns existing writable directory path");
+    {
+        const std::string tempDir = PathHelper::tempDirectory();
+        REQUIRE(!tempDir.empty());
+        REQUIRE(PathHelper::exists(tempDir));
+        REQUIRE(PathHelper::isDirectory(tempDir));
+    }
+
+    // Test 40: removeAll - removes files and nested directories
+    BEGIN_TEST("removeAll: recursively removes directory tree");
+    {
+        const std::string root = "test_path_api_tmp/remove_root";
+        const std::string leaf = PathHelper::joinPath(root, "nested/leaf");
+        const std::string fileA = PathHelper::joinPath(root, "a.txt");
+        const std::string fileB = PathHelper::joinPath(leaf, "b.txt");
+
+        REQUIRE(PathHelper::createDirectories(leaf));
+        REQUIRE(createTextFile_(fileA, "alpha"));
+        REQUIRE(createTextFile_(fileB, "beta"));
+        REQUIRE(PathHelper::exists(fileA));
+        REQUIRE(PathHelper::exists(fileB));
+
+        REQUIRE(PathHelper::removeAll(root));
+        REQUIRE(!PathHelper::exists(root));
+    }
+
+    // Test 41: removeAll - missing path treated as success
+    BEGIN_TEST("removeAll: missing path is success");
+    {
+        REQUIRE(PathHelper::removeAll("test_path_api_tmp/does_not_exist"));
+    }
+
+    // Cleanup for PathHelper filesystem-lite tests.
+    (void)PathHelper::removeAll("test_path_api_tmp");
 
     cleanupTestDirs();
 

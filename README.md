@@ -50,6 +50,21 @@ These project constraints are intentional and should not be reported as bugs in 
     client contract. Same-socket keep-alive reuse is supported; broader
     resumption remains follow-up work.
 
+## Filesystem-lite API (no std::filesystem required)
+
+For path/file operations, prefer `PathHelper` + `FileIO` instead of
+`std::filesystem`.
+
+Key helpers in `PathHelper`:
+- `normalizePath(path)`
+- `joinPath(base, component)`
+- `createDirectories(path)`
+- `removeAll(path)`
+- `tempDirectory()`
+
+This keeps compile times predictable and avoids bringing `std::filesystem`
+into user code unless you explicitly choose to use it.
+
 ## Hot-path optimisations (Mar 2026)
 
 | # | Change | Where |

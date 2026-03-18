@@ -1,4 +1,5 @@
 #include "HttpsFileServer.h"
+#include "PathHelper.h"
 #include "TlsOpenSsl.h"
 #include "test_helpers.h"
 #include "SocketFactory.h"
@@ -7,13 +8,12 @@
 #include <fstream>
 #include <thread>
 #include <openssl/ssl.h>
- #include <filesystem>
  #include <optional>
 
 using namespace aiSocks;
 
 static std::string repoRootFromFile(const char* file) {
-    std::string path = std::filesystem::path(file).generic_string();
+    std::string path = PathHelper::normalizePath(file);
     const std::string marker = "/tests/";
     const size_t pos = path.rfind(marker);
     if (pos != std::string::npos) return path.substr(0, pos);

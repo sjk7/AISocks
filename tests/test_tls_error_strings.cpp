@@ -1,13 +1,13 @@
 #include "TlsOpenSsl.h"
+#include "PathHelper.h"
 #include "test_helpers.h"
 
-#include <filesystem>
 #include <string>
 
 using namespace aiSocks;
 
 static std::string repoRootFromFile(const char* file) {
-    std::string path = std::filesystem::path(file).generic_string();
+    std::string path = PathHelper::normalizePath(file);
     const std::string marker = "/tests/";
     const size_t pos = path.rfind(marker);
     if (pos != std::string::npos) return path.substr(0, pos);

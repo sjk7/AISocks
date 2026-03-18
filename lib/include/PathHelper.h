@@ -59,6 +59,16 @@ class PathHelper {
     static std::string joinPath(
         const std::string& base, const std::string& component);
 
+    /// Create a directory and any missing parents. Returns true on success.
+    static bool createDirectories(const std::string& path);
+
+    /// Remove a file or directory tree recursively. Missing paths are treated
+    /// as success.
+    static bool removeAll(const std::string& path);
+
+    /// Return a writable temporary directory path.
+    static std::string tempDirectory();
+
     private:
     static std::string normalizePathManual(const std::string& path);
 };

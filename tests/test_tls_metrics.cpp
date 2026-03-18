@@ -1,5 +1,6 @@
 #include "HttpsPollServer.h"
 #include "HttpClient.h"
+#include "PathHelper.h"
 #include "TlsOpenSsl.h"
 #include "test_helpers.h"
 #include <thread>
@@ -7,7 +8,6 @@
 #include <atomic>
 #include <mutex>
 #include <optional>
-#include <filesystem>
 #include <condition_variable>
 
 #ifdef AISOCKS_ENABLE_TLS
@@ -15,7 +15,7 @@
 using namespace aiSocks;
 
 static std::string sourceRoot() {
-    std::string path = std::filesystem::path(__FILE__).generic_string();
+    std::string path = PathHelper::normalizePath(__FILE__);
     const std::string marker = "/tests/test_tls_metrics.cpp";
     const size_t pos = path.rfind(marker);
     if (pos != std::string::npos) return path.substr(0, pos);

@@ -6,6 +6,7 @@
 
 #include "HttpClient.h"
 #include "HttpPollServer.h"
+#include "PathHelper.h"
 #include "Stopwatch.h"
 #ifdef AISOCKS_ENABLE_TLS
 #include "HttpsPollServer.h"
@@ -15,7 +16,6 @@
 #include <atomic>
 #include <chrono>
 #include <condition_variable>
-#include <filesystem>
 #include <mutex>
 #include <optional>
 #include <string>
@@ -25,7 +25,7 @@ using namespace aiSocks;
 
 #ifdef AISOCKS_ENABLE_TLS
 static std::string sourceRoot() {
-    std::string path = std::filesystem::path(__FILE__).generic_string();
+    std::string path = PathHelper::normalizePath(__FILE__);
     const std::string marker = "/tests/test_server_launchpad.cpp";
     const size_t pos = path.rfind(marker);
     if (pos != std::string::npos) return path.substr(0, pos);
