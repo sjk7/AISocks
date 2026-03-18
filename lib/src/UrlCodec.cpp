@@ -34,7 +34,15 @@ namespace {
                 const uint8_t hi = kFromHex[static_cast<unsigned char>(src[i + 1])];
                 const uint8_t lo = kFromHex[static_cast<unsigned char>(src[i + 2])];
                 if (hi != 0xFF && lo != 0xFF) {
-                    out += static_cast<char>((hi << 4) | lo);
+                    const unsigned char decoded = static_cast<unsigned char>((hi << 4) | lo);
+                    // Security: Reject null bytes (0x00) as they are invalid in URLs
+                    // and commonly used in directory traversal attacks
+                    if (decoded == 0x00) {
+                        // Skip null byte entirely - treat as invalid encoding
+                        i += 2;
+                        continue;
+                    }
+                    out += static_cast<char>(decoded);
                     i += 2;
                     continue;
                 }

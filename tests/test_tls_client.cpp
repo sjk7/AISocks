@@ -32,6 +32,7 @@
 #include <filesystem>
 #include <fstream>
 #include <mutex>
+#include <openssl/bio.h>
 #include <openssl/pem.h>
 #include <openssl/ssl.h>
 #include <sstream>
@@ -338,16 +339,6 @@ static bool writeFileWithByte_(
     return true;
 }
 
-static FILE* openFileReadBinary_(const std::string& path) {
-#ifdef _MSC_VER
-    FILE* fp = nullptr;
-    if (fopen_s(&fp, path.c_str(), "rb") != 0) return nullptr;
-    return fp;
-#else
-    return std::fopen(path.c_str(), "rb");
-#endif
-}
-
 static std::string getEnvValue_(const char* name) {
 #ifdef _MSC_VER
     char* value = nullptr;
@@ -364,14 +355,15 @@ static std::string getEnvValue_(const char* name) {
 
 static bool appendHashedCaCert_(const std::string& certPemPath,
     const std::filesystem::path& capathDir, std::string& err) {
-    FILE* fp = openFileReadBinary_(certPemPath);
-    if (!fp) {
+    // Use BIO instead of FILE* to avoid OPENSSL_Uplink errors on Windows
+    BIO* bio = BIO_new_file(certPemPath.c_str(), "rb");
+    if (!bio) {
         err = "failed to open cert PEM for capath fixture";
         return false;
     }
 
-    X509* cert = PEM_read_X509(fp, nullptr, nullptr, nullptr);
-    std::fclose(fp);
+    X509* cert = PEM_read_bio_X509(bio, nullptr, nullptr, nullptr);
+    BIO_free(bio);
     if (!cert) {
         err = "failed to parse cert PEM for capath fixture";
         return false;
