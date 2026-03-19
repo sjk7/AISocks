@@ -7,6 +7,7 @@
 #include "BuildInfo.h"
 #include "FileIO.h"
 #include "HttpParserUtils.h"
+#include "HttpRequestFramer.h"
 #include "HttpRequest.h"
 #include "HttpResponse.h"
 #include <algorithm>
@@ -52,61 +53,6 @@ namespace {
         }
         out = static_cast<size_t>(parsed);
         return true;
-    }
-
-    static bool parseChunkSize_(std::string_view sizeLine, size_t& out) {
-        const size_t extPos = sizeLine.find(';');
-        const std::string_view hexStr = (extPos == std::string_view::npos)
-            ? sizeLine
-            : sizeLine.substr(0, extPos);
-        if (hexStr.empty()) return false;
-
-        out = 0;
-        for (char c : hexStr) {
-            const unsigned char uc = static_cast<unsigned char>(c);
-            size_t digit = 0;
-            if (uc >= '0' && uc <= '9')
-                digit = static_cast<size_t>(uc - '0');
-            else if (uc >= 'a' && uc <= 'f')
-                digit = static_cast<size_t>(uc - 'a' + 10);
-            else if (uc >= 'A' && uc <= 'F')
-                digit = static_cast<size_t>(uc - 'A' + 10);
-            else
-                return false;
-
-            if (out > (kMaxRequestBodyBytes - digit) / 16) return false;
-            out = out * 16 + digit;
-        }
-        return true;
-    }
-
-    static bool transferEncodingEndsInChunked_(std::string_view value) {
-        size_t start = 0;
-        std::string_view last;
-        while (start < value.size()) {
-            const size_t comma = value.find(',', start);
-            const size_t end
-                = (comma == std::string_view::npos) ? value.size() : comma;
-            std::string_view tok = value.substr(start, end - start);
-            const size_t ts = tok.find_first_not_of(" \t");
-            if (ts != std::string_view::npos) tok = tok.substr(ts);
-            const size_t te = tok.find_last_not_of(" \t");
-            if (te != std::string_view::npos)
-                tok = tok.substr(0, te + 1);
-            else
-                tok = {};
-            if (!tok.empty()) last = tok;
-            if (comma == std::string_view::npos) break;
-            start = comma + 1;
-        }
-        if (last.size() != 7) return false;
-        return std::tolower(static_cast<unsigned char>(last[0])) == 'c'
-            && std::tolower(static_cast<unsigned char>(last[1])) == 'h'
-            && std::tolower(static_cast<unsigned char>(last[2])) == 'u'
-            && std::tolower(static_cast<unsigned char>(last[3])) == 'n'
-            && std::tolower(static_cast<unsigned char>(last[4])) == 'k'
-            && std::tolower(static_cast<unsigned char>(last[5])) == 'e'
-            && std::tolower(static_cast<unsigned char>(last[6])) == 'd';
     }
 
     static bool ciTokenPresent_(
@@ -251,7 +197,7 @@ namespace {
 
         if (hasTransferEncoding) {
             if (hasContentLength) return RequestFrameStatus::BadRequest;
-            if (!transferEncodingEndsInChunked_(transferEncodingValue))
+            if (!detail::transferEncodingEndsInChunked(transferEncodingValue))
                 return RequestFrameStatus::UnsupportedTransferEncoding;
 
             size_t pos = 0;
@@ -264,7 +210,8 @@ namespace {
                 const std::string_view sizeLine
                     = body.substr(pos, crlfPos - pos);
                 size_t chunkSize = 0;
-                if (!parseChunkSize_(sizeLine, chunkSize))
+                if (!detail::parseChunkSizeWithLimit(
+                        sizeLine, chunkSize, kMaxRequestBodyBytes))
                     return RequestFrameStatus::BadRequest;
 
                 if (chunkSize == 0) {
