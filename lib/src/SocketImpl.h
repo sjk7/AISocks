@@ -201,14 +201,15 @@ class SocketImpl {
     bool setBufSizeOpt(int optname, int bytes, const char* errMsg);
     bool waitReady(bool forRead, std::chrono::milliseconds timeout);
     static Endpoint endpointFromSockaddr(const sockaddr_storage& addr);
-    int doTransfer_(bool forSend, void* buffer, const void* data,
-        size_t length, const char* timeoutMsg, const char* failMsg);
+    int doTransfer_(bool forSend, void* buffer, const void* data, size_t length,
+        const char* timeoutMsg, const char* failMsg);
 
     // connect() helpers
     bool resolveAddress_(const std::string& address, Port port,
         Milliseconds timeout, sockaddr_storage& out_addr, socklen_t& out_len);
     bool startConnect_(const sockaddr_storage& serverAddr, socklen_t addrLen,
         Milliseconds timeout);
+    bool pollConnectUntilReady_(Milliseconds timeout, int evFd);
     bool waitForConnect_(Milliseconds timeout);
 
     // Propagate blocking mode, buffer sizes, TCP_NODELAY and SO_KEEPALIVE

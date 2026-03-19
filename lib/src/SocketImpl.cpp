@@ -608,6 +608,11 @@ bool SocketImpl::waitForConnect_(Milliseconds timeout) {
         }
     }
 
+    return pollConnectUntilReady_(timeout, evFd);
+}
+
+bool SocketImpl::pollConnectUntilReady_(Milliseconds timeout, int evFd) {
+
     auto deadline = std::chrono::steady_clock::now()
         + std::chrono::milliseconds(timeout.count);
 
