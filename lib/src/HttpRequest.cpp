@@ -23,39 +23,11 @@ namespace {
 
     static bool decodeChunkedBody_(
         std::string_view rawBody, std::string& decodedOut) {
-        decodedOut.clear();
-        size_t pos = 0;
-
-        while (true) {
-            const size_t crlfPos = rawBody.find("\r\n", pos);
-            if (crlfPos == std::string_view::npos) return false;
-
-            size_t chunkSize = 0;
-                if (!detail::parseChunkSizeWithLimit(
-                    rawBody.substr(pos, crlfPos - pos), chunkSize,
-                    kMaxRequestBodyLen))
-                return false;
-
-            if (chunkSize == 0) {
-                const size_t trailerEnd = rawBody.find("\r\n\r\n", crlfPos);
-                if (trailerEnd == std::string_view::npos) return false;
-                const size_t consumed = trailerEnd + 4;
-                return consumed == rawBody.size();
-            }
-
-            if (decodedOut.size() > kMaxRequestBodyLen - chunkSize)
-                return false;
-
-            const size_t dataStart = crlfPos + 2;
-            const size_t dataEnd = dataStart + chunkSize;
-            const size_t nextChunk = dataEnd + 2;
-            if (nextChunk > rawBody.size()) return false;
-            if (rawBody[dataEnd] != '\r' || rawBody[dataEnd + 1] != '\n')
-                return false;
-
-            decodedOut.append(rawBody.data() + dataStart, chunkSize);
-            pos = nextChunk;
-        }
+        size_t consumed = 0;
+        const auto result = detail::parseChunkedBodyWithLimit(
+            rawBody, kMaxRequestBodyLen, consumed, &decodedOut);
+        return result == detail::ChunkedBodyParseResult::Complete
+            && consumed == rawBody.size();
     }
 } // namespace
 
@@ -196,16 +168,12 @@ HttpRequest HttpRequest::parse(std::string_view raw) {
     }
 
     if (const std::string* cl = req.header("content-length")) {
-        // Accept only a non-negative decimal number with no trailing bytes.
-        if (cl->empty()) return HttpRequest{};
-        uint64_t parsed = 0;
-        for (char ch : *cl) {
-            if (ch < '0' || ch > '9') return HttpRequest{};
-            const uint64_t digit = static_cast<uint64_t>(ch - '0');
-            if (parsed > (UINT64_MAX - digit) / 10) return HttpRequest{};
-            parsed = parsed * 10 + digit;
+        size_t parsed = 0;
+        bool overflow = false;
+        if (!detail::parseContentLengthWithLimit(
+                *cl, parsed, overflow, kMaxRequestBodyLen)) {
+            return HttpRequest{};
         }
-        if (parsed > kMaxRequestBodyLen) return HttpRequest{};
         if (parsed != req.body.size()) return HttpRequest{};
     }
 

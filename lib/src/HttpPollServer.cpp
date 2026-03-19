@@ -35,26 +35,6 @@ namespace {
         BodyTooLarge
     };
 
-    static bool parseContentLength_(
-        std::string_view value, size_t& out, bool& overflow) {
-        overflow = false;
-        if (value.empty()) return false;
-        if (!std::all_of(value.begin(), value.end(),
-                [](char ch) { return ch >= '0' && ch <= '9'; }))
-            return false;
-        unsigned long long parsed = 0;
-        auto [ptr, ec] = std::from_chars(
-            value.data(), value.data() + value.size(), parsed);
-        if (ec != std::errc{} || ptr != value.data() + value.size())
-            return false;
-        if (parsed > static_cast<unsigned long long>(SIZE_MAX)) {
-            overflow = true;
-            return false;
-        }
-        out = static_cast<size_t>(parsed);
-        return true;
-    }
-
     static bool ciTokenPresent_(
         std::string_view field, std::string_view token) {
         const size_t tlen = token.size();
@@ -174,7 +154,8 @@ namespace {
                     } else if (key == "content-length") {
                         size_t parsed = 0;
                         bool overflow = false;
-                        if (!parseContentLength_(val, parsed, overflow)) {
+                        if (!detail::parseContentLengthWithLimit(
+                                val, parsed, overflow, maxBodyBytes)) {
                             contentLengthOverflow = overflow;
                             hasContentLength = true;
                             contentLength = 0;
@@ -200,40 +181,18 @@ namespace {
             if (!detail::transferEncodingEndsInChunked(transferEncodingValue))
                 return RequestFrameStatus::UnsupportedTransferEncoding;
 
-            size_t pos = 0;
-            size_t decodedTotal = 0;
-            while (true) {
-                const size_t crlfPos = body.find("\r\n", pos);
-                if (crlfPos == std::string_view::npos)
+            size_t chunkedConsumed = 0;
+            switch (detail::parseChunkedBodyWithLimit(
+                body, maxBodyBytes, chunkedConsumed)) {
+                case detail::ChunkedBodyParseResult::NeedMore:
                     return RequestFrameStatus::NeedMore;
-
-                const std::string_view sizeLine
-                    = body.substr(pos, crlfPos - pos);
-                size_t chunkSize = 0;
-                if (!detail::parseChunkSizeWithLimit(
-                        sizeLine, chunkSize, kMaxRequestBodyBytes))
-                    return RequestFrameStatus::BadRequest;
-
-                if (chunkSize == 0) {
-                    const size_t trailerEnd = body.find("\r\n\r\n", crlfPos);
-                    if (trailerEnd == std::string_view::npos)
-                        return RequestFrameStatus::NeedMore;
-                    consumedLen = headerBytes + trailerEnd + 4;
-                    return RequestFrameStatus::Complete;
-                }
-
-                if (decodedTotal > maxBodyBytes - chunkSize)
+                case detail::ChunkedBodyParseResult::BodyTooLarge:
                     return RequestFrameStatus::BodyTooLarge;
-                decodedTotal += chunkSize;
-
-                const size_t dataStart = crlfPos + 2;
-                const size_t dataEnd = dataStart + chunkSize;
-                const size_t nextChunk = dataEnd + 2;
-                if (nextChunk > body.size())
-                    return RequestFrameStatus::NeedMore;
-                if (body[dataEnd] != '\r' || body[dataEnd + 1] != '\n')
+                case detail::ChunkedBodyParseResult::BadFrame:
                     return RequestFrameStatus::BadRequest;
-                pos = nextChunk;
+                case detail::ChunkedBodyParseResult::Complete:
+                    consumedLen = headerBytes + chunkedConsumed;
+                    return RequestFrameStatus::Complete;
             }
         }
 

@@ -5,10 +5,19 @@
 #pragma once
 
 #include <cctype>
+#include <charconv>
 #include <cstddef>
+#include <string>
 #include <string_view>
 
 namespace aiSocks::detail {
+
+enum class ChunkedBodyParseResult {
+    NeedMore,
+    Complete,
+    BadFrame,
+    BodyTooLarge
+};
 
 inline bool transferEncodingEndsInChunked(std::string_view value) noexcept {
     size_t pos = 0;
@@ -66,6 +75,72 @@ inline bool parseChunkSizeWithLimit(
         out = out * 16 + digit;
     }
     return true;
+}
+
+inline bool parseContentLengthWithLimit(std::string_view value, size_t& out,
+    bool& overflow, size_t maxAllowedBytes = SIZE_MAX) noexcept {
+    overflow = false;
+    if (value.empty()) return false;
+    for (char ch : value) {
+        if (ch < '0' || ch > '9') return false;
+    }
+
+    unsigned long long parsed = 0;
+    auto [ptr, ec]
+        = std::from_chars(value.data(), value.data() + value.size(), parsed);
+    if (ec != std::errc{} || ptr != value.data() + value.size()) return false;
+
+    if (parsed > static_cast<unsigned long long>(maxAllowedBytes)
+        || parsed > static_cast<unsigned long long>(SIZE_MAX)) {
+        overflow = true;
+        return false;
+    }
+
+    out = static_cast<size_t>(parsed);
+    return true;
+}
+
+inline ChunkedBodyParseResult parseChunkedBodyWithLimit(std::string_view body,
+    size_t maxDecodedBytes, size_t& consumedBytes,
+    std::string* decodedOut = nullptr) {
+    consumedBytes = 0;
+    size_t pos = 0;
+    size_t decodedTotal = 0;
+    if (decodedOut) decodedOut->clear();
+
+    while (true) {
+        const size_t crlfPos = body.find("\r\n", pos);
+        if (crlfPos == std::string_view::npos)
+            return ChunkedBodyParseResult::NeedMore;
+
+        size_t chunkSize = 0;
+        if (!parseChunkSizeWithLimit(
+                body.substr(pos, crlfPos - pos), chunkSize, maxDecodedBytes)) {
+            return ChunkedBodyParseResult::BadFrame;
+        }
+
+        if (chunkSize == 0) {
+            const size_t trailerEnd = body.find("\r\n\r\n", crlfPos);
+            if (trailerEnd == std::string_view::npos)
+                return ChunkedBodyParseResult::NeedMore;
+            consumedBytes = trailerEnd + 4;
+            return ChunkedBodyParseResult::Complete;
+        }
+
+        if (decodedTotal > maxDecodedBytes - chunkSize)
+            return ChunkedBodyParseResult::BodyTooLarge;
+        decodedTotal += chunkSize;
+
+        const size_t dataStart = crlfPos + 2;
+        const size_t dataEnd = dataStart + chunkSize;
+        const size_t nextChunk = dataEnd + 2;
+        if (nextChunk > body.size()) return ChunkedBodyParseResult::NeedMore;
+        if (body[dataEnd] != '\r' || body[dataEnd + 1] != '\n')
+            return ChunkedBodyParseResult::BadFrame;
+
+        if (decodedOut) decodedOut->append(body.data() + dataStart, chunkSize);
+        pos = nextChunk;
+    }
 }
 
 } // namespace aiSocks::detail
