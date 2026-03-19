@@ -767,6 +767,66 @@ static void test_reject_unsupported_transfer_encoding() {
     REQUIRE(!req.valid);
 }
 
+// 50. Accept TE list when final coding is chunked (RFC-compatible)
+static void test_accept_te_list_ending_in_chunked() {
+    BEGIN_TEST("accept Transfer-Encoding list ending in chunked");
+    std::string raw = "POST /upload HTTP/1.1\r\n"
+                      "Host: example.com\r\n"
+                      "Transfer-Encoding: gzip, chunked\r\n"
+                      "\r\n"
+                      "4\r\n"
+                      "Wiki\r\n"
+                      "0\r\n"
+                      "\r\n";
+    auto req = HttpRequest::parse(raw);
+    REQUIRE(req.valid);
+    CHECK_FIELD("decoded body", req.body, "Wiki");
+}
+
+// 51. Reject TE list when final coding is not chunked
+static void test_reject_te_list_not_ending_in_chunked() {
+    BEGIN_TEST("reject Transfer-Encoding list not ending in chunked");
+    auto req = HttpRequest::parse("POST /upload HTTP/1.1\r\n"
+                                  "Host: example.com\r\n"
+                                  "Transfer-Encoding: chunked, gzip\r\n"
+                                  "\r\n"
+                                  "4\r\n"
+                                  "Wiki\r\n"
+                                  "0\r\n"
+                                  "\r\n");
+    REQUIRE(!req.valid);
+}
+
+// 52. Accept chunk-size extensions in chunked framing
+static void test_accept_chunk_extensions() {
+    BEGIN_TEST("accept chunk-size extensions");
+    std::string raw = "POST /upload HTTP/1.1\r\n"
+                      "Host: example.com\r\n"
+                      "Transfer-Encoding: chunked\r\n"
+                      "\r\n"
+                      "4;foo=bar\r\n"
+                      "Wiki\r\n"
+                      "0\r\n"
+                      "\r\n";
+    auto req = HttpRequest::parse(raw);
+    REQUIRE(req.valid);
+    CHECK_FIELD("decoded body", req.body, "Wiki");
+}
+
+// 53. Reject malformed chunk-size token
+static void test_reject_bad_chunk_size_token() {
+    BEGIN_TEST("reject malformed chunk-size token");
+    auto req = HttpRequest::parse("POST /upload HTTP/1.1\r\n"
+                                  "Host: example.com\r\n"
+                                  "Transfer-Encoding: chunked\r\n"
+                                  "\r\n"
+                                  "Z\r\n"
+                                  "Wiki\r\n"
+                                  "0\r\n"
+                                  "\r\n");
+    REQUIRE(!req.valid);
+}
+
 // -- main -------------------------------------------------------------------
 
 int main() {
@@ -826,5 +886,9 @@ int main() {
     test_accept_max_body_content_length();
     test_decode_chunked_request_body();
     test_reject_unsupported_transfer_encoding();
+    test_accept_te_list_ending_in_chunked();
+    test_reject_te_list_not_ending_in_chunked();
+    test_accept_chunk_extensions();
+    test_reject_bad_chunk_size_token();
     return test_summary();
 }
