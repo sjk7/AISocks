@@ -33,9 +33,6 @@ Refactor `lib/src/SocketImpl.cpp` into focused internal units.
 ### Changes
 - Extract connect path into a separate internal module:
 - DNS worker gating
-- timed connect wait loop
-- event-fd setup/teardown
-- Keep send/recv loops in a dedicated transfer module.
 - Keep option getters/setters in an options-focused module.
 
 ### Benefits

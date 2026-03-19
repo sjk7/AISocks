@@ -1244,22 +1244,22 @@ bool SocketImpl::waitReady(bool forRead, std::chrono::milliseconds timeout) {
     }
 }
 
-bool SocketImpl::waitReadable(Milliseconds timeout) {
+bool SocketImpl::waitWithTimeoutError_(
+    bool forRead, Milliseconds timeout, const char* timeoutErrorMsg) {
     RETURN_IF_INVALID();
-    if (!waitReady(true, std::chrono::milliseconds(timeout.count))) {
-        setError(SocketError::Timeout, "waitReadable timed out");
+    if (!waitReady(forRead, std::chrono::milliseconds(timeout.count))) {
+        setError(SocketError::Timeout, timeoutErrorMsg);
         return false;
     }
     return true;
 }
 
+bool SocketImpl::waitReadable(Milliseconds timeout) {
+    return waitWithTimeoutError_(true, timeout, "waitReadable timed out");
+}
+
 bool SocketImpl::waitWritable(Milliseconds timeout) {
-    RETURN_IF_INVALID();
-    if (!waitReady(false, std::chrono::milliseconds(timeout.count))) {
-        setError(SocketError::Timeout, "waitWritable timed out");
-        return false;
-    }
-    return true;
+    return waitWithTimeoutError_(false, timeout, "waitWritable timed out");
 }
 
 bool SocketImpl::setReceiveBufferSize(int bytes) {

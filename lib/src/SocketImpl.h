@@ -198,6 +198,8 @@ class SocketImpl {
     bool setBoolOpt(int level, int optname, bool val, const char* errMsg);
     bool setTimeoutOpt(
         int optname, std::chrono::milliseconds ms, const char* errMsg);
+    bool waitWithTimeoutError_(
+        bool forRead, Milliseconds timeout, const char* timeoutErrorMsg);
     bool setBufSizeOpt(int optname, int bytes, const char* errMsg);
     bool waitReady(bool forRead, std::chrono::milliseconds timeout);
     static Endpoint endpointFromSockaddr(const sockaddr_storage& addr);
