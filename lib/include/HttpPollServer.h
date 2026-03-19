@@ -268,6 +268,12 @@ class HttpPollServer : public ServerBase<HttpClientState> {
         Result<TcpSocket>* result = nullptr)
         : ServerBase<HttpClientState>(bind, family, result), bind_(bind) {}
 
+    HttpPollServer(const HttpPollServer&) = delete;
+    HttpPollServer& operator=(const HttpPollServer&) = delete;
+    HttpPollServer(HttpPollServer&&) = delete;
+    HttpPollServer& operator=(HttpPollServer&&) = delete;
+    ~HttpPollServer() override = default;
+
     // ---- security / observability hooks ---------------------------------
 
     // Attach an IpFilter.  The server does NOT take ownership; the caller

@@ -188,6 +188,12 @@ class HttpClient {
     explicit HttpClient(Options options = Options{})
         : options_(std::move(options)) {}
 
+    HttpClient(const HttpClient&) = delete;
+    HttpClient& operator=(const HttpClient&) = delete;
+    HttpClient(HttpClient&&) = default;
+    HttpClient& operator=(HttpClient&&) = default;
+    ~HttpClient() = default;
+
     // HTTP methods
     Result<HttpClientResponse> get(const std::string& url) {
         return performRequest("GET", url, {}, {});
@@ -355,7 +361,8 @@ class HttpClient {
 #endif
     }
 
-    static bool hasTokenCI_(std::string_view field, std::string_view token) {
+    static bool hasTokenCI_(
+        std::string_view field, std::string_view token) noexcept {
         auto trim = [](std::string_view s) {
             size_t begin = 0;
             size_t end = s.size();
@@ -396,7 +403,7 @@ class HttpClient {
         return false;
     }
 
-    static bool shouldKeepAlive_(const HttpResponse& resp) {
+    static bool shouldKeepAlive_(const HttpResponse& resp) noexcept {
         const auto conn = resp.header("connection");
         const std::string_view connValue
             = conn ? std::string_view(*conn) : std::string_view{};
@@ -409,7 +416,8 @@ class HttpClient {
         return !hasTokenCI_(connValue, "close");
     }
 
-    static bool hasHeaderCI_(const HeaderMap& headers, std::string_view name) {
+    static bool hasHeaderCI_(
+        const HeaderMap& headers, std::string_view name) noexcept {
         auto equalsCI = [](std::string_view a, std::string_view b) {
             if (a.size() != b.size()) return false;
             for (size_t i = 0; i < a.size(); ++i) {
@@ -429,25 +437,25 @@ class HttpClient {
     }
 
 #ifdef AISOCKS_ENABLE_TLS
-    static std::string normalizeTlsHost_(std::string host) {
+    static std::string normalizeTlsHost_(std::string host) noexcept {
         while (host.size() > 1 && host.back() == '.') {
             host.pop_back();
         }
         return host;
     }
 
-    static bool isLikelyIpLiteral_(const std::string& host) {
+    static bool isLikelyIpLiteral_(const std::string& host) noexcept {
         return Socket::isValidIPv4(host) || Socket::isValidIPv6(host);
     }
 
-    static bool hasNonAsciiHostChar_(const std::string& host) {
+    static bool hasNonAsciiHostChar_(const std::string& host) noexcept {
         for (unsigned char c : host) {
             if (c > 0x7F) return true;
         }
         return false;
     }
 
-    static int lastTlsHandshakeSysError_() {
+    static int lastTlsHandshakeSysError_() noexcept {
 #ifdef _WIN32
         return WSAGetLastError();
 #else
@@ -455,7 +463,7 @@ class HttpClient {
 #endif
     }
 
-    static bool isLikelyTlsHandshakeTimeoutSysError_(int err) {
+    static bool isLikelyTlsHandshakeTimeoutSysError_(int err) noexcept {
 #ifdef _WIN32
         return err == WSAETIMEDOUT || err == WSAEWOULDBLOCK;
 #else
@@ -463,7 +471,7 @@ class HttpClient {
 #endif
     }
 
-    static bool tlsDebugEnabled_() {
+    static bool tlsDebugEnabled_() noexcept {
         const char* envName = "AISOCKS_TLS_DEBUG";
 #ifdef _MSC_VER
         char* value = nullptr;

@@ -66,6 +66,12 @@ class SimpleClient {
         }
     }
 
+    SimpleClient(const SimpleClient&) = delete;
+    SimpleClient& operator=(const SimpleClient&) = delete;
+    SimpleClient(SimpleClient&&) = default;
+    SimpleClient& operator=(SimpleClient&&) = default;
+    ~SimpleClient() = default;
+
     // ── Named run step ───────────────────────────────────────────────────────
     //
     // Invokes callback(socket) if the connection is live.  Returns true if
