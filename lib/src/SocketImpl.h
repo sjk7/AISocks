@@ -201,6 +201,8 @@ class SocketImpl {
     bool setBufSizeOpt(int optname, int bytes, const char* errMsg);
     bool waitReady(bool forRead, std::chrono::milliseconds timeout);
     static Endpoint endpointFromSockaddr(const sockaddr_storage& addr);
+    int doTransfer_(bool forSend, void* buffer, const void* data,
+        size_t length, const char* timeoutMsg, const char* failMsg);
 
     // connect() helpers
     bool resolveAddress_(const std::string& address, Port port,

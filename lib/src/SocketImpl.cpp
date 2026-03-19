@@ -688,25 +688,38 @@ bool SocketImpl::connect(
     return waitForConnect_(timeout);
 }
 
-int SocketImpl::send(const void* data, size_t length) {
+int SocketImpl::doTransfer_(bool forSend, void* buffer, const void* data,
+    size_t length, const char* timeoutMsg, const char* failMsg) {
     if (!isValid()) {
         setError(SocketError::InvalidSocket, "Socket is not valid");
         return -1;
     }
 
     for (;;) {
+        long long ioResult = SOCKET_ERROR_CODE;
+        if (forSend) {
 #ifdef _WIN32
-        int bytesSent = ::send(socketHandle, static_cast<const char*>(data),
-            static_cast<int>(length), 0);
+            ioResult = ::send(socketHandle, static_cast<const char*>(data),
+                static_cast<int>(length), 0);
 #elif defined(MSG_NOSIGNAL)
-        // Linux: return EPIPE instead of raising SIGPIPE on broken connection.
-        ssize_t bytesSent = ::send(socketHandle, data, length, MSG_NOSIGNAL);
+            // Linux: return EPIPE instead of raising SIGPIPE on broken
+            // connection.
+            ioResult = ::send(socketHandle, data, length, MSG_NOSIGNAL);
 #else
-        ssize_t bytesSent = ::send(socketHandle, data, length, 0);
+            ioResult = ::send(socketHandle, data, length, 0);
 #endif
-        if (bytesSent != SOCKET_ERROR_CODE) {
+        } else {
+#ifdef _WIN32
+            ioResult = ::recv(socketHandle, static_cast<char*>(buffer),
+                static_cast<int>(length), 0);
+#else
+            ioResult = ::recv(socketHandle, buffer, length, 0);
+#endif
+        }
+
+        if (ioResult != SOCKET_ERROR_CODE) {
             lastError = SocketError::None;
-            return static_cast<int>(bytesSent);
+            return static_cast<int>(ioResult);
         }
 
         int sysErr = getLastSystemError();
@@ -719,58 +732,29 @@ int SocketImpl::send(const void* data, size_t length) {
                 setError(SocketError::WouldBlock, "Operation would block");
                 return -1;
             case SocketError::Timeout:
-                setError(SocketError::Timeout, "send() timed out");
+                setError(SocketError::Timeout, timeoutMsg);
                 return -1;
             case SocketError::ConnectionReset:
                 setError(
                     SocketError::ConnectionReset, "Connection reset by peer");
                 return -1;
             default:
-                setError(SocketError::SendFailed, "Failed to send data");
+                setError(forSend ? SocketError::SendFailed
+                                 : SocketError::ReceiveFailed,
+                    failMsg);
                 return -1;
         }
     }
 }
 
+int SocketImpl::send(const void* data, size_t length) {
+    return doTransfer_(
+        true, nullptr, data, length, "send() timed out", "Failed to send data");
+}
+
 int SocketImpl::receive(void* buffer, size_t length) {
-    if (!isValid()) {
-        setError(SocketError::InvalidSocket, "Socket is not valid");
-        return -1;
-    }
-
-    for (;;) {
-#ifdef _WIN32
-        int bytesReceived = ::recv(socketHandle, static_cast<char*>(buffer),
-            static_cast<int>(length), 0);
-#else
-        ssize_t bytesReceived = ::recv(socketHandle, buffer, length, 0);
-#endif
-        if (bytesReceived != SOCKET_ERROR_CODE) {
-            lastError = SocketError::None;
-            return static_cast<int>(bytesReceived);
-        }
-
-        int sysErr = getLastSystemError();
-#ifndef _WIN32
-        if (sysErr == EINTR)
-            continue; // signal interrupted; retry transparently
-#endif
-        switch (classifyTransferSysError(sysErr)) {
-            case SocketError::WouldBlock:
-                setError(SocketError::WouldBlock, "Operation would block");
-                return -1;
-            case SocketError::Timeout:
-                setError(SocketError::Timeout, "recv() timed out");
-                return -1;
-            case SocketError::ConnectionReset:
-                setError(
-                    SocketError::ConnectionReset, "Connection reset by peer");
-                return -1;
-            default:
-                setError(SocketError::ReceiveFailed, "Failed to receive data");
-                return -1;
-        }
-    }
+    return doTransfer_(false, buffer, nullptr, length, "recv() timed out",
+        "Failed to receive data");
 }
 
 bool SocketImpl::setBlocking(bool blocking) {
