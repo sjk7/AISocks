@@ -285,6 +285,8 @@
 			"args": [
 				"--test-dir",
 				"build-relwithdebinfo",
+				"-j",
+				"8",
 				"--output-on-failure"
 			],
 			"isBackground": false,

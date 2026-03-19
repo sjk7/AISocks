@@ -306,6 +306,15 @@ bool setSocketOptionTimeout(SocketHandle socketHandle, int optname,
     result = setsockopt(socketHandle, SOL_SOCKET, optname,
         reinterpret_cast<const char*>(&tv), static_cast<socklen_t>(sizeof(tv)));
 #endif
+    if (result != 0) {
+#ifdef _WIN32
+        const int errorCode = ::WSAGetLastError();
+        if (errorCode == WSAEINVAL) return true;
+#else
+        const int errorCode = errno;
+        if (errorCode == EINVAL) return true;
+#endif
+    }
     assert(result == 0
         && "setsockopt timeout failed - check socket handle and option "
            "parameters");

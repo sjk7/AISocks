@@ -37,6 +37,18 @@
             }
         },
         {
+            "name": "mac-pch-tests-noexamples-tls",
+            "inherits": "base",
+            "displayName": "macOS PCH tests no examples TLS",
+            "binaryDir": "${sourceDir}/build-mac-pch-tests-tls",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "BUILD_EXAMPLES": "OFF",
+                "BUILD_TESTS": "ON",
+                "AISOCKS_ENABLE_TLS": "ON"
+            }
+        },
+        {
             "name": "fast-dev",
             "inherits": "base",
             "displayName": "Fast Dev (Debug, tests only)",
@@ -458,6 +470,15 @@
             "displayName": "Build test_http_poll_server",
             "targets": [
                 "test_http_poll_server"
+            ]
+        },
+        {
+            "name": "test-http-poll-server-mac-pch-tls",
+            "inherits": "base-build",
+            "configurePreset": "mac-pch-tests-noexamples-tls",
+            "displayName": "Build test_http_poll_server_mac_pch (TLS, no examples)",
+            "targets": [
+                "test_http_poll_server_mac_pch"
             ]
         },
         {

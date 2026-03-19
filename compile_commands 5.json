@@ -1,0 +1,620 @@
+[
+{
+  "directory": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo",
+  "command": "/usr/bin/c++ -DAISOCKS_ENABLE_TLS=1 -I/Users/stevekerr/Documents/code/AISocks/lib/include -isystem /opt/homebrew/Cellar/openssl@3/3.6.1/include -O2 -g -DNDEBUG -std=c++17 -arch arm64 -Wall -Wextra -Wconversion -Wno-sign-conversion -Werror -o CMakeFiles/aiSocksExample.dir/examples/main.cpp.o -c /Users/stevekerr/Documents/code/AISocks/examples/main.cpp",
+  "file": "/Users/stevekerr/Documents/code/AISocks/examples/main.cpp",
+  "output": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo/CMakeFiles/aiSocksExample.dir/examples/main.cpp.o"
+},
+{
+  "directory": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo",
+  "command": "/usr/bin/c++ -DAISOCKS_ENABLE_TLS=1 -I/Users/stevekerr/Documents/code/AISocks/lib/include -isystem /opt/homebrew/Cellar/openssl@3/3.6.1/include -O2 -g -DNDEBUG -std=c++17 -arch arm64 -Wall -Wextra -Wconversion -Wno-sign-conversion -Werror -o CMakeFiles/aiSocksNonBlocking.dir/examples/nonblocking.cpp.o -c /Users/stevekerr/Documents/code/AISocks/examples/nonblocking.cpp",
+  "file": "/Users/stevekerr/Documents/code/AISocks/examples/nonblocking.cpp",
+  "output": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo/CMakeFiles/aiSocksNonBlocking.dir/examples/nonblocking.cpp.o"
+},
+{
+  "directory": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo",
+  "command": "/usr/bin/c++ -DAISOCKS_ENABLE_TLS=1 -I/Users/stevekerr/Documents/code/AISocks/lib/include -isystem /opt/homebrew/Cellar/openssl@3/3.6.1/include -O2 -g -DNDEBUG -std=c++17 -arch arm64 -Wall -Wextra -Wconversion -Wno-sign-conversion -Werror -o CMakeFiles/aiSocksTestBlocking.dir/examples/test_blocking_state.cpp.o -c /Users/stevekerr/Documents/code/AISocks/examples/test_blocking_state.cpp",
+  "file": "/Users/stevekerr/Documents/code/AISocks/examples/test_blocking_state.cpp",
+  "output": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo/CMakeFiles/aiSocksTestBlocking.dir/examples/test_blocking_state.cpp.o"
+},
+{
+  "directory": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo",
+  "command": "/usr/bin/c++ -DAISOCKS_ENABLE_TLS=1 -I/Users/stevekerr/Documents/code/AISocks/lib/include -isystem /opt/homebrew/Cellar/openssl@3/3.6.1/include -O2 -g -DNDEBUG -std=c++17 -arch arm64 -Wall -Wextra -Wconversion -Wno-sign-conversion -Werror -o CMakeFiles/aiSocksTestIPv6.dir/examples/test_ipv6.cpp.o -c /Users/stevekerr/Documents/code/AISocks/examples/test_ipv6.cpp",
+  "file": "/Users/stevekerr/Documents/code/AISocks/examples/test_ipv6.cpp",
+  "output": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo/CMakeFiles/aiSocksTestIPv6.dir/examples/test_ipv6.cpp.o"
+},
+{
+  "directory": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo",
+  "command": "/usr/bin/c++ -DAISOCKS_ENABLE_TLS=1 -I/Users/stevekerr/Documents/code/AISocks/lib/include -isystem /opt/homebrew/Cellar/openssl@3/3.6.1/include -O2 -g -DNDEBUG -std=c++17 -arch arm64 -Wall -Wextra -Wconversion -Wno-sign-conversion -Werror -o CMakeFiles/aiSocksTestIPUtils.dir/examples/test_ip_utils.cpp.o -c /Users/stevekerr/Documents/code/AISocks/examples/test_ip_utils.cpp",
+  "file": "/Users/stevekerr/Documents/code/AISocks/examples/test_ip_utils.cpp",
+  "output": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo/CMakeFiles/aiSocksTestIPUtils.dir/examples/test_ip_utils.cpp.o"
+},
+{
+  "directory": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo",
+  "command": "/usr/bin/c++ -DAISOCKS_ENABLE_TLS=1 -I/Users/stevekerr/Documents/code/AISocks/lib/include -isystem /opt/homebrew/Cellar/openssl@3/3.6.1/include -O2 -g -DNDEBUG -std=c++17 -arch arm64 -Wall -Wextra -Wconversion -Wno-sign-conversion -Werror -o CMakeFiles/aiSocksTestMove.dir/examples/test_move_semantics.cpp.o -c /Users/stevekerr/Documents/code/AISocks/examples/test_move_semantics.cpp",
+  "file": "/Users/stevekerr/Documents/code/AISocks/examples/test_move_semantics.cpp",
+  "output": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo/CMakeFiles/aiSocksTestMove.dir/examples/test_move_semantics.cpp.o"
+},
+{
+  "directory": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo",
+  "command": "/usr/bin/c++ -DAISOCKS_ENABLE_TLS=1 -I/Users/stevekerr/Documents/code/AISocks/lib/include -isystem /opt/homebrew/Cellar/openssl@3/3.6.1/include -O2 -g -DNDEBUG -std=c++17 -arch arm64 -Wall -Wextra -Wconversion -Wno-sign-conversion -Werror -o CMakeFiles/aiSocksPeerLogger.dir/examples/peer_logger.cpp.o -c /Users/stevekerr/Documents/code/AISocks/examples/peer_logger.cpp",
+  "file": "/Users/stevekerr/Documents/code/AISocks/examples/peer_logger.cpp",
+  "output": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo/CMakeFiles/aiSocksPeerLogger.dir/examples/peer_logger.cpp.o"
+},
+{
+  "directory": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo",
+  "command": "/usr/bin/c++ -DAISOCKS_ENABLE_TLS=1 -I/Users/stevekerr/Documents/code/AISocks/lib/include -isystem /opt/homebrew/Cellar/openssl@3/3.6.1/include -O2 -g -DNDEBUG -std=c++17 -arch arm64 -Wall -Wextra -Wconversion -Wno-sign-conversion -Werror -o CMakeFiles/aiSocksGoogleClient.dir/examples/google_client.cpp.o -c /Users/stevekerr/Documents/code/AISocks/examples/google_client.cpp",
+  "file": "/Users/stevekerr/Documents/code/AISocks/examples/google_client.cpp",
+  "output": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo/CMakeFiles/aiSocksGoogleClient.dir/examples/google_client.cpp.o"
+},
+{
+  "directory": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo",
+  "command": "/usr/bin/c++ -DAISOCKS_ENABLE_TLS=1 -I/Users/stevekerr/Documents/code/AISocks/lib/include -isystem /opt/homebrew/Cellar/openssl@3/3.6.1/include -O2 -g -DNDEBUG -std=c++17 -arch arm64 -Wall -Wextra -Wconversion -Wno-sign-conversion -Werror -o CMakeFiles/aiSocksSocketFactoryDemo.dir/examples/socket_factory_demo.cpp.o -c /Users/stevekerr/Documents/code/AISocks/examples/socket_factory_demo.cpp",
+  "file": "/Users/stevekerr/Documents/code/AISocks/examples/socket_factory_demo.cpp",
+  "output": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo/CMakeFiles/aiSocksSocketFactoryDemo.dir/examples/socket_factory_demo.cpp.o"
+},
+{
+  "directory": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo",
+  "command": "/usr/bin/c++ -DAISOCKS_ENABLE_TLS=1 -I/Users/stevekerr/Documents/code/AISocks/lib/include -isystem /opt/homebrew/Cellar/openssl@3/3.6.1/include -O2 -g -DNDEBUG -std=c++17 -arch arm64 -Wall -Wextra -Wconversion -Wno-sign-conversion -Werror -o CMakeFiles/server_launchpad.dir/examples/server_launchpad.cpp.o -c /Users/stevekerr/Documents/code/AISocks/examples/server_launchpad.cpp",
+  "file": "/Users/stevekerr/Documents/code/AISocks/examples/server_launchpad.cpp",
+  "output": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo/CMakeFiles/server_launchpad.dir/examples/server_launchpad.cpp.o"
+},
+{
+  "directory": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo",
+  "command": "/usr/bin/c++ -DAISOCKS_ENABLE_TLS=1 -I/Users/stevekerr/Documents/code/AISocks/lib/include -isystem /opt/homebrew/Cellar/openssl@3/3.6.1/include -O2 -g -DNDEBUG -std=c++17 -arch arm64 -Wall -Wextra -Wconversion -Wno-sign-conversion -Werror -o CMakeFiles/low_level_http_server.dir/examples/low_level_http_server.cpp.o -c /Users/stevekerr/Documents/code/AISocks/examples/low_level_http_server.cpp",
+  "file": "/Users/stevekerr/Documents/code/AISocks/examples/low_level_http_server.cpp",
+  "output": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo/CMakeFiles/low_level_http_server.dir/examples/low_level_http_server.cpp.o"
+},
+{
+  "directory": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo",
+  "command": "/usr/bin/c++ -DAISOCKS_ENABLE_TLS=1 -I/Users/stevekerr/Documents/code/AISocks/lib/include -isystem /opt/homebrew/Cellar/openssl@3/3.6.1/include -O2 -g -DNDEBUG -std=c++17 -arch arm64 -Wall -Wextra -Wconversion -Wno-sign-conversion -Werror -o CMakeFiles/simple_file_server.dir/examples/simple_file_server.cpp.o -c /Users/stevekerr/Documents/code/AISocks/examples/simple_file_server.cpp",
+  "file": "/Users/stevekerr/Documents/code/AISocks/examples/simple_file_server.cpp",
+  "output": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo/CMakeFiles/simple_file_server.dir/examples/simple_file_server.cpp.o"
+},
+{
+  "directory": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo",
+  "command": "/usr/bin/c++ -DAISOCKS_ENABLE_TLS=1 -I/Users/stevekerr/Documents/code/AISocks/lib/include -isystem /opt/homebrew/Cellar/openssl@3/3.6.1/include -O2 -g -DNDEBUG -std=c++17 -arch arm64 -Wall -Wextra -Wconversion -Wno-sign-conversion -Werror -o CMakeFiles/advanced_file_server.dir/examples/advanced_file_server.cpp.o -c /Users/stevekerr/Documents/code/AISocks/examples/advanced_file_server.cpp",
+  "file": "/Users/stevekerr/Documents/code/AISocks/examples/advanced_file_server.cpp",
+  "output": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo/CMakeFiles/advanced_file_server.dir/examples/advanced_file_server.cpp.o"
+},
+{
+  "directory": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo",
+  "command": "/usr/bin/c++ -DAISOCKS_ENABLE_TLS=1 -I/Users/stevekerr/Documents/code/AISocks/lib/include -isystem /opt/homebrew/Cellar/openssl@3/3.6.1/include -O2 -g -DNDEBUG -std=c++17 -arch arm64 -Wall -Wextra -Wconversion -Wno-sign-conversion -Werror -o CMakeFiles/advanced_file_server.dir/examples/advanced_file_server_pages.cpp.o -c /Users/stevekerr/Documents/code/AISocks/examples/advanced_file_server_pages.cpp",
+  "file": "/Users/stevekerr/Documents/code/AISocks/examples/advanced_file_server_pages.cpp",
+  "output": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo/CMakeFiles/advanced_file_server.dir/examples/advanced_file_server_pages.cpp.o"
+},
+{
+  "directory": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo",
+  "command": "/usr/bin/c++ -DAISOCKS_ENABLE_TLS=1 -I/Users/stevekerr/Documents/code/AISocks/lib/include -isystem /opt/homebrew/Cellar/openssl@3/3.6.1/include -O2 -g -DNDEBUG -std=c++17 -arch arm64 -Wall -Wextra -Wconversion -Wno-sign-conversion -Werror -o CMakeFiles/throughput_client.dir/examples/throughput_client.cpp.o -c /Users/stevekerr/Documents/code/AISocks/examples/throughput_client.cpp",
+  "file": "/Users/stevekerr/Documents/code/AISocks/examples/throughput_client.cpp",
+  "output": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo/CMakeFiles/throughput_client.dir/examples/throughput_client.cpp.o"
+},
+{
+  "directory": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo",
+  "command": "/usr/bin/c++ -DAISOCKS_ENABLE_TLS=1 -I/Users/stevekerr/Documents/code/AISocks/lib/include -isystem /opt/homebrew/Cellar/openssl@3/3.6.1/include -O2 -g -DNDEBUG -std=c++17 -arch arm64 -Wall -Wextra -Wconversion -Wno-sign-conversion -Werror -o CMakeFiles/unix_throughput.dir/examples/unix_throughput.cpp.o -c /Users/stevekerr/Documents/code/AISocks/examples/unix_throughput.cpp",
+  "file": "/Users/stevekerr/Documents/code/AISocks/examples/unix_throughput.cpp",
+  "output": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo/CMakeFiles/unix_throughput.dir/examples/unix_throughput.cpp.o"
+},
+{
+  "directory": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo",
+  "command": "/usr/bin/c++ -DAISOCKS_ENABLE_TLS=1 -I/Users/stevekerr/Documents/code/AISocks/lib/include -isystem /opt/homebrew/Cellar/openssl@3/3.6.1/include -O2 -g -DNDEBUG -std=c++17 -arch arm64 -Wall -Wextra -Wconversion -Wno-sign-conversion -Werror -o CMakeFiles/http_client_example.dir/examples/http_client_example.cpp.o -c /Users/stevekerr/Documents/code/AISocks/examples/http_client_example.cpp",
+  "file": "/Users/stevekerr/Documents/code/AISocks/examples/http_client_example.cpp",
+  "output": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo/CMakeFiles/http_client_example.dir/examples/http_client_example.cpp.o"
+},
+{
+  "directory": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo",
+  "command": "/usr/bin/c++ -DAISOCKS_ENABLE_TLS=1 -I/Users/stevekerr/Documents/code/AISocks/lib/include -isystem /opt/homebrew/Cellar/openssl@3/3.6.1/include -O2 -g -DNDEBUG -std=c++17 -arch arm64 -Wall -Wextra -Wconversion -Wno-sign-conversion -Werror -o CMakeFiles/test_efficiency.dir/test_efficiency.cpp.o -c /Users/stevekerr/Documents/code/AISocks/test_efficiency.cpp",
+  "file": "/Users/stevekerr/Documents/code/AISocks/test_efficiency.cpp",
+  "output": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo/CMakeFiles/test_efficiency.dir/test_efficiency.cpp.o"
+},
+{
+  "directory": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo",
+  "command": "/usr/bin/c++ -DAISOCKS_ENABLE_TLS=1 -I/Users/stevekerr/Documents/code/AISocks/lib/include -isystem /opt/homebrew/Cellar/openssl@3/3.6.1/include -O2 -g -DNDEBUG -std=c++17 -arch arm64 -Wall -Wextra -Wconversion -Wno-sign-conversion -Werror -o CMakeFiles/dual_http_https_server.dir/examples/dual_http_https_server.cpp.o -c /Users/stevekerr/Documents/code/AISocks/examples/dual_http_https_server.cpp",
+  "file": "/Users/stevekerr/Documents/code/AISocks/examples/dual_http_https_server.cpp",
+  "output": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo/CMakeFiles/dual_http_https_server.dir/examples/dual_http_https_server.cpp.o"
+},
+{
+  "directory": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo",
+  "command": "/usr/bin/c++ -DAISOCKS_ENABLE_TLS=1 -DAISOCKS_TESTING=1 -I/Users/stevekerr/Documents/code/AISocks/lib/include -I/Users/stevekerr/Documents/code/AISocks/lib/src -isystem /opt/homebrew/Cellar/openssl@3/3.6.1/include -O2 -g -DNDEBUG -std=c++17 -arch arm64 -Wall -Wextra -Wconversion -Wno-sign-conversion -Werror -Wpedantic -Wno-shadow -o lib/CMakeFiles/aiSocksLib.dir/src/pch.cpp.o -c /Users/stevekerr/Documents/code/AISocks/lib/src/pch.cpp",
+  "file": "/Users/stevekerr/Documents/code/AISocks/lib/src/pch.cpp",
+  "output": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo/lib/CMakeFiles/aiSocksLib.dir/src/pch.cpp.o"
+},
+{
+  "directory": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo",
+  "command": "/usr/bin/c++ -DAISOCKS_ENABLE_TLS=1 -DAISOCKS_TESTING=1 -I/Users/stevekerr/Documents/code/AISocks/lib/include -I/Users/stevekerr/Documents/code/AISocks/lib/src -isystem /opt/homebrew/Cellar/openssl@3/3.6.1/include -O2 -g -DNDEBUG -std=c++17 -arch arm64 -Wall -Wextra -Wconversion -Wno-sign-conversion -Werror -Wpedantic -Wno-shadow -o lib/CMakeFiles/aiSocksLib.dir/src/Socket.cpp.o -c /Users/stevekerr/Documents/code/AISocks/lib/src/Socket.cpp",
+  "file": "/Users/stevekerr/Documents/code/AISocks/lib/src/Socket.cpp",
+  "output": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo/lib/CMakeFiles/aiSocksLib.dir/src/Socket.cpp.o"
+},
+{
+  "directory": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo",
+  "command": "/usr/bin/c++ -DAISOCKS_ENABLE_TLS=1 -DAISOCKS_TESTING=1 -I/Users/stevekerr/Documents/code/AISocks/lib/include -I/Users/stevekerr/Documents/code/AISocks/lib/src -isystem /opt/homebrew/Cellar/openssl@3/3.6.1/include -O2 -g -DNDEBUG -std=c++17 -arch arm64 -Wall -Wextra -Wconversion -Wno-sign-conversion -Werror -Wpedantic -Wno-shadow -o lib/CMakeFiles/aiSocksLib.dir/src/TcpSocket.cpp.o -c /Users/stevekerr/Documents/code/AISocks/lib/src/TcpSocket.cpp",
+  "file": "/Users/stevekerr/Documents/code/AISocks/lib/src/TcpSocket.cpp",
+  "output": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo/lib/CMakeFiles/aiSocksLib.dir/src/TcpSocket.cpp.o"
+},
+{
+  "directory": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo",
+  "command": "/usr/bin/c++ -DAISOCKS_ENABLE_TLS=1 -DAISOCKS_TESTING=1 -I/Users/stevekerr/Documents/code/AISocks/lib/include -I/Users/stevekerr/Documents/code/AISocks/lib/src -isystem /opt/homebrew/Cellar/openssl@3/3.6.1/include -O2 -g -DNDEBUG -std=c++17 -arch arm64 -Wall -Wextra -Wconversion -Wno-sign-conversion -Werror -Wpedantic -Wno-shadow -o lib/CMakeFiles/aiSocksLib.dir/src/UdpSocket.cpp.o -c /Users/stevekerr/Documents/code/AISocks/lib/src/UdpSocket.cpp",
+  "file": "/Users/stevekerr/Documents/code/AISocks/lib/src/UdpSocket.cpp",
+  "output": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo/lib/CMakeFiles/aiSocksLib.dir/src/UdpSocket.cpp.o"
+},
+{
+  "directory": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo",
+  "command": "/usr/bin/c++ -DAISOCKS_ENABLE_TLS=1 -DAISOCKS_TESTING=1 -I/Users/stevekerr/Documents/code/AISocks/lib/include -I/Users/stevekerr/Documents/code/AISocks/lib/src -isystem /opt/homebrew/Cellar/openssl@3/3.6.1/include -O2 -g -DNDEBUG -std=c++17 -arch arm64 -Wall -Wextra -Wconversion -Wno-sign-conversion -Werror -Wpedantic -Wno-shadow -o lib/CMakeFiles/aiSocksLib.dir/src/SocketImpl.cpp.o -c /Users/stevekerr/Documents/code/AISocks/lib/src/SocketImpl.cpp",
+  "file": "/Users/stevekerr/Documents/code/AISocks/lib/src/SocketImpl.cpp",
+  "output": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo/lib/CMakeFiles/aiSocksLib.dir/src/SocketImpl.cpp.o"
+},
+{
+  "directory": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo",
+  "command": "/usr/bin/c++ -DAISOCKS_ENABLE_TLS=1 -DAISOCKS_TESTING=1 -I/Users/stevekerr/Documents/code/AISocks/lib/include -I/Users/stevekerr/Documents/code/AISocks/lib/src -isystem /opt/homebrew/Cellar/openssl@3/3.6.1/include -O2 -g -DNDEBUG -std=c++17 -arch arm64 -Wall -Wextra -Wconversion -Wno-sign-conversion -Werror -Wpedantic -Wno-shadow -o lib/CMakeFiles/aiSocksLib.dir/src/SocketImplHelpers.cpp.o -c /Users/stevekerr/Documents/code/AISocks/lib/src/SocketImplHelpers.cpp",
+  "file": "/Users/stevekerr/Documents/code/AISocks/lib/src/SocketImplHelpers.cpp",
+  "output": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo/lib/CMakeFiles/aiSocksLib.dir/src/SocketImplHelpers.cpp.o"
+},
+{
+  "directory": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo",
+  "command": "/usr/bin/c++ -DAISOCKS_ENABLE_TLS=1 -DAISOCKS_TESTING=1 -I/Users/stevekerr/Documents/code/AISocks/lib/include -I/Users/stevekerr/Documents/code/AISocks/lib/src -isystem /opt/homebrew/Cellar/openssl@3/3.6.1/include -O2 -g -DNDEBUG -std=c++17 -arch arm64 -Wall -Wextra -Wconversion -Wno-sign-conversion -Werror -Wpedantic -Wno-shadow -o lib/CMakeFiles/aiSocksLib.dir/src/SocketFactory.cpp.o -c /Users/stevekerr/Documents/code/AISocks/lib/src/SocketFactory.cpp",
+  "file": "/Users/stevekerr/Documents/code/AISocks/lib/src/SocketFactory.cpp",
+  "output": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo/lib/CMakeFiles/aiSocksLib.dir/src/SocketFactory.cpp.o"
+},
+{
+  "directory": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo",
+  "command": "/usr/bin/c++ -DAISOCKS_ENABLE_TLS=1 -DAISOCKS_TESTING=1 -I/Users/stevekerr/Documents/code/AISocks/lib/include -I/Users/stevekerr/Documents/code/AISocks/lib/src -isystem /opt/homebrew/Cellar/openssl@3/3.6.1/include -O2 -g -DNDEBUG -std=c++17 -arch arm64 -Wall -Wextra -Wconversion -Wno-sign-conversion -Werror -Wpedantic -Wno-shadow -o lib/CMakeFiles/aiSocksLib.dir/src/UnixSocket.cpp.o -c /Users/stevekerr/Documents/code/AISocks/lib/src/UnixSocket.cpp",
+  "file": "/Users/stevekerr/Documents/code/AISocks/lib/src/UnixSocket.cpp",
+  "output": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo/lib/CMakeFiles/aiSocksLib.dir/src/UnixSocket.cpp.o"
+},
+{
+  "directory": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo",
+  "command": "/usr/bin/c++ -DAISOCKS_ENABLE_TLS=1 -DAISOCKS_TESTING=1 -I/Users/stevekerr/Documents/code/AISocks/lib/include -I/Users/stevekerr/Documents/code/AISocks/lib/src -isystem /opt/homebrew/Cellar/openssl@3/3.6.1/include -O2 -g -DNDEBUG -std=c++17 -arch arm64 -Wall -Wextra -Wconversion -Wno-sign-conversion -Werror -Wpedantic -Wno-shadow -o lib/CMakeFiles/aiSocksLib.dir/src/Result.cpp.o -c /Users/stevekerr/Documents/code/AISocks/lib/src/Result.cpp",
+  "file": "/Users/stevekerr/Documents/code/AISocks/lib/src/Result.cpp",
+  "output": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo/lib/CMakeFiles/aiSocksLib.dir/src/Result.cpp.o"
+},
+{
+  "directory": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo",
+  "command": "/usr/bin/c++ -DAISOCKS_ENABLE_TLS=1 -DAISOCKS_TESTING=1 -I/Users/stevekerr/Documents/code/AISocks/lib/include -I/Users/stevekerr/Documents/code/AISocks/lib/src -isystem /opt/homebrew/Cellar/openssl@3/3.6.1/include -O2 -g -DNDEBUG -std=c++17 -arch arm64 -Wall -Wextra -Wconversion -Wno-sign-conversion -Werror -Wpedantic -Wno-shadow -o lib/CMakeFiles/aiSocksLib.dir/src/ServerSignal.cpp.o -c /Users/stevekerr/Documents/code/AISocks/lib/src/ServerSignal.cpp",
+  "file": "/Users/stevekerr/Documents/code/AISocks/lib/src/ServerSignal.cpp",
+  "output": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo/lib/CMakeFiles/aiSocksLib.dir/src/ServerSignal.cpp.o"
+},
+{
+  "directory": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo",
+  "command": "/usr/bin/c++ -DAISOCKS_ENABLE_TLS=1 -DAISOCKS_TESTING=1 -I/Users/stevekerr/Documents/code/AISocks/lib/include -I/Users/stevekerr/Documents/code/AISocks/lib/src -isystem /opt/homebrew/Cellar/openssl@3/3.6.1/include -O2 -g -DNDEBUG -std=c++17 -arch arm64 -Wall -Wextra -Wconversion -Wno-sign-conversion -Werror -Wpedantic -Wno-shadow -o lib/CMakeFiles/aiSocksLib.dir/src/PathHelper.cpp.o -c /Users/stevekerr/Documents/code/AISocks/lib/src/PathHelper.cpp",
+  "file": "/Users/stevekerr/Documents/code/AISocks/lib/src/PathHelper.cpp",
+  "output": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo/lib/CMakeFiles/aiSocksLib.dir/src/PathHelper.cpp.o"
+},
+{
+  "directory": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo",
+  "command": "/usr/bin/c++ -DAISOCKS_ENABLE_TLS=1 -DAISOCKS_TESTING=1 -I/Users/stevekerr/Documents/code/AISocks/lib/include -I/Users/stevekerr/Documents/code/AISocks/lib/src -isystem /opt/homebrew/Cellar/openssl@3/3.6.1/include -O2 -g -DNDEBUG -std=c++17 -arch arm64 -Wall -Wextra -Wconversion -Wno-sign-conversion -Werror -Wpedantic -Wno-shadow -o lib/CMakeFiles/aiSocksLib.dir/src/FileIO.cpp.o -c /Users/stevekerr/Documents/code/AISocks/lib/src/FileIO.cpp",
+  "file": "/Users/stevekerr/Documents/code/AISocks/lib/src/FileIO.cpp",
+  "output": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo/lib/CMakeFiles/aiSocksLib.dir/src/FileIO.cpp.o"
+},
+{
+  "directory": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo",
+  "command": "/usr/bin/c++ -DAISOCKS_ENABLE_TLS=1 -DAISOCKS_TESTING=1 -I/Users/stevekerr/Documents/code/AISocks/lib/include -I/Users/stevekerr/Documents/code/AISocks/lib/src -isystem /opt/homebrew/Cellar/openssl@3/3.6.1/include -O2 -g -DNDEBUG -std=c++17 -arch arm64 -Wall -Wextra -Wconversion -Wno-sign-conversion -Werror -Wpedantic -Wno-shadow -o lib/CMakeFiles/aiSocksLib.dir/src/FileCache.cpp.o -c /Users/stevekerr/Documents/code/AISocks/lib/src/FileCache.cpp",
+  "file": "/Users/stevekerr/Documents/code/AISocks/lib/src/FileCache.cpp",
+  "output": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo/lib/CMakeFiles/aiSocksLib.dir/src/FileCache.cpp.o"
+},
+{
+  "directory": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo",
+  "command": "/usr/bin/c++ -DAISOCKS_ENABLE_TLS=1 -DAISOCKS_TESTING=1 -I/Users/stevekerr/Documents/code/AISocks/lib/include -I/Users/stevekerr/Documents/code/AISocks/lib/src -isystem /opt/homebrew/Cellar/openssl@3/3.6.1/include -O2 -g -DNDEBUG -std=c++17 -arch arm64 -Wall -Wextra -Wconversion -Wno-sign-conversion -Werror -Wpedantic -Wno-shadow -o lib/CMakeFiles/aiSocksLib.dir/src/HttpPollServer.cpp.o -c /Users/stevekerr/Documents/code/AISocks/lib/src/HttpPollServer.cpp",
+  "file": "/Users/stevekerr/Documents/code/AISocks/lib/src/HttpPollServer.cpp",
+  "output": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo/lib/CMakeFiles/aiSocksLib.dir/src/HttpPollServer.cpp.o"
+},
+{
+  "directory": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo",
+  "command": "/usr/bin/c++ -DAISOCKS_ENABLE_TLS=1 -DAISOCKS_TESTING=1 -I/Users/stevekerr/Documents/code/AISocks/lib/include -I/Users/stevekerr/Documents/code/AISocks/lib/src -isystem /opt/homebrew/Cellar/openssl@3/3.6.1/include -O2 -g -DNDEBUG -std=c++17 -arch arm64 -Wall -Wextra -Wconversion -Wno-sign-conversion -Werror -Wpedantic -Wno-shadow -o lib/CMakeFiles/aiSocksLib.dir/src/HttpFileServer.cpp.o -c /Users/stevekerr/Documents/code/AISocks/lib/src/HttpFileServer.cpp",
+  "file": "/Users/stevekerr/Documents/code/AISocks/lib/src/HttpFileServer.cpp",
+  "output": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo/lib/CMakeFiles/aiSocksLib.dir/src/HttpFileServer.cpp.o"
+},
+{
+  "directory": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo",
+  "command": "/usr/bin/c++ -DAISOCKS_ENABLE_TLS=1 -DAISOCKS_TESTING=1 -I/Users/stevekerr/Documents/code/AISocks/lib/include -I/Users/stevekerr/Documents/code/AISocks/lib/src -isystem /opt/homebrew/Cellar/openssl@3/3.6.1/include -O2 -g -DNDEBUG -std=c++17 -arch arm64 -Wall -Wextra -Wconversion -Wno-sign-conversion -Werror -Wpedantic -Wno-shadow -o lib/CMakeFiles/aiSocksLib.dir/src/HttpRequest.cpp.o -c /Users/stevekerr/Documents/code/AISocks/lib/src/HttpRequest.cpp",
+  "file": "/Users/stevekerr/Documents/code/AISocks/lib/src/HttpRequest.cpp",
+  "output": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo/lib/CMakeFiles/aiSocksLib.dir/src/HttpRequest.cpp.o"
+},
+{
+  "directory": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo",
+  "command": "/usr/bin/c++ -DAISOCKS_ENABLE_TLS=1 -DAISOCKS_TESTING=1 -I/Users/stevekerr/Documents/code/AISocks/lib/include -I/Users/stevekerr/Documents/code/AISocks/lib/src -isystem /opt/homebrew/Cellar/openssl@3/3.6.1/include -O2 -g -DNDEBUG -std=c++17 -arch arm64 -Wall -Wextra -Wconversion -Wno-sign-conversion -Werror -Wpedantic -Wno-shadow -o lib/CMakeFiles/aiSocksLib.dir/src/HttpResponse.cpp.o -c /Users/stevekerr/Documents/code/AISocks/lib/src/HttpResponse.cpp",
+  "file": "/Users/stevekerr/Documents/code/AISocks/lib/src/HttpResponse.cpp",
+  "output": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo/lib/CMakeFiles/aiSocksLib.dir/src/HttpResponse.cpp.o"
+},
+{
+  "directory": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo",
+  "command": "/usr/bin/c++ -DAISOCKS_ENABLE_TLS=1 -DAISOCKS_TESTING=1 -I/Users/stevekerr/Documents/code/AISocks/lib/include -I/Users/stevekerr/Documents/code/AISocks/lib/src -isystem /opt/homebrew/Cellar/openssl@3/3.6.1/include -O2 -g -DNDEBUG -std=c++17 -arch arm64 -Wall -Wextra -Wconversion -Wno-sign-conversion -Werror -Wpedantic -Wno-shadow -o lib/CMakeFiles/aiSocksLib.dir/src/UrlCodec.cpp.o -c /Users/stevekerr/Documents/code/AISocks/lib/src/UrlCodec.cpp",
+  "file": "/Users/stevekerr/Documents/code/AISocks/lib/src/UrlCodec.cpp",
+  "output": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo/lib/CMakeFiles/aiSocksLib.dir/src/UrlCodec.cpp.o"
+},
+{
+  "directory": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo",
+  "command": "/usr/bin/c++ -DAISOCKS_ENABLE_TLS=1 -DAISOCKS_TESTING=1 -I/Users/stevekerr/Documents/code/AISocks/lib/include -I/Users/stevekerr/Documents/code/AISocks/lib/src -isystem /opt/homebrew/Cellar/openssl@3/3.6.1/include -O2 -g -DNDEBUG -std=c++17 -arch arm64 -Wall -Wextra -Wconversion -Wno-sign-conversion -Werror -Wpedantic -Wno-shadow -o lib/CMakeFiles/aiSocksLib.dir/src/IpFilter.cpp.o -c /Users/stevekerr/Documents/code/AISocks/lib/src/IpFilter.cpp",
+  "file": "/Users/stevekerr/Documents/code/AISocks/lib/src/IpFilter.cpp",
+  "output": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo/lib/CMakeFiles/aiSocksLib.dir/src/IpFilter.cpp.o"
+},
+{
+  "directory": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo",
+  "command": "/usr/bin/c++ -DAISOCKS_ENABLE_TLS=1 -DAISOCKS_TESTING=1 -I/Users/stevekerr/Documents/code/AISocks/lib/include -I/Users/stevekerr/Documents/code/AISocks/lib/src -isystem /opt/homebrew/Cellar/openssl@3/3.6.1/include -O2 -g -DNDEBUG -std=c++17 -arch arm64 -Wall -Wextra -Wconversion -Wno-sign-conversion -Werror -Wpedantic -Wno-shadow -o lib/CMakeFiles/aiSocksLib.dir/src/AccessLogger.cpp.o -c /Users/stevekerr/Documents/code/AISocks/lib/src/AccessLogger.cpp",
+  "file": "/Users/stevekerr/Documents/code/AISocks/lib/src/AccessLogger.cpp",
+  "output": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo/lib/CMakeFiles/aiSocksLib.dir/src/AccessLogger.cpp.o"
+},
+{
+  "directory": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo",
+  "command": "/usr/bin/c++ -DAISOCKS_ENABLE_TLS=1 -DAISOCKS_TESTING=1 -I/Users/stevekerr/Documents/code/AISocks/lib/include -I/Users/stevekerr/Documents/code/AISocks/lib/src -isystem /opt/homebrew/Cellar/openssl@3/3.6.1/include -O2 -g -DNDEBUG -std=c++17 -arch arm64 -Wall -Wextra -Wconversion -Wno-sign-conversion -Werror -Wpedantic -Wno-shadow -o lib/CMakeFiles/aiSocksLib.dir/src/TlsOpenSsl.cpp.o -c /Users/stevekerr/Documents/code/AISocks/lib/src/TlsOpenSsl.cpp",
+  "file": "/Users/stevekerr/Documents/code/AISocks/lib/src/TlsOpenSsl.cpp",
+  "output": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo/lib/CMakeFiles/aiSocksLib.dir/src/TlsOpenSsl.cpp.o"
+},
+{
+  "directory": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo",
+  "command": "/usr/bin/c++ -DAISOCKS_ENABLE_TLS=1 -DAISOCKS_TESTING=1 -I/Users/stevekerr/Documents/code/AISocks/lib/include -I/Users/stevekerr/Documents/code/AISocks/lib/src -isystem /opt/homebrew/Cellar/openssl@3/3.6.1/include -O2 -g -DNDEBUG -std=c++17 -arch arm64 -Wall -Wextra -Wconversion -Wno-sign-conversion -Werror -Wpedantic -Wno-shadow -o lib/CMakeFiles/aiSocksLib.dir/src/PollerKqueue.cpp.o -c /Users/stevekerr/Documents/code/AISocks/lib/src/PollerKqueue.cpp",
+  "file": "/Users/stevekerr/Documents/code/AISocks/lib/src/PollerKqueue.cpp",
+  "output": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo/lib/CMakeFiles/aiSocksLib.dir/src/PollerKqueue.cpp.o"
+},
+{
+  "directory": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo",
+  "command": "/usr/bin/c++ -DAISOCKS_ENABLE_TLS=1 -DAISOCKS_TESTING=1 -I/Users/stevekerr/Documents/code/AISocks/tests -I/Users/stevekerr/Documents/code/AISocks/lib/include -isystem /opt/homebrew/Cellar/openssl@3/3.6.1/include -O2 -g -DNDEBUG -std=c++17 -arch arm64 -Wall -Wextra -Wconversion -Wno-sign-conversion -Werror -o tests/CMakeFiles/test_socket_basics.dir/test_socket_basics.cpp.o -c /Users/stevekerr/Documents/code/AISocks/tests/test_socket_basics.cpp",
+  "file": "/Users/stevekerr/Documents/code/AISocks/tests/test_socket_basics.cpp",
+  "output": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo/tests/CMakeFiles/test_socket_basics.dir/test_socket_basics.cpp.o"
+},
+{
+  "directory": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo",
+  "command": "/usr/bin/c++ -DAISOCKS_ENABLE_TLS=1 -DAISOCKS_TESTING=1 -I/Users/stevekerr/Documents/code/AISocks/tests -I/Users/stevekerr/Documents/code/AISocks/lib/include -isystem /opt/homebrew/Cellar/openssl@3/3.6.1/include -O2 -g -DNDEBUG -std=c++17 -arch arm64 -Wall -Wextra -Wconversion -Wno-sign-conversion -Werror -o tests/CMakeFiles/test_socket_types.dir/test_socket_types.cpp.o -c /Users/stevekerr/Documents/code/AISocks/tests/test_socket_types.cpp",
+  "file": "/Users/stevekerr/Documents/code/AISocks/tests/test_socket_types.cpp",
+  "output": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo/tests/CMakeFiles/test_socket_types.dir/test_socket_types.cpp.o"
+},
+{
+  "directory": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo",
+  "command": "/usr/bin/c++ -DAISOCKS_ENABLE_TLS=1 -DAISOCKS_TESTING=1 -I/Users/stevekerr/Documents/code/AISocks/tests -I/Users/stevekerr/Documents/code/AISocks/lib/include -isystem /opt/homebrew/Cellar/openssl@3/3.6.1/include -O2 -g -DNDEBUG -std=c++17 -arch arm64 -Wall -Wextra -Wconversion -Wno-sign-conversion -Werror -o tests/CMakeFiles/test_ip_utils.dir/test_ip_utils.cpp.o -c /Users/stevekerr/Documents/code/AISocks/tests/test_ip_utils.cpp",
+  "file": "/Users/stevekerr/Documents/code/AISocks/tests/test_ip_utils.cpp",
+  "output": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo/tests/CMakeFiles/test_ip_utils.dir/test_ip_utils.cpp.o"
+},
+{
+  "directory": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo",
+  "command": "/usr/bin/c++ -DAISOCKS_ENABLE_TLS=1 -DAISOCKS_TESTING=1 -I/Users/stevekerr/Documents/code/AISocks/tests -I/Users/stevekerr/Documents/code/AISocks/lib/include -isystem /opt/homebrew/Cellar/openssl@3/3.6.1/include -O2 -g -DNDEBUG -std=c++17 -arch arm64 -Wall -Wextra -Wconversion -Wno-sign-conversion -Werror -o tests/CMakeFiles/test_blocking.dir/test_blocking.cpp.o -c /Users/stevekerr/Documents/code/AISocks/tests/test_blocking.cpp",
+  "file": "/Users/stevekerr/Documents/code/AISocks/tests/test_blocking.cpp",
+  "output": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo/tests/CMakeFiles/test_blocking.dir/test_blocking.cpp.o"
+},
+{
+  "directory": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo",
+  "command": "/usr/bin/c++ -DAISOCKS_ENABLE_TLS=1 -DAISOCKS_TESTING=1 -I/Users/stevekerr/Documents/code/AISocks/tests -I/Users/stevekerr/Documents/code/AISocks/lib/include -isystem /opt/homebrew/Cellar/openssl@3/3.6.1/include -O2 -g -DNDEBUG -std=c++17 -arch arm64 -Wall -Wextra -Wconversion -Wno-sign-conversion -Werror -o tests/CMakeFiles/test_move_semantics.dir/test_move_semantics.cpp.o -c /Users/stevekerr/Documents/code/AISocks/tests/test_move_semantics.cpp",
+  "file": "/Users/stevekerr/Documents/code/AISocks/tests/test_move_semantics.cpp",
+  "output": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo/tests/CMakeFiles/test_move_semantics.dir/test_move_semantics.cpp.o"
+},
+{
+  "directory": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo",
+  "command": "/usr/bin/c++ -DAISOCKS_ENABLE_TLS=1 -DAISOCKS_TESTING=1 -I/Users/stevekerr/Documents/code/AISocks/tests -I/Users/stevekerr/Documents/code/AISocks/lib/include -isystem /opt/homebrew/Cellar/openssl@3/3.6.1/include -O2 -g -DNDEBUG -std=c++17 -arch arm64 -Wall -Wextra -Wconversion -Wno-sign-conversion -Werror -o tests/CMakeFiles/test_loopback_tcp.dir/test_loopback_tcp.cpp.o -c /Users/stevekerr/Documents/code/AISocks/tests/test_loopback_tcp.cpp",
+  "file": "/Users/stevekerr/Documents/code/AISocks/tests/test_loopback_tcp.cpp",
+  "output": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo/tests/CMakeFiles/test_loopback_tcp.dir/test_loopback_tcp.cpp.o"
+},
+{
+  "directory": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo",
+  "command": "/usr/bin/c++ -DAISOCKS_ENABLE_TLS=1 -DAISOCKS_TESTING=1 -I/Users/stevekerr/Documents/code/AISocks/tests -I/Users/stevekerr/Documents/code/AISocks/lib/include -isystem /opt/homebrew/Cellar/openssl@3/3.6.1/include -O2 -g -DNDEBUG -std=c++17 -arch arm64 -Wall -Wextra -Wconversion -Wno-sign-conversion -Werror -o tests/CMakeFiles/test_error_handling.dir/test_error_handling.cpp.o -c /Users/stevekerr/Documents/code/AISocks/tests/test_error_handling.cpp",
+  "file": "/Users/stevekerr/Documents/code/AISocks/tests/test_error_handling.cpp",
+  "output": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo/tests/CMakeFiles/test_error_handling.dir/test_error_handling.cpp.o"
+},
+{
+  "directory": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo",
+  "command": "/usr/bin/c++ -DAISOCKS_ENABLE_TLS=1 -DAISOCKS_TESTING=1 -I/Users/stevekerr/Documents/code/AISocks/tests -I/Users/stevekerr/Documents/code/AISocks/lib/include -isystem /opt/homebrew/Cellar/openssl@3/3.6.1/include -O2 -g -DNDEBUG -std=c++17 -arch arm64 -Wall -Wextra -Wconversion -Wno-sign-conversion -Werror -o tests/CMakeFiles/test_construction.dir/test_construction.cpp.o -c /Users/stevekerr/Documents/code/AISocks/tests/test_construction.cpp",
+  "file": "/Users/stevekerr/Documents/code/AISocks/tests/test_construction.cpp",
+  "output": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo/tests/CMakeFiles/test_construction.dir/test_construction.cpp.o"
+},
+{
+  "directory": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo",
+  "command": "/usr/bin/c++ -DAISOCKS_ENABLE_TLS=1 -DAISOCKS_TESTING=1 -I/Users/stevekerr/Documents/code/AISocks/tests -I/Users/stevekerr/Documents/code/AISocks/lib/include -isystem /opt/homebrew/Cellar/openssl@3/3.6.1/include -O2 -g -DNDEBUG -std=c++17 -arch arm64 -Wall -Wextra -Wconversion -Wno-sign-conversion -Werror -o tests/CMakeFiles/test_new_features.dir/test_new_features.cpp.o -c /Users/stevekerr/Documents/code/AISocks/tests/test_new_features.cpp",
+  "file": "/Users/stevekerr/Documents/code/AISocks/tests/test_new_features.cpp",
+  "output": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo/tests/CMakeFiles/test_new_features.dir/test_new_features.cpp.o"
+},
+{
+  "directory": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo",
+  "command": "/usr/bin/c++ -DAISOCKS_ENABLE_TLS=1 -DAISOCKS_TESTING=1 -I/Users/stevekerr/Documents/code/AISocks/tests -I/Users/stevekerr/Documents/code/AISocks/lib/include -isystem /opt/homebrew/Cellar/openssl@3/3.6.1/include -O2 -g -DNDEBUG -std=c++17 -arch arm64 -Wall -Wextra -Wconversion -Wno-sign-conversion -Werror -o tests/CMakeFiles/test_error_messages.dir/test_error_messages.cpp.o -c /Users/stevekerr/Documents/code/AISocks/tests/test_error_messages.cpp",
+  "file": "/Users/stevekerr/Documents/code/AISocks/tests/test_error_messages.cpp",
+  "output": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo/tests/CMakeFiles/test_error_messages.dir/test_error_messages.cpp.o"
+},
+{
+  "directory": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo",
+  "command": "/usr/bin/c++ -DAISOCKS_ENABLE_TLS=1 -DAISOCKS_TESTING=1 -I/Users/stevekerr/Documents/code/AISocks/tests -I/Users/stevekerr/Documents/code/AISocks/lib/include -isystem /opt/homebrew/Cellar/openssl@3/3.6.1/include -O2 -g -DNDEBUG -std=c++17 -arch arm64 -Wall -Wextra -Wconversion -Wno-sign-conversion -Werror -o tests/CMakeFiles/test_poller.dir/test_poller.cpp.o -c /Users/stevekerr/Documents/code/AISocks/tests/test_poller.cpp",
+  "file": "/Users/stevekerr/Documents/code/AISocks/tests/test_poller.cpp",
+  "output": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo/tests/CMakeFiles/test_poller.dir/test_poller.cpp.o"
+},
+{
+  "directory": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo",
+  "command": "/usr/bin/c++ -DAISOCKS_ENABLE_TLS=1 -DAISOCKS_TESTING=1 -I/Users/stevekerr/Documents/code/AISocks/tests -I/Users/stevekerr/Documents/code/AISocks/lib/include -isystem /opt/homebrew/Cellar/openssl@3/3.6.1/include -O2 -g -DNDEBUG -std=c++17 -arch arm64 -Wall -Wextra -Wconversion -Wno-sign-conversion -Werror -o tests/CMakeFiles/test_tcp_socket.dir/test_tcp_socket.cpp.o -c /Users/stevekerr/Documents/code/AISocks/tests/test_tcp_socket.cpp",
+  "file": "/Users/stevekerr/Documents/code/AISocks/tests/test_tcp_socket.cpp",
+  "output": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo/tests/CMakeFiles/test_tcp_socket.dir/test_tcp_socket.cpp.o"
+},
+{
+  "directory": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo",
+  "command": "/usr/bin/c++ -DAISOCKS_ENABLE_TLS=1 -DAISOCKS_TESTING=1 -I/Users/stevekerr/Documents/code/AISocks/tests -I/Users/stevekerr/Documents/code/AISocks/lib/include -isystem /opt/homebrew/Cellar/openssl@3/3.6.1/include -O2 -g -DNDEBUG -std=c++17 -arch arm64 -Wall -Wextra -Wconversion -Wno-sign-conversion -Werror -o tests/CMakeFiles/test_simple_client.dir/test_simple_client.cpp.o -c /Users/stevekerr/Documents/code/AISocks/tests/test_simple_client.cpp",
+  "file": "/Users/stevekerr/Documents/code/AISocks/tests/test_simple_client.cpp",
+  "output": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo/tests/CMakeFiles/test_simple_client.dir/test_simple_client.cpp.o"
+},
+{
+  "directory": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo",
+  "command": "/usr/bin/c++ -DAISOCKS_ENABLE_TLS=1 -DAISOCKS_TESTING=1 -I/Users/stevekerr/Documents/code/AISocks/tests -I/Users/stevekerr/Documents/code/AISocks/lib/include -isystem /opt/homebrew/Cellar/openssl@3/3.6.1/include -O2 -g -DNDEBUG -std=c++17 -arch arm64 -Wall -Wextra -Wconversion -Wno-sign-conversion -Werror -o tests/CMakeFiles/test_server_base.dir/test_server_base.cpp.o -c /Users/stevekerr/Documents/code/AISocks/tests/test_server_base.cpp",
+  "file": "/Users/stevekerr/Documents/code/AISocks/tests/test_server_base.cpp",
+  "output": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo/tests/CMakeFiles/test_server_base.dir/test_server_base.cpp.o"
+},
+{
+  "directory": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo",
+  "command": "/usr/bin/c++ -DAISOCKS_ENABLE_TLS=1 -DAISOCKS_TESTING=1 -I/Users/stevekerr/Documents/code/AISocks/tests -I/Users/stevekerr/Documents/code/AISocks/lib/include -isystem /opt/homebrew/Cellar/openssl@3/3.6.1/include -O2 -g -DNDEBUG -std=c++17 -arch arm64 -Wall -Wextra -Wconversion -Wno-sign-conversion -Werror -o tests/CMakeFiles/test_server_base_edge_cases.dir/test_server_base_edge_cases.cpp.o -c /Users/stevekerr/Documents/code/AISocks/tests/test_server_base_edge_cases.cpp",
+  "file": "/Users/stevekerr/Documents/code/AISocks/tests/test_server_base_edge_cases.cpp",
+  "output": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo/tests/CMakeFiles/test_server_base_edge_cases.dir/test_server_base_edge_cases.cpp.o"
+},
+{
+  "directory": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo",
+  "command": "/usr/bin/c++ -DAISOCKS_ENABLE_TLS=1 -DAISOCKS_TESTING=1 -I/Users/stevekerr/Documents/code/AISocks/tests -I/Users/stevekerr/Documents/code/AISocks/lib/include -isystem /opt/homebrew/Cellar/openssl@3/3.6.1/include -O2 -g -DNDEBUG -std=c++17 -arch arm64 -Wall -Wextra -Wconversion -Wno-sign-conversion -Werror -o tests/CMakeFiles/test_http_request.dir/test_http_request.cpp.o -c /Users/stevekerr/Documents/code/AISocks/tests/test_http_request.cpp",
+  "file": "/Users/stevekerr/Documents/code/AISocks/tests/test_http_request.cpp",
+  "output": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo/tests/CMakeFiles/test_http_request.dir/test_http_request.cpp.o"
+},
+{
+  "directory": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo",
+  "command": "/usr/bin/c++ -DAISOCKS_ENABLE_TLS=1 -DAISOCKS_TESTING=1 -I/Users/stevekerr/Documents/code/AISocks/tests -I/Users/stevekerr/Documents/code/AISocks/lib/include -isystem /opt/homebrew/Cellar/openssl@3/3.6.1/include -O2 -g -DNDEBUG -std=c++17 -arch arm64 -Wall -Wextra -Wconversion -Wno-sign-conversion -Werror -o tests/CMakeFiles/test_url_codec.dir/test_url_codec.cpp.o -c /Users/stevekerr/Documents/code/AISocks/tests/test_url_codec.cpp",
+  "file": "/Users/stevekerr/Documents/code/AISocks/tests/test_url_codec.cpp",
+  "output": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo/tests/CMakeFiles/test_url_codec.dir/test_url_codec.cpp.o"
+},
+{
+  "directory": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo",
+  "command": "/usr/bin/c++ -DAISOCKS_ENABLE_TLS=1 -DAISOCKS_TESTING=1 -I/Users/stevekerr/Documents/code/AISocks/tests -I/Users/stevekerr/Documents/code/AISocks/lib/include -isystem /opt/homebrew/Cellar/openssl@3/3.6.1/include -O2 -g -DNDEBUG -std=c++17 -arch arm64 -Wall -Wextra -Wconversion -Wno-sign-conversion -Werror -o tests/CMakeFiles/test_socket_factory.dir/test_socket_factory.cpp.o -c /Users/stevekerr/Documents/code/AISocks/tests/test_socket_factory.cpp",
+  "file": "/Users/stevekerr/Documents/code/AISocks/tests/test_socket_factory.cpp",
+  "output": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo/tests/CMakeFiles/test_socket_factory.dir/test_socket_factory.cpp.o"
+},
+{
+  "directory": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo",
+  "command": "/usr/bin/c++ -DAISOCKS_ENABLE_TLS=1 -DAISOCKS_TESTING=1 -I/Users/stevekerr/Documents/code/AISocks/tests -I/Users/stevekerr/Documents/code/AISocks/lib/include -isystem /opt/homebrew/Cellar/openssl@3/3.6.1/include -O2 -g -DNDEBUG -std=c++17 -arch arm64 -Wall -Wextra -Wconversion -Wno-sign-conversion -Werror -o tests/CMakeFiles/test_server_base_simple.dir/test_server_base_simple.cpp.o -c /Users/stevekerr/Documents/code/AISocks/tests/test_server_base_simple.cpp",
+  "file": "/Users/stevekerr/Documents/code/AISocks/tests/test_server_base_simple.cpp",
+  "output": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo/tests/CMakeFiles/test_server_base_simple.dir/test_server_base_simple.cpp.o"
+},
+{
+  "directory": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo",
+  "command": "/usr/bin/c++ -DAISOCKS_ENABLE_TLS=1 -DAISOCKS_TESTING=1 -I/Users/stevekerr/Documents/code/AISocks/tests -I/Users/stevekerr/Documents/code/AISocks/lib/include -isystem /opt/homebrew/Cellar/openssl@3/3.6.1/include -O2 -g -DNDEBUG -std=c++17 -arch arm64 -Wall -Wextra -Wconversion -Wno-sign-conversion -Werror -o tests/CMakeFiles/test_server_base_minimal.dir/test_server_base_minimal.cpp.o -c /Users/stevekerr/Documents/code/AISocks/tests/test_server_base_minimal.cpp",
+  "file": "/Users/stevekerr/Documents/code/AISocks/tests/test_server_base_minimal.cpp",
+  "output": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo/tests/CMakeFiles/test_server_base_minimal.dir/test_server_base_minimal.cpp.o"
+},
+{
+  "directory": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo",
+  "command": "/usr/bin/c++ -DAISOCKS_ENABLE_TLS=1 -DAISOCKS_TESTING=1 -I/Users/stevekerr/Documents/code/AISocks/tests -I/Users/stevekerr/Documents/code/AISocks/lib/include -isystem /opt/homebrew/Cellar/openssl@3/3.6.1/include -O2 -g -DNDEBUG -std=c++17 -arch arm64 -Wall -Wextra -Wconversion -Wno-sign-conversion -Werror -o tests/CMakeFiles/test_server_base_echo_simple.dir/test_server_base_echo_simple.cpp.o -c /Users/stevekerr/Documents/code/AISocks/tests/test_server_base_echo_simple.cpp",
+  "file": "/Users/stevekerr/Documents/code/AISocks/tests/test_server_base_echo_simple.cpp",
+  "output": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo/tests/CMakeFiles/test_server_base_echo_simple.dir/test_server_base_echo_simple.cpp.o"
+},
+{
+  "directory": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo",
+  "command": "/usr/bin/c++ -DAISOCKS_ENABLE_TLS=1 -DAISOCKS_TESTING=1 -I/Users/stevekerr/Documents/code/AISocks/tests -I/Users/stevekerr/Documents/code/AISocks/lib/include -isystem /opt/homebrew/Cellar/openssl@3/3.6.1/include -O2 -g -DNDEBUG -std=c++17 -arch arm64 -Wall -Wextra -Wconversion -Wno-sign-conversion -Werror -o tests/CMakeFiles/test_server_base_no_timeout.dir/test_server_base_no_timeout.cpp.o -c /Users/stevekerr/Documents/code/AISocks/tests/test_server_base_no_timeout.cpp",
+  "file": "/Users/stevekerr/Documents/code/AISocks/tests/test_server_base_no_timeout.cpp",
+  "output": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo/tests/CMakeFiles/test_server_base_no_timeout.dir/test_server_base_no_timeout.cpp.o"
+},
+{
+  "directory": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo",
+  "command": "/usr/bin/c++ -DAISOCKS_ENABLE_TLS=1 -DAISOCKS_TESTING=1 -I/Users/stevekerr/Documents/code/AISocks/tests -I/Users/stevekerr/Documents/code/AISocks/lib/include -isystem /opt/homebrew/Cellar/openssl@3/3.6.1/include -O2 -g -DNDEBUG -std=c++17 -arch arm64 -Wall -Wextra -Wconversion -Wno-sign-conversion -Werror -o tests/CMakeFiles/test_fixes.dir/test_fixes.cpp.o -c /Users/stevekerr/Documents/code/AISocks/tests/test_fixes.cpp",
+  "file": "/Users/stevekerr/Documents/code/AISocks/tests/test_fixes.cpp",
+  "output": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo/tests/CMakeFiles/test_fixes.dir/test_fixes.cpp.o"
+},
+{
+  "directory": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo",
+  "command": "/usr/bin/c++ -DAISOCKS_ENABLE_TLS=1 -DAISOCKS_TESTING=1 -I/Users/stevekerr/Documents/code/AISocks/tests -I/Users/stevekerr/Documents/code/AISocks/lib/include -isystem /opt/homebrew/Cellar/openssl@3/3.6.1/include -O2 -g -DNDEBUG -std=c++17 -arch arm64 -Wall -Wextra -Wconversion -Wno-sign-conversion -Werror -o tests/CMakeFiles/test_simple_server.dir/test_simple_server.cpp.o -c /Users/stevekerr/Documents/code/AISocks/tests/test_simple_server.cpp",
+  "file": "/Users/stevekerr/Documents/code/AISocks/tests/test_simple_server.cpp",
+  "output": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo/tests/CMakeFiles/test_simple_server.dir/test_simple_server.cpp.o"
+},
+{
+  "directory": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo",
+  "command": "/usr/bin/c++ -DAISOCKS_ENABLE_TLS=1 -DAISOCKS_TESTING=1 -I/Users/stevekerr/Documents/code/AISocks/tests -I/Users/stevekerr/Documents/code/AISocks/lib/include -isystem /opt/homebrew/Cellar/openssl@3/3.6.1/include -O2 -g -DNDEBUG -std=c++17 -arch arm64 -Wall -Wextra -Wconversion -Wno-sign-conversion -Werror -o tests/CMakeFiles/test_server_launchpad.dir/test_server_launchpad.cpp.o -c /Users/stevekerr/Documents/code/AISocks/tests/test_server_launchpad.cpp",
+  "file": "/Users/stevekerr/Documents/code/AISocks/tests/test_server_launchpad.cpp",
+  "output": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo/tests/CMakeFiles/test_server_launchpad.dir/test_server_launchpad.cpp.o"
+},
+{
+  "directory": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo",
+  "command": "/usr/bin/c++ -DAISOCKS_ENABLE_TLS=1 -DAISOCKS_TESTING=1 -I/Users/stevekerr/Documents/code/AISocks/tests -I/Users/stevekerr/Documents/code/AISocks/lib/include -isystem /opt/homebrew/Cellar/openssl@3/3.6.1/include -O2 -g -DNDEBUG -std=c++17 -arch arm64 -Wall -Wextra -Wconversion -Wno-sign-conversion -Werror -o tests/CMakeFiles/test_advanced_file_server.dir/test_advanced_file_server.cpp.o -c /Users/stevekerr/Documents/code/AISocks/tests/test_advanced_file_server.cpp",
+  "file": "/Users/stevekerr/Documents/code/AISocks/tests/test_advanced_file_server.cpp",
+  "output": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo/tests/CMakeFiles/test_advanced_file_server.dir/test_advanced_file_server.cpp.o"
+},
+{
+  "directory": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo",
+  "command": "/usr/bin/c++ -DAISOCKS_ENABLE_TLS=1 -DAISOCKS_TESTING=1 -I/Users/stevekerr/Documents/code/AISocks/tests -I/Users/stevekerr/Documents/code/AISocks/lib/include -isystem /opt/homebrew/Cellar/openssl@3/3.6.1/include -O2 -g -DNDEBUG -std=c++17 -arch arm64 -Wall -Wextra -Wconversion -Wno-sign-conversion -Werror -o tests/CMakeFiles/test_file_io.dir/test_file_io.cpp.o -c /Users/stevekerr/Documents/code/AISocks/tests/test_file_io.cpp",
+  "file": "/Users/stevekerr/Documents/code/AISocks/tests/test_file_io.cpp",
+  "output": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo/tests/CMakeFiles/test_file_io.dir/test_file_io.cpp.o"
+},
+{
+  "directory": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo",
+  "command": "/usr/bin/c++ -DAISOCKS_ENABLE_TLS=1 -DAISOCKS_TESTING=1 -I/Users/stevekerr/Documents/code/AISocks/tests -I/Users/stevekerr/Documents/code/AISocks/lib/include -isystem /opt/homebrew/Cellar/openssl@3/3.6.1/include -O2 -g -DNDEBUG -std=c++17 -arch arm64 -Wall -Wextra -Wconversion -Wno-sign-conversion -Werror -o tests/CMakeFiles/test_file_cache.dir/test_file_cache.cpp.o -c /Users/stevekerr/Documents/code/AISocks/tests/test_file_cache.cpp",
+  "file": "/Users/stevekerr/Documents/code/AISocks/tests/test_file_cache.cpp",
+  "output": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo/tests/CMakeFiles/test_file_cache.dir/test_file_cache.cpp.o"
+},
+{
+  "directory": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo",
+  "command": "/usr/bin/c++ -DAISOCKS_ENABLE_TLS=1 -DAISOCKS_TESTING=1 -I/Users/stevekerr/Documents/code/AISocks/tests -I/Users/stevekerr/Documents/code/AISocks/lib/include -isystem /opt/homebrew/Cellar/openssl@3/3.6.1/include -O2 -g -DNDEBUG -std=c++17 -arch arm64 -Wall -Wextra -Wconversion -Wno-sign-conversion -Werror -o tests/CMakeFiles/test_path_helper.dir/test_path_helper.cpp.o -c /Users/stevekerr/Documents/code/AISocks/tests/test_path_helper.cpp",
+  "file": "/Users/stevekerr/Documents/code/AISocks/tests/test_path_helper.cpp",
+  "output": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo/tests/CMakeFiles/test_path_helper.dir/test_path_helper.cpp.o"
+},
+{
+  "directory": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo",
+  "command": "/usr/bin/c++ -DAISOCKS_ENABLE_TLS=1 -DAISOCKS_TESTING=1 -I/Users/stevekerr/Documents/code/AISocks/tests -I/Users/stevekerr/Documents/code/AISocks/lib/include -isystem /opt/homebrew/Cellar/openssl@3/3.6.1/include -O2 -g -DNDEBUG -std=c++17 -arch arm64 -Wall -Wextra -Wconversion -Wno-sign-conversion -Werror -o tests/CMakeFiles/test_result.dir/test_result.cpp.o -c /Users/stevekerr/Documents/code/AISocks/tests/test_result.cpp",
+  "file": "/Users/stevekerr/Documents/code/AISocks/tests/test_result.cpp",
+  "output": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo/tests/CMakeFiles/test_result.dir/test_result.cpp.o"
+},
+{
+  "directory": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo",
+  "command": "/usr/bin/c++ -DAISOCKS_ENABLE_TLS=1 -DAISOCKS_TESTING=1 -I/Users/stevekerr/Documents/code/AISocks/tests -I/Users/stevekerr/Documents/code/AISocks/lib/include -isystem /opt/homebrew/Cellar/openssl@3/3.6.1/include -O2 -g -DNDEBUG -std=c++17 -arch arm64 -Wall -Wextra -Wconversion -Wno-sign-conversion -Werror -o tests/CMakeFiles/test_server_signal.dir/test_server_signal.cpp.o -c /Users/stevekerr/Documents/code/AISocks/tests/test_server_signal.cpp",
+  "file": "/Users/stevekerr/Documents/code/AISocks/tests/test_server_signal.cpp",
+  "output": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo/tests/CMakeFiles/test_server_signal.dir/test_server_signal.cpp.o"
+},
+{
+  "directory": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo",
+  "command": "/usr/bin/c++ -DAISOCKS_ENABLE_TLS=1 -DAISOCKS_TESTING=1 -I/Users/stevekerr/Documents/code/AISocks/tests -I/Users/stevekerr/Documents/code/AISocks/lib/include -isystem /opt/homebrew/Cellar/openssl@3/3.6.1/include -O2 -g -DNDEBUG -std=c++17 -arch arm64 -Wall -Wextra -Wconversion -Wno-sign-conversion -Werror -o tests/CMakeFiles/test_http_poll_server.dir/test_http_poll_server.cpp.o -c /Users/stevekerr/Documents/code/AISocks/tests/test_http_poll_server.cpp",
+  "file": "/Users/stevekerr/Documents/code/AISocks/tests/test_http_poll_server.cpp",
+  "output": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo/tests/CMakeFiles/test_http_poll_server.dir/test_http_poll_server.cpp.o"
+},
+{
+  "directory": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo",
+  "command": "/usr/bin/c++ -DAISOCKS_ENABLE_TLS=1 -DAISOCKS_TESTING=1 -I/Users/stevekerr/Documents/code/AISocks/tests -I/Users/stevekerr/Documents/code/AISocks/lib/include -isystem /opt/homebrew/Cellar/openssl@3/3.6.1/include -O2 -g -DNDEBUG -std=c++17 -arch arm64 -Wall -Wextra -Wconversion -Wno-sign-conversion -Werror -o tests/CMakeFiles/test_extracted_components.dir/test_extracted_components.cpp.o -c /Users/stevekerr/Documents/code/AISocks/tests/test_extracted_components.cpp",
+  "file": "/Users/stevekerr/Documents/code/AISocks/tests/test_extracted_components.cpp",
+  "output": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo/tests/CMakeFiles/test_extracted_components.dir/test_extracted_components.cpp.o"
+},
+{
+  "directory": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo",
+  "command": "/usr/bin/c++ -DAISOCKS_ENABLE_TLS=1 -DAISOCKS_TESTING=1 -I/Users/stevekerr/Documents/code/AISocks/tests -I/Users/stevekerr/Documents/code/AISocks/lib/include -isystem /opt/homebrew/Cellar/openssl@3/3.6.1/include -O2 -g -DNDEBUG -std=c++17 -arch arm64 -Wall -Wextra -Wconversion -Wno-sign-conversion -Werror -o tests/CMakeFiles/test_file_server_utils.dir/test_file_server_utils.cpp.o -c /Users/stevekerr/Documents/code/AISocks/tests/test_file_server_utils.cpp",
+  "file": "/Users/stevekerr/Documents/code/AISocks/tests/test_file_server_utils.cpp",
+  "output": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo/tests/CMakeFiles/test_file_server_utils.dir/test_file_server_utils.cpp.o"
+},
+{
+  "directory": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo",
+  "command": "/usr/bin/c++ -DAISOCKS_ENABLE_TLS=1 -DAISOCKS_TESTING=1 -I/Users/stevekerr/Documents/code/AISocks/tests -I/Users/stevekerr/Documents/code/AISocks/lib/include -isystem /opt/homebrew/Cellar/openssl@3/3.6.1/include -O2 -g -DNDEBUG -std=c++17 -arch arm64 -Wall -Wextra -Wconversion -Wno-sign-conversion -Werror -o tests/CMakeFiles/test_html_escape.dir/test_html_escape.cpp.o -c /Users/stevekerr/Documents/code/AISocks/tests/test_html_escape.cpp",
+  "file": "/Users/stevekerr/Documents/code/AISocks/tests/test_html_escape.cpp",
+  "output": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo/tests/CMakeFiles/test_html_escape.dir/test_html_escape.cpp.o"
+},
+{
+  "directory": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo",
+  "command": "/usr/bin/c++ -DAISOCKS_ENABLE_TLS=1 -DAISOCKS_TESTING=1 -I/Users/stevekerr/Documents/code/AISocks/tests -I/Users/stevekerr/Documents/code/AISocks/lib/include -isystem /opt/homebrew/Cellar/openssl@3/3.6.1/include -O2 -g -DNDEBUG -std=c++17 -arch arm64 -Wall -Wextra -Wconversion -Wno-sign-conversion -Werror -o tests/CMakeFiles/test_html_page_generator.dir/test_html_page_generator.cpp.o -c /Users/stevekerr/Documents/code/AISocks/tests/test_html_page_generator.cpp",
+  "file": "/Users/stevekerr/Documents/code/AISocks/tests/test_html_page_generator.cpp",
+  "output": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo/tests/CMakeFiles/test_html_page_generator.dir/test_html_page_generator.cpp.o"
+},
+{
+  "directory": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo",
+  "command": "/usr/bin/c++ -DAISOCKS_ENABLE_TLS=1 -DAISOCKS_TESTING=1 -I/Users/stevekerr/Documents/code/AISocks/tests -I/Users/stevekerr/Documents/code/AISocks/lib/include -isystem /opt/homebrew/Cellar/openssl@3/3.6.1/include -O2 -g -DNDEBUG -std=c++17 -arch arm64 -Wall -Wextra -Wconversion -Wno-sign-conversion -Werror -o tests/CMakeFiles/test_http_poll_server_simple.dir/test_http_poll_server_simple.cpp.o -c /Users/stevekerr/Documents/code/AISocks/tests/test_http_poll_server_simple.cpp",
+  "file": "/Users/stevekerr/Documents/code/AISocks/tests/test_http_poll_server_simple.cpp",
+  "output": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo/tests/CMakeFiles/test_http_poll_server_simple.dir/test_http_poll_server_simple.cpp.o"
+},
+{
+  "directory": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo",
+  "command": "/usr/bin/c++ -DAISOCKS_ENABLE_TLS=1 -DAISOCKS_TESTING=1 -I/Users/stevekerr/Documents/code/AISocks/tests -I/Users/stevekerr/Documents/code/AISocks/lib/include -isystem /opt/homebrew/Cellar/openssl@3/3.6.1/include -O2 -g -DNDEBUG -std=c++17 -arch arm64 -Wall -Wextra -Wconversion -Wno-sign-conversion -Werror -o tests/CMakeFiles/test_security_malicious_clients.dir/test_security_malicious_clients.cpp.o -c /Users/stevekerr/Documents/code/AISocks/tests/test_security_malicious_clients.cpp",
+  "file": "/Users/stevekerr/Documents/code/AISocks/tests/test_security_malicious_clients.cpp",
+  "output": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo/tests/CMakeFiles/test_security_malicious_clients.dir/test_security_malicious_clients.cpp.o"
+},
+{
+  "directory": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo",
+  "command": "/usr/bin/c++ -DAISOCKS_ENABLE_TLS=1 -DAISOCKS_TESTING=1 -I/Users/stevekerr/Documents/code/AISocks/tests -I/Users/stevekerr/Documents/code/AISocks/lib/include -isystem /opt/homebrew/Cellar/openssl@3/3.6.1/include -O2 -g -DNDEBUG -std=c++17 -arch arm64 -Wall -Wextra -Wconversion -Wno-sign-conversion -Werror -o tests/CMakeFiles/test_udp_discovery.dir/test_udp_discovery.cpp.o -c /Users/stevekerr/Documents/code/AISocks/tests/test_udp_discovery.cpp",
+  "file": "/Users/stevekerr/Documents/code/AISocks/tests/test_udp_discovery.cpp",
+  "output": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo/tests/CMakeFiles/test_udp_discovery.dir/test_udp_discovery.cpp.o"
+},
+{
+  "directory": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo",
+  "command": "/usr/bin/c++ -DAISOCKS_ENABLE_TLS=1 -DAISOCKS_TESTING=1 -I/Users/stevekerr/Documents/code/AISocks/tests -I/Users/stevekerr/Documents/code/AISocks/lib/include -isystem /opt/homebrew/Cellar/openssl@3/3.6.1/include -O2 -g -DNDEBUG -std=c++17 -arch arm64 -Wall -Wextra -Wconversion -Wno-sign-conversion -Werror -o tests/CMakeFiles/test_unix_socket.dir/test_unix_socket.cpp.o -c /Users/stevekerr/Documents/code/AISocks/tests/test_unix_socket.cpp",
+  "file": "/Users/stevekerr/Documents/code/AISocks/tests/test_unix_socket.cpp",
+  "output": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo/tests/CMakeFiles/test_unix_socket.dir/test_unix_socket.cpp.o"
+},
+{
+  "directory": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo",
+  "command": "/usr/bin/c++ -DAISOCKS_ENABLE_TLS=1 -DAISOCKS_TESTING=1 -I/Users/stevekerr/Documents/code/AISocks/tests -I/Users/stevekerr/Documents/code/AISocks/lib/include -isystem /opt/homebrew/Cellar/openssl@3/3.6.1/include -O2 -g -DNDEBUG -std=c++17 -arch arm64 -Wall -Wextra -Wconversion -Wno-sign-conversion -Werror -o tests/CMakeFiles/test_http_stress.dir/test_http_stress.cpp.o -c /Users/stevekerr/Documents/code/AISocks/tests/test_http_stress.cpp",
+  "file": "/Users/stevekerr/Documents/code/AISocks/tests/test_http_stress.cpp",
+  "output": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo/tests/CMakeFiles/test_http_stress.dir/test_http_stress.cpp.o"
+},
+{
+  "directory": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo",
+  "command": "/usr/bin/c++ -DAISOCKS_ENABLE_TLS=1 -DAISOCKS_TESTING=1 -I/Users/stevekerr/Documents/code/AISocks/tests -I/Users/stevekerr/Documents/code/AISocks/lib/include -isystem /opt/homebrew/Cellar/openssl@3/3.6.1/include -O2 -g -DNDEBUG -std=c++17 -arch arm64 -Wall -Wextra -Wconversion -Wno-sign-conversion -Werror -o tests/CMakeFiles/test_http_response_builder.dir/test_http_response_builder.cpp.o -c /Users/stevekerr/Documents/code/AISocks/tests/test_http_response_builder.cpp",
+  "file": "/Users/stevekerr/Documents/code/AISocks/tests/test_http_response_builder.cpp",
+  "output": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo/tests/CMakeFiles/test_http_response_builder.dir/test_http_response_builder.cpp.o"
+},
+{
+  "directory": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo",
+  "command": "/usr/bin/c++ -DAISOCKS_ENABLE_TLS=1 -DAISOCKS_TESTING=1 -I/Users/stevekerr/Documents/code/AISocks/tests -I/Users/stevekerr/Documents/code/AISocks/lib/include -isystem /opt/homebrew/Cellar/openssl@3/3.6.1/include -O2 -g -DNDEBUG -std=c++17 -arch arm64 -Wall -Wextra -Wconversion -Wno-sign-conversion -Werror -o tests/CMakeFiles/test_http_response_parser.dir/test_http_response_parser.cpp.o -c /Users/stevekerr/Documents/code/AISocks/tests/test_http_response_parser.cpp",
+  "file": "/Users/stevekerr/Documents/code/AISocks/tests/test_http_response_parser.cpp",
+  "output": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo/tests/CMakeFiles/test_http_response_parser.dir/test_http_response_parser.cpp.o"
+},
+{
+  "directory": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo",
+  "command": "/usr/bin/c++ -DAISOCKS_ENABLE_TLS=1 -DAISOCKS_TESTING=1 -I/Users/stevekerr/Documents/code/AISocks/tests -I/Users/stevekerr/Documents/code/AISocks/lib/include -isystem /opt/homebrew/Cellar/openssl@3/3.6.1/include -O2 -g -DNDEBUG -std=c++17 -arch arm64 -Wall -Wextra -Wconversion -Wno-sign-conversion -Werror -o tests/CMakeFiles/test_client_http_request.dir/test_client_http_request.cpp.o -c /Users/stevekerr/Documents/code/AISocks/tests/test_client_http_request.cpp",
+  "file": "/Users/stevekerr/Documents/code/AISocks/tests/test_client_http_request.cpp",
+  "output": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo/tests/CMakeFiles/test_client_http_request.dir/test_client_http_request.cpp.o"
+},
+{
+  "directory": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo",
+  "command": "/usr/bin/c++ -DAISOCKS_ENABLE_TLS=1 -DAISOCKS_TESTING=1 -I/Users/stevekerr/Documents/code/AISocks/tests -I/Users/stevekerr/Documents/code/AISocks/lib/include -isystem /opt/homebrew/Cellar/openssl@3/3.6.1/include -O2 -g -DNDEBUG -std=c++17 -arch arm64 -Wall -Wextra -Wconversion -Wno-sign-conversion -Werror -o tests/CMakeFiles/test_bugfix_coverage.dir/test_bugfix_coverage.cpp.o -c /Users/stevekerr/Documents/code/AISocks/tests/test_bugfix_coverage.cpp",
+  "file": "/Users/stevekerr/Documents/code/AISocks/tests/test_bugfix_coverage.cpp",
+  "output": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo/tests/CMakeFiles/test_bugfix_coverage.dir/test_bugfix_coverage.cpp.o"
+},
+{
+  "directory": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo",
+  "command": "/usr/bin/c++ -DAISOCKS_ENABLE_TLS=1 -DAISOCKS_TESTING=1 -I/Users/stevekerr/Documents/code/AISocks/tests -I/Users/stevekerr/Documents/code/AISocks/lib/include -isystem /opt/homebrew/Cellar/openssl@3/3.6.1/include -O2 -g -DNDEBUG -std=c++17 -arch arm64 -Wall -Wextra -Wconversion -Wno-sign-conversion -Werror -o tests/CMakeFiles/test_http_client_server.dir/test_http_client_server.cpp.o -c /Users/stevekerr/Documents/code/AISocks/tests/test_http_client_server.cpp",
+  "file": "/Users/stevekerr/Documents/code/AISocks/tests/test_http_client_server.cpp",
+  "output": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo/tests/CMakeFiles/test_http_client_server.dir/test_http_client_server.cpp.o"
+},
+{
+  "directory": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo",
+  "command": "/usr/bin/c++ -DAISOCKS_ENABLE_TLS=1 -DAISOCKS_TESTING=1 -I/Users/stevekerr/Documents/code/AISocks/tests -I/Users/stevekerr/Documents/code/AISocks/lib/include -isystem /opt/homebrew/Cellar/openssl@3/3.6.1/include -O2 -g -DNDEBUG -std=c++17 -arch arm64 -Wall -Wextra -Wconversion -Wno-sign-conversion -Werror -o tests/CMakeFiles/test_dns_resolution_gate.dir/test_dns_resolution_gate.cpp.o -c /Users/stevekerr/Documents/code/AISocks/tests/test_dns_resolution_gate.cpp",
+  "file": "/Users/stevekerr/Documents/code/AISocks/tests/test_dns_resolution_gate.cpp",
+  "output": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo/tests/CMakeFiles/test_dns_resolution_gate.dir/test_dns_resolution_gate.cpp.o"
+},
+{
+  "directory": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo",
+  "command": "/usr/bin/c++ -DAISOCKS_ENABLE_TLS=1 -DAISOCKS_TESTING=1 -I/Users/stevekerr/Documents/code/AISocks/tests -I/Users/stevekerr/Documents/code/AISocks/lib/include -isystem /opt/homebrew/Cellar/openssl@3/3.6.1/include -O2 -g -DNDEBUG -std=c++17 -arch arm64 -Wall -Wextra -Wconversion -Wno-sign-conversion -Werror -o tests/CMakeFiles/test_ip_filter.dir/test_ip_filter.cpp.o -c /Users/stevekerr/Documents/code/AISocks/tests/test_ip_filter.cpp",
+  "file": "/Users/stevekerr/Documents/code/AISocks/tests/test_ip_filter.cpp",
+  "output": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo/tests/CMakeFiles/test_ip_filter.dir/test_ip_filter.cpp.o"
+},
+{
+  "directory": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo",
+  "command": "/usr/bin/c++ -DAISOCKS_ENABLE_TLS=1 -DAISOCKS_TESTING=1 -I/Users/stevekerr/Documents/code/AISocks/tests -I/Users/stevekerr/Documents/code/AISocks/lib/include -isystem /opt/homebrew/Cellar/openssl@3/3.6.1/include -O2 -g -DNDEBUG -std=c++17 -arch arm64 -Wall -Wextra -Wconversion -Wno-sign-conversion -Werror -o tests/CMakeFiles/test_access_logger.dir/test_access_logger.cpp.o -c /Users/stevekerr/Documents/code/AISocks/tests/test_access_logger.cpp",
+  "file": "/Users/stevekerr/Documents/code/AISocks/tests/test_access_logger.cpp",
+  "output": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo/tests/CMakeFiles/test_access_logger.dir/test_access_logger.cpp.o"
+},
+{
+  "directory": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo",
+  "command": "/usr/bin/c++ -DAISOCKS_ENABLE_TLS=1 -DAISOCKS_TESTING=1 -I/Users/stevekerr/Documents/code/AISocks/tests -I/Users/stevekerr/Documents/code/AISocks/lib/include -isystem /opt/homebrew/Cellar/openssl@3/3.6.1/include -O2 -g -DNDEBUG -std=c++17 -arch arm64 -Wall -Wextra -Wconversion -Wno-sign-conversion -Werror -o tests/CMakeFiles/test_tls_client.dir/test_tls_client.cpp.o -c /Users/stevekerr/Documents/code/AISocks/tests/test_tls_client.cpp",
+  "file": "/Users/stevekerr/Documents/code/AISocks/tests/test_tls_client.cpp",
+  "output": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo/tests/CMakeFiles/test_tls_client.dir/test_tls_client.cpp.o"
+},
+{
+  "directory": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo",
+  "command": "/usr/bin/c++ -DAISOCKS_ENABLE_TLS=1 -DAISOCKS_TESTING=1 -I/Users/stevekerr/Documents/code/AISocks/tests -I/Users/stevekerr/Documents/code/AISocks/lib/include -isystem /opt/homebrew/Cellar/openssl@3/3.6.1/include -O2 -g -DNDEBUG -std=c++17 -arch arm64 -Wall -Wextra -Wconversion -Wno-sign-conversion -Werror -o tests/CMakeFiles/test_tls_alpn.dir/test_tls_alpn.cpp.o -c /Users/stevekerr/Documents/code/AISocks/tests/test_tls_alpn.cpp",
+  "file": "/Users/stevekerr/Documents/code/AISocks/tests/test_tls_alpn.cpp",
+  "output": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo/tests/CMakeFiles/test_tls_alpn.dir/test_tls_alpn.cpp.o"
+},
+{
+  "directory": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo",
+  "command": "/usr/bin/c++ -DAISOCKS_ENABLE_TLS=1 -DAISOCKS_TESTING=1 -I/Users/stevekerr/Documents/code/AISocks/tests -I/Users/stevekerr/Documents/code/AISocks/lib/include -isystem /opt/homebrew/Cellar/openssl@3/3.6.1/include -O2 -g -DNDEBUG -std=c++17 -arch arm64 -Wall -Wextra -Wconversion -Wno-sign-conversion -Werror -o tests/CMakeFiles/test_tls_policy_basic.dir/test_tls_policy_basic.cpp.o -c /Users/stevekerr/Documents/code/AISocks/tests/test_tls_policy_basic.cpp",
+  "file": "/Users/stevekerr/Documents/code/AISocks/tests/test_tls_policy_basic.cpp",
+  "output": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo/tests/CMakeFiles/test_tls_policy_basic.dir/test_tls_policy_basic.cpp.o"
+},
+{
+  "directory": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo",
+  "command": "/usr/bin/c++ -DAISOCKS_ENABLE_TLS=1 -DAISOCKS_TESTING=1 -I/Users/stevekerr/Documents/code/AISocks/tests -I/Users/stevekerr/Documents/code/AISocks/lib/include -isystem /opt/homebrew/Cellar/openssl@3/3.6.1/include -O2 -g -DNDEBUG -std=c++17 -arch arm64 -Wall -Wextra -Wconversion -Wno-sign-conversion -Werror -o tests/CMakeFiles/test_tls_policy_negotiation.dir/test_tls_policy_negotiation.cpp.o -c /Users/stevekerr/Documents/code/AISocks/tests/test_tls_policy_negotiation.cpp",
+  "file": "/Users/stevekerr/Documents/code/AISocks/tests/test_tls_policy_negotiation.cpp",
+  "output": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo/tests/CMakeFiles/test_tls_policy_negotiation.dir/test_tls_policy_negotiation.cpp.o"
+},
+{
+  "directory": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo",
+  "command": "/usr/bin/c++ -DAISOCKS_ENABLE_TLS=1 -DAISOCKS_TESTING=1 -I/Users/stevekerr/Documents/code/AISocks/tests -I/Users/stevekerr/Documents/code/AISocks/lib/include -isystem /opt/homebrew/Cellar/openssl@3/3.6.1/include -O2 -g -DNDEBUG -std=c++17 -arch arm64 -Wall -Wextra -Wconversion -Wno-sign-conversion -Werror -o tests/CMakeFiles/test_tls_sni_and_rotation.dir/test_tls_sni_and_rotation.cpp.o -c /Users/stevekerr/Documents/code/AISocks/tests/test_tls_sni_and_rotation.cpp",
+  "file": "/Users/stevekerr/Documents/code/AISocks/tests/test_tls_sni_and_rotation.cpp",
+  "output": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo/tests/CMakeFiles/test_tls_sni_and_rotation.dir/test_tls_sni_and_rotation.cpp.o"
+},
+{
+  "directory": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo",
+  "command": "/usr/bin/c++ -DAISOCKS_ENABLE_TLS=1 -DAISOCKS_TESTING=1 -I/Users/stevekerr/Documents/code/AISocks/tests -I/Users/stevekerr/Documents/code/AISocks/lib/include -isystem /opt/homebrew/Cellar/openssl@3/3.6.1/include -O2 -g -DNDEBUG -std=c++17 -arch arm64 -Wall -Wextra -Wconversion -Wno-sign-conversion -Werror -o tests/CMakeFiles/test_tls_mtls_accept_reject.dir/test_tls_mtls_accept_reject.cpp.o -c /Users/stevekerr/Documents/code/AISocks/tests/test_tls_mtls_accept_reject.cpp",
+  "file": "/Users/stevekerr/Documents/code/AISocks/tests/test_tls_mtls_accept_reject.cpp",
+  "output": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo/tests/CMakeFiles/test_tls_mtls_accept_reject.dir/test_tls_mtls_accept_reject.cpp.o"
+},
+{
+  "directory": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo",
+  "command": "/usr/bin/c++ -DAISOCKS_ENABLE_TLS=1 -DAISOCKS_TESTING=1 -I/Users/stevekerr/Documents/code/AISocks/tests -I/Users/stevekerr/Documents/code/AISocks/lib/include -isystem /opt/homebrew/Cellar/openssl@3/3.6.1/include -O2 -g -DNDEBUG -std=c++17 -arch arm64 -Wall -Wextra -Wconversion -Wno-sign-conversion -Werror -o tests/CMakeFiles/test_tls_observability.dir/test_tls_observability.cpp.o -c /Users/stevekerr/Documents/code/AISocks/tests/test_tls_observability.cpp",
+  "file": "/Users/stevekerr/Documents/code/AISocks/tests/test_tls_observability.cpp",
+  "output": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo/tests/CMakeFiles/test_tls_observability.dir/test_tls_observability.cpp.o"
+},
+{
+  "directory": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo",
+  "command": "/usr/bin/c++ -DAISOCKS_ENABLE_TLS=1 -DAISOCKS_TESTING=1 -I/Users/stevekerr/Documents/code/AISocks/tests -I/Users/stevekerr/Documents/code/AISocks/lib/include -isystem /opt/homebrew/Cellar/openssl@3/3.6.1/include -O2 -g -DNDEBUG -std=c++17 -arch arm64 -Wall -Wextra -Wconversion -Wno-sign-conversion -Werror -o tests/CMakeFiles/test_tls_shutdown.dir/test_tls_shutdown.cpp.o -c /Users/stevekerr/Documents/code/AISocks/tests/test_tls_shutdown.cpp",
+  "file": "/Users/stevekerr/Documents/code/AISocks/tests/test_tls_shutdown.cpp",
+  "output": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo/tests/CMakeFiles/test_tls_shutdown.dir/test_tls_shutdown.cpp.o"
+},
+{
+  "directory": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo",
+  "command": "/usr/bin/c++ -DAISOCKS_ENABLE_TLS=1 -DAISOCKS_TESTING=1 -I/Users/stevekerr/Documents/code/AISocks/tests -I/Users/stevekerr/Documents/code/AISocks/lib/include -isystem /opt/homebrew/Cellar/openssl@3/3.6.1/include -O2 -g -DNDEBUG -std=c++17 -arch arm64 -Wall -Wextra -Wconversion -Wno-sign-conversion -Werror -o tests/CMakeFiles/test_tls_error_strings.dir/test_tls_error_strings.cpp.o -c /Users/stevekerr/Documents/code/AISocks/tests/test_tls_error_strings.cpp",
+  "file": "/Users/stevekerr/Documents/code/AISocks/tests/test_tls_error_strings.cpp",
+  "output": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo/tests/CMakeFiles/test_tls_error_strings.dir/test_tls_error_strings.cpp.o"
+},
+{
+  "directory": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo",
+  "command": "/usr/bin/c++ -DAISOCKS_ENABLE_TLS=1 -DAISOCKS_TESTING=1 -I/Users/stevekerr/Documents/code/AISocks/tests -I/Users/stevekerr/Documents/code/AISocks/lib/include -isystem /opt/homebrew/Cellar/openssl@3/3.6.1/include -O2 -g -DNDEBUG -std=c++17 -arch arm64 -Wall -Wextra -Wconversion -Wno-sign-conversion -Werror -o tests/CMakeFiles/test_tls_server_peer_subject.dir/test_tls_server_peer_subject.cpp.o -c /Users/stevekerr/Documents/code/AISocks/tests/test_tls_server_peer_subject.cpp",
+  "file": "/Users/stevekerr/Documents/code/AISocks/tests/test_tls_server_peer_subject.cpp",
+  "output": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo/tests/CMakeFiles/test_tls_server_peer_subject.dir/test_tls_server_peer_subject.cpp.o"
+},
+{
+  "directory": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo",
+  "command": "/usr/bin/c++ -DAISOCKS_ENABLE_TLS=1 -DAISOCKS_TESTING=1 -I/Users/stevekerr/Documents/code/AISocks/tests -I/Users/stevekerr/Documents/code/AISocks/lib/include -isystem /opt/homebrew/Cellar/openssl@3/3.6.1/include -O2 -g -DNDEBUG -std=c++17 -arch arm64 -Wall -Wextra -Wconversion -Wno-sign-conversion -Werror -o tests/CMakeFiles/test_tls_chain_validation.dir/test_tls_chain_validation.cpp.o -c /Users/stevekerr/Documents/code/AISocks/tests/test_tls_chain_validation.cpp",
+  "file": "/Users/stevekerr/Documents/code/AISocks/tests/test_tls_chain_validation.cpp",
+  "output": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo/tests/CMakeFiles/test_tls_chain_validation.dir/test_tls_chain_validation.cpp.o"
+},
+{
+  "directory": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo",
+  "command": "/usr/bin/c++ -DAISOCKS_ENABLE_TLS=1 -DAISOCKS_TESTING=1 -I/Users/stevekerr/Documents/code/AISocks/tests -I/Users/stevekerr/Documents/code/AISocks/lib/include -isystem /opt/homebrew/Cellar/openssl@3/3.6.1/include -O2 -g -DNDEBUG -std=c++17 -arch arm64 -Wall -Wextra -Wconversion -Wno-sign-conversion -Werror -o tests/CMakeFiles/test_tls_metrics.dir/test_tls_metrics.cpp.o -c /Users/stevekerr/Documents/code/AISocks/tests/test_tls_metrics.cpp",
+  "file": "/Users/stevekerr/Documents/code/AISocks/tests/test_tls_metrics.cpp",
+  "output": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo/tests/CMakeFiles/test_tls_metrics.dir/test_tls_metrics.cpp.o"
+},
+{
+  "directory": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo",
+  "command": "/usr/bin/c++ -DAISOCKS_ENABLE_TLS=1 -DAISOCKS_TESTING=1 -I/Users/stevekerr/Documents/code/AISocks/tests -I/Users/stevekerr/Documents/code/AISocks/lib/include -isystem /opt/homebrew/Cellar/openssl@3/3.6.1/include -O2 -g -DNDEBUG -std=c++17 -arch arm64 -Wall -Wextra -Wconversion -Wno-sign-conversion -Werror -o tests/CMakeFiles/test_tls_hostile_load.dir/test_tls_hostile_load.cpp.o -c /Users/stevekerr/Documents/code/AISocks/tests/test_tls_hostile_load.cpp",
+  "file": "/Users/stevekerr/Documents/code/AISocks/tests/test_tls_hostile_load.cpp",
+  "output": "/Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo/tests/CMakeFiles/test_tls_hostile_load.dir/test_tls_hostile_load.cpp.o"
+}
+]

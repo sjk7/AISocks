@@ -199,6 +199,79 @@ foreach(TEST_NAME ${TEST_SOURCES})
     endif()
 endforeach()
 
+# macOS-only clone of test_http_poll_server that enables PCH.
+# The default test targets keep PCH disabled on macOS; this clone is provided
+# for direct comparison against the non-PCH variant.
+if(APPLE)
+    add_library(test_http_poll_server_mac_pch_host STATIC EXCLUDE_FROM_ALL
+        ${CMAKE_CURRENT_SOURCE_DIR}/pch_stub.cpp
+    )
+    target_link_libraries(test_http_poll_server_mac_pch_host PRIVATE aiSocksLib)
+    target_compile_definitions(test_http_poll_server_mac_pch_host PRIVATE AISOCKS_TESTING=1)
+    target_include_directories(test_http_poll_server_mac_pch_host PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}
+        ${CMAKE_SOURCE_DIR}/lib/include
+    )
+    if(NOT MSVC)
+        target_compile_options(test_http_poll_server_mac_pch_host PRIVATE
+            $<$<CONFIG:Release>:-O1>
+            $<$<CONFIG:Release>:-fno-lto>
+            $<$<CONFIG:Debug>:-g>
+            $<$<CONFIG:Debug>:-O0>
+        )
+    else()
+        target_compile_options(test_http_poll_server_mac_pch_host PRIVATE
+            /utf-8
+            $<$<CONFIG:Release>:/O1>
+            $<$<CONFIG:Debug>:/Zi>
+            $<$<CONFIG:Debug>:/Od>
+        )
+    endif()
+    target_precompile_headers(test_http_poll_server_mac_pch_host PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/test_pch.h
+    )
+
+    add_executable(test_http_poll_server_mac_pch
+        ${CMAKE_CURRENT_SOURCE_DIR}/test_http_poll_server.cpp
+    )
+    target_link_libraries(test_http_poll_server_mac_pch PRIVATE aiSocksLib)
+    target_compile_definitions(test_http_poll_server_mac_pch PRIVATE AISOCKS_TESTING=1)
+    target_include_directories(test_http_poll_server_mac_pch PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}
+        ${CMAKE_SOURCE_DIR}/lib/include
+    )
+    target_precompile_headers(test_http_poll_server_mac_pch REUSE_FROM
+        test_http_poll_server_mac_pch_host)
+
+    if(NOT MSVC)
+        target_compile_options(test_http_poll_server_mac_pch PRIVATE
+            $<$<CONFIG:Release>:-O1>
+            $<$<CONFIG:Release>:-fno-lto>
+            $<$<CONFIG:Debug>:-g>
+            $<$<CONFIG:Debug>:-O0>
+        )
+        target_link_options(test_http_poll_server_mac_pch PRIVATE
+            $<$<CONFIG:Debug>:-g>
+        )
+    else()
+        target_compile_options(test_http_poll_server_mac_pch PRIVATE
+            /utf-8
+            $<$<CONFIG:Release>:/O1>
+            $<$<CONFIG:Debug>:/Zi>
+            $<$<CONFIG:Debug>:/Od>
+        )
+        target_link_options(test_http_poll_server_mac_pch PRIVATE
+            $<$<CONFIG:Debug>:/DEBUG>
+        )
+    endif()
+
+    if(DEFINED _LLVM_LIBCXX_DIR)
+        target_link_directories(test_http_poll_server_mac_pch PRIVATE "${_LLVM_LIBCXX_DIR}")
+        set_target_properties(test_http_poll_server_mac_pch PROPERTIES
+            BUILD_RPATH "${_LLVM_LIBCXX_DIR}")
+    endif()
+endif()
+
 # test_timeout_heap sleeps for multiple keep-alive windows across 5 test cases
 if(ALLOW_SLOW_TESTS)
     if(CMAKE_CROSSCOMPILING)

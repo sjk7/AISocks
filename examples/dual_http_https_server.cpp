@@ -36,6 +36,7 @@ int main(int argc, char** argv) {
     config.enableDirectoryListing = true;
     config.enableETag = true;
     config.enableLastModified = true;
+    config.enableSecurityHeaders = true;
     config.maxFileSize = 50 * 1024 * 1024;
     config.customHeaders["Server"] = "Dual-HTTP-HTTPS/1.0";
     config.customHeaders["X-Content-Type-Options"] = "nosniff";
@@ -44,7 +45,7 @@ int main(int argc, char** argv) {
     // HTTP
     HttpFileServer httpServer(ServerBind{"0.0.0.0", Port{httpPort}}, config);
     std::thread httpThread(
-        [&] { httpServer.run(ClientLimit::Unlimited, Milliseconds{5}); });
+        [&] { httpServer.run(ClientLimit{2000}, Milliseconds{5}); });
 
 #ifdef AISOCKS_ENABLE_TLS
     // HTTPS
@@ -52,7 +53,7 @@ int main(int argc, char** argv) {
     HttpsFileServer httpsServer(
         ServerBind{"0.0.0.0", Port{httpsPort}}, config, tls);
     std::thread httpsThread(
-        [&] { httpsServer.run(ClientLimit::Unlimited, Milliseconds{5}); });
+        [&] { httpsServer.run(ClientLimit{2000}, Milliseconds{5}); });
 #endif
 
     httpThread.join();

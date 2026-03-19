@@ -1,0 +1,1 @@
+Test project /Users/stevekerr/Documents/code/AISocks/build-relwithdebinfo

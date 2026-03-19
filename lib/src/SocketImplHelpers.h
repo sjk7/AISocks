@@ -60,6 +60,17 @@ bool setSocketOption(SocketHandle socketHandle, int level, int optname,
 #else
         int errorCode = errno;
 #endif
+
+        // On some platforms (like macOS), certain socket options are not
+        // supported for certain address families (e.g. SO_RCVBUF on AF_UNIX).
+        // If the error is EINVAL / WSAEINVAL, we treat it as a non-fatal
+        // warning rather than a failure that might trigger an assertion.
+#ifdef _WIN32
+        if (errorCode == WSAEINVAL) return true;
+#else
+        if (errorCode == EINVAL) return true;
+#endif
+
 #ifdef _WIN32
         LPSTR errorText = nullptr;
         FormatMessageA(FORMAT_MESSAGE_ALLOCATE_BUFFER

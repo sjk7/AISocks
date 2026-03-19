@@ -31,18 +31,17 @@ namespace {
         for (size_t i = 0, n = src.size(); i < n; ++i) {
             const unsigned char c = static_cast<unsigned char>(src[i]);
             if (c == '%' && i + 2 < n) {
-                const uint8_t hi = kFromHex[static_cast<unsigned char>(src[i + 1])];
-                const uint8_t lo = kFromHex[static_cast<unsigned char>(src[i + 2])];
+                const uint8_t hi
+                    = kFromHex[static_cast<unsigned char>(src[i + 1])];
+                const uint8_t lo
+                    = kFromHex[static_cast<unsigned char>(src[i + 2])];
                 if (hi != 0xFF && lo != 0xFF) {
-                    const unsigned char decoded = static_cast<unsigned char>((hi << 4) | lo);
-                    // Security: Reject null bytes (0x00) as they are invalid in URLs
-                    // and commonly used in directory traversal attacks
-                    if (decoded == 0x00) {
-                        // Skip null byte entirely - treat as invalid encoding
-                        i += 2;
-                        continue;
+                    const char decoded = static_cast<char>((hi << 4) | lo);
+                    // SECURITY: Strip null bytes to prevent directory traversal
+                    // and other null-injection attacks.
+                    if (decoded != '\0') {
+                        out += decoded;
                     }
-                    out += static_cast<char>(decoded);
                     i += 2;
                     continue;
                 }

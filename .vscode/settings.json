@@ -19,6 +19,12 @@
     "-DBUILD_EXAMPLES=ON",
     "-DBUILD_TESTS=ON"
   ],
+  "cmake.parallelJobs": 0,
+  "cmake.ctestArgs": [
+    "-j",
+    "8",
+    "--output-on-failure"
+  ],
   "cmake.autoRestartBuild": true,
   "cmake.enableTraceLogging": true,
   "githubPullRequests.notifications": "pullRequests",

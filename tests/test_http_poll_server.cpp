@@ -661,7 +661,7 @@ int main() {
             AddressFamily::IPv4, ConnectArgs{"127.0.0.1", server.serverPort()});
         REQUIRE(clientResult.isSuccess());
         auto& client = clientResult.value();
-        client.setReceiveTimeout(Milliseconds{120});
+        client.setReceiveTimeout(Milliseconds{15});
 
         const std::string head = "GET / HTTP/1.1\r\nHost: localhost\r\n"
                                  "Content-Length: 4\r\n\r\n";
@@ -796,7 +796,7 @@ int main() {
                 partial.c_str());
 
             // Wait for the partial-request timeout to fire
-            std::this_thread::sleep_for(50ms);
+            std::this_thread::sleep_for(15ms);
         }
 
         DLOG("DEBUG: Test 11 - Stopping server...\n");
