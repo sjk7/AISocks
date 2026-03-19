@@ -665,10 +665,16 @@ bool SocketImpl::connect(
     if (!resolveAddress_(address, port, timeout, serverAddr, addrLen))
         return false;
 
+    return startConnect_(serverAddr, addrLen, timeout);
+}
+
+bool SocketImpl::startConnect_(const sockaddr_storage& serverAddr,
+    socklen_t addrLen, Milliseconds timeout) {
+
     BlockingGuard blockingGuard(*this);
 
     int rc = ::connect(
-        socketHandle, reinterpret_cast<sockaddr*>(&serverAddr), addrLen);
+        socketHandle, reinterpret_cast<const sockaddr*>(&serverAddr), addrLen);
     if (rc == 0) {
         lastError = SocketError::None;
         return true;

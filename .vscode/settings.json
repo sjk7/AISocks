@@ -6,7 +6,9 @@
   "cmake.defaultBuildType": "Debug",
   "cmake.showAdvanced": true,
   "cmake.useCMakePresets": "always",
-  "cmake.defaultConfigurePreset": "tls-windows-relwithdebinfo-ninja",
+  "cmake.defaultConfigurePreset": "relwithdebinfo",
+  "cmake.defaultBuildPreset": "relwithdebinfo",
+  "cmake.defaultTestPreset": "relwithdebinfo",
   "cmake.statusbar.advanced": {
     "target": "visible",
     "buildType": "visible",
@@ -20,11 +22,6 @@
     "-DBUILD_TESTS=ON"
   ],
   "cmake.parallelJobs": 0,
-  "cmake.ctestArgs": [
-    "-j",
-    "8",
-    "--output-on-failure"
-  ],
   "cmake.autoRestartBuild": true,
   "cmake.enableTraceLogging": true,
   "githubPullRequests.notifications": "pullRequests",

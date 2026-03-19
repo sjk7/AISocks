@@ -207,6 +207,8 @@ class SocketImpl {
     // connect() helpers
     bool resolveAddress_(const std::string& address, Port port,
         Milliseconds timeout, sockaddr_storage& out_addr, socklen_t& out_len);
+    bool startConnect_(const sockaddr_storage& serverAddr, socklen_t addrLen,
+        Milliseconds timeout);
     bool waitForConnect_(Milliseconds timeout);
 
     // Propagate blocking mode, buffer sizes, TCP_NODELAY and SO_KEEPALIVE

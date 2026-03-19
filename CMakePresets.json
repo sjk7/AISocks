@@ -612,6 +612,30 @@
             }
         },
         {
+            "name": "relwithdebinfo",
+            "configurePreset": "relwithdebinfo",
+            "displayName": "RelWithDebInfo Tests",
+            "execution": {
+                "jobs": 8,
+                "noTestsAction": "error"
+            },
+            "output": {
+                "outputOnFailure": true
+            }
+        },
+        {
+            "name": "tls-relwithdebinfo",
+            "configurePreset": "tls-relwithdebinfo",
+            "displayName": "TLS RelWithDebInfo Tests",
+            "execution": {
+                "jobs": 8,
+                "noTestsAction": "error"
+            },
+            "output": {
+                "outputOnFailure": true
+            }
+        },
+        {
             "name": "coverage",
             "configurePreset": "coverage",
             "displayName": "Coverage Tests"
