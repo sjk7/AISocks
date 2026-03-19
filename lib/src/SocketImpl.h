@@ -194,13 +194,9 @@ class SocketImpl {
 
     int getLastSystemError() const;
 
-    // Private helpers that consolidate repeated setsockopt / select patterns.
-    bool setBoolOpt(int level, int optname, bool val, const char* errMsg);
-    bool setTimeoutOpt(
-        int optname, std::chrono::milliseconds ms, const char* errMsg);
+    // Private helpers that consolidate repeated select patterns.
     bool waitWithTimeoutError_(
         bool forRead, Milliseconds timeout, const char* timeoutErrorMsg);
-    bool setBufSizeOpt(int optname, int bytes, const char* errMsg);
     bool waitReady(bool forRead, std::chrono::milliseconds timeout);
     static Endpoint endpointFromSockaddr(const sockaddr_storage& addr);
     int doTransfer_(bool forSend, void* buffer, const void* data, size_t length,
