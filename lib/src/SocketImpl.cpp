@@ -1363,35 +1363,33 @@ Result<Endpoint> SocketImpl::getPeerEndpoint() const {
 // -----------------------------------------------------------------------
 // Query socket options (getters)
 // -----------------------------------------------------------------------
+static bool getSockOptInt_(
+    SocketHandle handle, int level, int optname, int& out) {
+    out = 0;
+    socklen_t len = static_cast<socklen_t>(sizeof(out));
+    return getsockopt(
+               handle, level, optname, reinterpret_cast<char*>(&out), &len)
+        == 0;
+}
+
 int SocketImpl::getReceiveBufferSize() const {
     if (!isValid()) return -1;
     int size = 0;
-    socklen_t len = static_cast<socklen_t>(sizeof(size));
-    if (getsockopt(socketHandle, SOL_SOCKET, SO_RCVBUF,
-            reinterpret_cast<char*>(&size), &len)
-        != 0)
-        return -1;
+    if (!getSockOptInt_(socketHandle, SOL_SOCKET, SO_RCVBUF, size)) return -1;
     return size;
 }
 
 int SocketImpl::getSendBufferSize() const {
     if (!isValid()) return -1;
     int size = 0;
-    socklen_t len = static_cast<socklen_t>(sizeof(size));
-    if (getsockopt(socketHandle, SOL_SOCKET, SO_SNDBUF,
-            reinterpret_cast<char*>(&size), &len)
-        != 0)
-        return -1;
+    if (!getSockOptInt_(socketHandle, SOL_SOCKET, SO_SNDBUF, size)) return -1;
     return size;
 }
 
 bool SocketImpl::getNoDelay() const {
     if (!isValid()) return false;
     int noDelay = 0;
-    socklen_t len = static_cast<socklen_t>(sizeof(noDelay));
-    if (getsockopt(socketHandle, IPPROTO_TCP, TCP_NODELAY,
-            reinterpret_cast<char*>(&noDelay), &len)
-        != 0)
+    if (!getSockOptInt_(socketHandle, IPPROTO_TCP, TCP_NODELAY, noDelay))
         return false;
     return noDelay != 0;
 }
@@ -1399,10 +1397,7 @@ bool SocketImpl::getNoDelay() const {
 bool SocketImpl::getKeepAlive() const {
     if (!isValid()) return false;
     int keepAlive = 0;
-    socklen_t len = static_cast<socklen_t>(sizeof(keepAlive));
-    if (getsockopt(socketHandle, SOL_SOCKET, SO_KEEPALIVE,
-            reinterpret_cast<char*>(&keepAlive), &len)
-        != 0)
+    if (!getSockOptInt_(socketHandle, SOL_SOCKET, SO_KEEPALIVE, keepAlive))
         return false;
     return keepAlive != 0;
 }
