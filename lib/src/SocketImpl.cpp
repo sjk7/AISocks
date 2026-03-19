@@ -54,6 +54,14 @@ namespace {
         }
     }
 
+    static void releaseDnsWorkerSlot_() noexcept {
+        g_activeDnsWorkers.fetch_sub(1, std::memory_order_acq_rel);
+    }
+
+    struct DnsSlotGuard {
+        ~DnsSlotGuard() { releaseDnsWorkerSlot_(); }
+    };
+
 #if defined(_WIN32) && defined(AISOCKS_TESTING)
     static bool traceUnixCloseEnabled_() {
         static const bool enabled = []() {
@@ -513,11 +521,7 @@ bool SocketImpl::resolveAddress_(const std::string& address, Port port,
         std::thread([addr = address, p = port, af = addressFamily,
                         st = socketType, res = dnsRes,
                         prom = std::move(dnsProm)]() mutable {
-            struct DnsSlotGuard {
-                ~DnsSlotGuard() {
-                    g_activeDnsWorkers.fetch_sub(1, std::memory_order_acq_rel);
-                }
-            } guard;
+            DnsSlotGuard guard;
 #ifdef AISOCKS_TESTING
             const int64_t testDelay
                 = g_dnsTestDelayMs.load(std::memory_order_relaxed);
@@ -530,7 +534,7 @@ bool SocketImpl::resolveAddress_(const std::string& address, Port port,
             prom.set_value();
         }).detach();
     } catch (...) {
-        g_activeDnsWorkers.fetch_sub(1, std::memory_order_acq_rel);
+        releaseDnsWorkerSlot_();
         setError(SocketError::ConnectFailed, "Failed to start DNS worker");
         return false;
     }

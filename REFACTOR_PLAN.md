@@ -33,7 +33,6 @@ Refactor `lib/src/SocketImpl.cpp` into focused internal units.
 ### Changes
 - Extract connect path into a separate internal module:
 - DNS worker gating
-- Keep option getters/setters in an options-focused module.
 
 ### Benefits
 - Reduces one of the largest maintenance hotspots.
