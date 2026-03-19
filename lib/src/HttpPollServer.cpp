@@ -457,17 +457,8 @@ void HttpPollServer::dispatchBuildResponse(HttpClientState& s) {
 ServerResult HttpPollServer::onReadable(TcpSocket& sock, HttpClientState& s) {
     char buf[RECV_BUF_SIZE];
     for (;;) {
-#ifdef AISOCKS_ENABLE_TLS
-        if (isTlsMode(s) && !s.tlsHandshakeDone) {
-            const ServerResult hs = doTlsHandshakeStep(sock, s);
-            if (hs != ServerResult::KeepConnection) return hs;
-            if (!s.tlsHandshakeDone) {
-                setClientWritable(sock, s.tlsWantsWrite);
-                return ServerResult::KeepConnection;
-            }
-            setClientWritable(sock, false);
-        }
-#endif
+        ServerResult stageOut = ServerResult::KeepConnection;
+        if (runTlsHandshakeStage_(sock, s, stageOut)) return stageOut;
 
         // Slowloris protection: drop if headers not received within 5 seconds.
         // Clock is read once per loop iteration and reused by the timeout
@@ -501,76 +492,8 @@ ServerResult HttpPollServer::onReadable(TcpSocket& sock, HttpClientState& s) {
             s.request.append(buf, static_cast<size_t>(n));
 
             if (s.responseView.empty()) {
-                size_t consumed = 0;
-                const RequestFrameStatus frame
-                    = inspectRequestFrame_(std::string_view(s.request),
-                        consumed, HttpPollServer::MAX_HEADER_SIZE);
-                if (frame == RequestFrameStatus::NeedMore) {
-                    if (!s.expectContinueSent
-                        && shouldSend100Continue_(s.request, frame)) {
-                        s.responseBuf = "HTTP/1.1 100 Continue\r\n\r\n";
-                        s.responseView = s.responseBuf;
-                        s.sent = 0;
-                        s.responseStarted = false;
-                        s.closeAfterSend = false;
-                        s.interimResponse = true;
-                        s.expectContinueSent = true;
-                        setClientWritable(sock, true);
-                        return ServerResult::KeepConnection;
-                    }
-                    continue;
-                }
-
-                if (frame == RequestFrameStatus::HeaderTooLarge) {
-                    s.responseBuf = makeResponse(
-                        "HTTP/1.1 431 Request Header Fields Too Large",
-                        "text/plain; charset=utf-8",
-                        "Header section too large.\n", false);
-                    s.responseView = s.responseBuf;
-                    s.closeAfterSend = true;
-                    setClientWritable(sock, true);
-                    return ServerResult::KeepConnection;
-                }
-
-                if (frame == RequestFrameStatus::BodyTooLarge) {
-                    s.responseBuf
-                        = makeResponse("HTTP/1.1 413 Payload Too Large",
-                            "text/plain; charset=utf-8",
-                            "Request body is too large.\n", false);
-                    s.responseView = s.responseBuf;
-                    s.closeAfterSend = true;
-                    setClientWritable(sock, true);
-                    return ServerResult::KeepConnection;
-                }
-
-                if (frame == RequestFrameStatus::UnsupportedTransferEncoding) {
-                    s.responseBuf = makeResponse("HTTP/1.1 501 Not Implemented",
-                        "text/plain; charset=utf-8",
-                        "Unsupported Transfer-Encoding.\n", false);
-                    s.responseView = s.responseBuf;
-                    s.closeAfterSend = true;
-                    setClientWritable(sock, true);
-                    return ServerResult::KeepConnection;
-                }
-
-                if (frame == RequestFrameStatus::BadRequest
-                    || frame == RequestFrameStatus::Complete) {
-                    // Consume exactly one request so any pipelined tail remains
-                    // queued for the next response cycle.
-                    if (frame == RequestFrameStatus::BadRequest) {
-                        consumed = s.request.size();
-                    }
-                    if (consumeRequestMessage_(s.request, consumed)
-                        && consumed < s.request.size()) {
-                        s.queuedRequest.append(s.request.data() + consumed,
-                            s.request.size() - consumed);
-                        s.request.resize(consumed);
-                    }
-                    s.requestScanPos = 0;
-                    dispatchBuildResponse(s);
-                    setClientWritable(sock, true);
-                    return ServerResult::KeepConnection;
-                }
+                if (runRequestFrameInspectionStage_(sock, s, stageOut))
+                    return stageOut;
             }
         } else if (n == 0) {
             return ServerResult::Disconnect;
@@ -596,119 +519,232 @@ ServerResult HttpPollServer::onReadable(TcpSocket& sock, HttpClientState& s) {
 
 ServerResult HttpPollServer::onWritable(TcpSocket& sock, HttpClientState& s) {
     while (true) {
-#ifdef AISOCKS_ENABLE_TLS
-        if (isTlsMode(s) && !s.tlsHandshakeDone) {
-            const ServerResult hs = doTlsHandshakeStep(sock, s);
-            if (hs != ServerResult::KeepConnection) return hs;
-            if (!s.tlsHandshakeDone) {
-                setClientWritable(sock, s.tlsWantsWrite);
-                return ServerResult::KeepConnection;
-            }
-            setClientWritable(sock, false);
-        }
-#endif
-
+        ServerResult stageOut = ServerResult::KeepConnection;
+        if (runTlsHandshakeStage_(sock, s, stageOut)) return stageOut;
         if (s.responseView.empty()) return ServerResult::KeepConnection;
+        if (runSendStreamStage_(sock, s, stageOut)) return stageOut;
+        if (runPipelineContinuationStage_(sock, s, stageOut)) return stageOut;
+    }
+}
 
-        if (!s.responseStarted && !s.interimResponse) {
-            s.responseStarted = true;
-            if (s.responseStatusCode == 0)
-                s.responseStatusCode
-                    = AccessLogger::extractStatusCode(s.responseView);
-            if (s.responseBytesPlanned == 0)
-                s.responseBytesPlanned = s.responseView.size();
-            onResponseBegin(s);
-        }
-
-        int sent = tlsWrite(sock, s, s.responseView.data() + s.sent,
-            s.responseView.size() - s.sent);
-
-        if (sent > 0) {
-            touchClient(sock, std::chrono::steady_clock::now());
-            s.sent += static_cast<size_t>(sent);
-        } else {
+bool HttpPollServer::runTlsHandshakeStage_(
+    TcpSocket& sock, HttpClientState& s, ServerResult& out) {
 #ifdef AISOCKS_ENABLE_TLS
-            if (isTlsMode(s) && s.tlsSession) {
-                const int tlsErr = s.tlsSession->getLastErrorCode(sent);
-                if (tlsErr == SSL_ERROR_WANT_READ
-                    || tlsErr == SSL_ERROR_WANT_WRITE) {
-                    setClientWritable(sock, tlsErr == SSL_ERROR_WANT_WRITE);
-                    return ServerResult::KeepConnection;
-                }
-            }
+    if (isTlsMode(s) && !s.tlsHandshakeDone) {
+        const ServerResult hs = doTlsHandshakeStep(sock, s);
+        if (hs != ServerResult::KeepConnection) {
+            out = hs;
+            return true;
+        }
+        if (!s.tlsHandshakeDone) {
+            setClientWritable(sock, s.tlsWantsWrite);
+            out = ServerResult::KeepConnection;
+            return true;
+        }
+        setClientWritable(sock, false);
+    }
+#else
+    (void)sock;
+    (void)s;
 #endif
-            const auto err = sock.getLastError();
-            if (err == SocketError::WouldBlock || err == SocketError::Timeout)
-                return ServerResult::KeepConnection;
-            return ServerResult::Disconnect;
+    out = ServerResult::KeepConnection;
+    return false;
+}
+
+bool HttpPollServer::runRequestFrameInspectionStage_(
+    TcpSocket& sock, HttpClientState& s, ServerResult& out) {
+    size_t consumed = 0;
+    const RequestFrameStatus frame = inspectRequestFrame_(
+        std::string_view(s.request), consumed, HttpPollServer::MAX_HEADER_SIZE);
+    if (frame == RequestFrameStatus::NeedMore) {
+        if (!s.expectContinueSent && shouldSend100Continue_(s.request, frame)) {
+            s.responseBuf = "HTTP/1.1 100 Continue\r\n\r\n";
+            s.responseView = s.responseBuf;
+            s.sent = 0;
+            s.responseStarted = false;
+            s.closeAfterSend = false;
+            s.interimResponse = true;
+            s.expectContinueSent = true;
+            setClientWritable(sock, true);
+            out = ServerResult::KeepConnection;
+            return true;
+        }
+        return false;
+    }
+
+    if (frame == RequestFrameStatus::HeaderTooLarge) {
+        s.responseBuf = makeResponse(
+            "HTTP/1.1 431 Request Header Fields Too Large",
+            "text/plain; charset=utf-8", "Header section too large.\n", false);
+        s.responseView = s.responseBuf;
+        s.closeAfterSend = true;
+        setClientWritable(sock, true);
+        out = ServerResult::KeepConnection;
+        return true;
+    }
+
+    if (frame == RequestFrameStatus::BodyTooLarge) {
+        s.responseBuf = makeResponse("HTTP/1.1 413 Payload Too Large",
+            "text/plain; charset=utf-8", "Request body is too large.\n", false);
+        s.responseView = s.responseBuf;
+        s.closeAfterSend = true;
+        setClientWritable(sock, true);
+        out = ServerResult::KeepConnection;
+        return true;
+    }
+
+    if (frame == RequestFrameStatus::UnsupportedTransferEncoding) {
+        s.responseBuf = makeResponse("HTTP/1.1 501 Not Implemented",
+            "text/plain; charset=utf-8", "Unsupported Transfer-Encoding.\n",
+            false);
+        s.responseView = s.responseBuf;
+        s.closeAfterSend = true;
+        setClientWritable(sock, true);
+        out = ServerResult::KeepConnection;
+        return true;
+    }
+
+    if (frame == RequestFrameStatus::BadRequest
+        || frame == RequestFrameStatus::Complete) {
+        // Consume exactly one request so any pipelined tail remains queued
+        // for the next response cycle.
+        if (frame == RequestFrameStatus::BadRequest)
+            consumed = s.request.size();
+        if (consumeRequestMessage_(s.request, consumed)
+            && consumed < s.request.size()) {
+            s.queuedRequest.append(
+                s.request.data() + consumed, s.request.size() - consumed);
+            s.request.resize(consumed);
+        }
+        s.requestScanPos = 0;
+        dispatchBuildResponse(s);
+        setClientWritable(sock, true);
+        out = ServerResult::KeepConnection;
+        return true;
+    }
+
+    return false;
+}
+
+bool HttpPollServer::runSendStreamStage_(
+    TcpSocket& sock, HttpClientState& s, ServerResult& out) {
+    if (!s.responseStarted && !s.interimResponse) {
+        s.responseStarted = true;
+        if (s.responseStatusCode == 0)
+            s.responseStatusCode
+                = AccessLogger::extractStatusCode(s.responseView);
+        if (s.responseBytesPlanned == 0)
+            s.responseBytesPlanned = s.responseView.size();
+        onResponseBegin(s);
+    }
+
+    int sent = tlsWrite(sock, s, s.responseView.data() + s.sent,
+        s.responseView.size() - s.sent);
+
+    if (sent > 0) {
+        touchClient(sock, std::chrono::steady_clock::now());
+        s.sent += static_cast<size_t>(sent);
+    } else {
+#ifdef AISOCKS_ENABLE_TLS
+        if (isTlsMode(s) && s.tlsSession) {
+            const int tlsErr = s.tlsSession->getLastErrorCode(sent);
+            if (tlsErr == SSL_ERROR_WANT_READ
+                || tlsErr == SSL_ERROR_WANT_WRITE) {
+                setClientWritable(sock, tlsErr == SSL_ERROR_WANT_WRITE);
+                out = ServerResult::KeepConnection;
+                return true;
+            }
+        }
+#endif
+        const auto err = sock.getLastError();
+        if (err == SocketError::WouldBlock || err == SocketError::Timeout) {
+            out = ServerResult::KeepConnection;
+            return true;
+        }
+        out = ServerResult::Disconnect;
+        return true;
+    }
+
+    if (s.sent < s.responseView.size()) {
+        out = ServerResult::KeepConnection;
+        return true;
+    }
+
+    if (s.streamingBodyActive) {
+        if (!s.streamingFile || !s.streamingFile->isOpen()) {
+            out = ServerResult::Disconnect;
+            return true;
         }
 
-        if (s.sent < s.responseView.size()) return ServerResult::KeepConnection;
+        if (s.streamingRemaining == 0) {
+            s.streamingBodyActive = false;
+            s.streamingFile.reset();
+        } else {
+            const size_t toRead
+                = std::min(s.streamingChunkBuf.size(), s.streamingRemaining);
+            const size_t got
+                = s.streamingFile->read(s.streamingChunkBuf.data(), 1, toRead);
+            if (got == 0) {
+                out = ServerResult::Disconnect;
+                return true;
+            }
 
-        if (s.streamingBodyActive) {
-            if (!s.streamingFile || !s.streamingFile->isOpen())
-                return ServerResult::Disconnect;
+            s.streamingRemaining -= got;
+            s.responseView = std::string_view(s.streamingChunkBuf.data(), got);
+            s.sent = 0;
 
             if (s.streamingRemaining == 0) {
                 s.streamingBodyActive = false;
                 s.streamingFile.reset();
-            } else {
-                const size_t toRead = std::min(
-                    s.streamingChunkBuf.size(), s.streamingRemaining);
-                const size_t got = s.streamingFile->read(
-                    s.streamingChunkBuf.data(), 1, toRead);
-                if (got == 0) return ServerResult::Disconnect;
-
-                s.streamingRemaining -= got;
-                s.responseView
-                    = std::string_view(s.streamingChunkBuf.data(), got);
-                s.sent = 0;
-
-                if (s.streamingRemaining == 0) {
-                    s.streamingBodyActive = false;
-                    s.streamingFile.reset();
-                }
-                continue;
             }
+            return false;
         }
-
-        if (s.interimResponse) {
-            s.responseView = {};
-            s.responseBuf.clear();
-            s.sent = 0;
-            s.responseStarted = false;
-            s.closeAfterSend = false;
-            s.interimResponse = false;
-            setClientWritable(sock, false);
-            return ServerResult::KeepConnection;
-        }
-
-        onResponseSent(s);
-        const bool shouldClose = s.closeAfterSend;
-        resetAfterSend_(s);
-        setClientWritable(sock, false);
-
-        if (shouldClose) return ServerResult::Disconnect;
-
-        if (!s.request.empty()
-            && requestComplete(s.request, s.requestScanPos)) {
-            // Immediately process queued pipelined data already buffered on
-            // this connection.
-            size_t consumed = 0;
-            if (consumeRequestMessage_(s.request, consumed)
-                && consumed < s.request.size()) {
-                s.queuedRequest.append(
-                    s.request.data() + consumed, s.request.size() - consumed);
-                s.request.resize(consumed);
-            }
-            s.requestScanPos = 0;
-            dispatchBuildResponse(s);
-            setClientWritable(sock, true);
-            continue;
-        }
-
-        return ServerResult::KeepConnection;
     }
+
+    if (s.interimResponse) {
+        s.responseView = {};
+        s.responseBuf.clear();
+        s.sent = 0;
+        s.responseStarted = false;
+        s.closeAfterSend = false;
+        s.interimResponse = false;
+        setClientWritable(sock, false);
+        out = ServerResult::KeepConnection;
+        return true;
+    }
+
+    onResponseSent(s);
+    const bool shouldClose = s.closeAfterSend;
+    resetAfterSend_(s);
+    setClientWritable(sock, false);
+    if (shouldClose) {
+        out = ServerResult::Disconnect;
+        return true;
+    }
+
+    return false;
+}
+
+bool HttpPollServer::runPipelineContinuationStage_(
+    TcpSocket& sock, HttpClientState& s, ServerResult& out) {
+    if (!s.request.empty() && requestComplete(s.request, s.requestScanPos)) {
+        // Immediately process queued pipelined data already buffered on this
+        // connection.
+        size_t consumed = 0;
+        if (consumeRequestMessage_(s.request, consumed)
+            && consumed < s.request.size()) {
+            s.queuedRequest.append(
+                s.request.data() + consumed, s.request.size() - consumed);
+            s.request.resize(consumed);
+        }
+        s.requestScanPos = 0;
+        dispatchBuildResponse(s);
+        setClientWritable(sock, true);
+        return false;
+    }
+
+    out = ServerResult::KeepConnection;
+    return true;
 }
 
 void HttpPollServer::resetAfterSend_(HttpClientState& s) {

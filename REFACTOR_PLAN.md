@@ -3,12 +3,6 @@
 ## Goal
 Reduce maintenance complexity in core networking and HTTP/TLS paths without changing external behavior.
 
-- [x] Make certain our server and client classes are not copiable,
-  but moveable is OK.
-
-- [x] Add noexcept to high-impact / hot areas of code where we KNOW
-	an exception is not thrown.
-
 ## Why This Plan
 Complexity is concentrated in a few engine files:
 - `lib/src/SocketImpl.cpp`
@@ -31,48 +25,6 @@ Most other modules are already relatively simple and cohesive.
 - TLS handshake and ALPN
 - Connect timeouts + DNS timeout behavior
 3. Keep this baseline for regression checks after each phase.
-
-## Phase 1: Centralize HTTP Framing Logic (Low Risk, High Return)
-### Scope
-- Extract shared request framing/parser helpers used by both:
-- `lib/src/HttpPollServer.cpp`
-- `lib/src/HttpRequest.cpp`
-
-### Changes
-- Introduce a single internal component (example: `HttpRequestFramer`) for:
-- Content-Length validation
-- Transfer-Encoding: chunked detection
-- Chunk-size parsing
-- Decoding/consumption boundaries
-
-### Benefits
-- Removes duplicate logic and drift risk.
-- Makes parser behavior easier to reason about and test.
-
-### Exit Criteria
-- No duplicate chunked/content-length framing code in the two files.
-- Existing parser tests pass, plus focused new tests for edge cases.
-
-## Phase 2: Split HttpPollServer State Machine (Medium Risk, High Return)
-### Scope
-Refactor `lib/src/HttpPollServer.cpp` by separating major lifecycle stages.
-
-### Changes
-- Break `onReadable` and `onWritable` into explicit internal stages:
-- TLS handshake stage
-- Read/buffer stage
-- Request-frame inspection stage
-- Response-build stage
-- Send/stream stage
-- Pipeline continuation stage
-
-### Benefits
-- Smaller functions, fewer intertwined branches.
-- Easier to test each stage independently.
-
-### Exit Criteria
-- `onReadable` and `onWritable` are orchestration-only wrappers.
-- Stage helpers have focused responsibilities and tests.
 
 ## Phase 3: Decompose SocketImpl by Concern (Medium-High Risk, Highest Return)
 ### Scope
@@ -154,16 +106,12 @@ For every phase:
 4. If regressions appear, revert only that phase and narrow scope.
 
 ## Recommended Execution Order
-1. Phase 1
-2. Phase 2
-3. Phase 3
-4. Phase 4
-5. Phase 5
-6. Phase 6 (optional)
+1. Phase 3
+2. Phase 4
+3. Phase 5
+4. Phase 6 (optional)
 
-## Suggested First PR
-Start with Phase 1 only:
-- Small blast radius
-- Easy review
-- Immediate reduction of duplicate HTTP framing logic
-- Builds confidence for later higher-risk phases
+## Next PR
+Start with Phase 3 only:
+- Isolate connect path and transfer path in SocketImpl
+- Reduce hotspot complexity for timeout and DNS debugging
