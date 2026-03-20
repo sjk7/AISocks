@@ -12,11 +12,11 @@ All planned refactoring phases (3, 4, 5, and 6) have been implemented and verifi
 - **Phase 5**: Simplified `HttpClientState` ownership and payload management.
 - **Phase 6**: Extracted orchestration and logging from `ServerBase.h` into `ServerOrchestrator`.
 - **Phase 7**: Decoupled "Accept Filter" into `ServerOrchestrator::AcceptPolicy`. Fixed legacy `HttpPollServer` build regressions and optimized local build with Ninja (0.63s test runs).
+- **Phase 8**: Refactored `HttpPollServer` to use a generic `ProtocolDispatcher` policy. This decoupled the core event loop from HTTP/TLS framing logic, improving maintainability and making the server protocol-agnostic.
 - **Performance Audit**: Verified `ServerOrchestrator` handles 10k concurrent connections with ~6,700 requests/sec and zero stability issues.
 
 ## Next Steps / Future Work
 - **Portability Testing**: Verify the recent `SocketImpl` decompositions on Windows (WSA) and Linux (epoll) via CI.
-- **Protocol Dispatcher**: Consider refactoring the `onReadable` switch in `HttpPollServer` into a policy-based dispatcher.
 
 ## Test Strategy
 For any future changes:
