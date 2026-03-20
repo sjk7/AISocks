@@ -282,6 +282,7 @@ jobs:
         env:
           CC: ${{ matrix.cc }}
           CXX: ${{ matrix.cxx }}
+          COMPILER: ${{ matrix.compiler }}
           SANITIZER_FLAGS: ${{ matrix.sanitizer_flags }}
           ENABLE_TLS: ${{ matrix.enable_tls || 'OFF' }}
         run: |
@@ -297,7 +298,7 @@ jobs:
             -DBUILD_EXAMPLES=OFF
             -DAISOCKS_ENABLE_TLS=${ENABLE_TLS}
           )
-          if [[ "$RUNNER_OS" == "Windows" ]]; then
+          if [[ "$RUNNER_OS" == "Windows" && "$COMPILER" == "msvc" ]]; then
             # Optimize Windows builds for speed and avoid PDB locking issues.
             # 1. Use /Z7 (Embedded) for debug info to avoid central .pdb contention.
             # 2. Use /DEBUG:FASTLINK to speed up the linking phase.
