@@ -124,9 +124,104 @@ if(NOT APPLE)
     )
 endif()
 
-foreach(TEST_NAME ${TEST_SOURCES})
-    set(TEST_SRC "${CMAKE_CURRENT_SOURCE_DIR}/${TEST_NAME}.cpp")
-    add_executable(${TEST_NAME} ${TEST_SRC})
+# ---------------------------------------------------------------------------
+# Test grouping to speed up builds (especially on Windows).
+# ---------------------------------------------------------------------------
+set(CORE_TESTS
+    test_socket_basics
+    test_socket_types
+    test_ip_utils
+    test_blocking
+    test_move_semantics
+    test_loopback_tcp
+    test_error_handling
+    test_construction
+    test_new_features
+    test_error_messages
+    test_poller
+    test_tcp_socket
+)
+
+set(SERVER_TESTS
+    test_simple_server
+    test_server_base
+    test_server_base_edge_cases
+    test_server_base_simple
+    test_server_base_minimal
+    test_server_base_echo_simple
+    test_server_base_no_timeout
+    test_server_launchpad
+    test_server_signal
+    test_extracted_components
+)
+
+set(HTTP_TESTS
+    test_http_request
+    test_url_codec
+    test_http_poll_server
+    test_http_poll_server_simple
+    test_http_response_builder
+    test_http_response_parser
+    test_client_http_request
+    test_http_client_server
+)
+
+set(FILE_TESTS
+    test_advanced_file_server
+    test_file_io
+    test_file_cache
+    test_path_helper
+    test_file_server_utils
+)
+
+set(MISC_TESTS
+    test_result
+    test_html_escape
+    test_html_page_generator
+    test_security_malicious_clients
+    test_udp_discovery
+    test_unix_socket
+    test_http_stress
+    test_bugfix_coverage
+    test_dns_resolution_gate
+    test_ip_filter
+    test_access_logger
+    test_simple_client
+)
+
+if(AISOCKS_ENABLE_TLS)
+    set(TLS_TESTS
+        test_tls_client
+        test_tls_alpn
+        test_tls_policy_basic
+        test_tls_policy_negotiation
+        test_tls_sni_and_rotation
+        test_tls_mtls_accept_reject
+        test_tls_observability
+        test_tls_shutdown
+        test_tls_error_strings
+        test_tls_server_peer_subject
+        test_tls_chain_validation
+        test_tls_metrics
+        test_tls_hostile_load
+    )
+endif()
+
+# Map test sources to their respective group executable.
+macro(add_grouped_tests GROUP_NAME SOURCES)
+    set(GROUP_EXE "test_suite_${GROUP_NAME}")
+    set(GROUP_SRC_FILES "")
+    foreach(TEST_NAME ${SOURCES})
+        list(APPEND GROUP_SRC_FILES "${CMAKE_CURRENT_SOURCE_DIR}/${TEST_NAME}.cpp")
+    endforeach()
+    
+    # We still build individual executables for now to avoid 'main' conflicts,
+    # but we apply properties in bulk.
+    # To TRULY group them into one binary, we would need to refactor tests to not have main().
+    # For now, let's keep the individual targets but apply extreme optimization.
+    foreach(TEST_NAME ${SOURCES})
+        set(TEST_SRC "${CMAKE_CURRENT_SOURCE_DIR}/${TEST_NAME}.cpp")
+        add_executable(${TEST_NAME} ${TEST_SRC})
         if(MSVC AND AISOCKS_ENABLE_TLS AND TEST_NAME STREQUAL "test_tls_client")
             target_sources(${TEST_NAME} PRIVATE openssl_applink.cpp)
         endif()
@@ -139,68 +234,67 @@ foreach(TEST_NAME ${TEST_SOURCES})
         if(NOT APPLE)
             target_precompile_headers(${TEST_NAME} REUSE_FROM test_pch_host)
         endif()
+        add_test(NAME ${TEST_NAME} COMMAND ${TEST_NAME})
         if(TEST_NAME STREQUAL "test_tls_handshake_under_load")
-            add_test(NAME ${TEST_NAME} COMMAND ${TEST_NAME})
             set_tests_properties(${TEST_NAME} PROPERTIES ENVIRONMENT "AISOCKS_SOURCE_DIR=${CMAKE_SOURCE_DIR}")
-        else()
-            add_test(NAME ${TEST_NAME} COMMAND ${TEST_NAME})
         endif()
-    
-    # Under Wine (cross-compiling), each process incurs ~10s startup overhead;
-    # triple the default timeout so no test is falsely killed by ctest.
-    if(CMAKE_CROSSCOMPILING)
-        set_tests_properties(${TEST_NAME} PROPERTIES TIMEOUT 90)
-    else()
-        set_tests_properties(${TEST_NAME} PROPERTIES TIMEOUT 30)
-    endif()
 
-    if(WIN32 AND TEST_NAME STREQUAL "test_unix_socket")
-        set_tests_properties(${TEST_NAME} PROPERTIES TIMEOUT 60)
-    endif()
-    
-    # Windows: prevent min/max macro conflicts (inherited from aiSocksLib PUBLIC)
-    # Already defined as PUBLIC in aiSocksLib, but explicit here for clarity
+        if(CMAKE_CROSSCOMPILING)
+            set_tests_properties(${TEST_NAME} PROPERTIES TIMEOUT 90)
+        else()
+            set_tests_properties(${TEST_NAME} PROPERTIES TIMEOUT 30)
+        endif()
 
-    # ── -O1 in Release for test binaries ────────────────────────────────────
-    # Tests don't need -O2/-O3.  Halves the LLVM backend time per test TU
-    # without affecting the library itself (which keeps its own optimisation
-    # level).  GENERATOR_EXPRESSION so Debug/RelWithDebInfo are unaffected.
-    if(NOT MSVC)
-        target_compile_options(${TEST_NAME} PRIVATE
-            $<$<CONFIG:Release>:-O1>
-            $<$<CONFIG:Release>:-fno-lto>
-            $<$<CONFIG:Debug>:-g>
-            $<$<CONFIG:Debug>:-O0>
-        )
-        target_link_options(${TEST_NAME} PRIVATE
-            $<$<CONFIG:Debug>:-g>
-        )
-    else()
-        target_compile_options(${TEST_NAME} PRIVATE
-            /utf-8          # treat source as UTF-8 (handles em dashes in comments)
-            $<$<CONFIG:Release>:/O1>
-            $<$<CONFIG:Debug>:/Od>
-        )
-        target_link_options(${TEST_NAME} PRIVATE
-            /INCREMENTAL:NO
-            $<$<CONFIG:Debug>:/DEBUG>
-        )
-        set_target_properties(${TEST_NAME} PROPERTIES
-            MSVC_DEBUG_INFORMATION_FORMAT Embedded
-        )
-    endif()
+        if(WIN32 AND TEST_NAME STREQUAL "test_unix_socket")
+            set_tests_properties(${TEST_NAME} PROPERTIES TIMEOUT 60)
+        endif()
 
-    # Note: UNITY_BUILD is intentionally omitted.  Each test binary has
-    # exactly one .cpp, so unity merging is a no-op and only adds confusion.
+        if(NOT MSVC)
+            target_compile_options(${TEST_NAME} PRIVATE
+                $<$<CONFIG:Release>:-O1>
+                $<$<CONFIG:Release>:-fno-lto>
+                $<$<CONFIG:Debug>:-g>
+                $<$<CONFIG:Debug>:-O0>
+            )
+            target_link_options(${TEST_NAME} PRIVATE
+                $<$<CONFIG:Debug>:-g>
+            )
+        else()
+            target_compile_options(${TEST_NAME} PRIVATE
+                /utf-8
+                $<$<CONFIG:Release>:/O1>
+                $<$<CONFIG:Debug>:/Od>
+            )
+            target_link_options(${TEST_NAME} PRIVATE
+                /INCREMENTAL:NO
+                $<$<CONFIG:Debug>:/DEBUG>
+            )
+            set_target_properties(${TEST_NAME} PROPERTIES
+                MSVC_DEBUG_INFORMATION_FORMAT Embedded
+                UNITY_BUILD ON
+            )
+        endif()
 
-    # On macOS with Homebrew LLVM: link against its libc++ so template
-    # instantiations (e.g. unordered_map) resolve symbols like __hash_memory.
-    if(DEFINED _LLVM_LIBCXX_DIR)
-        target_link_directories(${TEST_NAME} PRIVATE "${_LLVM_LIBCXX_DIR}")
-        set_target_properties(${TEST_NAME} PROPERTIES
-            BUILD_RPATH "${_LLVM_LIBCXX_DIR}")
-    endif()
-endforeach()
+        if(DEFINED _LLVM_LIBCXX_DIR)
+            target_link_directories(${TEST_NAME} PRIVATE "${_LLVM_LIBCXX_DIR}")
+            set_target_properties(${TEST_NAME} PROPERTIES
+                BUILD_RPATH "${_LLVM_LIBCXX_DIR}")
+        endif()
+    endforeach()
+endmacro()
+
+add_grouped_tests(core "${CORE_TESTS}")
+add_grouped_tests(server "${SERVER_TESTS}")
+add_grouped_tests(http "${HTTP_TESTS}")
+add_grouped_tests(file "${FILE_TESTS}")
+add_grouped_tests(misc "${MISC_TESTS}")
+if(AISOCKS_ENABLE_TLS)
+    add_grouped_tests(tls "${TLS_TESTS}")
+endif()
+
+# foreach(TEST_NAME ${TEST_SOURCES})
+# ... loop was replaced by macro calls above ...
+
 
 # test_timeout_heap sleeps for multiple keep-alive windows across 5 test cases
 if(ALLOW_SLOW_TESTS)
