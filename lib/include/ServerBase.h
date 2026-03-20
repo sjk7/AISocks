@@ -403,6 +403,12 @@ template <typename ClientData> class ServerBase {
         return ep.isSuccess() ? ep.value().port : Port::any;
     }
 
+    // Current number of connected clients.
+    size_t clientCount() const { return clientFds_.size(); }
+
+    // Peak concurrent client count since server started.
+    size_t peakClientCount() const { return orchestrator_.peakClients; }
+
     // Access the coordination logic and policies.
     ServerOrchestrator& getOrchestrator() { return orchestrator_; }
     const ServerOrchestrator& getOrchestrator() const { return orchestrator_; }
