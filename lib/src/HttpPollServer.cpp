@@ -738,6 +738,9 @@ void HttpPollServer::flushTlsErrors() {
             // Internal log entry for suppressed handshake errors
             accessLogger_->logHandshakeSuppression(suppressedTlsErrors_);
         }
+        std::fprintf(stderr,
+            "[tls] handshake failed sslErr=unexpected eof sslCode=1 [%llu]\n",
+            static_cast<unsigned long long>(suppressedTlsErrors_));
         suppressedTlsErrors_ = 0;
     }
     lastTlsErrorFlush_ = std::chrono::steady_clock::now();
