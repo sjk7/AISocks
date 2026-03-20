@@ -324,11 +324,12 @@ jobs:
           if [[ "$RUNNER_OS" == "Windows" && "$COMPILER" == "msvc" ]]; then
             # Optimize MSVC builds for speed and avoid PDB contention.
             # Use /Z7 (Embedded) and /MP (Multi-processor compilation).
-            # We use CMAKE_CXX_FLAGS to avoid shell globbing/path issues in Bash.
+            # We prefix the flags with space to prevent Git Bash from thinking
+            # these are paths it needs to "fix".
             CMAKE_ARGS+=(
               "-DCMAKE_MSVC_DEBUG_INFORMATION_FORMAT=Embedded"
-              "-DCMAKE_CXX_FLAGS=/MP"
-              "-DCMAKE_C_FLAGS=/MP"
+              "-DCMAKE_CXX_FLAGS= /MP"
+              "-DCMAKE_C_FLAGS= /MP"
             )
           fi
           if [[ "$ENABLE_TLS" == "ON" ]]; then
