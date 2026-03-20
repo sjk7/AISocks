@@ -82,7 +82,14 @@ endif()
 
 # Compiler-specific settings
 if(MSVC)
-    target_compile_options(aiSocksLib PRIVATE /W4 /WX /utf-8 /MP)
+    target_compile_options(aiSocksLib PRIVATE 
+        /W4 /WX /utf-8 /MP
+        $<$<OR:$<CONFIG:Debug>,$<CONFIG:RelWithDebInfo>>:/Z7>
+    )
+    target_link_options(aiSocksLib PRIVATE
+        $<$<OR:$<CONFIG:Debug>,$<CONFIG:RelWithDebInfo>>:/DEBUG:FASTLINK>
+        $<$<OR:$<CONFIG:Debug>,$<CONFIG:RelWithDebInfo>>:/INCREMENTAL:NO>
+    )
 else()
     target_compile_options(aiSocksLib PRIVATE -Wall -Wextra -Wpedantic -Werror -Wno-shadow)
     # Ensure debug symbols in Debug builds for Clang

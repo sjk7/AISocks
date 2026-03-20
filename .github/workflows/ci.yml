@@ -335,11 +335,16 @@ jobs:
             -DBUILD_EXAMPLES=OFF
             -DAISOCKS_ENABLE_TLS=${ENABLE_TLS}
           )
-          if [[ "$RUNNER_OS" == "Windows" && "${{ matrix.build_type }}" == "RelWithDebInfo" ]]; then
-            # Use CMake's MSVC debug-info knob to request /Z7 without passing
-            # raw /-style flags through Git Bash argument conversion.
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            # Optimize Windows builds for speed and avoid PDB locking issues.
+            # 1. Use /Z7 (Embedded) for debug info to avoid central .pdb contention.
+            # 2. Use /DEBUG:FASTLINK to speed up the linking phase.
+            # 3. Disable incremental linking (/INCREMENTAL:NO) for cleaner, faster CI builds.
             CMAKE_ARGS+=(
               "-DCMAKE_MSVC_DEBUG_INFORMATION_FORMAT=Embedded"
+              "-DCMAKE_EXE_LINKER_FLAGS=/DEBUG:FASTLINK /INCREMENTAL:NO"
+              "-DCMAKE_SHARED_LINKER_FLAGS=/DEBUG:FASTLINK /INCREMENTAL:NO"
+              "-DCMAKE_MODULE_LINKER_FLAGS=/DEBUG:FASTLINK /INCREMENTAL:NO"
             )
           fi
           if [[ "$ENABLE_TLS" == "ON" ]]; then

@@ -181,6 +181,7 @@ foreach(TEST_NAME ${TEST_SOURCES})
             $<$<CONFIG:Release>:/O1>
             $<$<OR:$<CONFIG:Debug>,$<CONFIG:RelWithDebInfo>>:/Z7>
             $<$<CONFIG:Debug>:/Od>
+            /MP             # Enable multi-processor compilation
         )
         target_link_options(${TEST_NAME} PRIVATE
             $<$<OR:$<CONFIG:Debug>,$<CONFIG:RelWithDebInfo>>:/DEBUG:FASTLINK>
