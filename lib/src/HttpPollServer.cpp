@@ -382,7 +382,7 @@ static bool resolveKeepAlive_(const HttpRequest& req) {
 bool HttpPollServer::slowlorisExpired(const HttpClientState& s,
     std::chrono::steady_clock::time_point now, int timeoutMs) const {
     if (!s.dataView.empty()) return false; // already responding
-    if (s.request.empty()) return false;
+    if (s.request.empty() && s.tlsHandshakeDone) return false;
     const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
         now - s.startTime);
     return elapsed.count() > timeoutMs;

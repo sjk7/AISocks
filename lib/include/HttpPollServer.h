@@ -399,6 +399,9 @@ class HttpPollServer : public ServerBase<HttpClientState> {
         return sock.sendChunked(data, len);
     }
 
+    void recordTlsHandshakeSuppressed();
+    void flushTlsErrors();
+
     // Returns true when the slowloris deadline has expired.
     bool slowlorisExpired(const HttpClientState& s,
         std::chrono::steady_clock::time_point now, int timeoutMs) const;
@@ -408,11 +411,20 @@ class HttpPollServer : public ServerBase<HttpClientState> {
     AccessLogger* accessLogger_{nullptr};
     int slowlorisTimeoutMs_{SLOWLORIS_TIMEOUT_MS};
 
+    // Tracks TLS handshake errors that were suppressed during high load.
+    // Flushed periodically during onIdle().
+    uint64_t suppressedTlsErrors_{0};
+    std::chrono::steady_clock::time_point lastTlsErrorFlush_{};
+
     std::unique_ptr<ProtocolDispatcher<HttpClientState>> protocolDispatcher_;
 
     ServerResult onReadable(TcpSocket& sock, HttpClientState& s) final;
     ServerResult onWritable(TcpSocket& sock, HttpClientState& s) final;
     ServerResult onIdle() override;
+
+    // Flush any pending TLS error counters to the log.
+    void flushTlsErrors();
+
     bool runTlsHandshakeStage_(
         TcpSocket& sock, HttpClientState& s, ServerResult& out);
     bool runRequestFrameInspectionStage_(

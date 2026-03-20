@@ -1,7 +1,8 @@
-// This is an independent project of an individual developer. Dear PVS-Studio, please check it.
+// This is an independent project of an individual developer. Dear PVS-Studio,
+// please check it.
 
-// PVS-Studio Static Code Analyzer for C, C++, C#, and Java: https://pvs-studio.com
- 
+// PVS-Studio Static Code Analyzer for C, C++, C#, and Java:
+// https://pvs-studio.com
 
 // dual_http_https_server.cpp
 // Example: Run both HTTP and HTTPS servers in one process using aiSocks
@@ -50,7 +51,7 @@ int main(int argc, char** argv) {
     // HTTP
     HttpFileServer httpServer(ServerBind{"0.0.0.0", Port{httpPort}}, config);
     std::thread httpThread(
-        [&] { httpServer.run(ClientLimit{2000}, Milliseconds{5}); });
+        [&] { httpServer.run(ClientLimit::Unlimited, Milliseconds{5}); });
 
 #ifdef AISOCKS_ENABLE_TLS
     // HTTPS
@@ -58,7 +59,7 @@ int main(int argc, char** argv) {
     HttpsFileServer httpsServer(
         ServerBind{"0.0.0.0", Port{httpsPort}}, config, tls);
     std::thread httpsThread(
-        [&] { httpsServer.run(ClientLimit{2000}, Milliseconds{5}); });
+        [&] { httpsServer.run(ClientLimit::Unlimited, Milliseconds{5}); });
 #endif
 
     httpThread.join();

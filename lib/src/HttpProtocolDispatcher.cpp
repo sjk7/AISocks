@@ -73,8 +73,19 @@ ServerResult HttpProtocolDispatcher::onWritable(
         if (server_.runTlsHandshakeStage_(sock, s, stageOut)) return stageOut;
         if (s.dataView.empty()) return ServerResult::KeepConnection;
         if (server_.runSendStreamStage_(sock, s, stageOut)) return stageOut;
+
+        // Pipeline continuation: if runPipelineContinuationStage_ returns
+        // false, a new request was found and dispatched.
         if (server_.runPipelineContinuationStage_(sock, s, stageOut))
             return stageOut;
+
+        // Fairness check: if we are under high load, exit after one full
+        // response cycle to ensure other clients are not starved. If load is
+        // low, we "hog" the connection to maximize pipeline throughput.
+        if (server_.clientCount()
+            > HttpPollServer::SLOWLORIS_HIGH_LOAD_THRESHOLD) {
+            return ServerResult::KeepConnection;
+        }
     }
 }
 

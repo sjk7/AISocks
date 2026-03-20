@@ -91,8 +91,11 @@ class HttpsFileServer : public HttpFileServer {
 
         // Surface OpenSSL error for debugging.
         const std::string opensslErr = TlsOpenSsl::lastErrorString();
-        std::fprintf(stderr, "[tls] handshake failed sslErr=%s sslCode=%d\n",
-            opensslErr.empty() ? "<empty>" : opensslErr.c_str(), e);
+        if (e != SSL_ERROR_ZERO_RETURN && e != SSL_ERROR_SYSCALL) {
+            std::fprintf(stderr,
+                "[tls] handshake failed sslErr=%s sslCode=%d\n",
+                opensslErr.empty() ? "<empty>" : opensslErr.c_str(), e);
+        }
         return ServerResult::Disconnect;
     }
 
