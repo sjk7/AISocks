@@ -125,7 +125,7 @@ class TestHttpsServer : public HttpPollServer {
     void waitReady() {
         std::unique_lock<std::mutex> lk(readyMtx_);
         const bool ready = readyCv_.wait_for(
-            lk, std::chrono::seconds{2}, [this] { return ready_.load(); });
+            lk, std::chrono::milliseconds{10}, [this] { return ready_.load(); });
         REQUIRE_MSG(ready, "server readiness timed out");
     }
 
@@ -249,7 +249,7 @@ class TestHttpServer : public HttpPollServer {
     void waitReady() {
         std::unique_lock<std::mutex> lk(readyMtx_);
         const bool ready = readyCv_.wait_for(
-            lk, std::chrono::seconds{2}, [this] { return ready_.load(); });
+            lk, std::chrono::milliseconds{10}, [this] { return ready_.load(); });
         REQUIRE_MSG(ready, "server readiness timed out");
     }
 
@@ -285,7 +285,7 @@ class TestHttpsFileServer : public HttpsFileServer {
     void waitReady() {
         std::unique_lock<std::mutex> lk(readyMtx_);
         const bool ready = readyCv_.wait_for(
-            lk, std::chrono::seconds{2}, [this] { return ready_.load(); });
+            lk, std::chrono::milliseconds{10}, [this] { return ready_.load(); });
         REQUIRE_MSG(ready, "server readiness timed out");
     }
 
@@ -517,8 +517,8 @@ static void test_https_client_basic_get() {
     server.waitReady();
 
     HttpClient::Options opts;
-    opts.connectTimeout = Milliseconds{900};
-    opts.requestTimeout = Milliseconds{900};
+    opts.connectTimeout = Milliseconds{10};
+    opts.requestTimeout = Milliseconds{10};
     opts.verifyCertificate = false; // self-signed cert in test
     HttpClient client{opts};
 
@@ -554,8 +554,8 @@ static void test_https_client_multiple_requests_keep_alive() {
     server.waitReady();
 
     HttpClient::Options opts;
-    opts.connectTimeout = Milliseconds{1200};
-    opts.requestTimeout = Milliseconds{1200};
+    opts.connectTimeout = Milliseconds{10};
+    opts.requestTimeout = Milliseconds{10};
     opts.verifyCertificate = false;
     HttpClient client{opts};
 
@@ -591,8 +591,8 @@ static void test_https_cache_is_not_reused_for_http_same_host_port() {
     server.waitReady();
 
     HttpClient::Options opts;
-    opts.connectTimeout = Milliseconds{1200};
-    opts.requestTimeout = Milliseconds{1200};
+    opts.connectTimeout = Milliseconds{10};
+    opts.requestTimeout = Milliseconds{10};
     opts.verifyCertificate = false;
     HttpClient client{opts};
 
@@ -634,8 +634,8 @@ static void test_https_verify_enabled_trusted_ca_and_matching_host() {
     server.waitReady();
 
     HttpClient::Options opts;
-    opts.connectTimeout = Milliseconds{1200};
-    opts.requestTimeout = Milliseconds{1200};
+    opts.connectTimeout = Milliseconds{10};
+    opts.requestTimeout = Milliseconds{10};
     opts.verifyCertificate = true;
     opts.caCertFile = cert;
     HttpClient client{opts};
@@ -670,8 +670,8 @@ static void test_https_verify_enabled_fails_on_wrong_hostname() {
     server.waitReady();
 
     HttpClient::Options opts;
-    opts.connectTimeout = Milliseconds{1200};
-    opts.requestTimeout = Milliseconds{1200};
+    opts.connectTimeout = Milliseconds{10};
+    opts.requestTimeout = Milliseconds{10};
     opts.verifyCertificate = true;
     opts.caCertFile = cert;
     HttpClient client{opts};
@@ -703,8 +703,8 @@ static void test_https_verify_enabled_fails_for_untrusted_self_signed() {
     server.waitReady();
 
     HttpClient::Options opts;
-    opts.connectTimeout = Milliseconds{1200};
-    opts.requestTimeout = Milliseconds{1200};
+    opts.connectTimeout = Milliseconds{10};
+    opts.requestTimeout = Milliseconds{10};
     opts.verifyCertificate = true;
     HttpClient client{opts};
 
@@ -735,8 +735,8 @@ static void test_https_verify_enabled_invalid_ca_file_fails_setup() {
     server.waitReady();
 
     HttpClient::Options opts;
-    opts.connectTimeout = Milliseconds{1200};
-    opts.requestTimeout = Milliseconds{1200};
+    opts.connectTimeout = Milliseconds{10};
+    opts.requestTimeout = Milliseconds{10};
     opts.verifyCertificate = true;
     opts.caCertFile = "/nonexistent/ca-bundle.pem";
     HttpClient client{opts};
@@ -768,8 +768,8 @@ static void test_https_verify_enabled_invalid_ca_dir_fails_setup() {
     server.waitReady();
 
     HttpClient::Options opts;
-    opts.connectTimeout = Milliseconds{1200};
-    opts.requestTimeout = Milliseconds{1200};
+    opts.connectTimeout = Milliseconds{10};
+    opts.requestTimeout = Milliseconds{10};
     opts.verifyCertificate = true;
     opts.caCertDir = "/nonexistent/ca-dir";
     HttpClient client{opts};
@@ -801,8 +801,8 @@ static void test_https_verify_enabled_ca_file_plus_invalid_dir_fails_setup() {
     server.waitReady();
 
     HttpClient::Options opts;
-    opts.connectTimeout = Milliseconds{1200};
-    opts.requestTimeout = Milliseconds{1200};
+    opts.connectTimeout = Milliseconds{10};
+    opts.requestTimeout = Milliseconds{10};
     opts.verifyCertificate = true;
     opts.caCertFile = cert;
     opts.caCertDir = "/nonexistent/ca-dir";
@@ -842,8 +842,8 @@ static void test_https_verify_enabled_ca_dir_only_succeeds() {
     server.waitReady();
 
     HttpClient::Options opts;
-    opts.connectTimeout = Milliseconds{1200};
-    opts.requestTimeout = Milliseconds{1200};
+    opts.connectTimeout = Milliseconds{10};
+    opts.requestTimeout = Milliseconds{10};
     opts.verifyCertificate = true;
     opts.caCertDir = capathFixture.path;
     HttpClient client{opts};
@@ -885,8 +885,8 @@ static void test_https_verify_enabled_ca_file_plus_valid_dir_succeeds() {
     server.waitReady();
 
     HttpClient::Options opts;
-    opts.connectTimeout = Milliseconds{1200};
-    opts.requestTimeout = Milliseconds{1200};
+    opts.connectTimeout = Milliseconds{10};
+    opts.requestTimeout = Milliseconds{10};
     opts.verifyCertificate = true;
     opts.caCertFile = cert;
     opts.caCertDir = capathFixture.path;
@@ -945,8 +945,8 @@ static void test_https_redirect_to_different_host_with_verify_enabled() {
     origin.waitReady();
 
     HttpClient::Options opts;
-    opts.connectTimeout = Milliseconds{1200};
-    opts.requestTimeout = Milliseconds{1200};
+    opts.connectTimeout = Milliseconds{10};
+    opts.requestTimeout = Milliseconds{10};
     opts.verifyCertificate = true;
     opts.caCertDir = capathFixture.path;
     HttpClient client{opts};
@@ -992,8 +992,8 @@ static void test_https_to_http_redirect_behavior() {
     origin.waitReady();
 
     HttpClient::Options opts;
-    opts.connectTimeout = Milliseconds{1200};
-    opts.requestTimeout = Milliseconds{1200};
+    opts.connectTimeout = Milliseconds{10};
+    opts.requestTimeout = Milliseconds{10};
     opts.verifyCertificate = true;
     opts.caCertFile = cert;
     HttpClient client{opts};
@@ -1033,8 +1033,8 @@ static void test_https_set_options_rebuilds_tls_context() {
     server.waitReady();
 
     HttpClient::Options opts;
-    opts.connectTimeout = Milliseconds{1200};
-    opts.requestTimeout = Milliseconds{1200};
+    opts.connectTimeout = Milliseconds{10};
+    opts.requestTimeout = Milliseconds{10};
     opts.verifyCertificate = true;
     opts.caCertFile = cert;
     HttpClient client{opts};
@@ -1072,8 +1072,8 @@ static void test_https_ip_literal_does_not_send_sni() {
     server.waitReady();
 
     HttpClient::Options opts;
-    opts.connectTimeout = Milliseconds{1200};
-    opts.requestTimeout = Milliseconds{1200};
+    opts.connectTimeout = Milliseconds{10};
+    opts.requestTimeout = Milliseconds{10};
     opts.verifyCertificate = false;
     HttpClient client{opts};
 
@@ -1103,8 +1103,8 @@ static void test_https_dns_host_sends_sni() {
     server.waitReady();
 
     HttpClient::Options opts;
-    opts.connectTimeout = Milliseconds{1200};
-    opts.requestTimeout = Milliseconds{1200};
+    opts.connectTimeout = Milliseconds{10};
+    opts.requestTimeout = Milliseconds{10};
     opts.verifyCertificate = false;
     HttpClient client{opts};
 
@@ -1139,8 +1139,8 @@ static void test_https_verify_enabled_ipv6_san_match_succeeds() {
     server.waitReady();
 
     HttpClient::Options opts;
-    opts.connectTimeout = Milliseconds{1200};
-    opts.requestTimeout = Milliseconds{1200};
+    opts.connectTimeout = Milliseconds{10};
+    opts.requestTimeout = Milliseconds{10};
     opts.verifyCertificate = true;
     opts.caCertFile = cert;
     HttpClient client{opts};
@@ -1180,8 +1180,8 @@ static void test_https_verify_enabled_ipv6_san_mismatch_fails() {
     server.waitReady();
 
     HttpClient::Options opts;
-    opts.connectTimeout = Milliseconds{1200};
-    opts.requestTimeout = Milliseconds{1200};
+    opts.connectTimeout = Milliseconds{10};
+    opts.requestTimeout = Milliseconds{10};
     opts.verifyCertificate = true;
     opts.caCertFile = cert;
     HttpClient client{opts};
@@ -1202,8 +1202,8 @@ static void test_https_verify_enabled_rejects_non_ascii_dns_host() {
                "requires punycode");
 
     HttpClient::Options opts;
-    opts.connectTimeout = Milliseconds{1200};
-    opts.requestTimeout = Milliseconds{1200};
+    opts.connectTimeout = Milliseconds{10};
+    opts.requestTimeout = Milliseconds{10};
     opts.verifyCertificate = true;
     HttpClient client{opts};
 
@@ -1220,8 +1220,8 @@ static void test_https_verify_depth_invalid_value_fails_early() {
                "error");
 
     HttpClient::Options opts;
-    opts.connectTimeout = Milliseconds{1200};
-    opts.requestTimeout = Milliseconds{1200};
+    opts.connectTimeout = Milliseconds{10};
+    opts.requestTimeout = Milliseconds{10};
     opts.verifyCertificate = true;
     opts.verifyDepth = -2;
     HttpClient client{opts};
@@ -1247,8 +1247,8 @@ static void test_https_verify_depth_zero_still_succeeds_for_self_signed_leaf() {
     server.waitReady();
 
     HttpClient::Options opts;
-    opts.connectTimeout = Milliseconds{1200};
-    opts.requestTimeout = Milliseconds{1200};
+    opts.connectTimeout = Milliseconds{10};
+    opts.requestTimeout = Milliseconds{10};
     opts.verifyCertificate = true;
     opts.caCertFile = cert;
     opts.verifyDepth = 0;

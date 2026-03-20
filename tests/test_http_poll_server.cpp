@@ -260,7 +260,7 @@ std::string receiveCompleteResponse(
         } else {
             const auto err = client.getLastError();
             if (err == SocketError::WouldBlock || err == SocketError::Timeout) {
-                std::this_thread::sleep_for(10ms); // Small delay before retry
+                std::this_thread::sleep_for(1ms); // Small delay before retry
                 continue;
             }
             break; // Error

@@ -209,7 +209,8 @@ bool TlsContext::configureVerifyPeer(bool verifyPeer, bool loadDefaultCaPaths,
     if (verifyPeer && failIfNoPeerCert)
         verifyMode |= SSL_VERIFY_FAIL_IF_NO_PEER_CERT;
 
-    // Explicitly check verifyMode to satisfy V1051 and ensure it's not a misprint
+    // Explicitly check verifyMode to satisfy V1051 and ensure it's not a
+    // misprint
     if (verifyMode != SSL_VERIFY_NONE || !verifyPeer) {
         SSL_CTX_set_verify(ctx_, verifyMode, nullptr);
     }
@@ -422,6 +423,102 @@ std::unique_ptr<TlsSession> TlsSession::create(
     }
 
     return std::unique_ptr<TlsSession>(new TlsSession(ssl));
+}
+
+bool TlsContext::applyPolicy(const TlsPolicy& policy, std::string* error) {
+    if (!ctx_) {
+        if (error) *error = "TLS context not initialized";
+        return false;
+    }
+
+    // Configure protocol versions
+#if OPENSSL_VERSION_NUMBER >= 0x10101000L
+    if (policy.minProtocol > 0)
+        SSL_CTX_set_min_proto_version(ctx_, policy.minProtocol);
+    if (policy.maxProtocol > 0)
+        SSL_CTX_set_max_proto_version(ctx_, policy.maxProtocol);
+#endif
+
+    // Apply manual SSL_OP_NO_ flags for backward compatibility and robustness
+    if (policy.maxProtocol > 0) {
+#ifdef SSL_OP_NO_TLSv1_3
+        if (policy.maxProtocol < TLS1_3_VERSION)
+            SSL_CTX_set_options(ctx_, SSL_OP_NO_TLSv1_3);
+#endif
+#ifdef SSL_OP_NO_TLSv1_2
+        if (policy.maxProtocol < TLS1_2_VERSION)
+            SSL_CTX_set_options(ctx_, SSL_OP_NO_TLSv1_2);
+#endif
+#ifdef SSL_OP_NO_TLSv1_1
+        if (policy.maxProtocol < TLS1_1_VERSION)
+            SSL_CTX_set_options(ctx_, SSL_OP_NO_TLSv1_1);
+#endif
+#ifdef SSL_OP_NO_TLSv1
+        if (policy.maxProtocol < TLS1_VERSION)
+            SSL_CTX_set_options(ctx_, SSL_OP_NO_TLSv1);
+#endif
+    }
+
+    // Configure ciphers
+#if defined(SSL_CTX_set_ciphersuites)
+    if (!policy.tls13CipherSuites.empty()) {
+        if (SSL_CTX_set_ciphersuites(ctx_, policy.tls13CipherSuites.c_str())
+            != 1) {
+            if (error) *error = TlsOpenSsl::lastErrorString();
+            return false;
+        }
+    }
+#endif
+    if (!policy.tls12CipherList.empty()) {
+        if (SSL_CTX_set_cipher_list(ctx_, policy.tls12CipherList.c_str())
+            != 1) {
+            if (error) *error = TlsOpenSsl::lastErrorString();
+            return false;
+        }
+    }
+
+    if (policy.preferServerCiphers) {
+#ifdef SSL_OP_CIPHER_SERVER_PREFERENCE
+        SSL_CTX_set_options(ctx_, SSL_OP_CIPHER_SERVER_PREFERENCE);
+#endif
+    }
+
+    // Security level
+#ifdef SSL_CTX_set_security_level
+    if (policy.securityLevel >= 0) {
+        SSL_CTX_set_security_level(ctx_, policy.securityLevel);
+    }
+#endif
+
+    // Verification
+    int verifyMode = policy.verifyPeer ? SSL_VERIFY_PEER : SSL_VERIFY_NONE;
+    if (policy.verifyPeer && policy.failIfNoPeerCert)
+        verifyMode |= SSL_VERIFY_FAIL_IF_NO_PEER_CERT;
+
+    SSL_CTX_set_verify(ctx_, verifyMode, nullptr);
+
+    if (policy.verifyPeer) {
+        const char* caFileArg
+            = policy.caFile.empty() ? nullptr : policy.caFile.c_str();
+        const char* caDirArg
+            = policy.caDir.empty() ? nullptr : policy.caDir.c_str();
+
+        if (caFileArg || caDirArg) {
+            if (SSL_CTX_load_verify_locations(ctx_, caFileArg, caDirArg) != 1) {
+                if (error) *error = TlsOpenSsl::lastErrorString();
+                return false;
+            }
+        } else if (policy.loadDefaultCaPaths) {
+            SSL_CTX_set_default_verify_paths(ctx_);
+        }
+    }
+
+    // ALPN
+    if (!policy.alpnProtocols.empty()) {
+        return setAlpnProtocols(policy.alpnProtocols, error);
+    }
+
+    return true;
 }
 
 bool TlsSession::attachSocket(int fd, std::string* error) {

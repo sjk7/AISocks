@@ -123,19 +123,20 @@ class HttpsPollServer : public HttpPollServer {
             const char* negotiatedCipher = SSL_get_cipher_name(
                 static_cast<SSL*>(s.tlsSession->nativeHandle()));
             std::fprintf(stderr,
-                "[tls] handshake success protocol=%s cipher=%s peer_subject=%s\n",
+                "[tls] handshake success protocol=%s cipher=%s "
+                "peer_subject=%s\n",
                 negotiatedProto ? negotiatedProto : "<unknown>",
                 negotiatedCipher ? negotiatedCipher : "<unknown>",
                 peerSubj.empty() ? "<none>" : peerSubj.c_str());
 
-                // Record metrics.
-                ++tlsMetrics_.handshakeSuccessCount;
-                if (negotiatedProto) {
-                    ++tlsMetrics_.protocolDistribution[negotiatedProto];
-                }
-                if (negotiatedCipher) {
-                    ++tlsMetrics_.cipherDistribution[negotiatedCipher];
-                }
+            // Record metrics.
+            ++tlsMetrics_.handshakeSuccessCount;
+            if (negotiatedProto) {
+                ++tlsMetrics_.protocolDistribution[negotiatedProto];
+            }
+            if (negotiatedCipher) {
+                ++tlsMetrics_.cipherDistribution[negotiatedCipher];
+            }
 
             s.tlsHandshakeDone = true;
             s.tlsWantsWrite = false;
@@ -168,8 +169,8 @@ class HttpsPollServer : public HttpPollServer {
                     "[tls] handshake timeout after %lld ms sslErr=%s\n",
                     static_cast<long long>(elapsed),
                     opensslErr.empty() ? "<empty>" : opensslErr.c_str());
-                    // Record timeout metric.
-                    ++tlsMetrics_.handshakeTimeoutCount;
+                // Record timeout metric.
+                ++tlsMetrics_.handshakeTimeoutCount;
                 return ServerResult::Disconnect;
             }
         }
@@ -180,8 +181,8 @@ class HttpsPollServer : public HttpPollServer {
             std::fprintf(stderr,
                 "[tls] handshake failed sslErr=%s sslCode=%d\n",
                 opensslErr.empty() ? "<empty>" : opensslErr.c_str(), e);
-                // Record failure metric.
-                ++tlsMetrics_.handshakeFailureCount;
+            // Record failure metric.
+            ++tlsMetrics_.handshakeFailureCount;
         }
         return ServerResult::Disconnect;
     }
@@ -230,8 +231,7 @@ class HttpsPollServer : public HttpPollServer {
                 "[tls][init] loadCertificateChain failed reason=%s cert=%s "
                 "key=%s\n",
                 tlsInitError_.empty() ? "<empty>" : tlsInitError_.c_str(),
-                tls.certChainFile.c_str(),
-                tls.privateKeyFile.c_str());
+                tls.certChainFile.c_str(), tls.privateKeyFile.c_str());
             return;
         }
 
@@ -276,61 +276,30 @@ class HttpsPollServer : public HttpPollServer {
             }
         }
 
-        // Apply optional server policy (ciphers, proto range, server prefs).
+        // Apply server policy using the new data-driven applyPolicy.
         {
-            std::string policyErr;
-            if (!ctx->configureServerPolicy(tls.tls12CipherList,
-                    tls.tls13CipherSuites, tls.minProtoVersion,
-                    tls.maxProtoVersion, tls.preferServerCiphers,
-                    tls.securityLevel, &policyErr)) {
-                tlsInitError_ = policyErr.empty()
-                    ? "configureServerPolicy failed"
-                    : policyErr;
+            TlsPolicy policy;
+            policy.minProtocol = tls.minProtoVersion;
+            policy.maxProtocol = tls.maxProtoVersion;
+            policy.tls12CipherList = tls.tls12CipherList;
+            policy.tls13CipherSuites = tls.tls13CipherSuites;
+            policy.preferServerCiphers = tls.preferServerCiphers;
+            policy.securityLevel = tls.securityLevel;
+            policy.alpnProtocols = tls.alpnProtocols;
+            policy.verifyPeer
+                = (tls.clientAuth != TlsServerConfig::ClientAuthMode::None);
+            policy.failIfNoPeerCert
+                = (tls.clientAuth == TlsServerConfig::ClientAuthMode::Require);
+            policy.loadDefaultCaPaths
+                = (tls.caFile.empty() && tls.caDir.empty());
+            policy.caFile = tls.caFile;
+            policy.caDir = tls.caDir;
+            policy.verifyDepth = tls.verifyDepth;
+
+            if (!ctx->applyPolicy(policy, &tlsInitError_)) {
                 std::fprintf(stderr,
-                    "[tls][init] configureServerPolicy failed reason=%s "
-                    "ciphers12=%s ciphers13=%s\n",
-                    tlsInitError_.c_str(),
-                    tls.tls12CipherList.empty() ? "<default>"
-                                                : tls.tls12CipherList.c_str(),
-                    tls.tls13CipherSuites.empty()
-                        ? "<default>"
-                        : tls.tls13CipherSuites.c_str());
-                return;
-            }
-
-            // Configure ALPN protocols, if provided.
-            if (!tls.alpnProtocols.empty()) {
-                std::string alpnErr;
-                if (!ctx->setAlpnProtocols(tls.alpnProtocols, &alpnErr)) {
-                    tlsInitError_
-                        = alpnErr.empty() ? "setAlpnProtocols failed" : alpnErr;
-                    std::fprintf(stderr,
-                        "[tls][init] setAlpnProtocols failed reason=%s\n",
-                        tlsInitError_.c_str());
-                    return;
-                }
-            }
-        }
-
-        tlsHandshakeTimeoutMs_ = tls.handshakeTimeoutMs;
-
-        // Configure client certificate verification if requested.
-        if (tls.clientAuth != TlsServerConfig::ClientAuthMode::None) {
-            bool verifyPeer = true;
-            bool loadDefaults = tls.caFile.empty() && tls.caDir.empty();
-            std::string verErr;
-            if (!ctx->configureVerifyPeer(verifyPeer, loadDefaults, tls.caFile,
-                    tls.caDir,
-                    tls.clientAuth == TlsServerConfig::ClientAuthMode::Require,
-                    tls.verifyDepth, &verErr)) {
-                tlsInitError_
-                    = verErr.empty() ? "configureVerifyPeer failed" : verErr;
-                std::fprintf(stderr,
-                    "[tls][init] configureVerifyPeer failed reason=%s "
-                    "caFile=%s caDir=%s\n",
-                    tlsInitError_.c_str(),
-                    tls.caFile.empty() ? "<empty>" : tls.caFile.c_str(),
-                    tls.caDir.empty() ? "<empty>" : tls.caDir.c_str());
+                    "[tls][init] applyPolicy failed reason=%s\n",
+                    tlsInitError_.empty() ? "<empty>" : tlsInitError_.c_str());
                 return;
             }
 
@@ -341,6 +310,8 @@ class HttpsPollServer : public HttpPollServer {
                 tlsRequirePeerCert_ = true;
             }
         }
+
+        tlsHandshakeTimeoutMs_ = tls.handshakeTimeoutMs;
 
         tlsContext_ = std::move(ctx);
     }

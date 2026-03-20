@@ -103,10 +103,122 @@ enum class ServerResult {
 //   }
 //   srv.run();
 //
-// On failure (bind, listen, or Poller registration), the server is leftimeour
+// ---------------------------------------------------------------------------
+// ServerBase<ClientData>  CRTP-free base for poll-driven TCP servers.
+//
+// Manages the listening socket, Poller registration, client socket lifetime,
+// and per-client state storage.  Derived classes only need to implement the
+// four virtual hooks:
+//
+//   ServerResult onReadable(TcpSocket& sock, ClientData& data)
+//     Called when the client socket has incoming data.
+//     Return ServerResult::Disconnect to disconnect and destroy the client.
+//     Return ServerResult::StopServer to stop the server gracefully.
+//     Return ServerResult::KeepConnection to continue.
+//
+//   ServerResult onWritable(TcpSocket& sock, ClientData& data)
+//     Called when the client socket buffer has space for more data.
+//     Return ServerResult::Disconnect to disconnect and destroy the client.
+//     Return ServerResult::StopServer to stop the server gracefully.
+//     Return ServerResult::KeepConnection to continue.
+//
+//   ServerResult onDisconnect(ClientData& data)   [optional]
+//     Called just before a client entry is removed (error, or Disconnect
+//     return from onReadable/onWritable).  Default returns Disconnect.
+//
+//   ServerResult onIdle()   [optional]
+//     Called when poller.wait() times out with no ready events.
+//     NOT called when events fire.  Default returns KeepConnection.
+//
+// Usage:
+//   struct MyState { std::string inbuf; std::string outbuf; size_t sent{}; };
+//
+//   class MyServer : public ServerBase<MyState> {
+//   public:
+//       explicit MyServer(const ServerBind& b) : ServerBase(b) {}
+//   protected:
+//       ServerResult onReadable(TcpSocket& sock, MyState& s) override {
+//           return ServerResult::KeepConnection;
+//       }
+//       ServerResult onWritable(TcpSocket& sock, MyState& s) override {
+//           return ServerResult::KeepConnection;
+//       }
+//   };
+//
+//   MyServer srv(ServerBind{"0.0.0.0", Port{9000}});
+//   if (!srv.isValid()) {
+//       // Handle server creation failure
+//       return;
+//   }
+//   srv.run();
+//
+//   // With detailed error information:
+//   Result<TcpSocket> serverResult;
+//   MyServer srv(ServerBind{"0.0.0.0", Port{9000}}, AddressFamily::IPv4,
+//   &serverResult); if (!srv.isValid()) {
+//       fprintf(stderr, "Server failed: %s\n", serverResult.message().c_str());
+//       return;
+//   }
+//   srv.run();
+//
+// On failure (bind, listen, or Poller registration), the server is left
 // invalid; check isValid(). run() blocks until there are no more clients and
 // accepting has stopped.
 // ---------------------------------------------------------------------------
+
+// Strategy policy for coordinating server-wide orchestration.
+struct ServerOrchestrator {
+    // Keepalive log throttle state — initialised to epoch so the first
+    // sweep always prints immediately rather than waiting a full minute.
+    std::chrono::steady_clock::time_point lastLogTime{};
+    size_t pendingLogCount{0};
+    size_t peakClients{0};
+
+    // Logging behavior for timeout events.
+    void onClientsTimedOut(size_t count) {
+        if (count == 0) return;
+        pendingLogCount += count;
+        auto now = std::chrono::steady_clock::now();
+        if (now - lastLogTime >= std::chrono::minutes{1}) {
+            std::printf("[keepalive] closed %zu idle connection%s in the last "
+                        "minute\n",
+                pendingLogCount, pendingLogCount == 1 ? "" : "s");
+            pendingLogCount = 0;
+            lastLogTime = now;
+        }
+    }
+
+    void updatePeak(size_t current) {
+        if (current > peakClients) peakClients = current;
+    }
+
+    void finalizeLog() {
+        if (pendingLogCount > 0) {
+            std::printf("[keepalive] closed %zu idle connection%s total\n",
+                pendingLogCount, pendingLogCount == 1 ? "" : "s");
+            pendingLogCount = 0;
+        }
+    }
+
+    // Adjusts accepting state if we have capacity to resume.
+    void resumeAcceptIfPossible(PollEventLoop& loop, TcpSocket& listener,
+        bool& accepting, size_t currentClients, ClientLimit maxClients) {
+        if (!accepting && maxClients != ClientLimit::Unlimited
+            && currentClients < static_cast<size_t>(maxClients)) {
+            if (loop.add(listener, PollEvent::Readable | PollEvent::Error))
+                accepting = true;
+        }
+    }
+
+    // Orchestrates a keep-alive sweep across the client set.
+    template <typename GetActivityFunc, typename DisconnectFunc>
+    size_t performSweep(KeepAliveTimeoutManager& timeouts, size_t clientCount,
+        GetActivityFunc&& getActivity, DisconnectFunc&& disconnect) {
+        if (!timeouts.sweepDue(clientCount)) return 0;
+        return timeouts.sweepRaw(std::forward<GetActivityFunc>(getActivity),
+            std::forward<DisconnectFunc>(disconnect));
+    }
+};
 
 template <typename ClientData> class ServerBase {
     public:
@@ -268,7 +380,7 @@ template <typename ClientData> class ServerBase {
     size_t clientCount() const { return clientFds_.size(); }
 
     // Peak concurrent client count since server started.
-    size_t peakClientCount() const { return peak_clients_; }
+    size_t peakClientCount() const { return orchestrator_.peakClients; }
 
     // Mark a client socket as active (resets the keep-alive idle timer).
     // Call this after a successful read or write.
@@ -394,15 +506,7 @@ template <typename ClientData> class ServerBase {
     // connections. Default: accumulates count and prints at most once per
     // minute.
     virtual void onClientsTimedOut(size_t count) {
-        timeoutLogCount_ += count;
-        auto now = SteadyClock::now();
-        if (now - timeoutLogLast_ >= std::chrono::minutes{1}) {
-            printf("[keepalive] closed %zu idle connection%s in the last "
-                   "minute\n",
-                timeoutLogCount_, timeoutLogCount_ == 1 ? "" : "s");
-            timeoutLogCount_ = 0;
-            timeoutLogLast_ = now;
-        }
+        orchestrator_.onClientsTimedOut(count);
     }
 
     // Called when a newly accepted socket cannot be registered with the
@@ -443,10 +547,6 @@ template <typename ClientData> class ServerBase {
     virtual ServerResult onIdle() { return ServerResult::KeepConnection; }
 
     private:
-    // Keepalive log throttle state — initialised to epoch so the first
-    // sweep always prints immediately rather than waiting a full minute.
-    SteadyClock::time_point timeoutLogLast_{};
-    size_t timeoutLogCount_{0};
     struct ClientEntry {
         std::unique_ptr<TcpSocket> socket;
         ClientData data;
@@ -516,7 +616,7 @@ template <typename ClientData> class ServerBase {
     std::vector<std::unique_ptr<ClientEntry>> clientSlots_;
     std::vector<uintptr_t> clientFds_;
     KeepAliveTimeoutManager timeouts_;
-    size_t peak_clients_{0};
+    ServerOrchestrator orchestrator_;
 
     // --- Flat client map helpers
     // ----------------------------------------------- O(1) by-fd lookup.
@@ -588,11 +688,7 @@ template <typename ClientData> class ServerBase {
             : noMore ? "client limit reached and all clients disconnected"
                      : "unknown";
         printf("\nServer stopped gracefully: %s.\n", reason);
-        if (timeoutLogCount_ > 0) {
-            printf("[keepalive] closed %zu idle connection%s total\n",
-                timeoutLogCount_, timeoutLogCount_ == 1 ? "" : "s");
-            timeoutLogCount_ = 0;
-        }
+        orchestrator_.finalizeLog();
     }
 
     // Disconnect every remaining client and clear the active-fd list.
@@ -641,11 +737,8 @@ template <typename ClientData> class ServerBase {
 
         if (!keep) {
             disconnectClient_(cfd, *ce);
-            resumeAcceptIfNeeded_(accepting, maxClients);
-#ifdef SERVER_STATS
-            printf("[stats] clients: %zu  peak: %zu\n", clientFds_.size(),
-                peak_clients_);
-#endif
+            orchestrator_.resumeAcceptIfPossible(
+                loop_, *listener_, accepting, clientFds_.size(), maxClients);
         }
         return true;
     }
@@ -656,20 +749,23 @@ template <typename ClientData> class ServerBase {
     bool handleAfterBatch_(bool idle, bool& accepting, ClientLimit maxClients) {
         timeouts_.adjustForLoad(clientFds_.size());
 
-        if (timeouts_.sweepDue(clientFds_.size())) {
-            ClientEntry* sweepCe = nullptr;
-            size_t closed = timeouts_.sweepRaw(
-                [&](uintptr_t fd) -> std::pair<bool, SteadyClock::time_point> {
-                    sweepCe = findClient(fd);
-                    if (!sweepCe) return {false, {}};
-                    return {true, sweepCe->lastActivity};
-                },
-                [&](uintptr_t fd) {
-                    if (!sweepCe) return;
-                    disconnectClient_(fd, *sweepCe);
-                });
-            if (closed > 0) onClientsTimedOut(closed);
-            resumeAcceptIfNeeded_(accepting, maxClients);
+        ClientEntry* sweepCe = nullptr;
+        size_t closed = orchestrator_.performSweep(
+            timeouts_, clientFds_.size(),
+            [&](uintptr_t fd) -> std::pair<bool, SteadyClock::time_point> {
+                sweepCe = findClient(fd);
+                if (!sweepCe) return {false, {}};
+                return {true, sweepCe->lastActivity};
+            },
+            [&](uintptr_t fd) {
+                if (!sweepCe) return;
+                disconnectClient_(fd, *sweepCe);
+            });
+
+        if (closed > 0) {
+            onClientsTimedOut(closed);
+            orchestrator_.resumeAcceptIfPossible(
+                loop_, *listener_, accepting, clientFds_.size(), maxClients);
         }
 
         if (idle) return onIdle() != ServerResult::StopServer;
@@ -686,15 +782,6 @@ template <typename ClientData> class ServerBase {
         eraseClient(fd);
     }
 
-    // Re-register the listener if we paused accepting due to client cap and
-    // are now below it again.  Called after any client removal.
-    void resumeAcceptIfNeeded_(bool& accepting, ClientLimit maxClients) {
-        if (!accepting && maxClients != ClientLimit::Unlimited
-            && clientFds_.size() < static_cast<size_t>(maxClients)) {
-            if (loop_.add(*listener_, PollEvent::Readable | PollEvent::Error))
-                accepting = true;
-        }
-    }
     // ---------------------------------------------------------------------------
 
     void drainAccept(PollEventLoop& loop, bool& accepting, size_t& accepted,
@@ -735,14 +822,13 @@ template <typename ClientData> class ServerBase {
             ClientEntry& ce = emplaceClient(key, std::move(client));
             onClientConnected(*ce.socket, ce.data);
             ++accepted;
-            if (clientFds_.size() > peak_clients_)
-                peak_clients_ = clientFds_.size();
+            orchestrator_.updatePeak(clientFds_.size());
 
             timeouts_.onAccept(key, ce.lastActivity);
 
 #ifdef SERVER_STATS
             printf("[stats] clients: %zu  peak: %zu\n", clientFds_.size(),
-                peak_clients_);
+                orchestrator_.peakClients);
 #endif
 
             if (maxClients != ClientLimit::Unlimited

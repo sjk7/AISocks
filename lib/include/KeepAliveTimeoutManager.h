@@ -134,13 +134,15 @@ class KeepAliveTimeoutManager {
     std::chrono::milliseconds getTimeout() const { return timeout_; }
 
     // Returns true (and records the sweep time) if enough time has elapsed
-    // to warrant running a sweep.  Throttles to at most once per 100 ms
-    // when client count >= 1000.
-    bool sweepDue(size_t clientCount) {
+    // to warrant running a sweep.
+    bool sweepDue(size_t /*clientCount*/) {
         if (timeout_.count() == 0 || heap_.empty()) return false;
         const auto now = Clock::now();
-        if (clientCount < 1000
-            || (now - lastSweep_) >= std::chrono::milliseconds{100}) {
+
+        // Run sweep if it's been at least 1ms since the last one.
+        // This keeps cleanup latency low for high-throughput tests while
+        // still avoiding CPU spinning in an empty loop.
+        if ((now - lastSweep_) >= std::chrono::milliseconds{1}) {
             lastSweep_ = now;
             return true;
         }

@@ -30,6 +30,32 @@ struct TlsMetrics {
     std::map<std::string, uint64_t> cipherDistribution;
 };
 
+// Data-driven TLS policy for configuration.
+struct TlsPolicy {
+    // Protocol versions (e.g., TLS1_2_VERSION, TLS1_3_VERSION or 0 for default)
+    int minProtocol{0};
+    int maxProtocol{0};
+
+    // Cipher settings
+    std::string tls12CipherList;
+    std::string tls13CipherSuites;
+    bool preferServerCiphers{true};
+
+    // Verification settings
+    bool verifyPeer{false};
+    bool failIfNoPeerCert{false};
+    bool loadDefaultCaPaths{true};
+    std::string caFile;
+    std::string caDir;
+    int verifyDepth{-1};
+
+    // Security level (0-5, or -1 for default)
+    int securityLevel{-1};
+
+    // ALPN protocols (in order of preference)
+    std::vector<std::string> alpnProtocols;
+};
+
 class TlsOpenSsl {
     public:
     static bool initialize();
@@ -76,6 +102,9 @@ class TlsContext {
     // Configure server-side ALPN protocols (server preference order).
     bool setAlpnProtocols(
         const std::vector<std::string>& alpn, std::string* error = nullptr);
+
+    // Apply a comprehensive TlsPolicy to this context.
+    bool applyPolicy(const TlsPolicy& policy, std::string* error = nullptr);
 
     private:
     explicit TlsContext(ssl_ctx_st* ctx, Mode mode) noexcept
