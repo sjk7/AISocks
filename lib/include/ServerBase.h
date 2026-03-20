@@ -177,17 +177,18 @@ struct AcceptPolicy {
 
     // Common configurations:
     static AcceptPolicy allowAll() {
-        return { [](const std::string&) { return true; } };
+        return {[](const std::string&) { return true; }};
     }
 
     static AcceptPolicy denyAll() {
-        return { [](const std::string&) { return false; } };
+        return {[](const std::string&) { return false; }};
     }
 
     static AcceptPolicy blacklist(const std::vector<std::string>& denied) {
-        return { [denied](const std::string& addr) {
-            return std::find(denied.begin(), denied.end(), addr) == denied.end();
-        } };
+        return {[denied](const std::string& addr) {
+            return std::find(denied.begin(), denied.end(), addr)
+                == denied.end();
+        }};
     }
 };
 
@@ -406,8 +407,8 @@ template <typename ClientData> class ServerBase {
     ServerOrchestrator& getOrchestrator() { return orchestrator_; }
     const ServerOrchestrator& getOrchestrator() const { return orchestrator_; }
 
-    // Access the underlying listening socket (e.g. to set socket options).
-    TcpSocket& getSocket() {
+    // Mark a client socket as active (resets the keep-alive idle timer).
+    // Call this after a successful read or write.
     //
     // How this interacts with the timeout heap:
     //   We update lastActivity in the ClientEntry, then push a *new*
@@ -498,16 +499,15 @@ template <typename ClientData> class ServerBase {
     virtual void onReady() {}
 
     // Called on the server thread immediately after a new client has been
-    // accepted and registered. Override in subclasses that need a thread-safe
-    // client-count observable from outside threads.
-    // Called on the server thread immediately after a new client has been
-    // accepted, registered with the poller, and stored in the client map.
-    // Override to initialise per-connection state (e.g. store the peer
-    // address).
+    // accepted and registered. Override in subclasses that need a
+    // thread-safe client-count observable from outside threads. Called on
+    // the server thread immediately after a new client has been accepted,
+    // registered with the poller, and stored in the client map. Override to
+    // initialise per-connection state (e.g. store the peer address).
     virtual void onClientConnected(TcpSocket& /*sock*/, ClientData& /*data*/) {}
 
-    // Called on the server thread immediately after a client has been removed
-    // from the active set (before the socket is closed).
+    // Called on the server thread immediately after a client has been
+    // removed from the active set (before the socket is closed).
     virtual void onClientDisconnected() {}
 
     // Called immediately after a new connection is accepted from the OS but
@@ -770,9 +770,9 @@ template <typename ClientData> class ServerBase {
         return true;
     }
 
-    // Called once per poller.wait() cycle, after all socket events have been
-    // dispatched.  `idle` is true when no events fired (genuine timeout).
-    // Returns false to stop the loop.
+    // Called once per poller.wait() cycle, after all socket events have
+    // been dispatched.  `idle` is true when no events fired (genuine
+    // timeout). Returns false to stop the loop.
     bool handleAfterBatch_(bool idle, bool& accepting, ClientLimit maxClients) {
         timeouts_.adjustForLoad(clientFds_.size());
 
