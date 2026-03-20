@@ -97,11 +97,11 @@ std::string AccessLogger::extractRequestLine(const std::string& requestBuf) {
 // extractStatusCode
 // ---------------------------------------------------------------------------
 
-int AccessLogger::extractStatusCode(std::string_view responseBuf) {
+int AccessLogger::extractStatusCode(std::string_view dataBuf) {
     // Expected: "HTTP/1.x NNN ..."
-    const size_t sp1 = responseBuf.find(' ');
-    if (sp1 == std::string::npos || sp1 + 1 >= responseBuf.size()) return 0;
-    const char* p = responseBuf.data() + sp1 + 1;
+    const size_t sp1 = dataBuf.find(' ');
+    if (sp1 == std::string::npos || sp1 + 1 >= dataBuf.size()) return 0;
+    const char* p = dataBuf.data() + sp1 + 1;
     char* end = nullptr;
     const long code = std::strtol(p, &end, 10);
     if (end == p || code < 100 || code > 999) return 0;

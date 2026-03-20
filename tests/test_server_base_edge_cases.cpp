@@ -57,8 +57,8 @@ static constexpr Milliseconds SHORT_KEEP_ALIVE{
 
 template <typename Predicate>
 static bool waitUntil(Predicate&& predicate, Milliseconds timeout) {
-    const auto deadline
-        = std::chrono::steady_clock::now() + std::chrono::milliseconds(timeout.count);
+    const auto deadline = std::chrono::steady_clock::now()
+        + std::chrono::milliseconds(timeout.count);
     while (!predicate()) {
         if (std::chrono::steady_clock::now() >= deadline) {
             return false;
@@ -108,12 +108,22 @@ class EdgeCaseServer : public ServerBase<EdgeCaseState> {
 
     std::atomic<bool> ready_{false};
     void waitReady() const {
-        while (!ready_.load(std::memory_order_acquire))
+        const auto deadline
+            = std::chrono::steady_clock::now() + std::chrono::seconds(2);
+        while (!ready_.load(std::memory_order_acquire)
+            && std::chrono::steady_clock::now() < deadline)
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        REQUIRE_MSG(ready_.load(std::memory_order_acquire),
+            "server readiness timed out");
     }
     void waitForMessages(int n) const {
-        while (totalMessagesReceived.load(std::memory_order_acquire) < n)
+        const auto deadline
+            = std::chrono::steady_clock::now() + std::chrono::seconds(2);
+        while (totalMessagesReceived.load(std::memory_order_acquire) < n
+            && std::chrono::steady_clock::now() < deadline)
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        REQUIRE_MSG(totalMessagesReceived.load(std::memory_order_acquire) >= n,
+            "waitForMessages timed out");
     }
 
     Port serverPort() const {
@@ -275,7 +285,8 @@ int main() {
             }
         }
 
-        DLOG("DEBUG: Connected %zu of %d clients\n", clients.size(), numClients);
+        DLOG(
+            "DEBUG: Connected %zu of %d clients\n", clients.size(), numClients);
 
         // Each client sends a small message
         for (auto& client : clients) {
@@ -724,7 +735,9 @@ int main() {
         // Give the server loop a bounded amount of time to process reject path.
         (void)waitUntil(
             [&server]() {
-                return server.acceptFilterRejected.load(std::memory_order_relaxed) > 0;
+                return server.acceptFilterRejected.load(
+                           std::memory_order_relaxed)
+                    > 0;
             },
             Milliseconds{30});
 

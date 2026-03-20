@@ -1,6 +1,8 @@
-// This is an independent project of an individual developer. Dear PVS-Studio, please check it.
+// This is an independent project of an individual developer. Dear PVS-Studio,
+// please check it.
 
-// PVS-Studio Static Code Analyzer for C, C++, C#, and Java: https://pvs-studio.com
+// PVS-Studio Static Code Analyzer for C, C++, C#, and Java:
+// https://pvs-studio.com
 
 #include "HttpsFileServer.h"
 #include "PathHelper.h"
@@ -28,7 +30,9 @@ class TestHttpsFileServer : public HttpsFileServer {
 
     void waitReady() {
         std::unique_lock<std::mutex> lk(readyMtx_);
-        readyCv_.wait(lk, [this] { return ready_.load(); });
+        const bool ready = readyCv_.wait_for(
+            lk, std::chrono::seconds{2}, [this] { return ready_.load(); });
+        REQUIRE_MSG(ready, "server readiness timed out");
     }
 
     protected:
@@ -82,14 +86,15 @@ void test_tls_alpn_selection() {
         const std::string initErr = server.tlsInitError();
         if (initErr.find("ALPN unsupported") != std::string::npos) {
             std::fprintf(stderr,
-                "ALPN unavailable on this OpenSSL build (server); skipping test\n");
+                "ALPN unavailable on this OpenSSL build (server); skipping "
+                "test\n");
             std::remove("index.html");
             return;
         }
     }
     REQUIRE(server.tlsReady());
     std::thread serverThread(
-        [&] { server.run(ClientLimit::Unlimited, Milliseconds{5}); });
+        [&] { server.run(ClientLimit::Unlimited, Milliseconds{1}); });
     server.waitReady();
 
     // Client offers http/1.1 first then h2; server preference should pick
@@ -117,7 +122,8 @@ void test_tls_alpn_selection() {
         server.requestStop();
         serverThread.join();
         if (err.find("ALPN unsupported") != std::string::npos) {
-            std::fprintf(stderr, "ALPN unavailable on this OpenSSL build; skipping test\n");
+            std::fprintf(stderr,
+                "ALPN unavailable on this OpenSSL build; skipping test\n");
             std::remove("index.html");
             return;
         }

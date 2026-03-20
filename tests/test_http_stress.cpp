@@ -34,9 +34,13 @@ class MockHttpServer : public HttpPollServer {
     void onReady() override { readyFlag = true; }
 
     void waitReady() {
-        while (!readyFlag) {
+        const auto deadline
+            = std::chrono::steady_clock::now() + std::chrono::seconds{2};
+        while (
+            !readyFlag.load() && std::chrono::steady_clock::now() < deadline) {
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
         }
+        REQUIRE_MSG(readyFlag.load(), "server readiness timed out");
     }
 
     // Override onIdle to force the loop to continue even if no events
@@ -53,7 +57,7 @@ static void test_slowloris_protection() {
 
     // Start server in background thread
     std::thread serverThread(
-        [&]() { server.run(ClientLimit::Default, Milliseconds{10}); });
+        [&]() { server.run(ClientLimit::Default, Milliseconds{1}); });
 
     server.waitReady();
 
@@ -67,7 +71,8 @@ static void test_slowloris_protection() {
     // Poll every 1ms until the server disconnects us (deadline: 2s)
     const auto deadline
         = std::chrono::steady_clock::now() + std::chrono::seconds{2};
-    while (!server.disconnected && std::chrono::steady_clock::now() < deadline) {
+    while (
+        !server.disconnected && std::chrono::steady_clock::now() < deadline) {
         // Poke the server so onReadable fires and it can check the timeout
         char extra = 'X';
         client.send(&extra, 1);
@@ -156,7 +161,7 @@ static void test_server_enforces_header_limit() {
     Port port = server.serverPort();
 
     std::thread serverThread(
-        [&]() { server.run(ClientLimit::Default, Milliseconds{10}); });
+        [&]() { server.run(ClientLimit::Default, Milliseconds{1}); });
 
     server.waitReady();
 
@@ -178,8 +183,14 @@ static void test_server_enforces_header_limit() {
             != std::string::npos);
     }
 
-    // Connection should be closed by server or closing after write
-    std::this_thread::sleep_for(std::chrono::milliseconds(200));
+    // Wait until disconnect is observed instead of sleeping a fixed amount.
+    const auto closeDeadline
+        = std::chrono::steady_clock::now() + std::chrono::milliseconds(300);
+    while (!server.disconnected.load()
+        && std::chrono::steady_clock::now() < closeDeadline) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+    REQUIRE(server.disconnected.load());
 
     // Attempting to send again should fail or be ignored
     char extra = 'Y';

@@ -262,10 +262,10 @@ void HttpPollServer::onResponseSent(HttpClientState& s) {
     const std::string requestLine = AccessLogger::extractRequestLine(s.request);
     const int statusCode = (s.responseStatusCode != 0)
         ? s.responseStatusCode
-        : AccessLogger::extractStatusCode(s.responseView);
+        : AccessLogger::extractStatusCode(s.dataView);
     const size_t bytesSent = (s.responseBytesPlanned != 0)
         ? s.responseBytesPlanned
-        : s.responseView.size();
+        : s.dataView.size();
     accessLogger_->log(s.peerAddress, requestLine, statusCode, bytesSent);
 }
 
@@ -348,16 +348,16 @@ std::string HttpPollServer::makeResponse(const char* statusLine,
 
 void HttpPollServer::setStreamedFileResponse(HttpClientState& s,
     std::string headerBlock, std::shared_ptr<File> file, size_t fileSize) {
-    s.responseBuf = std::move(headerBlock);
-    s.responseView = s.responseBuf;
+    s.dataBuf = std::move(headerBlock);
+    s.dataView = s.dataBuf;
     s.sent = 0;
 
     s.streamingFile = std::move(file);
     s.streamingRemaining = fileSize;
     s.streamingBodyActive = (s.streamingFile != nullptr) && (fileSize > 0);
 
-    s.responseStatusCode = AccessLogger::extractStatusCode(s.responseView);
-    s.responseBytesPlanned = s.responseView.size() + fileSize;
+    s.responseStatusCode = AccessLogger::extractStatusCode(s.dataView);
+    s.responseBytesPlanned = s.dataView.size() + fileSize;
 }
 
 // HTTP/1.0 defaults to close; HTTP/1.1 defaults to keep-alive (RFC 7230 §6.3).
@@ -376,7 +376,7 @@ static bool resolveKeepAlive_(const HttpRequest& req) {
 // iteration).
 static bool isSlowlorisTimeout_(const HttpClientState& s,
     std::chrono::steady_clock::time_point now, int timeoutMs) {
-    if (!s.responseView.empty()) return false; // already responding
+    if (!s.dataView.empty()) return false; // already responding
     if (s.request.empty()) return false;
     const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
         now - s.startTime);
@@ -390,11 +390,11 @@ void HttpPollServer::dispatchBuildResponse(HttpClientState& s) {
     if (sp != std::string::npos && sp > 0) {
         const std::string_view m{s.request.data(), sp};
         if (m != "GET" && m != "HEAD") {
-            s.responseBuf = makeResponse("HTTP/1.1 405 Method Not Allowed",
+            s.dataBuf = makeResponse("HTTP/1.1 405 Method Not Allowed",
                 "text/plain; charset=utf-8",
                 "405 Method Not Allowed\nOnly GET and HEAD are supported.\n",
                 false);
-            s.responseView = s.responseBuf;
+            s.dataView = s.dataBuf;
             s.closeAfterSend = true;
             s.parsedRequest = HttpRequest{};
             return;
@@ -403,9 +403,9 @@ void HttpPollServer::dispatchBuildResponse(HttpClientState& s) {
 
     auto req = HttpRequest::parse(s.request);
     if (!req.valid) {
-        s.responseBuf = makeResponse("HTTP/1.1 400 Bad Request",
+        s.dataBuf = makeResponse("HTTP/1.1 400 Bad Request",
             "text/plain; charset=utf-8", "400 Bad Request\n", false);
-        s.responseView = s.responseBuf;
+        s.dataView = s.dataBuf;
         s.closeAfterSend = true;
         s.parsedRequest = HttpRequest{};
         return;
@@ -414,10 +414,10 @@ void HttpPollServer::dispatchBuildResponse(HttpClientState& s) {
     // Determine connection semantics and cache the parse result so
     // buildResponse() overrides do not need to re-parse the same bytes.
     if (req.version == "HTTP/1.1" && !req.header("host")) {
-        s.responseBuf = makeResponse("HTTP/1.1 400 Bad Request",
+        s.dataBuf = makeResponse("HTTP/1.1 400 Bad Request",
             "text/plain; charset=utf-8",
             "400 Bad Request\nHost header required for HTTP/1.1.\n", false);
-        s.responseView = s.responseBuf;
+        s.dataView = s.dataBuf;
         s.closeAfterSend = true;
         s.parsedRequest = HttpRequest{};
         return;
@@ -425,9 +425,9 @@ void HttpPollServer::dispatchBuildResponse(HttpClientState& s) {
 
     if (const std::string* expect = req.header("expect")) {
         if (!ciTokenPresent_(*expect, "100-continue")) {
-            s.responseBuf = makeResponse("HTTP/1.1 417 Expectation Failed",
+            s.dataBuf = makeResponse("HTTP/1.1 417 Expectation Failed",
                 "text/plain; charset=utf-8", "417 Expectation Failed\n", false);
-            s.responseView = s.responseBuf;
+            s.dataView = s.dataBuf;
             s.closeAfterSend = true;
             s.parsedRequest = HttpRequest{};
             return;
@@ -441,10 +441,10 @@ void HttpPollServer::dispatchBuildResponse(HttpClientState& s) {
     if (ipFilter_) {
         ipFilter_->recordRequest(s.peerAddress);
         if (!ipFilter_->isAllowed(s.peerAddress)) {
-            s.responseBuf = makeResponse("HTTP/1.1 403 Forbidden",
+            s.dataBuf = makeResponse("HTTP/1.1 403 Forbidden",
                 "text/plain; charset=utf-8", "403 Forbidden\nAccess denied.\n",
                 false);
-            s.responseView = s.responseBuf;
+            s.dataView = s.dataBuf;
             s.closeAfterSend = true;
             s.parsedRequest = HttpRequest{};
             return;
@@ -480,7 +480,7 @@ ServerResult HttpPollServer::onReadable(TcpSocket& sock, HttpClientState& s) {
 
             // If a response is already in-flight, park incoming bytes as the
             // next pipelined request payload and process them after send.
-            if (!s.responseView.empty()) {
+            if (!s.dataView.empty()) {
                 s.queuedRequest.append(buf, static_cast<size_t>(n));
                 continue;
             }
@@ -491,7 +491,7 @@ ServerResult HttpPollServer::onReadable(TcpSocket& sock, HttpClientState& s) {
             }
             s.request.append(buf, static_cast<size_t>(n));
 
-            if (s.responseView.empty()) { //-V547
+            if (s.dataView.empty()) { //-V547
                 if (runRequestFrameInspectionStage_(sock, s, stageOut))
                     return stageOut;
             }
@@ -521,7 +521,7 @@ ServerResult HttpPollServer::onWritable(TcpSocket& sock, HttpClientState& s) {
     while (true) {
         ServerResult stageOut = ServerResult::KeepConnection;
         if (runTlsHandshakeStage_(sock, s, stageOut)) return stageOut;
-        if (s.responseView.empty()) return ServerResult::KeepConnection;
+        if (s.dataView.empty()) return ServerResult::KeepConnection;
         if (runSendStreamStage_(sock, s, stageOut)) return stageOut;
         if (runPipelineContinuationStage_(sock, s, stageOut)) return stageOut;
     }
@@ -558,8 +558,8 @@ bool HttpPollServer::runRequestFrameInspectionStage_(
         std::string_view(s.request), consumed, HttpPollServer::MAX_HEADER_SIZE);
     if (frame == RequestFrameStatus::NeedMore) {
         if (!s.expectContinueSent && shouldSend100Continue_(s.request, frame)) {
-            s.responseBuf = "HTTP/1.1 100 Continue\r\n\r\n";
-            s.responseView = s.responseBuf;
+            s.dataBuf = "HTTP/1.1 100 Continue\r\n\r\n";
+            s.dataView = s.dataBuf;
             s.sent = 0;
             s.responseStarted = false;
             s.closeAfterSend = false;
@@ -573,10 +573,10 @@ bool HttpPollServer::runRequestFrameInspectionStage_(
     }
 
     if (frame == RequestFrameStatus::HeaderTooLarge) {
-        s.responseBuf = makeResponse(
+        s.dataBuf = makeResponse(
             "HTTP/1.1 431 Request Header Fields Too Large",
             "text/plain; charset=utf-8", "Header section too large.\n", false);
-        s.responseView = s.responseBuf;
+        s.dataView = s.dataBuf;
         s.closeAfterSend = true;
         setClientWritable(sock, true);
         out = ServerResult::KeepConnection;
@@ -584,9 +584,9 @@ bool HttpPollServer::runRequestFrameInspectionStage_(
     }
 
     if (frame == RequestFrameStatus::BodyTooLarge) {
-        s.responseBuf = makeResponse("HTTP/1.1 413 Payload Too Large",
+        s.dataBuf = makeResponse("HTTP/1.1 413 Payload Too Large",
             "text/plain; charset=utf-8", "Request body is too large.\n", false);
-        s.responseView = s.responseBuf;
+        s.dataView = s.dataBuf;
         s.closeAfterSend = true;
         setClientWritable(sock, true);
         out = ServerResult::KeepConnection;
@@ -594,10 +594,10 @@ bool HttpPollServer::runRequestFrameInspectionStage_(
     }
 
     if (frame == RequestFrameStatus::UnsupportedTransferEncoding) {
-        s.responseBuf = makeResponse("HTTP/1.1 501 Not Implemented",
+        s.dataBuf = makeResponse("HTTP/1.1 501 Not Implemented",
             "text/plain; charset=utf-8", "Unsupported Transfer-Encoding.\n",
             false);
-        s.responseView = s.responseBuf;
+        s.dataView = s.dataBuf;
         s.closeAfterSend = true;
         setClientWritable(sock, true);
         out = ServerResult::KeepConnection;
@@ -635,14 +635,14 @@ bool HttpPollServer::runSendStreamStage_(
         s.responseStarted = true;
         if (s.responseStatusCode == 0)
             s.responseStatusCode
-                = AccessLogger::extractStatusCode(s.responseView);
+                = AccessLogger::extractStatusCode(s.dataView);
         if (s.responseBytesPlanned == 0)
-            s.responseBytesPlanned = s.responseView.size();
+            s.responseBytesPlanned = s.dataView.size();
         onResponseBegin(s);
     }
 
-    int sent = tlsWrite(sock, s, s.responseView.data() + s.sent,
-        s.responseView.size() - s.sent);
+    int sent = tlsWrite(sock, s, s.dataView.data() + s.sent,
+        s.dataView.size() - s.sent);
 
     if (sent > 0) {
         touchClient(sock, std::chrono::steady_clock::now());
@@ -668,7 +668,7 @@ bool HttpPollServer::runSendStreamStage_(
         return true;
     }
 
-    if (s.sent < s.responseView.size()) {
+    if (s.sent < s.dataView.size()) {
         out = ServerResult::KeepConnection;
         return true;
     }
@@ -693,7 +693,7 @@ bool HttpPollServer::runSendStreamStage_(
             }
 
             s.streamingRemaining -= got;
-            s.responseView = std::string_view(s.streamingChunkBuf.data(), got);
+            s.dataView = std::string_view(s.streamingChunkBuf.data(), got);
             s.sent = 0;
 
             if (s.streamingRemaining == 0) {
@@ -705,8 +705,8 @@ bool HttpPollServer::runSendStreamStage_(
     }
 
     if (s.interimResponse) {
-        s.responseView = {};
-        s.responseBuf.clear();
+        s.dataView = {};
+        s.dataBuf.clear();
         s.sent = 0;
         s.responseStarted = false;
         s.closeAfterSend = false;
@@ -753,8 +753,8 @@ bool HttpPollServer::runPipelineContinuationStage_(
 void HttpPollServer::resetAfterSend_(HttpClientState& s) {
     s.request = std::move(s.queuedRequest);
     s.queuedRequest.clear();
-    s.responseView = {};
-    s.responseBuf.clear();
+    s.dataView = {};
+    s.dataBuf.clear();
     s.streamingBodyActive = false;
     s.streamingFile.reset();
     s.streamingRemaining = 0;

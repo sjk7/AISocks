@@ -47,14 +47,17 @@ struct HttpClientState {
     // Bytes for subsequent pipelined requests received while a response is
     // already being written.
     std::string queuedRequest;
-    // Zero-copy response path: responseView is the active view of the response
-    // data.  For static pre-built responses it points directly into the
-    // server's long-lived std::string storage — no copy, no allocation.
-    // For dynamic responses (error pages etc.) responseBuf owns the bytes
-    // and responseView points into it.
-    std::string_view responseView;
-    std::string responseBuf;
-    // Large-body streaming path: send responseView first (headers), then file
+
+    // Response payload management.
+    // dataView is the active view of the response bytes being sent.
+    // It may point into:
+    // 1. Long-lived static storage (zero-copy)
+    // 2. dataBuf (for dynamic/error responses)
+    // 3. streamingChunkBuf (during file streaming)
+    std::string_view dataView;
+    std::string dataBuf;
+
+    // Large-body streaming path: send dataView first (headers), then file
     // data in fixed-size chunks from streamingChunkBuf.
     bool streamingBodyActive{false};
     std::shared_ptr<File> streamingFile;
@@ -69,7 +72,7 @@ struct HttpClientState {
     bool expectContinueSent{
         false}; // interim 100 Continue already sent for current request
     bool interimResponse{
-        false}; // true when responseView contains interim 1xx (not final)
+        false}; // true when dataView contains interim 1xx (not final)
     // Tracks how far requestComplete() has already scanned so repeated
     // calls are O(n) total even when bytes arrive one at a time.
     size_t requestScanPos{0};
@@ -99,8 +102,8 @@ struct HttpClientState {
     HttpClientState(const HttpClientState& other)
         : request(other.request)
         , queuedRequest(other.queuedRequest)
-        , responseView(other.responseView)
-        , responseBuf(other.responseBuf)
+        , dataView(other.dataView)
+        , dataBuf(other.dataBuf)
         , streamingBodyActive(other.streamingBodyActive)
         , streamingFile(other.streamingFile)
         , streamingRemaining(other.streamingRemaining)
@@ -123,17 +126,21 @@ struct HttpClientState {
         , tlsSession(other.tlsSession)
 #endif
     {
-        // If view pointed into the original's responseBuf, redirect into ours.
-        if (!responseBuf.empty()
-            && other.responseView.data() == other.responseBuf.data())
-            responseView = responseBuf;
+        // If view pointed into the original's dataBuf, redirect into ours.
+        if (!dataBuf.empty() && other.dataView.data() == other.dataBuf.data())
+            dataView = dataBuf;
+        // If view pointed into the original's streamingChunkBuf, redirect into
+        // ours.
+        else if (other.dataView.data() == other.streamingChunkBuf.data())
+            dataView = std::string_view(
+                streamingChunkBuf.data(), other.dataView.size());
     }
 
     HttpClientState(HttpClientState&& other) noexcept
         : request(std::move(other.request))
         , queuedRequest(std::move(other.queuedRequest))
-        , responseView(other.responseView)
-        , responseBuf(std::move(other.responseBuf))
+        , dataView(other.dataView)
+        , dataBuf(std::move(other.dataBuf))
         , streamingBodyActive(other.streamingBodyActive)
         , streamingFile(std::move(other.streamingFile))
         , streamingRemaining(other.streamingRemaining)
@@ -157,12 +164,12 @@ struct HttpClientState {
 #endif
     {
         // Fix up the view only if it was pointing into the moved-from buf.
-        // After std::string move, responseBuf.data() == old
-        // other.responseBuf.data() for heap-allocated strings, so the pointer
+        // After std::string move, dataBuf.data() == old
+        // other.dataBuf.data() for heap-allocated strings, so the pointer
         // comparison is correct.
-        if (!responseBuf.empty() && responseView.data() == responseBuf.data())
-            responseView = responseBuf;
-        other.responseView = {};
+        if (!dataBuf.empty() && dataView.data() == dataBuf.data())
+            dataView = dataBuf;
+        other.dataView = {};
         other.streamingBodyActive = false;
         other.streamingRemaining = 0;
         other.responseStatusCode = 0;
@@ -173,8 +180,8 @@ struct HttpClientState {
         if (this == &other) return *this;
         request = other.request;
         queuedRequest = other.queuedRequest;
-        responseView = other.responseView;
-        responseBuf = other.responseBuf;
+        dataView = other.dataView;
+        dataBuf = other.dataBuf;
         streamingBodyActive = other.streamingBodyActive;
         streamingFile = other.streamingFile;
         streamingRemaining = other.streamingRemaining;
@@ -195,10 +202,9 @@ struct HttpClientState {
         tlsWantsWrite = other.tlsWantsWrite;
         tlsSession = other.tlsSession;
 #endif
-        // If view pointed into the original's responseBuf, redirect into ours.
-        if (!responseBuf.empty()
-            && other.responseView.data() == other.responseBuf.data())
-            responseView = responseBuf;
+        // If view pointed into the original's dataBuf, redirect into ours.
+        if (!dataBuf.empty() && other.dataView.data() == other.dataBuf.data())
+            dataView = dataBuf;
         return *this;
     }
 
@@ -206,8 +212,8 @@ struct HttpClientState {
         if (this == &other) return *this;
         request = std::move(other.request);
         queuedRequest = std::move(other.queuedRequest);
-        responseView = other.responseView;
-        responseBuf = std::move(other.responseBuf);
+        dataView = other.dataView;
+        dataBuf = std::move(other.dataBuf);
         streamingBodyActive = other.streamingBodyActive;
         streamingFile = std::move(other.streamingFile);
         streamingRemaining = other.streamingRemaining;
@@ -229,9 +235,9 @@ struct HttpClientState {
         tlsSession = std::move(other.tlsSession);
 #endif
         // Fix up the view only if it was pointing into the moved-from buf.
-        if (!responseBuf.empty() && responseView.data() == responseBuf.data())
-            responseView = responseBuf;
-        other.responseView = {};
+        if (!dataBuf.empty() && dataView.data() == dataBuf.data())
+            dataView = dataBuf;
+        other.dataView = {};
         other.streamingBodyActive = false;
         other.streamingRemaining = 0;
         other.responseStatusCode = 0;
@@ -337,12 +343,12 @@ class HttpPollServer : public ServerBase<HttpClientState> {
 
     // Convenience helpers for common responses.
     // These auto-apply Connection based on s.closeAfterSend and populate both
-    // responseBuf and responseView.
+    // dataBuf and dataView.
     static void setAutoResponse(HttpClientState& s, const char* statusLine,
         const char* contentType, const std::string& body) {
-        s.responseBuf
+        s.dataBuf
             = makeResponse(statusLine, contentType, body, !s.closeAfterSend);
-        s.responseView = s.responseBuf;
+        s.dataView = s.dataBuf;
     }
 
     static void respondText(HttpClientState& s, const std::string& body,

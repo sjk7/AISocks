@@ -29,7 +29,9 @@ class SignalTestServer : public ServerBase<int> {
 
     void waitReady() {
         std::unique_lock<std::mutex> lk(readyMtx_);
-        readyCv_.wait(lk, [this] { return ready_.load(); });
+        const bool ready = readyCv_.wait_for(
+            lk, std::chrono::seconds{2}, [this] { return ready_.load(); });
+        REQUIRE_MSG(ready, "server readiness timed out");
     }
 
     protected:

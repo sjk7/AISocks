@@ -7,8 +7,8 @@
 // 2. FG-1: HttpRequest fields outlive source buffer
 // 3. FG-2: HttpResponse fields outlive parser reset()
 // 4. FG-2: HttpResponse fields outlive parser destruction
-// 5. FG-4: HttpClientState move — external responseView not corrupted
-// 6. FG-4: HttpClientState move — internal responseBuf view fixed up
+// 5. FG-4: HttpClientState move — external dataView not corrupted
+// 6. FG-4: HttpClientState move — internal dataBuf view fixed up
 // 7. FG-5: isHttpRequest() rejects method-name superstrings (e.g. "POSTAL")
 // 8. FG-5: isHttpRequest() accepts all seven supported methods
 
@@ -187,90 +187,90 @@ static void test_response_copy_survives_parser_destruction() {
 }
 
 // ---------------------------------------------------------------------------
-// 5. FG-4: HttpClientState move — external responseView preserved
+// 5. FG-4: HttpClientState move — external dataView preserved
 // ---------------------------------------------------------------------------
 static void test_client_state_move_external_view() {
-    BEGIN_TEST("HttpClientState move: external responseView preserved (FG-4)");
-    // Simulate the zero-copy path: responseView points into server-owned
-    // static storage, not into responseBuf.
+    BEGIN_TEST("HttpClientState move: external dataView preserved (FG-4)");
+    // Simulate the zero-copy path: dataView points into server-owned
+    // static storage, not into dataBuf.
     static const std::string kServerResponse
         = "HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n";
 
     HttpClientState src;
-    src.responseView = kServerResponse; // NOT pointing into responseBuf
-    REQUIRE(src.responseBuf.empty());
+    src.dataView = kServerResponse; // NOT pointing into dataBuf
+    REQUIRE(src.dataBuf.empty());
 
     HttpClientState dst = std::move(src);
 
     // Before the fix, the move ctor unconditionally ran:
-    //   if (!responseBuf.empty()) responseView = responseBuf;
-    // which was benign here (responseBuf was empty), but the fix now also
-    // correctly handles the responseBuf-non-empty + external-view case.
-    // This test verifies responseView still tracks the external string.
-    REQUIRE(dst.responseView.data() == kServerResponse.data());
-    REQUIRE(dst.responseView == kServerResponse);
-    REQUIRE(dst.responseBuf.empty());
+    //   if (!dataBuf.empty()) dataView = dataBuf;
+    // which was benign here (dataBuf was empty), but the fix now also
+    // correctly handles the dataBuf-non-empty + external-view case.
+    // This test verifies dataView still tracks the external string.
+    REQUIRE(dst.dataView.data() == kServerResponse.data());
+    REQUIRE(dst.dataView == kServerResponse);
+    REQUIRE(dst.dataBuf.empty());
 }
 
 static void test_client_state_copy_external_view() {
-    BEGIN_TEST("HttpClientState copy: external responseView preserved (FG-4)");
+    BEGIN_TEST("HttpClientState copy: external dataView preserved (FG-4)");
     static const std::string kExt = "HTTP/1.1 204 No Content\r\n\r\n";
     HttpClientState src;
-    src.responseView = kExt;
+    src.dataView = kExt;
 
     HttpClientState dst = src; // copy constructor
 
-    REQUIRE(dst.responseView.data() == kExt.data());
-    REQUIRE(dst.responseView == kExt);
-    REQUIRE(dst.responseBuf.empty());
+    REQUIRE(dst.dataView.data() == kExt.data());
+    REQUIRE(dst.dataView == kExt);
+    REQUIRE(dst.dataBuf.empty());
 }
 
 // ---------------------------------------------------------------------------
-// 6. FG-4: HttpClientState move — responseBuf view fixed up
+// 6. FG-4: HttpClientState move — dataBuf view fixed up
 // ---------------------------------------------------------------------------
 static void test_client_state_move_internal_view() {
-    BEGIN_TEST("HttpClientState move: responseBuf view fixed up (FG-4)");
+    BEGIN_TEST("HttpClientState move: dataBuf view fixed up (FG-4)");
     HttpClientState src;
-    src.responseBuf = "HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n";
-    src.responseView = src.responseBuf; // points into responseBuf
+    src.dataBuf = "HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n";
+    src.dataView = src.dataBuf; // points into dataBuf
 
-    const auto old_data = src.responseBuf.data(); // address before move
+    const auto old_data = src.dataBuf.data(); // address before move
 
     HttpClientState dst = std::move(src);
 
     // std::string move usually keeps the same heap address (SSO aside).
-    // What matters is dst.responseView points into dst.responseBuf, not
-    // into the (now-moved-from) src.responseBuf.
-    REQUIRE(dst.responseBuf.data() == old_data); // move stayed same address
-    REQUIRE(dst.responseView.data() == dst.responseBuf.data());
-    REQUIRE(dst.responseView == dst.responseBuf);
+    // What matters is dst.dataView points into dst.dataBuf, not
+    // into the (now-moved-from) src.dataBuf.
+    REQUIRE(dst.dataBuf.data() == old_data); // move stayed same address
+    REQUIRE(dst.dataView.data() == dst.dataBuf.data());
+    REQUIRE(dst.dataView == dst.dataBuf);
 }
 
 static void test_client_state_move_assign_internal_view() {
-    BEGIN_TEST("HttpClientState move-assign: responseBuf view fixed up (FG-4)");
+    BEGIN_TEST("HttpClientState move-assign: dataBuf view fixed up (FG-4)");
     HttpClientState src;
-    src.responseBuf = "HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n";
-    src.responseView = src.responseBuf;
+    src.dataBuf = "HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n";
+    src.dataView = src.dataBuf;
 
     HttpClientState dst;
     dst = std::move(src);
 
-    REQUIRE(dst.responseView.data() == dst.responseBuf.data());
-    REQUIRE(dst.responseView == dst.responseBuf);
+    REQUIRE(dst.dataView.data() == dst.dataBuf.data());
+    REQUIRE(dst.dataView == dst.dataBuf);
 }
 
 static void test_client_state_copy_internal_view() {
-    BEGIN_TEST("HttpClientState copy: responseBuf view fixed up (FG-4)");
+    BEGIN_TEST("HttpClientState copy: dataBuf view fixed up (FG-4)");
     HttpClientState src;
-    src.responseBuf = "HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n";
-    src.responseView = src.responseBuf;
+    src.dataBuf = "HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n";
+    src.dataView = src.dataBuf;
 
     HttpClientState dst = src; // copy constructor
 
-    // dst.responseBuf is a new heap allocation; view must point into dst's buf.
-    REQUIRE(dst.responseView.data() != src.responseBuf.data());
-    REQUIRE(dst.responseView.data() == dst.responseBuf.data());
-    REQUIRE(dst.responseView == dst.responseBuf);
+    // dst.dataBuf is a new heap allocation; view must point into dst's buf.
+    REQUIRE(dst.dataView.data() != src.dataBuf.data());
+    REQUIRE(dst.dataView.data() == dst.dataBuf.data());
+    REQUIRE(dst.dataView == dst.dataBuf);
 }
 
 // ---------------------------------------------------------------------------

@@ -61,8 +61,13 @@ class TestHttpServer : public HttpPollServer {
 
     std::atomic<bool> ready_{false};
     void waitReady() const {
-        while (!ready_.load(std::memory_order_acquire))
+        const auto deadline
+            = std::chrono::steady_clock::now() + std::chrono::seconds(2);
+        while (!ready_.load(std::memory_order_acquire)
+            && std::chrono::steady_clock::now() < deadline)
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        REQUIRE_MSG(ready_.load(std::memory_order_acquire),
+            "server readiness timed out");
     }
     void waitForResponseBegin(int n = 1) const {
         while (responseBeginCount.load(std::memory_order_acquire) < n)
@@ -86,16 +91,16 @@ class TestHttpServer : public HttpPollServer {
     protected:
     void buildResponse(HttpClientState& state) override {
         if (useStaticResponse) {
-            // Zero-copy path: point responseView directly at
+            // Zero-copy path: point dataView directly at
             // staticResponseStorage
-            state.responseView = staticResponseStorage;
+            state.dataView = staticResponseStorage;
         } else {
-            // Dynamic response path: build in responseBuf
-            state.responseBuf
+            // Dynamic response path: build in dataBuf
+            state.dataBuf
                 = "HTTP/1.1 200 OK\r\nContent-Length: 7\r\n\r\nDynamic";
-            state.responseView = state.responseBuf;
+            state.dataView = state.dataBuf;
         }
-        lastResponse = std::string(state.responseView);
+        lastResponse = std::string(state.dataView);
     }
 
     void onReady() override { ready_.store(true, std::memory_order_release); }
@@ -822,8 +827,13 @@ int main() {
             public:
             std::atomic<bool> ready_{false};
             void waitReady() const {
-                while (!ready_.load(std::memory_order_acquire))
+                const auto deadline = std::chrono::steady_clock::now()
+                    + std::chrono::seconds(2);
+                while (!ready_.load(std::memory_order_acquire)
+                    && std::chrono::steady_clock::now() < deadline)
                     std::this_thread::sleep_for(std::chrono::milliseconds(1));
+                REQUIRE_MSG(ready_.load(std::memory_order_acquire),
+                    "server readiness timed out");
             }
             explicit LargeResponseServer(const ServerBind& bind)
                 : HttpPollServer(bind) {}
@@ -837,9 +847,9 @@ int main() {
                 // send buffer, so onWritable must be called multiple times
                 // to drain the response across several poll iterations.
                 std::string body(512 * 1024, 'X');
-                state.responseBuf = "HTTP/1.1 200 OK\r\nContent-Length: "
+                state.dataBuf = "HTTP/1.1 200 OK\r\nContent-Length: "
                     + std::to_string(body.size()) + "\r\n\r\n" + body;
-                state.responseView = state.responseBuf;
+                state.dataView = state.dataBuf;
             }
         };
 
@@ -988,14 +998,14 @@ int main() {
 
     // Test 16: Copy assignment — basic
     // Use a response long enough to be heap-allocated (> 22 bytes for libc++
-    // SSO). The copy-assignment fixup redirects responseView into the new
-    // responseBuf only when it pointed into the original's responseBuf.
+    // SSO). The copy-assignment fixup redirects dataView into the new
+    // dataBuf only when it pointed into the original's dataBuf.
     BEGIN_TEST("HttpClientState: copy assignment copies all fields");
     {
         HttpClientState src;
         src.request = "GET / HTTP/1.1\r\n\r\n";
-        src.responseBuf = "HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\nHello";
-        src.responseView = src.responseBuf; // view into own buf
+        src.dataBuf = "HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\nHello";
+        src.dataView = src.dataBuf; // view into own buf
         src.sent = 7;
         src.responseStarted = true;
         src.closeAfterSend = true;
@@ -1009,9 +1019,9 @@ int main() {
         REQUIRE(dst.responseStarted == src.responseStarted);
         REQUIRE(dst.closeAfterSend == src.closeAfterSend);
         REQUIRE(dst.requestScanPos == src.requestScanPos);
-        REQUIRE(dst.responseBuf == src.responseBuf);
-        // responseView must have been redirected into dst's own responseBuf
-        REQUIRE(dst.responseView.data() == dst.responseBuf.data());
+        REQUIRE(dst.dataBuf == src.dataBuf);
+        // dataView must have been redirected into dst's own dataBuf
+        REQUIRE(dst.dataView.data() == dst.dataBuf.data());
     }
 
     // Test 17: Copy assignment — self-assignment is a no-op
@@ -1026,22 +1036,22 @@ int main() {
         REQUIRE(s.sent == 42u);
     }
 
-    // Test 18: Copy assignment — responseView pointing outside responseBuf
+    // Test 18: Copy assignment — dataView pointing outside dataBuf
     // is NOT redirected (it belongs to external storage)
-    BEGIN_TEST("HttpClientState: copy assignment with external responseView");
+    BEGIN_TEST("HttpClientState: copy assignment with external dataView");
     {
         static const std::string sharedStorage = "HTTP/1.1 200 OK\r\n\r\n";
         HttpClientState src;
-        src.responseBuf.clear();
-        src.responseView = sharedStorage; // view into external storage
+        src.dataBuf.clear();
+        src.dataView = sharedStorage; // view into external storage
 
         HttpClientState dst;
         dst = src;
 
-        // responseBuf is empty -> no fixup branch taken
-        REQUIRE(dst.responseBuf.empty());
-        // responseView still points at sharedStorage (unchanged)
-        REQUIRE(dst.responseView.data() == sharedStorage.data());
+        // dataBuf is empty -> no fixup branch taken
+        REQUIRE(dst.dataBuf.empty());
+        // dataView still points at sharedStorage (unchanged)
+        REQUIRE(dst.dataView.data() == sharedStorage.data());
     }
 
     // Test 19: Move assignment — basic
@@ -1052,8 +1062,8 @@ int main() {
     {
         HttpClientState src;
         src.request = "GET / HTTP/1.1\r\n\r\n";
-        src.responseBuf = "HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\nHello";
-        src.responseView = src.responseBuf; // view into own buf
+        src.dataBuf = "HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\nHello";
+        src.dataView = src.dataBuf; // view into own buf
         src.sent = 5;
         src.closeAfterSend = true;
         src.requestScanPos = 2;
@@ -1065,11 +1075,11 @@ int main() {
         REQUIRE(dst.sent == 5u);
         REQUIRE(dst.closeAfterSend == true);
         REQUIRE(dst.requestScanPos == 2u);
-        REQUIRE(!dst.responseBuf.empty());
-        // responseView must have been fixed up to dst's responseBuf
-        REQUIRE(dst.responseView.data() == dst.responseBuf.data());
-        // After move, src.responseView should be cleared
-        REQUIRE(src.responseView.empty()); // NOLINT(bugprone-use-after-move)
+        REQUIRE(!dst.dataBuf.empty());
+        // dataView must have been fixed up to dst's dataBuf
+        REQUIRE(dst.dataView.data() == dst.dataBuf.data());
+        // After move, src.dataView should be cleared
+        REQUIRE(src.dataView.empty()); // NOLINT(bugprone-use-after-move)
     }
 
     // Test 20: Move assignment — self-assignment is a no-op
@@ -1090,19 +1100,19 @@ int main() {
         REQUIRE(s.sent == 99u);
     }
 
-    // Test 21: Move assignment — external responseView not redirected
-    BEGIN_TEST("HttpClientState: move assignment with external responseView");
+    // Test 21: Move assignment — external dataView not redirected
+    BEGIN_TEST("HttpClientState: move assignment with external dataView");
     {
         static const std::string ext = "HTTP/1.1 404 Not Found\r\n\r\n";
         HttpClientState src;
-        src.responseBuf.clear();
-        src.responseView = ext; // external storage: no fixup needed
+        src.dataBuf.clear();
+        src.dataView = ext; // external storage: no fixup needed
 
         HttpClientState dst;
         dst = std::move(src);
 
-        REQUIRE(dst.responseBuf.empty());
-        REQUIRE(dst.responseView.data() == ext.data());
+        REQUIRE(dst.dataBuf.empty());
+        REQUIRE(dst.dataView.data() == ext.data());
     }
 
     // -----------------------------------------------------------------------

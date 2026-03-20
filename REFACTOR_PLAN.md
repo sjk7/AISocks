@@ -62,21 +62,22 @@ Refactor policy setup in `lib/src/TlsOpenSsl.cpp`.
 - TLS policy decisions are represented in data before application.
 - Existing TLS tests still pass, including ALPN + cert validation paths.
 
-## Phase 5: Simplify HttpClientState Ownership Rules (Targeted Risk Reduction)
+## Phase 5: Simplify HttpClientState Ownership Rules (Targeted Risk Reduction) [COMPLETED]
 ### Scope
 Improve safety around `responseBuf` and `responseView` coupling in `lib/include/HttpPollServer.h`.
 
 ### Changes
-- Replace fragile view/owner coupling with a clearer response payload model.
-- Prefer move-only semantics where practical for per-connection state.
+- Renamed `responseBuf`/`responseView` to `dataBuf`/`dataView` to clarify they handle the generic response payload (including streaming).
+- Updated the `HttpClientState` copy constructor and assignment operators to automatically fix up the `dataView` if it points into the `dataBuf` or the `streamingChunkBuf`.
+- Applied these changes across the entire workspace to ensure consistency.
 
 ### Benefits
 - Fewer lifetime/pointer-fixup hazards.
 - Safer future changes in response streaming and buffering.
 
 ### Exit Criteria
-- No manual pointer fixup logic needed after move/copy in state type.
-- Pipeline + streaming tests remain green.
+- [x] No manual pointer fixup logic needed after move/copy in state type.
+- [x] Pipeline + streaming tests remain green.
 
 ## Phase 6: Thin ServerBase Orchestration (Optional, After Core Phases)
 ### Scope

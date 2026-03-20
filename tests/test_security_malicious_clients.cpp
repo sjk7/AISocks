@@ -214,8 +214,8 @@ void testPathTraversalAttacks() {
         state.request = request; //-V820
 
         server.testBuildResponse(state);
-        std::string status = extractStatus(state.responseBuf);
-        std::string body = extractBody(state.responseBuf);
+        std::string status = extractStatus(state.dataBuf);
+        std::string body = extractBody(state.dataBuf);
 
         SecurityTestFramework::assert_true(
             status.find("403") != std::string::npos
@@ -233,8 +233,8 @@ void testPathTraversalAttacks() {
         state.request = request; //-V820
 
         server.testBuildResponse(state);
-        std::string status = extractStatus(state.responseBuf);
-        std::string body = extractBody(state.responseBuf);
+        std::string status = extractStatus(state.dataBuf);
+        std::string body = extractBody(state.dataBuf);
 
         SecurityTestFramework::assert_true(
             status.find("403") != std::string::npos
@@ -252,8 +252,8 @@ void testPathTraversalAttacks() {
         state.request = request; //-V820
 
         server.testBuildResponse(state);
-        std::string status = extractStatus(state.responseBuf);
-        std::string body = extractBody(state.responseBuf);
+        std::string status = extractStatus(state.dataBuf);
+        std::string body = extractBody(state.dataBuf);
 
         SecurityTestFramework::assert_true(
             status.find("403") != std::string::npos
@@ -271,8 +271,8 @@ void testPathTraversalAttacks() {
         state.request = request; //-V820
 
         server.testBuildResponse(state);
-        std::string status = extractStatus(state.responseBuf);
-        std::string body = extractBody(state.responseBuf);
+        std::string status = extractStatus(state.dataBuf);
+        std::string body = extractBody(state.dataBuf);
 
         SecurityTestFramework::assert_true(
             status.find("403") != std::string::npos
@@ -290,7 +290,7 @@ void testPathTraversalAttacks() {
         state.request = request; //-V820
 
         server.testBuildResponse(state);
-        std::string status = extractStatus(state.responseBuf);
+        std::string status = extractStatus(state.dataBuf);
 
         SecurityTestFramework::assert_true(
             status.find("403") != std::string::npos
@@ -317,7 +317,7 @@ void testXSSAttacks() {
         state.request = request; //-V820
 
         server.testBuildResponse(state);
-        std::string body = extractBody(state.responseBuf);
+        std::string body = extractBody(state.dataBuf);
 
         // The filename contains &  — it must be HTML-escaped as &amp;
         SecurityTestFramework::assert_not_contains(body, "test&xss",
@@ -334,7 +334,7 @@ void testXSSAttacks() {
         state.request = request; //-V820
 
         server.testBuildResponse(state);
-        std::string body = extractBody(state.responseBuf);
+        std::string body = extractBody(state.dataBuf);
 
         SecurityTestFramework::assert_not_contains(body,
             "<script>alert(document.cookie)</script>",
@@ -356,7 +356,7 @@ void testSecurityHeaders() {
     state.request = request; //-V820
 
     server.testBuildResponse(state);
-    std::string response = state.responseBuf;
+    std::string response = state.dataBuf;
 
     SecurityTestFramework::assert_contains(response,
         "X-Content-Type-Options: nosniff",
@@ -386,7 +386,7 @@ void testInformationLeakage() {
         state.request = request; //-V820
 
         server.testBuildResponse(state);
-        std::string body = extractBody(state.responseBuf);
+        std::string body = extractBody(state.dataBuf);
 
         SecurityTestFramework::assert_not_contains(body,
             "aiSocks HttpFileServer",
@@ -404,7 +404,7 @@ void testInformationLeakage() {
         state.request = request; //-V820
 
         server2.testBuildResponse(state);
-        std::string body = extractBody(state.responseBuf);
+        std::string body = extractBody(state.dataBuf);
 
         SecurityTestFramework::assert_not_contains(body, "test_secure/public",
             "Full directory paths should not be exposed in listings");
@@ -491,8 +491,8 @@ void testURLDecodingIssues() {
         state.request = request; //-V820
 
         server.testBuildResponse(state);
-        std::string status = extractStatus(state.responseBuf);
-        std::string body = extractBody(state.responseBuf);
+        std::string status = extractStatus(state.dataBuf);
+        std::string body = extractBody(state.dataBuf);
 
         SecurityTestFramework::assert_true(
             status.find("200") != std::string::npos,
@@ -525,7 +525,7 @@ void testMethodValidation() {
         state.request = request; //-V820
 
         server.testBuildResponse(state);
-        std::string status = extractStatus(state.responseBuf);
+        std::string status = extractStatus(state.dataBuf);
 
         std::string testMsg
             = std::string("HTTP method ") + method + " should be rejected";
@@ -550,7 +550,7 @@ void testFileTypeRestrictions() {
         state.request = request; //-V820
 
         server.testBuildResponse(state);
-        std::string status = extractStatus(state.responseBuf);
+        std::string status = extractStatus(state.dataBuf);
 
         SecurityTestFramework::assert_true(
             status.find("403") != std::string::npos,

@@ -29,7 +29,7 @@ using namespace std::chrono_literals;
 namespace {
 constexpr auto kFastBlacklistDuration = std::chrono::milliseconds{80};
 constexpr auto kFastRateWindow = std::chrono::milliseconds{80};
-constexpr auto kFastSleepBuffer = std::chrono::milliseconds{180};
+constexpr auto kFastSleepBuffer = std::chrono::milliseconds{120};
 } // namespace
 
 // ---------------------------------------------------------------------------

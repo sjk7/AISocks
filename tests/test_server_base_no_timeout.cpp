@@ -108,7 +108,8 @@ class NoTimeoutServer : public ServerBase<NoTimeoutState> {
 int main() {
     printf("=== No Timeout ServerBase Test ===\n");
 
-    BEGIN_TEST("ServerBase keeps idle client alive when keep-alive timeout is unset");
+    BEGIN_TEST(
+        "ServerBase keeps idle client alive when keep-alive timeout is unset");
     {
         NoTimeoutServer server(Port::any);
         REQUIRE(server.isValid());
@@ -127,8 +128,12 @@ int main() {
         });
 
         // Wait for server to be ready AND actually accept a client
-        while (!ready) //-V1044 //-V776
+        const auto readyDeadline
+            = std::chrono::steady_clock::now() + std::chrono::seconds{2};
+        while (
+            !ready.load() && std::chrono::steady_clock::now() < readyDeadline)
             std::this_thread::sleep_for(std::chrono::milliseconds{1});
+        REQUIRE_MSG(ready.load(), "server readiness timed out");
 
         DLOG("Server started successfully\n");
 
@@ -145,19 +150,15 @@ int main() {
 
         const bool stillConnected = waitForCondition(
             "client remains connected without timeout",
-            [&]() {
-                return server.atomicClientCount_.load() == 1;
-            },
-            std::chrono::milliseconds{300},
-            std::chrono::milliseconds{15});
+            [&]() { return server.atomicClientCount_.load() == 1; },
+            std::chrono::milliseconds{300}, std::chrono::milliseconds{15});
         REQUIRE(stillConnected);
 
         REQUIRE(client->sendAll("ping", 4));
         const bool stillConnectedAfterTraffic = waitForCondition(
             "client remains connected after traffic",
             [&]() { return server.atomicClientCount_.load() == 1; },
-            std::chrono::milliseconds{300},
-            std::chrono::milliseconds{15});
+            std::chrono::milliseconds{300}, std::chrono::milliseconds{15});
         REQUIRE(stillConnectedAfterTraffic);
 
         DLOG("Stopping server...\n");

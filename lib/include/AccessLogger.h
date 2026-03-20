@@ -70,7 +70,7 @@ class AccessLogger {
 
     // Extract the HTTP status code from the first line of a raw response.
     // Returns 0 when the buffer is empty or unparseable.
-    static int extractStatusCode(std::string_view responseBuf);
+    static int extractStatusCode(std::string_view dataBuf);
 
     private:
     File file_;

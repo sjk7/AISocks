@@ -42,7 +42,9 @@ class PlainLaunchpadServer : public HttpPollServer {
 
     void waitReady() {
         std::unique_lock<std::mutex> lk(readyMtx_);
-        readyCv_.wait(lk, [this] { return ready_.load(); });
+        const bool ready = readyCv_.wait_for(
+            lk, std::chrono::seconds{2}, [this] { return ready_.load(); });
+        REQUIRE_MSG(ready, "server readiness timed out");
     }
 
     protected:
@@ -55,9 +57,9 @@ class PlainLaunchpadServer : public HttpPollServer {
     }
 
     void buildResponse(HttpClientState& s) override {
-        s.responseBuf = makeResponse("HTTP/1.1 200 OK", "text/plain",
+        s.dataBuf = makeResponse("HTTP/1.1 200 OK", "text/plain",
             "Hello from plain HTTP server_launchpad\n");
-        s.responseView = s.responseBuf;
+        s.dataView = s.dataBuf;
     }
 
     private:
@@ -76,7 +78,9 @@ class TlsLaunchpadServer : public HttpsPollServer {
 
     void waitReady() {
         std::unique_lock<std::mutex> lk(readyMtx_);
-        readyCv_.wait(lk, [this] { return ready_.load(); });
+        const bool ready = readyCv_.wait_for(
+            lk, std::chrono::seconds{2}, [this] { return ready_.load(); });
+        REQUIRE_MSG(ready, "server readiness timed out");
     }
 
     protected:
@@ -89,9 +93,9 @@ class TlsLaunchpadServer : public HttpsPollServer {
     }
 
     void buildResponse(HttpClientState& s) override {
-        s.responseBuf = makeResponse("HTTP/1.1 200 OK", "text/plain",
+        s.dataBuf = makeResponse("HTTP/1.1 200 OK", "text/plain",
             "Hello from HTTPS server_launchpad\n");
-        s.responseView = s.responseBuf;
+        s.dataView = s.dataBuf;
     }
 
     private:
@@ -115,7 +119,7 @@ static void test_plain_server_launchpad_smoke() {
     if (!server.isValid()) return;
 
     std::thread serverThread(
-        [&] { server.run(ClientLimit::Unlimited, Milliseconds{5}); });
+        [&] { server.run(ClientLimit::Unlimited, Milliseconds{1}); });
     {
         Stopwatch readyTimer{"[timing] launchpad plain waitReady"};
         server.waitReady();
@@ -167,7 +171,7 @@ static void test_tls_server_launchpad_smoke() {
     if (!server.isValid() || !server.tlsReady()) return;
 
     std::thread serverThread(
-        [&] { server.run(ClientLimit::Unlimited, Milliseconds{5}); });
+        [&] { server.run(ClientLimit::Unlimited, Milliseconds{1}); });
     {
         Stopwatch readyTimer{"[timing] launchpad tls waitReady"};
         server.waitReady();

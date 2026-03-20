@@ -103,9 +103,9 @@ class CustomFileServer : public HttpFileServer {
 
         // Root redirects to the public landing page (no auth required)
         if (request.path == "/") {
-            state.responseBuf = "HTTP/1.1 302 Found\r\nLocation: "
+            state.dataBuf = "HTTP/1.1 302 Found\r\nLocation: "
                                 "/public.html\r\nContent-Length: 0\r\n\r\n";
-            state.responseView = state.responseBuf;
+            state.dataView = state.dataBuf;
             return;
         }
 
@@ -150,8 +150,8 @@ class CustomFileServer : public HttpFileServer {
                 response.append(instructions);
             }
 
-            state.responseBuf = std::move(response);
-            state.responseView = state.responseBuf;
+            state.dataBuf = std::move(response);
+            state.dataView = state.dataBuf;
             return;
         }
 
@@ -178,8 +178,8 @@ class CustomFileServer : public HttpFileServer {
                 response.append(demoPage);
             }
 
-            state.responseBuf = std::move(response);
-            state.responseView = state.responseBuf;
+            state.dataBuf = std::move(response);
+            state.dataView = state.dataBuf;
             return;
         }
 
@@ -214,8 +214,8 @@ class CustomFileServer : public HttpFileServer {
                 response.append(page);
             }
 
-            state.responseBuf = std::move(response);
-            state.responseView = state.responseBuf;
+            state.dataBuf = std::move(response);
+            state.dataView = state.dataBuf;
             return;
         }
 
@@ -295,14 +295,14 @@ class CustomFileServer : public HttpFileServer {
 
         // For HEAD requests, just send headers
         if (request.method == "HEAD") {
-            state.responseBuf = std::move(response);
-            state.responseView = state.responseBuf;
+            state.dataBuf = std::move(response);
+            state.dataView = state.dataBuf;
             return;
         }
 
         // For GET requests, generate the file content
-        state.responseBuf = std::move(response);
-        state.responseBuf.reserve(state.responseBuf.size() + fileSize);
+        state.dataBuf = std::move(response);
+        state.dataBuf.reserve(state.dataBuf.size() + fileSize);
 
         // Generate 500MB of repeating pattern data
         const char pattern[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
@@ -312,11 +312,11 @@ class CustomFileServer : public HttpFileServer {
         while (remaining > 0) {
             size_t chunkSize
                 = (remaining < patternLen) ? remaining : patternLen;
-            state.responseBuf.append(pattern, chunkSize);
+            state.dataBuf.append(pattern, chunkSize);
             remaining -= chunkSize;
         }
 
-        state.responseView = state.responseBuf;
+        state.dataView = state.dataBuf;
     }
 
     /// Override to customize directory listing
@@ -494,8 +494,8 @@ class CustomFileServer : public HttpFileServer {
             "\r\nWWW-Authenticate: Basic realm=\"Secure Area\"\r\n\r\n");
         response.append(htmlBody);
 
-        state.responseBuf = std::move(response);
-        state.responseView = state.responseBuf;
+        state.dataBuf = std::move(response);
+        state.dataView = state.dataBuf;
     }
 
     std::string getCurrentTime() const {

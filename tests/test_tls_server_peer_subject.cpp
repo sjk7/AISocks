@@ -1,6 +1,8 @@
-// This is an independent project of an individual developer. Dear PVS-Studio, please check it.
+// This is an independent project of an individual developer. Dear PVS-Studio,
+// please check it.
 
-// PVS-Studio Static Code Analyzer for C, C++, C#, and Java: https://pvs-studio.com
+// PVS-Studio Static Code Analyzer for C, C++, C#, and Java:
+// https://pvs-studio.com
 
 #include "HttpsFileServer.h"
 #include "PathHelper.h"
@@ -11,8 +13,11 @@
 #include <chrono>
 #include <fstream>
 #include <thread>
+#include <atomic>
+#include <condition_variable>
+#include <mutex>
 #include <openssl/ssl.h>
- #include <optional>
+#include <optional>
 
 using namespace aiSocks;
 
@@ -26,14 +31,34 @@ static std::string repoRootFromFile(const char* file) {
 
 // Simple test server that echoes the peer certificate subject as response body.
 class PeerSubjectServer : public HttpsFileServer {
-  public:
+    public:
     using HttpsFileServer::HttpsFileServer;
 
-  protected:
+    void waitReady() {
+        std::unique_lock<std::mutex> lk(readyMtx_);
+        const bool ready = readyCv_.wait_for(
+            lk, std::chrono::seconds{2}, [this] { return ready_.load(); });
+        REQUIRE_MSG(ready, "server readiness timed out");
+    }
+
+    protected:
+    void onReady() override {
+        {
+            std::lock_guard<std::mutex> lk(readyMtx_);
+            ready_ = true;
+        }
+        readyCv_.notify_all();
+    }
+
     void buildResponse(HttpClientState& s) override {
         // Respond with the peer certificate subject (empty if none).
         respondText(s, s.peerCertSubject);
     }
+
+    private:
+    std::atomic<bool> ready_{false};
+    std::mutex readyMtx_;
+    std::condition_variable readyCv_;
 };
 
 // Perform an HTTPS request and return the response body. If handshake fails,
@@ -96,7 +121,8 @@ void test_tls_server_peer_subject() {
     const std::string repoRoot = repoRootFromFile(__FILE__);
     const std::string serverCert = repoRoot + "/tests/certs/test_cert.pem";
     const std::string serverKey = repoRoot + "/tests/certs/test_key.pem";
-    const std::string clientCert = repoRoot + "/tests/certs/test_cert_local.pem";
+    const std::string clientCert
+        = repoRoot + "/tests/certs/test_cert_local.pem";
     const std::string clientKey = repoRoot + "/tests/certs/test_key_local.pem";
 
     // 1) Require client cert, present -> server echoes non-empty subject
@@ -112,13 +138,13 @@ void test_tls_server_peer_subject() {
 
         PeerSubjectServer server{ServerBind{"127.0.0.1", Port{0}}, cfg, tls};
         REQUIRE(server.tlsReady());
-        std::thread serverThread([
-            &] { server.run(ClientLimit::Unlimited, Milliseconds{5}); });
-        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        std::thread serverThread(
+            [&] { server.run(ClientLimit::Unlimited, Milliseconds{1}); });
+        server.waitReady();
 
         const auto& port = server.serverPort();
-        auto resp = do_client_request(port.value(), true,
-            clientCert, clientKey);
+        auto resp
+            = do_client_request(port.value(), true, clientCert, clientKey);
         REQUIRE(resp.has_value());
         if (resp.has_value()) {
             REQUIRE(!resp->empty());
@@ -141,9 +167,9 @@ void test_tls_server_peer_subject() {
 
         PeerSubjectServer server{ServerBind{"127.0.0.1", Port{0}}, cfg, tls};
         REQUIRE(server.tlsReady());
-        std::thread serverThread([
-            &] { server.run(ClientLimit::Unlimited, Milliseconds{5}); });
-        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        std::thread serverThread(
+            [&] { server.run(ClientLimit::Unlimited, Milliseconds{1}); });
+        server.waitReady();
 
         auto resp = do_client_request(server.serverPort().value(), false);
         if (resp.has_value()) {
@@ -170,9 +196,9 @@ void test_tls_server_peer_subject() {
 
         PeerSubjectServer server{ServerBind{"127.0.0.1", Port{0}}, cfg, tls};
         REQUIRE(server.tlsReady());
-        std::thread serverThread([
-            &] { server.run(ClientLimit::Unlimited, Milliseconds{5}); });
-        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        std::thread serverThread(
+            [&] { server.run(ClientLimit::Unlimited, Milliseconds{1}); });
+        server.waitReady();
 
         auto resp = do_client_request(server.serverPort().value(), false);
         REQUIRE(resp.has_value());

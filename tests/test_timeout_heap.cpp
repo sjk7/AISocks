@@ -78,7 +78,7 @@ using namespace std::chrono_literals;
 //               Covers OS scheduler jitter and CI slowness.
 // ---------------------------------------------------------------------------
 static constexpr Milliseconds KEEP_ALIVE{1000}; // 1 s
-static constexpr Milliseconds POLL_TICK{20};
+static constexpr Milliseconds POLL_TICK{1};
 static constexpr Milliseconds GRACE{600}; // generous for slow machines
 
 // ---------------------------------------------------------------------------

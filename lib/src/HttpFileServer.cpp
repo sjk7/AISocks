@@ -84,10 +84,10 @@ namespace {
 
     // For HEAD, keep headers (including Content-Length) but drop the body.
     void stripBodyForHead_(HttpClientState& state) {
-        const size_t sep = state.responseBuf.find("\r\n\r\n");
+        const size_t sep = state.dataBuf.find("\r\n\r\n");
         if (sep == std::string::npos) return;
-        state.responseBuf.resize(sep + 4);
-        state.responseView = state.responseBuf;
+        state.dataBuf.resize(sep + 4);
+        state.dataView = state.dataBuf;
     }
 
 } // anonymous namespace
@@ -358,8 +358,8 @@ void HttpFileServer::handleFileRequest(HttpClientState& state,
 
         const bool headOnly = (request.method == "HEAD");
         if (headOnly) {
-            state.responseBuf = std::move(response);
-            state.responseView = state.responseBuf;
+            state.dataBuf = std::move(response);
+            state.dataView = state.dataBuf;
             return;
         }
 
@@ -390,8 +390,8 @@ void HttpFileServer::handleFileRequest(HttpClientState& state,
         fileInfo.lastModified, fileInfo.etag, config_);
     response.append(fileContent.data(), fileContent.size());
 
-    state.responseBuf = std::move(response);
-    state.responseView = state.responseBuf;
+    state.dataBuf = std::move(response);
+    state.dataView = state.dataBuf;
 }
 
 void HttpFileServer::sendError(HttpClientState& state, int code,
@@ -415,8 +415,8 @@ void HttpFileServer::sendError(HttpClientState& state, int code,
         response, config_.enableSecurityHeaders, config_.customHeaders);
     response += htmlBody;
 
-    state.responseBuf = std::move(response);
-    state.responseView = state.responseBuf;
+    state.dataBuf = std::move(response);
+    state.dataView = state.dataBuf;
 }
 
 void HttpFileServer::sendNotModified(
@@ -440,8 +440,8 @@ void HttpFileServer::sendNotModified(
     appendConfigAndTrailingCRLF(
         response, config_.enableSecurityHeaders, config_.customHeaders);
 
-    state.responseBuf = std::move(response);
-    state.responseView = state.responseBuf;
+    state.dataBuf = std::move(response);
+    state.dataView = state.dataBuf;
 }
 
 void HttpFileServer::sendCachedFile(HttpClientState& state,
@@ -455,8 +455,8 @@ void HttpFileServer::sendCachedFile(HttpClientState& state,
         fileInfo.etag, config_);
     response.append(cached.content.data(), cached.content.size());
 
-    state.responseBuf = std::move(response);
-    state.responseView = state.responseBuf;
+    state.dataBuf = std::move(response);
+    state.dataView = state.dataBuf;
 }
 
 void HttpFileServer::sendDirectoryListing(
@@ -474,8 +474,8 @@ void HttpFileServer::sendDirectoryListing(
         response, config_.enableSecurityHeaders, config_.customHeaders);
     response += htmlBody;
 
-    state.responseBuf = std::move(response);
-    state.responseView = state.responseBuf;
+    state.dataBuf = std::move(response);
+    state.dataView = state.dataBuf;
 }
 
 std::string HttpFileServer::generateErrorHtml(

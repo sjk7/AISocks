@@ -41,7 +41,9 @@ class EchoServer : public HttpPollServer {
     // Block until onReady() has fired and the server is in its poll loop.
     void waitReady() {
         std::unique_lock<std::mutex> lk(readyMtx_);
-        readyCv_.wait(lk, [this] { return ready_.load(); });
+        const bool ready = readyCv_.wait_for(
+            lk, std::chrono::seconds{2}, [this] { return ready_.load(); });
+        REQUIRE_MSG(ready, "server readiness timed out");
     }
 
     std::atomic<int> requestsServed{0};
@@ -69,9 +71,9 @@ class EchoServer : public HttpPollServer {
                                                   : pathEnd - pathStart));
         }
 
-        s.responseBuf = makeResponse(
+        s.dataBuf = makeResponse(
             "HTTP/1.1 200 OK", "text/plain", path.empty() ? "/" : path);
-        s.responseView = s.responseBuf;
+        s.dataView = s.dataBuf;
         requestsServed.fetch_add(1, std::memory_order_relaxed);
     }
 
@@ -93,7 +95,9 @@ class SilentServer : public HttpPollServer {
 
     void waitReady() {
         std::unique_lock<std::mutex> lk(readyMtx_);
-        readyCv_.wait(lk, [this] { return ready_.load(); });
+        const bool ready = readyCv_.wait_for(
+            lk, std::chrono::seconds{2}, [this] { return ready_.load(); });
+        REQUIRE_MSG(ready, "server readiness timed out");
     }
 
     protected:
@@ -105,8 +109,8 @@ class SilentServer : public HttpPollServer {
         readyCv_.notify_all();
     }
 
-    // Leave responseView empty: onWritable returns KeepConnection when
-    // responseView is empty, so the socket stays open indefinitely.
+    // Leave dataView empty: onWritable returns KeepConnection when
+    // dataView is empty, so the socket stays open indefinitely.
     // The client's requestTimeout fires rather than waiting forever.
     void buildResponse(HttpClientState& /*s*/) override {}
 
@@ -129,7 +133,9 @@ class RedirectToHttpsServer : public HttpPollServer {
 
     void waitReady() {
         std::unique_lock<std::mutex> lk(readyMtx_);
-        readyCv_.wait(lk, [this] { return ready_.load(); });
+        const bool ready = readyCv_.wait_for(
+            lk, std::chrono::seconds{2}, [this] { return ready_.load(); });
+        REQUIRE_MSG(ready, "server readiness timed out");
     }
 
     protected:
@@ -142,11 +148,11 @@ class RedirectToHttpsServer : public HttpPollServer {
     }
 
     void buildResponse(HttpClientState& s) override {
-        s.responseBuf = "HTTP/1.1 302 Found\r\n"
-                        "Location: https://example.com/secure\r\n"
-                        "Content-Length: 0\r\n"
-                        "Connection: close\r\n\r\n";
-        s.responseView = s.responseBuf;
+        s.dataBuf = "HTTP/1.1 302 Found\r\n"
+                    "Location: https://example.com/secure\r\n"
+                    "Content-Length: 0\r\n"
+                    "Connection: close\r\n\r\n";
+        s.dataView = s.dataBuf;
     }
 
     private:
@@ -168,7 +174,9 @@ class ReuseTrackingServer : public HttpPollServer {
 
     void waitReady() {
         std::unique_lock<std::mutex> lk(readyMtx_);
-        readyCv_.wait(lk, [this] { return ready_.load(); });
+        const bool ready = readyCv_.wait_for(
+            lk, std::chrono::seconds{2}, [this] { return ready_.load(); });
+        REQUIRE_MSG(ready, "server readiness timed out");
     }
 
     std::atomic<int> connectionsAccepted{0};
@@ -189,11 +197,11 @@ class ReuseTrackingServer : public HttpPollServer {
     }
 
     void buildResponse(HttpClientState& s) override {
-        s.responseBuf = "HTTP/1.1 200 OK\r\n"
-                        "Content-Length: 2\r\n"
-                        "Connection: keep-alive\r\n\r\n"
-                        "OK";
-        s.responseView = s.responseBuf;
+        s.dataBuf = "HTTP/1.1 200 OK\r\n"
+                    "Content-Length: 2\r\n"
+                    "Connection: keep-alive\r\n\r\n"
+                    "OK";
+        s.dataView = s.dataBuf;
         requestsServed.fetch_add(1, std::memory_order_relaxed);
     }
 
@@ -387,7 +395,7 @@ static void test_request_timeout_is_total_deadline() {
         const char* body = "hello";
         for (int i = 0; i < 5; ++i) {
             if (!client->sendAll(body + i, 1)) break;
-            std::this_thread::sleep_for(40ms);
+            std::this_thread::sleep_for(25ms);
         }
     });
 

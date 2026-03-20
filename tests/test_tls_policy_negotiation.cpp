@@ -79,7 +79,7 @@ void test_tls_policy_negotiation() {
     HttpsFileServer server{ServerBind{"127.0.0.1", Port{0}}, cfg, tls};
     REQUIRE(server.tlsReady());
     std::thread serverThread(
-        [&] { server.run(ClientLimit::Unlimited, Milliseconds{5}); });
+        [&] { server.run(ClientLimit::Unlimited, Milliseconds{1}); });
     std::this_thread::sleep_for(std::chrono::milliseconds(50));
 
     std::string proto, cipher;

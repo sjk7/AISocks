@@ -1,6 +1,8 @@
-// This is an independent project of an individual developer. Dear PVS-Studio, please check it.
+// This is an independent project of an individual developer. Dear PVS-Studio,
+// please check it.
 
-// PVS-Studio Static Code Analyzer for C, C++, C#, and Java: https://pvs-studio.com
+// PVS-Studio Static Code Analyzer for C, C++, C#, and Java:
+// https://pvs-studio.com
 
 #include "HttpsPollServer.h"
 #include "HttpClient.h"
@@ -28,15 +30,16 @@ static std::string sourceRoot() {
 
 class TestTlsServer : public HttpsPollServer {
     public:
-    explicit TestTlsServer(const ServerBind& bind,
-        const TlsServerConfig& tls)
+    explicit TestTlsServer(const ServerBind& bind, const TlsServerConfig& tls)
         : HttpsPollServer(bind, AddressFamily::IPv4, tls) {
         setHandleSignals(false);
     }
 
     void waitReady() {
         std::unique_lock<std::mutex> lk(readyMtx_);
-        readyCv_.wait(lk, [this] { return ready_.load(); });
+        const bool ready = readyCv_.wait_for(
+            lk, std::chrono::seconds{2}, [this] { return ready_.load(); });
+        REQUIRE_MSG(ready, "server readiness timed out");
     }
 
     protected:
@@ -49,8 +52,8 @@ class TestTlsServer : public HttpsPollServer {
     }
 
     void buildResponse(HttpClientState& s) override {
-        s.responseBuf = "HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n";
-        s.responseView = s.responseBuf;
+        s.dataBuf = "HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n";
+        s.dataView = s.dataBuf;
     }
 
     private:
@@ -64,9 +67,9 @@ void test_tls_metrics_initial_state() {
 
     // Create a server and verify metrics start at zero
     TlsServerConfig tlsCfg;
-        const std::string root = sourceRoot();
-        tlsCfg.certChainFile = root + "/tests/certs/test_cert.pem";
-        tlsCfg.privateKeyFile = root + "/tests/certs/test_key.pem";
+    const std::string root = sourceRoot();
+    tlsCfg.certChainFile = root + "/tests/certs/test_cert.pem";
+    tlsCfg.privateKeyFile = root + "/tests/certs/test_key.pem";
     ServerBind bind{"127.0.0.1", Port{0}};
     std::optional<TestTlsServer> serverOpt;
     serverOpt.emplace(bind, tlsCfg);
@@ -75,7 +78,7 @@ void test_tls_metrics_initial_state() {
     REQUIRE(server.tlsReady());
 
     const TlsMetrics& metrics = server.getTlsMetrics();
-    
+
     // All counters should start at zero
     REQUIRE(metrics.handshakeSuccessCount == 0);
     REQUIRE(metrics.handshakeFailureCount == 0);
@@ -110,9 +113,9 @@ void test_tls_metrics_handshake_collection() {
     TlsServerConfig tlsCfg;
     tlsCfg.handshakeTimeoutMs = 5000;
 
-        const std::string root = sourceRoot();
-        tlsCfg.certChainFile = root + "/tests/certs/test_cert.pem";
-        tlsCfg.privateKeyFile = root + "/tests/certs/test_key.pem";
+    const std::string root = sourceRoot();
+    tlsCfg.certChainFile = root + "/tests/certs/test_cert.pem";
+    tlsCfg.privateKeyFile = root + "/tests/certs/test_key.pem";
     ServerBind bind{"127.0.0.1", Port{0}};
     std::optional<TestTlsServer> serverOpt;
     serverOpt.emplace(bind, tlsCfg);
@@ -121,7 +124,7 @@ void test_tls_metrics_handshake_collection() {
     REQUIRE(server.tlsReady());
 
     std::thread serverThread(
-        [&] { server.run(ClientLimit::Unlimited, Milliseconds{10}); });
+        [&] { server.run(ClientLimit::Unlimited, Milliseconds{1}); });
     server.waitReady();
 
     // Verify initial metrics
@@ -135,7 +138,7 @@ void test_tls_metrics_handshake_collection() {
         HttpClient::Options opts;
         opts.connectTimeout = Milliseconds{1000};
         opts.requestTimeout = Milliseconds{1000};
-            opts.verifyCertificate = false;
+        opts.verifyCertificate = false;
         HttpClient client{opts};
         const std::string url = "https://127.0.0.1:"
             + std::to_string(server.serverPort().value()) + "/test";
@@ -146,36 +149,45 @@ void test_tls_metrics_handshake_collection() {
         }
     }
 
-    // Give it a moment to finish
-    std::this_thread::sleep_for(std::chrono::milliseconds(200));
+    // Wait briefly for metrics to update without a fixed delay.
+    const auto deadline
+        = std::chrono::steady_clock::now() + std::chrono::milliseconds(200);
+    while (std::chrono::steady_clock::now() < deadline) {
+        const auto& m = server.getTlsMetrics();
+        if ((m.handshakeSuccessCount + m.handshakeFailureCount
+                + m.handshakeTimeoutCount)
+            > 0) {
+            break;
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
 
     server.requestStop();
     serverThread.join();
 
     // Verify metrics were collected
     const TlsMetrics& metrics = server.getTlsMetrics();
-    
+
     // Should have at least one handshake attempt (success or failure)
-    const uint64_t totalAttempts = metrics.handshakeSuccessCount 
-        + metrics.handshakeFailureCount 
-        + metrics.handshakeTimeoutCount;
+    const uint64_t totalAttempts = metrics.handshakeSuccessCount
+        + metrics.handshakeFailureCount + metrics.handshakeTimeoutCount;
     REQUIRE(totalAttempts > 0);
-        REQUIRE(metrics.handshakeSuccessCount > 0);
-        REQUIRE(!metrics.protocolDistribution.empty());
-        REQUIRE(!metrics.cipherDistribution.empty());
-    
+    REQUIRE(metrics.handshakeSuccessCount > 0);
+    REQUIRE(!metrics.protocolDistribution.empty());
+    REQUIRE(!metrics.cipherDistribution.empty());
+
     // Print collected metrics for debugging
     std::fprintf(stderr,
         "Metrics: successes=%llu timeouts=%llu failures=%llu\n",
         static_cast<unsigned long long>(metrics.handshakeSuccessCount),
         static_cast<unsigned long long>(metrics.handshakeTimeoutCount),
         static_cast<unsigned long long>(metrics.handshakeFailureCount));
-    
+
     for (const auto& [proto, count] : metrics.protocolDistribution) {
         std::fprintf(stderr, "  Protocol %s: %llu\n", proto.c_str(),
             static_cast<unsigned long long>(count));
     }
-    
+
     for (const auto& [cipher, count] : metrics.cipherDistribution) {
         std::fprintf(stderr, "  Cipher %s: %llu\n", cipher.c_str(),
             static_cast<unsigned long long>(count));
@@ -189,11 +201,11 @@ int main() {
     return test_summary();
 }
 
-#else  // AISOCKS_ENABLE_TLS
+#else // AISOCKS_ENABLE_TLS
 
 int main() {
     fprintf(stderr, "TLS not enabled; skipping test\n");
     return 0;
 }
 
-#endif  // AISOCKS_ENABLE_TLS
+#endif // AISOCKS_ENABLE_TLS

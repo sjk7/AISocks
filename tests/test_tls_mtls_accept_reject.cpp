@@ -1,6 +1,8 @@
-// This is an independent project of an individual developer. Dear PVS-Studio, please check it.
+// This is an independent project of an individual developer. Dear PVS-Studio,
+// please check it.
 
-// PVS-Studio Static Code Analyzer for C, C++, C#, and Java: https://pvs-studio.com
+// PVS-Studio Static Code Analyzer for C, C++, C#, and Java:
+// https://pvs-studio.com
 
 #include "HttpsFileServer.h"
 #include "PathHelper.h"
@@ -11,10 +13,39 @@
 #include <chrono>
 #include <fstream>
 #include <thread>
+#include <atomic>
+#include <condition_variable>
+#include <mutex>
 #include <openssl/ssl.h>
- #include <optional>
+#include <optional>
 
 using namespace aiSocks;
+
+class ReadyHttpsFileServer : public HttpsFileServer {
+    public:
+    using HttpsFileServer::HttpsFileServer;
+
+    void waitReady() {
+        std::unique_lock<std::mutex> lk(readyMtx_);
+        const bool ready = readyCv_.wait_for(
+            lk, std::chrono::seconds{2}, [this] { return ready_.load(); });
+        REQUIRE_MSG(ready, "server readiness timed out");
+    }
+
+    protected:
+    void onReady() override {
+        {
+            std::lock_guard<std::mutex> lk(readyMtx_);
+            ready_ = true;
+        }
+        readyCv_.notify_all();
+    }
+
+    private:
+    std::atomic<bool> ready_{false};
+    std::mutex readyMtx_;
+    std::condition_variable readyCv_;
+};
 
 static std::string repoRootFromFile(const char* file) {
     std::string path = PathHelper::normalizePath(file);
@@ -97,15 +128,15 @@ void test_tls_mtls_accept_reject() {
         tls.clientAuth = TlsServerConfig::ClientAuthMode::Require;
         tls.caFile = clientCert; // trust the client's self-signed cert
 
-        HttpsFileServer server{ServerBind{"127.0.0.1", Port{0}}, cfg, tls};
+        ReadyHttpsFileServer server{ServerBind{"127.0.0.1", Port{0}}, cfg, tls};
         REQUIRE(server.tlsReady());
         std::thread serverThread(
-            [&] { server.run(ClientLimit::Unlimited, Milliseconds{5}); });
-        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+            [&] { server.run(ClientLimit::Unlimited, Milliseconds{1}); });
+        server.waitReady();
 
         const auto& port = server.serverPort();
-        bool ok = do_client_handshake(
-            port.value(), true, clientCert, clientKey);
+        bool ok
+            = do_client_handshake(port.value(), true, clientCert, clientKey);
         REQUIRE(ok);
 
         server.requestStop();
@@ -123,11 +154,11 @@ void test_tls_mtls_accept_reject() {
         tls.clientAuth = TlsServerConfig::ClientAuthMode::Require;
         tls.caFile = clientCert;
 
-        HttpsFileServer server{ServerBind{"127.0.0.1", Port{0}}, cfg, tls};
+        ReadyHttpsFileServer server{ServerBind{"127.0.0.1", Port{0}}, cfg, tls};
         REQUIRE(server.tlsReady());
         std::thread serverThread(
-            [&] { server.run(ClientLimit::Unlimited, Milliseconds{5}); });
-        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+            [&] { server.run(ClientLimit::Unlimited, Milliseconds{1}); });
+        server.waitReady();
 
         bool ok = do_client_handshake(server.serverPort().value(), false);
         REQUIRE(!ok);
@@ -148,11 +179,11 @@ void test_tls_mtls_accept_reject() {
         tls.clientAuth = TlsServerConfig::ClientAuthMode::Optional;
         tls.caFile = clientCert;
 
-        HttpsFileServer server{ServerBind{"127.0.0.1", Port{0}}, cfg, tls};
+        ReadyHttpsFileServer server{ServerBind{"127.0.0.1", Port{0}}, cfg, tls};
         REQUIRE(server.tlsReady());
         std::thread serverThread(
-            [&] { server.run(ClientLimit::Unlimited, Milliseconds{5}); });
-        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+            [&] { server.run(ClientLimit::Unlimited, Milliseconds{1}); });
+        server.waitReady();
 
         bool ok = do_client_handshake(server.serverPort().value(), false);
         REQUIRE(ok);

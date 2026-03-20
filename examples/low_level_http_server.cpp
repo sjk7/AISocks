@@ -175,7 +175,7 @@ class HttpServer : public HttpPollServer {
     protected:
     void buildResponse(HttpClientState& s) override {
         if (!isHttpRequest(s.request)) {
-            s.responseView
+            s.dataView
                 = cached_bad_request_; // zero-copy: view into static string
             return;
         }
@@ -183,10 +183,10 @@ class HttpServer : public HttpPollServer {
         // Assign string_view directly into pre-built storage — no copy, no
         // allocation.
         if (s.request.find("GET /big ") != std::string::npos) {
-            s.responseView
+            s.dataView
                 = s.closeAfterSend ? big_close_response_ : big_ka_response_;
         } else {
-            s.responseView = s.closeAfterSend ? close_response_ : ka_response_;
+            s.dataView = s.closeAfterSend ? close_response_ : ka_response_;
         }
     }
 };

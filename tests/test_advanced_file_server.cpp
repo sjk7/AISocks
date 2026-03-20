@@ -89,8 +89,8 @@ class CustomFileServer : public HttpFileServer {
             response += "\r\nCache-Control: no-store\r\nRefresh: 2\r\n\r\n";
             if (!headOnly) response += page;
 
-            state.responseBuf = std::move(response);
-            state.responseView = state.responseBuf;
+            state.dataBuf = std::move(response);
+            state.dataView = state.dataBuf;
             return;
         }
 
@@ -117,8 +117,8 @@ class CustomFileServer : public HttpFileServer {
             response += "\r\n";
             if (!headOnly) response += instructions;
 
-            state.responseBuf = std::move(response);
-            state.responseView = state.responseBuf;
+            state.dataBuf = std::move(response);
+            state.dataView = state.dataBuf;
             return;
         }
 
@@ -203,8 +203,8 @@ class CustomFileServer : public HttpFileServer {
         response += "\r\nWWW-Authenticate: Basic realm=\"Secure Area\"\r\n\r\n";
         response += htmlBody;
 
-        state.responseBuf = std::move(response);
-        state.responseView = state.responseBuf;
+        state.dataBuf = std::move(response);
+        state.dataView = state.dataBuf;
     }
 
     void logRequest(const HttpRequest& request, const HttpClientState& state) {
@@ -515,7 +515,7 @@ void testCacheHitsOnRepeatedRequest() {
         state.request = request; //-V820
         server.buildResponse(state);
         std::string status
-            = BehavioralTestHelper::extractStatus(state.responseBuf);
+            = BehavioralTestHelper::extractStatus(state.dataBuf);
         TestFramework::assert_contains(
             status, "200", "First request should be served successfully");
     }
@@ -533,7 +533,7 @@ void testCacheHitsOnRepeatedRequest() {
         state.request = request; //-V820
         server.buildResponse(state);
         std::string status
-            = BehavioralTestHelper::extractStatus(state.responseBuf);
+            = BehavioralTestHelper::extractStatus(state.dataBuf);
         TestFramework::assert_contains(
             status, "200", "Second request should be served successfully");
     }
@@ -571,7 +571,7 @@ void testQueryStringBypassesCache() {
 
         server.buildResponse(state);
         std::string status
-            = BehavioralTestHelper::extractStatus(state.responseBuf);
+            = BehavioralTestHelper::extractStatus(state.dataBuf);
 
         TestFramework::assert_contains(
             status, "200", "Query request should be served successfully");
@@ -588,7 +588,7 @@ void testQueryStringBypassesCache() {
 
         server.buildResponse(state);
         std::string status
-            = BehavioralTestHelper::extractStatus(state.responseBuf);
+            = BehavioralTestHelper::extractStatus(state.dataBuf);
 
         TestFramework::assert_contains(
             status, "200", "Non-query request should be served successfully");
@@ -670,12 +670,12 @@ void testAccessLogBrowserTailBehavior() {
         server.buildResponse(state);
 
         std::string status
-            = BehavioralTestHelper::extractStatus(state.responseBuf);
+            = BehavioralTestHelper::extractStatus(state.dataBuf);
         std::string contentType = BehavioralTestHelper::extractHeader(
-            state.responseBuf, "Content-Type");
+            state.dataBuf, "Content-Type");
         std::string refresh
-            = BehavioralTestHelper::extractHeader(state.responseBuf, "Refresh");
-        std::string body = BehavioralTestHelper::extractBody(state.responseBuf);
+            = BehavioralTestHelper::extractHeader(state.dataBuf, "Refresh");
+        std::string body = BehavioralTestHelper::extractBody(state.dataBuf);
 
         TestFramework::assert_contains(
             status, "200", "Local authenticated access log viewer should load");
@@ -699,8 +699,8 @@ void testAccessLogBrowserTailBehavior() {
         server.buildResponse(state);
 
         std::string status
-            = BehavioralTestHelper::extractStatus(state.responseBuf);
-        std::string body = BehavioralTestHelper::extractBody(state.responseBuf);
+            = BehavioralTestHelper::extractStatus(state.dataBuf);
+        std::string body = BehavioralTestHelper::extractBody(state.dataBuf);
 
         TestFramework::assert_contains(status, "403",
             "Non-local access log viewer requests should be blocked");
@@ -725,10 +725,10 @@ void testLargeFileBypassesCacheForHotPath() {
 
     server.buildResponse(state);
 
-    std::string status = BehavioralTestHelper::extractStatus(state.responseBuf);
+    std::string status = BehavioralTestHelper::extractStatus(state.dataBuf);
     std::string contentLength = BehavioralTestHelper::extractHeader(
-        state.responseBuf, "Content-Length");
-    std::string body = BehavioralTestHelper::extractBody(state.responseBuf);
+        state.dataBuf, "Content-Length");
+    std::string body = BehavioralTestHelper::extractBody(state.dataBuf);
 
     TestFramework::assert_contains(
         status, "200", "Large file should be served successfully");
@@ -779,7 +779,7 @@ void testAuthenticationBehavior() {
         state.request = request; //-V820
 
         server.buildResponse(state);
-        std::string response = state.responseBuf;
+        std::string response = state.dataBuf;
         std::string status = BehavioralTestHelper::extractStatus(response);
         std::string body = BehavioralTestHelper::extractBody(response);
 
@@ -798,7 +798,7 @@ void testAuthenticationBehavior() {
         state.request = request; //-V820
 
         server.buildResponse(state);
-        std::string response = state.responseBuf;
+        std::string response = state.dataBuf;
         std::string status = BehavioralTestHelper::extractStatus(response);
         std::string body = BehavioralTestHelper::extractBody(response);
 
@@ -818,7 +818,7 @@ void testAuthenticationBehavior() {
         state.request = request; //-V820
 
         server.buildResponse(state);
-        std::string response = state.responseBuf;
+        std::string response = state.dataBuf;
         std::string status = BehavioralTestHelper::extractStatus(response);
         std::string authHeader
             = BehavioralTestHelper::extractHeader(response, "WWW-Authenticate");
@@ -846,7 +846,7 @@ void testFileServingBehavior() {
         state.request = request; //-V820
 
         server.buildResponse(state);
-        std::string response = state.responseBuf;
+        std::string response = state.dataBuf;
         std::string status = BehavioralTestHelper::extractStatus(response);
         std::string contentType
             = BehavioralTestHelper::extractHeader(response, "Content-Type");
@@ -872,7 +872,7 @@ void testFileServingBehavior() {
         state.request = request; //-V820
 
         server.buildResponse(state);
-        std::string response = state.responseBuf;
+        std::string response = state.dataBuf;
         std::string status = BehavioralTestHelper::extractStatus(response);
         std::string contentType
             = BehavioralTestHelper::extractHeader(response, "Content-Type");
@@ -894,7 +894,7 @@ void testFileServingBehavior() {
         state.request = request; //-V820
 
         server.buildResponse(state);
-        std::string response = state.responseBuf;
+        std::string response = state.dataBuf;
         std::string status = BehavioralTestHelper::extractStatus(response);
         std::string contentType
             = BehavioralTestHelper::extractHeader(response, "Content-Type");
@@ -926,8 +926,8 @@ void testErrorHandlingBehavior() {
 
         server.buildResponse(state);
         std::string status
-            = BehavioralTestHelper::extractStatus(state.responseBuf);
-        std::string body = BehavioralTestHelper::extractBody(state.responseBuf);
+            = BehavioralTestHelper::extractStatus(state.dataBuf);
+        std::string body = BehavioralTestHelper::extractBody(state.dataBuf);
 
         TestFramework::assert_contains(
             status, "404", "Nonexistent file should return 404");
@@ -944,7 +944,7 @@ void testErrorHandlingBehavior() {
 
         server.buildResponse(state);
         std::string status
-            = BehavioralTestHelper::extractStatus(state.responseBuf);
+            = BehavioralTestHelper::extractStatus(state.dataBuf);
 
         TestFramework::assert_contains(status, "403",
             "Directory without index should return 403 when listing disabled");
@@ -959,8 +959,8 @@ void testErrorHandlingBehavior() {
 
         server.buildResponse(state);
         std::string status
-            = BehavioralTestHelper::extractStatus(state.responseBuf);
-        std::string body = BehavioralTestHelper::extractBody(state.responseBuf);
+            = BehavioralTestHelper::extractStatus(state.dataBuf);
+        std::string body = BehavioralTestHelper::extractBody(state.dataBuf);
 
         TestFramework::assert_contains(
             status, "403", "Blocked file type should return 403");
@@ -977,7 +977,7 @@ void testErrorHandlingBehavior() {
 
         server.buildResponse(state);
         std::string status
-            = BehavioralTestHelper::extractStatus(state.responseBuf);
+            = BehavioralTestHelper::extractStatus(state.dataBuf);
 
         TestFramework::assert_contains(
             status, "403", "Log files should be blocked");
@@ -992,8 +992,8 @@ void testErrorHandlingBehavior() {
 
         server.buildResponse(state);
         std::string status
-            = BehavioralTestHelper::extractStatus(state.responseBuf);
-        std::string body = BehavioralTestHelper::extractBody(state.responseBuf);
+            = BehavioralTestHelper::extractStatus(state.dataBuf);
+        std::string body = BehavioralTestHelper::extractBody(state.dataBuf);
 
         TestFramework::assert_contains(
             status, "403", "Dotfiles should return 403 Forbidden, not 404");
@@ -1012,7 +1012,7 @@ void testErrorHandlingBehavior() {
 
         server.buildResponse(state);
         std::string status
-            = BehavioralTestHelper::extractStatus(state.responseBuf);
+            = BehavioralTestHelper::extractStatus(state.dataBuf);
 
         TestFramework::assert_contains(
             status, "403", ".env files should return 403 Forbidden, not 404");
@@ -1027,8 +1027,8 @@ void testErrorHandlingBehavior() {
 
         server.buildResponse(state);
         std::string status
-            = BehavioralTestHelper::extractStatus(state.responseBuf);
-        std::string body = BehavioralTestHelper::extractBody(state.responseBuf);
+            = BehavioralTestHelper::extractStatus(state.dataBuf);
+        std::string body = BehavioralTestHelper::extractBody(state.dataBuf);
 
         TestFramework::assert_contains(
             status, "404", "Nonexistent dotfile should return 404 Not Found");
@@ -1058,8 +1058,8 @@ void testInvalidMethodsBehavior() {
 
         server.buildResponse(state);
         std::string status
-            = BehavioralTestHelper::extractStatus(state.responseBuf);
-        std::string body = BehavioralTestHelper::extractBody(state.responseBuf);
+            = BehavioralTestHelper::extractStatus(state.dataBuf);
+        std::string body = BehavioralTestHelper::extractBody(state.dataBuf);
 
         TestFramework::assert_contains(
             status, "405", "POST method should return 405");
@@ -1078,7 +1078,7 @@ void testInvalidMethodsBehavior() {
 
         server.buildResponse(state);
         std::string status
-            = BehavioralTestHelper::extractStatus(state.responseBuf);
+            = BehavioralTestHelper::extractStatus(state.dataBuf);
 
         TestFramework::assert_contains(
             status, "405", "PUT method should return 405");
@@ -1095,7 +1095,7 @@ void testInvalidMethodsBehavior() {
 
         server.buildResponse(state);
         std::string status
-            = BehavioralTestHelper::extractStatus(state.responseBuf);
+            = BehavioralTestHelper::extractStatus(state.dataBuf);
 
         TestFramework::assert_contains(
             status, "405", "DELETE method should return 405");
@@ -1118,7 +1118,7 @@ void testMalformedRequestsBehavior() {
 
         server.buildResponse(state);
         std::string status
-            = BehavioralTestHelper::extractStatus(state.responseBuf);
+            = BehavioralTestHelper::extractStatus(state.dataBuf);
 
         TestFramework::assert_contains(
             status, "400", "Malformed request should return 400");
@@ -1132,7 +1132,7 @@ void testMalformedRequestsBehavior() {
 
         server.buildResponse(state);
         std::string status
-            = BehavioralTestHelper::extractStatus(state.responseBuf);
+            = BehavioralTestHelper::extractStatus(state.dataBuf);
 
         TestFramework::assert_contains(
             status, "400", "Empty request should return 400");
@@ -1146,7 +1146,7 @@ void testMalformedRequestsBehavior() {
 
         server.buildResponse(state);
         std::string status
-            = BehavioralTestHelper::extractStatus(state.responseBuf);
+            = BehavioralTestHelper::extractStatus(state.dataBuf);
 
         TestFramework::assert_true(status.find("400") != std::string::npos
                 || status.find("405") != std::string::npos,
@@ -1171,8 +1171,8 @@ void testPathTraversalBehavior() {
 
         server.buildResponse(state);
         std::string status
-            = BehavioralTestHelper::extractStatus(state.responseBuf);
-        std::string body = BehavioralTestHelper::extractBody(state.responseBuf);
+            = BehavioralTestHelper::extractStatus(state.dataBuf);
+        std::string body = BehavioralTestHelper::extractBody(state.dataBuf);
 
         // Print actual status for debugging
         printf("   DEBUG: Path traversal /../etc/passwd returns: %s\n",
@@ -1194,7 +1194,7 @@ void testPathTraversalBehavior() {
 
         server.buildResponse(state);
         std::string status
-            = BehavioralTestHelper::extractStatus(state.responseBuf);
+            = BehavioralTestHelper::extractStatus(state.dataBuf);
 
         TestFramework::assert_contains(status, "403",
             "URL-encoded path traversal should return 403 Forbidden");
@@ -1209,7 +1209,7 @@ void testPathTraversalBehavior() {
 
         server.buildResponse(state);
         std::string status
-            = BehavioralTestHelper::extractStatus(state.responseBuf);
+            = BehavioralTestHelper::extractStatus(state.dataBuf);
 
         TestFramework::assert_contains(
             status, "403", "Deep path traversal should return 403 Forbidden");
@@ -1233,8 +1233,8 @@ void testAuthenticationFailuresBehavior() {
 
         server.buildResponse(state);
         std::string status
-            = BehavioralTestHelper::extractStatus(state.responseBuf);
-        std::string body = BehavioralTestHelper::extractBody(state.responseBuf);
+            = BehavioralTestHelper::extractStatus(state.dataBuf);
+        std::string body = BehavioralTestHelper::extractBody(state.dataBuf);
 
         TestFramework::assert_contains(
             status, "401", "Wrong password should return 401");
@@ -1252,7 +1252,7 @@ void testAuthenticationFailuresBehavior() {
         state.request = request; //-V820
 
         server.buildResponse(state);
-        std::string response = state.responseBuf;
+        std::string response = state.dataBuf;
         std::string status = BehavioralTestHelper::extractStatus(response);
 
         TestFramework::assert_contains(
@@ -1270,7 +1270,7 @@ void testAuthenticationFailuresBehavior() {
 
         server.buildResponse(state);
         std::string status
-            = BehavioralTestHelper::extractStatus(state.responseBuf);
+            = BehavioralTestHelper::extractStatus(state.dataBuf);
 
         TestFramework::assert_contains(
             status, "401", "Malformed auth should return 401");
@@ -1285,9 +1285,9 @@ void testAuthenticationFailuresBehavior() {
 
         server.buildResponse(state);
         std::string status
-            = BehavioralTestHelper::extractStatus(state.responseBuf);
+            = BehavioralTestHelper::extractStatus(state.dataBuf);
         std::string authHeader = BehavioralTestHelper::extractHeader(
-            state.responseBuf, "WWW-Authenticate");
+            state.dataBuf, "WWW-Authenticate");
 
         TestFramework::assert_contains(
             status, "401", "No credentials should return 401");
@@ -1313,10 +1313,10 @@ void testHeadMethodBehavior() {
 
         server.buildResponse(state);
         std::string status
-            = BehavioralTestHelper::extractStatus(state.responseBuf);
-        std::string body = BehavioralTestHelper::extractBody(state.responseBuf);
+            = BehavioralTestHelper::extractStatus(state.dataBuf);
+        std::string body = BehavioralTestHelper::extractBody(state.dataBuf);
         std::string contentLength = BehavioralTestHelper::extractHeader(
-            state.responseBuf, "Content-Length");
+            state.dataBuf, "Content-Length");
 
         TestFramework::assert_equals(
             "HTTP/1.1 200 OK", status, "HEAD request should return 200 OK");
@@ -1335,9 +1335,9 @@ void testHeadMethodBehavior() {
 
         server.buildResponse(state);
         std::string status
-            = BehavioralTestHelper::extractStatus(state.responseBuf);
+            = BehavioralTestHelper::extractStatus(state.dataBuf);
         std::string contentType = BehavioralTestHelper::extractHeader(
-            state.responseBuf, "Content-Type");
+            state.dataBuf, "Content-Type");
 
         TestFramework::assert_equals(
             "HTTP/1.1 200 OK", status, "HEAD on CSS should return 200");
@@ -1354,7 +1354,7 @@ void testHeadMethodBehavior() {
 
         server.buildResponse(state);
         std::string status
-            = BehavioralTestHelper::extractStatus(state.responseBuf);
+            = BehavioralTestHelper::extractStatus(state.dataBuf);
 
         TestFramework::assert_contains(
             status, "404", "HEAD request for missing file should return 404");
@@ -1369,7 +1369,7 @@ void testHeadMethodBehavior() {
 
         server.buildResponse(state);
         std::string status
-            = BehavioralTestHelper::extractStatus(state.responseBuf);
+            = BehavioralTestHelper::extractStatus(state.dataBuf);
 
         TestFramework::assert_contains(
             status, "401", "HEAD without credentials should return 401");
@@ -1396,7 +1396,7 @@ void testRangeRequestBehavior() {
 
         server.buildResponse(state);
         std::string status
-            = BehavioralTestHelper::extractStatus(state.responseBuf);
+            = BehavioralTestHelper::extractStatus(state.dataBuf);
 
         // Server should support 206 or might not implement ranges (return 200)
         TestFramework::assert_true(status.find("200") != std::string::npos
@@ -1416,7 +1416,7 @@ void testRangeRequestBehavior() {
 
         server.buildResponse(state);
         std::string status
-            = BehavioralTestHelper::extractStatus(state.responseBuf);
+            = BehavioralTestHelper::extractStatus(state.dataBuf);
 
         TestFramework::assert_true(status.find("200") != std::string::npos
                 || status.find("206") != std::string::npos
@@ -1442,7 +1442,7 @@ void testCachingHeadersBehavior() {
 
         server.buildResponse(state);
         std::string lastModified = BehavioralTestHelper::extractHeader(
-            state.responseBuf, "Last-Modified");
+            state.dataBuf, "Last-Modified");
 
         TestFramework::assert_true(
             lastModified.empty() || lastModified.find('-') != std::string::npos,
@@ -1463,7 +1463,7 @@ void testCachingHeadersBehavior() {
 
         server.buildResponse(state);
         std::string status
-            = BehavioralTestHelper::extractStatus(state.responseBuf);
+            = BehavioralTestHelper::extractStatus(state.dataBuf);
 
         TestFramework::assert_true(status.find("200") != std::string::npos
                 || status.find("304") != std::string::npos,
@@ -1479,9 +1479,9 @@ void testCachingHeadersBehavior() {
 
         server.buildResponse(state);
         std::string cacheControl = BehavioralTestHelper::extractHeader(
-            state.responseBuf, "Cache-Control");
+            state.dataBuf, "Cache-Control");
         std::string expires
-            = BehavioralTestHelper::extractHeader(state.responseBuf, "Expires");
+            = BehavioralTestHelper::extractHeader(state.dataBuf, "Expires");
 
         TestFramework::assert_true(
             cacheControl.empty() || expires.empty() || true,
@@ -1507,7 +1507,7 @@ void testMimeTypeBehavior() {
 
         server.buildResponse(state);
         std::string contentType = BehavioralTestHelper::extractHeader(
-            state.responseBuf, "Content-Type");
+            state.dataBuf, "Content-Type");
 
         TestFramework::assert_contains(contentType, "text/html",
             "HTML files should have text/html MIME type");
@@ -1522,7 +1522,7 @@ void testMimeTypeBehavior() {
 
         server.buildResponse(state);
         std::string contentType = BehavioralTestHelper::extractHeader(
-            state.responseBuf, "Content-Type");
+            state.dataBuf, "Content-Type");
 
         TestFramework::assert_contains(contentType, "text/css",
             "CSS files should have text/css MIME type");
@@ -1537,7 +1537,7 @@ void testMimeTypeBehavior() {
 
         server.buildResponse(state);
         std::string contentType = BehavioralTestHelper::extractHeader(
-            state.responseBuf, "Content-Type");
+            state.dataBuf, "Content-Type");
 
         TestFramework::assert_contains(contentType, "javascript",
             "JS files should have javascript MIME type");
@@ -1552,7 +1552,7 @@ void testMimeTypeBehavior() {
 
         server.buildResponse(state);
         std::string contentType = BehavioralTestHelper::extractHeader(
-            state.responseBuf, "Content-Type");
+            state.dataBuf, "Content-Type");
 
         TestFramework::assert_true(contentType.find("text") != std::string::npos
                 || contentType.find("plain") != std::string::npos,
@@ -1579,7 +1579,7 @@ void testConcurrencyBehavior() {
 
             server.buildResponse(state);
             std::string status
-                = BehavioralTestHelper::extractStatus(state.responseBuf);
+                = BehavioralTestHelper::extractStatus(state.dataBuf);
 
             if (status.find("200") != std::string::npos) {
                 successCount++;
@@ -1608,7 +1608,7 @@ void testConcurrencyBehavior() {
             state.request = request; //-V820
 
             server.buildResponse(state);
-            std::string response = state.responseBuf;
+            std::string response = state.dataBuf;
 
             if (response.find("200") != std::string::npos
                 && response.find(expectedContent) != std::string::npos) {
@@ -1635,7 +1635,7 @@ void testConcurrencyBehavior() {
             try {
                 server.buildResponse(state);
                 std::string status
-                    = BehavioralTestHelper::extractStatus(state.responseBuf);
+                    = BehavioralTestHelper::extractStatus(state.dataBuf);
                 if (status.find("200") != std::string::npos) {
                     successCount++;
                 }

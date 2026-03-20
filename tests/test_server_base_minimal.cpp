@@ -127,8 +127,12 @@ int main() {
         });
 
         // Wait for server to be ready AND actually accept a client
-        while (!ready) //-V1044 //-V776
+        const auto readyDeadline
+            = std::chrono::steady_clock::now() + std::chrono::seconds{2};
+        while (
+            !ready.load() && std::chrono::steady_clock::now() < readyDeadline)
             std::this_thread::sleep_for(std::chrono::milliseconds{1});
+        REQUIRE_MSG(ready.load(), "server readiness timed out");
 
         auto result1 = SocketFactory::createTcpClient(AddressFamily::IPv4,
             ConnectArgs{"127.0.0.1", port, Milliseconds{300}});
@@ -140,8 +144,8 @@ int main() {
         REQUIRE(result2.isSuccess());
         auto client2 = std::make_unique<TcpSocket>(std::move(result2.value()));
 
-        const bool acceptedTwo = waitForCondition("server to accept two clients",
-            [&]() {
+        const bool acceptedTwo = waitForCondition(
+            "server to accept two clients", [&]() {
                 return server.atomicClientCount_.load(std::memory_order_relaxed)
                     == 2;
             });

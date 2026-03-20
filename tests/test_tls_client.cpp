@@ -124,7 +124,9 @@ class TestHttpsServer : public HttpPollServer {
 
     void waitReady() {
         std::unique_lock<std::mutex> lk(readyMtx_);
-        readyCv_.wait(lk, [this] { return ready_.load(); });
+        const bool ready = readyCv_.wait_for(
+            lk, std::chrono::seconds{2}, [this] { return ready_.load(); });
+        REQUIRE_MSG(ready, "server readiness timed out");
     }
 
     std::atomic<int> requestsServed{0};
@@ -139,9 +141,9 @@ class TestHttpsServer : public HttpPollServer {
     }
 
     void buildResponse(HttpClientState& s) override {
-        s.responseBuf
+        s.dataBuf
             = makeResponse("HTTP/1.1 200 OK", "text/plain", "Hello, HTTPS!");
-        s.responseView = s.responseBuf;
+        s.dataView = s.dataBuf;
         requestsServed.fetch_add(1, std::memory_order_relaxed);
     }
 
@@ -223,13 +225,13 @@ class RedirectHttpsServer : public TestHttpsServer {
 
     protected:
     void buildResponse(HttpClientState& s) override {
-        s.responseBuf = "HTTP/1.1 302 Found\r\n"
-                        "Location: "
+        s.dataBuf = "HTTP/1.1 302 Found\r\n"
+                    "Location: "
             + location_
             + "\r\n"
               "Content-Length: 0\r\n"
               "Connection: close\r\n\r\n";
-        s.responseView = s.responseBuf;
+        s.dataView = s.dataBuf;
         requestsServed.fetch_add(1, std::memory_order_relaxed);
     }
 
@@ -246,7 +248,9 @@ class TestHttpServer : public HttpPollServer {
 
     void waitReady() {
         std::unique_lock<std::mutex> lk(readyMtx_);
-        readyCv_.wait(lk, [this] { return ready_.load(); });
+        const bool ready = readyCv_.wait_for(
+            lk, std::chrono::seconds{2}, [this] { return ready_.load(); });
+        REQUIRE_MSG(ready, "server readiness timed out");
     }
 
     protected:
@@ -259,8 +263,8 @@ class TestHttpServer : public HttpPollServer {
     }
 
     void buildResponse(HttpClientState& s) override {
-        s.responseBuf = makeResponse("HTTP/1.1 200 OK", "text/plain", body_);
-        s.responseView = s.responseBuf;
+        s.dataBuf = makeResponse("HTTP/1.1 200 OK", "text/plain", body_);
+        s.dataView = s.dataBuf;
     }
 
     private:
@@ -280,7 +284,9 @@ class TestHttpsFileServer : public HttpsFileServer {
 
     void waitReady() {
         std::unique_lock<std::mutex> lk(readyMtx_);
-        readyCv_.wait(lk, [this] { return ready_.load(); });
+        const bool ready = readyCv_.wait_for(
+            lk, std::chrono::seconds{2}, [this] { return ready_.load(); });
+        REQUIRE_MSG(ready, "server readiness timed out");
     }
 
     protected:
@@ -374,7 +380,8 @@ static bool appendHashedCaCert_(const std::string& certPemPath,
     for (int suffix = 0; suffix < 16; ++suffix) {
         char hashFile[32] = {};
         std::snprintf(hashFile, sizeof(hashFile), "%08lx.%d", hash, suffix);
-        const std::string hashedCert = PathHelper::joinPath(capathDir, hashFile);
+        const std::string hashedCert
+            = PathHelper::joinPath(capathDir, hashFile);
         if (PathHelper::exists(hashedCert)) continue;
         if (!copyFile_(certPemPath, hashedCert)) {
             err = "failed to write hashed cert file in capath fixture";
@@ -506,7 +513,7 @@ static void test_https_client_basic_get() {
     REQUIRE(server.tlsReady());
 
     std::thread serverThread(
-        [&] { server.run(ClientLimit::Unlimited, Milliseconds{5}); });
+        [&] { server.run(ClientLimit::Unlimited, Milliseconds{1}); });
     server.waitReady();
 
     HttpClient::Options opts;
@@ -543,12 +550,12 @@ static void test_https_client_multiple_requests_keep_alive() {
     REQUIRE(server.tlsReady());
 
     std::thread serverThread(
-        [&] { server.run(ClientLimit::Unlimited, Milliseconds{5}); });
+        [&] { server.run(ClientLimit::Unlimited, Milliseconds{1}); });
     server.waitReady();
 
     HttpClient::Options opts;
-    opts.connectTimeout = Milliseconds{2000};
-    opts.requestTimeout = Milliseconds{2000};
+    opts.connectTimeout = Milliseconds{1200};
+    opts.requestTimeout = Milliseconds{1200};
     opts.verifyCertificate = false;
     HttpClient client{opts};
 
@@ -580,7 +587,7 @@ static void test_https_cache_is_not_reused_for_http_same_host_port() {
     REQUIRE(server.tlsReady());
 
     std::thread serverThread(
-        [&] { server.run(ClientLimit::Unlimited, Milliseconds{5}); });
+        [&] { server.run(ClientLimit::Unlimited, Milliseconds{1}); });
     server.waitReady();
 
     HttpClient::Options opts;
@@ -623,12 +630,12 @@ static void test_https_verify_enabled_trusted_ca_and_matching_host() {
     REQUIRE(server.tlsReady());
 
     std::thread serverThread(
-        [&] { server.run(ClientLimit::Unlimited, Milliseconds{5}); });
+        [&] { server.run(ClientLimit::Unlimited, Milliseconds{1}); });
     server.waitReady();
 
     HttpClient::Options opts;
-    opts.connectTimeout = Milliseconds{2000};
-    opts.requestTimeout = Milliseconds{2000};
+    opts.connectTimeout = Milliseconds{1200};
+    opts.requestTimeout = Milliseconds{1200};
     opts.verifyCertificate = true;
     opts.caCertFile = cert;
     HttpClient client{opts};
@@ -659,12 +666,12 @@ static void test_https_verify_enabled_fails_on_wrong_hostname() {
     REQUIRE(server.tlsReady());
 
     std::thread serverThread(
-        [&] { server.run(ClientLimit::Unlimited, Milliseconds{5}); });
+        [&] { server.run(ClientLimit::Unlimited, Milliseconds{1}); });
     server.waitReady();
 
     HttpClient::Options opts;
-    opts.connectTimeout = Milliseconds{2000};
-    opts.requestTimeout = Milliseconds{2000};
+    opts.connectTimeout = Milliseconds{1200};
+    opts.requestTimeout = Milliseconds{1200};
     opts.verifyCertificate = true;
     opts.caCertFile = cert;
     HttpClient client{opts};
@@ -692,12 +699,12 @@ static void test_https_verify_enabled_fails_for_untrusted_self_signed() {
     REQUIRE(server.tlsReady());
 
     std::thread serverThread(
-        [&] { server.run(ClientLimit::Unlimited, Milliseconds{5}); });
+        [&] { server.run(ClientLimit::Unlimited, Milliseconds{1}); });
     server.waitReady();
 
     HttpClient::Options opts;
-    opts.connectTimeout = Milliseconds{2000};
-    opts.requestTimeout = Milliseconds{2000};
+    opts.connectTimeout = Milliseconds{1200};
+    opts.requestTimeout = Milliseconds{1200};
     opts.verifyCertificate = true;
     HttpClient client{opts};
 
@@ -724,12 +731,12 @@ static void test_https_verify_enabled_invalid_ca_file_fails_setup() {
     REQUIRE(server.tlsReady());
 
     std::thread serverThread(
-        [&] { server.run(ClientLimit::Unlimited, Milliseconds{5}); });
+        [&] { server.run(ClientLimit::Unlimited, Milliseconds{1}); });
     server.waitReady();
 
     HttpClient::Options opts;
-    opts.connectTimeout = Milliseconds{2000};
-    opts.requestTimeout = Milliseconds{2000};
+    opts.connectTimeout = Milliseconds{1200};
+    opts.requestTimeout = Milliseconds{1200};
     opts.verifyCertificate = true;
     opts.caCertFile = "/nonexistent/ca-bundle.pem";
     HttpClient client{opts};
@@ -757,12 +764,12 @@ static void test_https_verify_enabled_invalid_ca_dir_fails_setup() {
     REQUIRE(server.tlsReady());
 
     std::thread serverThread(
-        [&] { server.run(ClientLimit::Unlimited, Milliseconds{5}); });
+        [&] { server.run(ClientLimit::Unlimited, Milliseconds{1}); });
     server.waitReady();
 
     HttpClient::Options opts;
-    opts.connectTimeout = Milliseconds{2000};
-    opts.requestTimeout = Milliseconds{2000};
+    opts.connectTimeout = Milliseconds{1200};
+    opts.requestTimeout = Milliseconds{1200};
     opts.verifyCertificate = true;
     opts.caCertDir = "/nonexistent/ca-dir";
     HttpClient client{opts};
@@ -790,12 +797,12 @@ static void test_https_verify_enabled_ca_file_plus_invalid_dir_fails_setup() {
     REQUIRE(server.tlsReady());
 
     std::thread serverThread(
-        [&] { server.run(ClientLimit::Unlimited, Milliseconds{5}); });
+        [&] { server.run(ClientLimit::Unlimited, Milliseconds{1}); });
     server.waitReady();
 
     HttpClient::Options opts;
-    opts.connectTimeout = Milliseconds{2000};
-    opts.requestTimeout = Milliseconds{2000};
+    opts.connectTimeout = Milliseconds{1200};
+    opts.requestTimeout = Milliseconds{1200};
     opts.verifyCertificate = true;
     opts.caCertFile = cert;
     opts.caCertDir = "/nonexistent/ca-dir";
@@ -831,12 +838,12 @@ static void test_https_verify_enabled_ca_dir_only_succeeds() {
     REQUIRE(server.tlsReady());
 
     std::thread serverThread(
-        [&] { server.run(ClientLimit::Unlimited, Milliseconds{5}); });
+        [&] { server.run(ClientLimit::Unlimited, Milliseconds{1}); });
     server.waitReady();
 
     HttpClient::Options opts;
-    opts.connectTimeout = Milliseconds{2000};
-    opts.requestTimeout = Milliseconds{2000};
+    opts.connectTimeout = Milliseconds{1200};
+    opts.requestTimeout = Milliseconds{1200};
     opts.verifyCertificate = true;
     opts.caCertDir = capathFixture.path;
     HttpClient client{opts};
@@ -874,12 +881,12 @@ static void test_https_verify_enabled_ca_file_plus_valid_dir_succeeds() {
     REQUIRE(server.tlsReady());
 
     std::thread serverThread(
-        [&] { server.run(ClientLimit::Unlimited, Milliseconds{5}); });
+        [&] { server.run(ClientLimit::Unlimited, Milliseconds{1}); });
     server.waitReady();
 
     HttpClient::Options opts;
-    opts.connectTimeout = Milliseconds{2000};
-    opts.requestTimeout = Milliseconds{2000};
+    opts.connectTimeout = Milliseconds{1200};
+    opts.requestTimeout = Milliseconds{1200};
     opts.verifyCertificate = true;
     opts.caCertFile = cert;
     opts.caCertDir = capathFixture.path;
@@ -925,7 +932,7 @@ static void test_https_redirect_to_different_host_with_verify_enabled() {
     TestHttpsServer target{certV6, keyV6, "::1", AddressFamily::IPv6};
     REQUIRE(target.tlsReady());
     std::thread targetThread(
-        [&] { target.run(ClientLimit::Unlimited, Milliseconds{5}); });
+        [&] { target.run(ClientLimit::Unlimited, Milliseconds{1}); });
     target.waitReady();
 
     const std::string location = "https://[::1]:"
@@ -934,12 +941,12 @@ static void test_https_redirect_to_different_host_with_verify_enabled() {
     RedirectHttpsServer origin{certV4, keyV4, location};
     REQUIRE(origin.tlsReady());
     std::thread originThread(
-        [&] { origin.run(ClientLimit::Unlimited, Milliseconds{5}); });
+        [&] { origin.run(ClientLimit::Unlimited, Milliseconds{1}); });
     origin.waitReady();
 
     HttpClient::Options opts;
-    opts.connectTimeout = Milliseconds{2000};
-    opts.requestTimeout = Milliseconds{2000};
+    opts.connectTimeout = Milliseconds{1200};
+    opts.requestTimeout = Milliseconds{1200};
     opts.verifyCertificate = true;
     opts.caCertDir = capathFixture.path;
     HttpClient client{opts};
@@ -972,7 +979,7 @@ static void test_https_to_http_redirect_behavior() {
 
     TestHttpServer httpTarget{"Hello, downgrade!"};
     std::thread httpThread(
-        [&] { httpTarget.run(ClientLimit::Unlimited, Milliseconds{5}); });
+        [&] { httpTarget.run(ClientLimit::Unlimited, Milliseconds{1}); });
     httpTarget.waitReady();
 
     const std::string location = "http://127.0.0.1:"
@@ -981,12 +988,12 @@ static void test_https_to_http_redirect_behavior() {
     RedirectHttpsServer origin{cert, key, location};
     REQUIRE(origin.tlsReady());
     std::thread originThread(
-        [&] { origin.run(ClientLimit::Unlimited, Milliseconds{5}); });
+        [&] { origin.run(ClientLimit::Unlimited, Milliseconds{1}); });
     origin.waitReady();
 
     HttpClient::Options opts;
-    opts.connectTimeout = Milliseconds{2000};
-    opts.requestTimeout = Milliseconds{2000};
+    opts.connectTimeout = Milliseconds{1200};
+    opts.requestTimeout = Milliseconds{1200};
     opts.verifyCertificate = true;
     opts.caCertFile = cert;
     HttpClient client{opts};
@@ -1022,12 +1029,12 @@ static void test_https_set_options_rebuilds_tls_context() {
     REQUIRE(server.tlsReady());
 
     std::thread serverThread(
-        [&] { server.run(ClientLimit::Unlimited, Milliseconds{5}); });
+        [&] { server.run(ClientLimit::Unlimited, Milliseconds{1}); });
     server.waitReady();
 
     HttpClient::Options opts;
-    opts.connectTimeout = Milliseconds{2000};
-    opts.requestTimeout = Milliseconds{2000};
+    opts.connectTimeout = Milliseconds{1200};
+    opts.requestTimeout = Milliseconds{1200};
     opts.verifyCertificate = true;
     opts.caCertFile = cert;
     HttpClient client{opts};
@@ -1061,12 +1068,12 @@ static void test_https_ip_literal_does_not_send_sni() {
     REQUIRE(server.tlsReady());
 
     std::thread serverThread(
-        [&] { server.run(ClientLimit::Unlimited, Milliseconds{5}); });
+        [&] { server.run(ClientLimit::Unlimited, Milliseconds{1}); });
     server.waitReady();
 
     HttpClient::Options opts;
-    opts.connectTimeout = Milliseconds{2000};
-    opts.requestTimeout = Milliseconds{2000};
+    opts.connectTimeout = Milliseconds{1200};
+    opts.requestTimeout = Milliseconds{1200};
     opts.verifyCertificate = false;
     HttpClient client{opts};
 
@@ -1092,12 +1099,12 @@ static void test_https_dns_host_sends_sni() {
     REQUIRE(server.tlsReady());
 
     std::thread serverThread(
-        [&] { server.run(ClientLimit::Unlimited, Milliseconds{5}); });
+        [&] { server.run(ClientLimit::Unlimited, Milliseconds{1}); });
     server.waitReady();
 
     HttpClient::Options opts;
-    opts.connectTimeout = Milliseconds{2000};
-    opts.requestTimeout = Milliseconds{2000};
+    opts.connectTimeout = Milliseconds{1200};
+    opts.requestTimeout = Milliseconds{1200};
     opts.verifyCertificate = false;
     HttpClient client{opts};
 
@@ -1128,12 +1135,12 @@ static void test_https_verify_enabled_ipv6_san_match_succeeds() {
     REQUIRE(server.tlsReady());
 
     std::thread serverThread(
-        [&] { server.run(ClientLimit::Unlimited, Milliseconds{5}); });
+        [&] { server.run(ClientLimit::Unlimited, Milliseconds{1}); });
     server.waitReady();
 
     HttpClient::Options opts;
-    opts.connectTimeout = Milliseconds{2000};
-    opts.requestTimeout = Milliseconds{2000};
+    opts.connectTimeout = Milliseconds{1200};
+    opts.requestTimeout = Milliseconds{1200};
     opts.verifyCertificate = true;
     opts.caCertFile = cert;
     HttpClient client{opts};
@@ -1169,12 +1176,12 @@ static void test_https_verify_enabled_ipv6_san_mismatch_fails() {
     REQUIRE(server.tlsReady());
 
     std::thread serverThread(
-        [&] { server.run(ClientLimit::Unlimited, Milliseconds{5}); });
+        [&] { server.run(ClientLimit::Unlimited, Milliseconds{1}); });
     server.waitReady();
 
     HttpClient::Options opts;
-    opts.connectTimeout = Milliseconds{2000};
-    opts.requestTimeout = Milliseconds{2000};
+    opts.connectTimeout = Milliseconds{1200};
+    opts.requestTimeout = Milliseconds{1200};
     opts.verifyCertificate = true;
     opts.caCertFile = cert;
     HttpClient client{opts};
@@ -1195,8 +1202,8 @@ static void test_https_verify_enabled_rejects_non_ascii_dns_host() {
                "requires punycode");
 
     HttpClient::Options opts;
-    opts.connectTimeout = Milliseconds{2000};
-    opts.requestTimeout = Milliseconds{2000};
+    opts.connectTimeout = Milliseconds{1200};
+    opts.requestTimeout = Milliseconds{1200};
     opts.verifyCertificate = true;
     HttpClient client{opts};
 
@@ -1213,8 +1220,8 @@ static void test_https_verify_depth_invalid_value_fails_early() {
                "error");
 
     HttpClient::Options opts;
-    opts.connectTimeout = Milliseconds{2000};
-    opts.requestTimeout = Milliseconds{2000};
+    opts.connectTimeout = Milliseconds{1200};
+    opts.requestTimeout = Milliseconds{1200};
     opts.verifyCertificate = true;
     opts.verifyDepth = -2;
     HttpClient client{opts};
@@ -1236,12 +1243,12 @@ static void test_https_verify_depth_zero_still_succeeds_for_self_signed_leaf() {
     REQUIRE(server.tlsReady());
 
     std::thread serverThread(
-        [&] { server.run(ClientLimit::Unlimited, Milliseconds{5}); });
+        [&] { server.run(ClientLimit::Unlimited, Milliseconds{1}); });
     server.waitReady();
 
     HttpClient::Options opts;
-    opts.connectTimeout = Milliseconds{2000};
-    opts.requestTimeout = Milliseconds{2000};
+    opts.connectTimeout = Milliseconds{1200};
+    opts.requestTimeout = Milliseconds{1200};
     opts.verifyCertificate = true;
     opts.caCertFile = cert;
     opts.verifyDepth = 0;
@@ -1325,7 +1332,7 @@ static void test_https_handshake_timeout_respects_request_timeout() {
     std::thread serverThread([&] {
         auto client = listener.accept();
         if (!client) return;
-        std::this_thread::sleep_for(std::chrono::milliseconds{40});
+        std::this_thread::sleep_for(std::chrono::milliseconds{30});
     });
 
     HttpClient::Options opts;
@@ -1363,9 +1370,9 @@ static void test_https_slow_reader_does_not_starve_other_clients() {
 
         protected:
         void buildResponse(HttpClientState& s) override {
-            s.responseBuf
+            s.dataBuf
                 = makeResponse("HTTP/1.1 200 OK", "text/plain", body_, false);
-            s.responseView = s.responseBuf;
+            s.dataView = s.dataBuf;
             requestsServed.fetch_add(1, std::memory_order_relaxed);
         }
 
@@ -1377,7 +1384,7 @@ static void test_https_slow_reader_does_not_starve_other_clients() {
     REQUIRE(server.tlsReady());
 
     std::thread serverThread(
-        [&] { server.run(ClientLimit::Unlimited, Milliseconds{5}); });
+        [&] { server.run(ClientLimit::Unlimited, Milliseconds{1}); });
     server.waitReady();
 
     std::string slowErr;
@@ -1389,8 +1396,8 @@ static void test_https_slow_reader_does_not_starve_other_clients() {
     std::this_thread::sleep_for(std::chrono::milliseconds(1));
 
     HttpClient::Options opts;
-    opts.connectTimeout = Milliseconds{1200};
-    opts.requestTimeout = Milliseconds{1200};
+    opts.connectTimeout = Milliseconds{800};
+    opts.requestTimeout = Milliseconds{800};
     opts.verifyCertificate = false;
     HttpClient client{opts};
 
@@ -1425,8 +1432,10 @@ static void test_https_file_server_slow_reader_does_not_starve_other_clients() {
         = PathHelper::joinPath(PathHelper::tempDirectory(), dirName.str());
     REQUIRE(PathHelper::createDirectories(docRoot.path));
 
-    const std::string largePath = PathHelper::joinPath(docRoot.path, "large.bin");
-    const std::string smallPath = PathHelper::joinPath(docRoot.path, "small.txt");
+    const std::string largePath
+        = PathHelper::joinPath(docRoot.path, "large.bin");
+    const std::string smallPath
+        = PathHelper::joinPath(docRoot.path, "small.txt");
     REQUIRE(writeFileWithByte_(largePath, 128 * 1024, 'z'));
     REQUIRE(writeFileWithByte_(smallPath, 32, 'a'));
 
@@ -1442,7 +1451,7 @@ static void test_https_file_server_slow_reader_does_not_starve_other_clients() {
     REQUIRE(server.tlsReady());
 
     std::thread serverThread(
-        [&] { server.run(ClientLimit::Unlimited, Milliseconds{5}); });
+        [&] { server.run(ClientLimit::Unlimited, Milliseconds{1}); });
     server.waitReady();
 
     std::string slowErr;
@@ -1454,8 +1463,8 @@ static void test_https_file_server_slow_reader_does_not_starve_other_clients() {
     std::this_thread::sleep_for(std::chrono::milliseconds(1));
 
     HttpClient::Options opts;
-    opts.connectTimeout = Milliseconds{1200};
-    opts.requestTimeout = Milliseconds{1200};
+    opts.connectTimeout = Milliseconds{800};
+    opts.requestTimeout = Milliseconds{800};
     opts.verifyCertificate = false;
     HttpClient client{opts};
 
@@ -1484,10 +1493,11 @@ static void test_https_server_handshake_timeout_drops_stalled_clients() {
 
     // Minimal document root for the file server.
     ScopedTempDir docRoot;
-    docRoot.path = PathHelper::joinPath(PathHelper::tempDirectory(),
-        "aisocks-tls-timeout");
+    docRoot.path = PathHelper::joinPath(
+        PathHelper::tempDirectory(), "aisocks-tls-timeout");
     REQUIRE(PathHelper::createDirectories(docRoot.path));
-    const std::string indexPath = PathHelper::joinPath(docRoot.path, "index.html");
+    const std::string indexPath
+        = PathHelper::joinPath(docRoot.path, "index.html");
     {
         std::ofstream out(indexPath);
         out << "hello";
@@ -1521,7 +1531,7 @@ static void test_https_server_handshake_timeout_drops_stalled_clients() {
     client.setReceiveTimeout(Milliseconds{90});
 
     // Wait longer than the server handshake timeout.
-    std::this_thread::sleep_for(std::chrono::milliseconds(25));
+    std::this_thread::sleep_for(std::chrono::milliseconds(22));
 
     char buf[8];
     int n = client.receive(buf, sizeof(buf));

@@ -1,6 +1,8 @@
-// This is an independent project of an individual developer. Dear PVS-Studio, please check it.
+// This is an independent project of an individual developer. Dear PVS-Studio,
+// please check it.
 
-// PVS-Studio Static Code Analyzer for C, C++, C#, and Java: https://pvs-studio.com
+// PVS-Studio Static Code Analyzer for C, C++, C#, and Java:
+// https://pvs-studio.com
 
 #include "HttpsPollServer.h"
 #include "HttpClient.h"
@@ -37,7 +39,9 @@ class TlsHostileLoadServer : public HttpsPollServer {
 
     void waitReady() {
         std::unique_lock<std::mutex> lk(readyMtx_);
-        readyCv_.wait(lk, [this] { return ready_.load(); });
+        const bool ready = readyCv_.wait_for(
+            lk, std::chrono::seconds{2}, [this] { return ready_.load(); });
+        REQUIRE_MSG(ready, "server readiness timed out");
     }
 
     protected:
@@ -50,9 +54,9 @@ class TlsHostileLoadServer : public HttpsPollServer {
     }
 
     void buildResponse(HttpClientState& s) override {
-        s.responseBuf = makeResponse(
+        s.dataBuf = makeResponse(
             "HTTP/1.1 200 OK", "text/plain", "hostile-load-ok\n");
-        s.responseView = s.responseBuf;
+        s.dataView = s.dataBuf;
     }
 
     private:
@@ -109,7 +113,7 @@ void test_tls_hostile_stalled_handshake_load() {
     if (!server.isValid() || !server.tlsReady()) return;
 
     std::thread serverThread(
-        [&] { server.run(ClientLimit::Unlimited, Milliseconds{5}); });
+        [&] { server.run(ClientLimit::Unlimited, Milliseconds{1}); });
     server.waitReady();
 
     const int port = static_cast<int>(server.serverPort().value());

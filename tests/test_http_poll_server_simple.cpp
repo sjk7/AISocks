@@ -27,15 +27,20 @@ class TestHttpServer : public HttpPollServer {
     explicit TestHttpServer(const ServerBind& bind) : HttpPollServer(bind) {}
 
     void waitReady() {
-        while (!ready_.load(std::memory_order_acquire)) {
+        const auto deadline
+            = std::chrono::steady_clock::now() + std::chrono::seconds(2);
+        while (!ready_.load(std::memory_order_acquire)
+            && std::chrono::steady_clock::now() < deadline) {
             std::this_thread::sleep_for(std::chrono::milliseconds{1});
         }
+        REQUIRE_MSG(ready_.load(std::memory_order_acquire),
+            "server readiness timed out");
     }
 
     protected:
     void buildResponse(HttpClientState& state) override {
-        state.responseBuf = "HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nOK";
-        state.responseView = state.responseBuf;
+        state.dataBuf = "HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nOK";
+        state.dataView = state.dataBuf;
     }
 
     void onResponseBegin(HttpClientState& state) override {
@@ -104,10 +109,12 @@ int main() {
         const Port port = server.serverPort();
         REQUIRE(port.value() > 0);
 
-        std::thread serverThread([&server]() { server.run(ClientLimit{4}, Milliseconds{1}); });
+        std::thread serverThread(
+            [&server]() { server.run(ClientLimit{4}, Milliseconds{1}); });
         server.waitReady();
 
-        const std::string request = "GET / HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n";
+        const std::string request
+            = "GET / HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n";
         const std::string response1 = sendSimpleRequest(port, request);
         REQUIRE(!response1.empty());
         REQUIRE(response1.find("HTTP/1.1 200 OK") != std::string::npos);
