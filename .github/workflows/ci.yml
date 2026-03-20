@@ -290,6 +290,15 @@ jobs:
             echo "Invalid matrix.enable_tls='$ENABLE_TLS' (expected ON or OFF)" >&2
             exit 1
           fi
+
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            # Ensure we use MSVC by default on Windows runners.
+            # Some GitHub runners have MinGW in the PATH which can lead to
+            # unintentional GCC-based builds if Ninja picks it up first.
+            export CC=cl.exe
+            export CXX=cl.exe
+          fi
+
           CMAKE_ARGS=(
             -S . -B build
             -G "${{ matrix.cmake_generator }}"
@@ -304,6 +313,8 @@ jobs:
             # 2. Use /DEBUG:FASTLINK to speed up the linking phase.
             # 3. Disable incremental linking (/INCREMENTAL:NO) for cleaner, faster CI builds.
             CMAKE_ARGS+=(
+              "-DCMAKE_C_COMPILER=cl.exe"
+              "-DCMAKE_CXX_COMPILER=cl.exe"
               "-DCMAKE_MSVC_DEBUG_INFORMATION_FORMAT=Embedded"
               "-DCMAKE_EXE_LINKER_FLAGS=/DEBUG:FASTLINK /INCREMENTAL:NO"
               "-DCMAKE_SHARED_LINKER_FLAGS=/DEBUG:FASTLINK /INCREMENTAL:NO"
