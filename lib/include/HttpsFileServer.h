@@ -92,7 +92,8 @@ class HttpsFileServer : public HttpFileServer {
         // Surface OpenSSL error for debugging.
         const std::string opensslErr = TlsOpenSsl::lastErrorString();
         if (e != SSL_ERROR_ZERO_RETURN && e != SSL_ERROR_SYSCALL) {
-            // Check if this is just an unexpected EOF (very common during high load)
+            // Check if this is just an unexpected EOF (very common during high
+            // load)
             if (opensslErr.find("unexpected eof") != std::string::npos) {
                 recordTlsHandshakeSuppressed();
             } else {

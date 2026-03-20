@@ -51,7 +51,7 @@ int main(int argc, char** argv) {
     // HTTP
     HttpFileServer httpServer(ServerBind{"0.0.0.0", Port{httpPort}}, config);
     std::thread httpThread(
-        [&] { httpServer.run(ClientLimit::Unlimited, Milliseconds{5}); });
+        [&] { httpServer.run(ClientLimit::Unlimited, Milliseconds{1}); });
 
 #ifdef AISOCKS_ENABLE_TLS
     // HTTPS
@@ -59,7 +59,7 @@ int main(int argc, char** argv) {
     HttpsFileServer httpsServer(
         ServerBind{"0.0.0.0", Port{httpsPort}}, config, tls);
     std::thread httpsThread(
-        [&] { httpsServer.run(ClientLimit::Unlimited, Milliseconds{5}); });
+        [&] { httpsServer.run(ClientLimit::Unlimited, Milliseconds{1}); });
 #endif
 
     httpThread.join();
