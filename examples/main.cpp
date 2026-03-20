@@ -34,7 +34,11 @@ TransferResult currentResult;
 bool isLikelyLanAddress(const std::string& address) {
     // Parse the address to check if it's in common LAN ranges
     int a, b, c, d;
+#ifdef _WIN32
+    if (sscanf_s(address.c_str(), "%d.%d.%d.%d", &a, &b, &c, &d) != 4) {
+#else
     if (sscanf(address.c_str(), "%d.%d.%d.%d", &a, &b, &c, &d) != 4) {
+#endif
         return false; // Invalid IP format
     }
 
@@ -58,7 +62,11 @@ bool isLikelyLanAddress(const std::string& address) {
 // Helper function to get priority score for address selection (higher = better)
 int getAddressPriority(const std::string& address) {
     int a, b, c, d;
+#ifdef _WIN32
+    if (sscanf_s(address.c_str(), "%d.%d.%d.%d", &a, &b, &c, &d) != 4) {
+#else
     if (sscanf(address.c_str(), "%d.%d.%d.%d", &a, &b, &c, &d) != 4) {
+#endif
         return -1; // Invalid IP
     }
 

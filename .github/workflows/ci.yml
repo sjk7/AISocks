@@ -328,8 +328,8 @@ jobs:
             # these are paths it needs to "fix".
             CMAKE_ARGS+=(
               "-DCMAKE_MSVC_DEBUG_INFORMATION_FORMAT=Embedded"
-              "-DCMAKE_CXX_FLAGS= /MP /EHsc /D_CRT_SECURE_NO_WARNINGS"
-              "-DCMAKE_C_FLAGS= /MP /EHsc /D_CRT_SECURE_NO_WARNINGS"
+              "-DCMAKE_CXX_FLAGS= /MP /EHsc"
+              "-DCMAKE_C_FLAGS= /MP /EHsc"
             )
           fi
           if [[ "$ENABLE_TLS" == "ON" ]]; then
