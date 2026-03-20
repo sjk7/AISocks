@@ -324,6 +324,7 @@ jobs:
           if [[ "$RUNNER_OS" == "Windows" && "$COMPILER" == "msvc" ]]; then
             # Optimize MSVC builds for speed and avoid PDB contention.
             # Use /Z7 (Embedded) and /MP (Multi-processor compilation).
+            # We use CMAKE_CXX_FLAGS to avoid shell globbing/path issues in Bash.
             CMAKE_ARGS+=(
               "-DCMAKE_MSVC_DEBUG_INFORMATION_FORMAT=Embedded"
               "-DCMAKE_CXX_FLAGS=/MP"
