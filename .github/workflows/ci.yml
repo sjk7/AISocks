@@ -219,7 +219,7 @@ jobs:
             sudo apt-get install -y ninja-build
           fi
 
-      - name: Install OpenSSL development package (Linux TLS)
+      - name: Install OpenSSL (Linux)
         if: runner.os == 'Linux' && matrix.enable_tls == 'ON'
         run: sudo apt-get install -y libssl-dev
 
@@ -232,7 +232,7 @@ jobs:
             brew install ninja
           fi
 
-      - name: Install OpenSSL (macOS TLS)
+      - name: Install OpenSSL (macOS)
         if: runner.os == 'macOS' && matrix.enable_tls == 'ON'
         run: brew install openssl@3
 
@@ -261,7 +261,7 @@ jobs:
             Write-Host "ninja already present"
           }
 
-      - name: Cache vcpkg packages (Windows TLS)
+      - name: Cache vcpkg (Windows)
         if: runner.os == 'Windows' && matrix.enable_tls == 'ON'
         uses: actions/cache@v4
         with:
@@ -272,7 +272,7 @@ jobs:
           restore-keys: |
             vcpkg-openssl-${{ runner.os }}-
 
-      - name: Bootstrap vcpkg (Windows TLS)
+      - name: Bootstrap vcpkg (Windows)
         if: runner.os == 'Windows' && matrix.enable_tls == 'ON'
         shell: bash
         run: |
@@ -283,7 +283,7 @@ jobs:
             echo "[ci] vcpkg cache hit; skipping clone"
           fi
 
-      - name: Install OpenSSL via vcpkg (Windows TLS)
+      - name: Install OpenSSL (Windows)
         if: runner.os == 'Windows' && matrix.enable_tls == 'ON'
         shell: bash
         run: |
