@@ -375,14 +375,19 @@ static bool resolveKeepAlive_(const HttpRequest& req) {
     return http10 ? !hasKeepAlive : hasClose;
 }
 
-// Returns true when the slowloris deadline has expired: more than `timeoutMs`
-// milliseconds have elapsed since the first byte arrived but headers are still
-// incomplete. `now` is passed in from the recv loop (already computed once per
-// iteration).
+// Headers are considered incomplete if we have some data but haven't
+// reached a double-CRLF separator, OR if we are waiting for a TLS handshake.
 bool HttpPollServer::slowlorisExpired(const HttpClientState& s,
     std::chrono::steady_clock::time_point now, int timeoutMs) const {
     if (!s.dataView.empty()) return false; // already responding
-    if (s.request.empty() && s.tlsHandshakeDone) return false;
+
+    bool handshakeDone = true;
+#ifdef AISOCKS_ENABLE_TLS
+    handshakeDone = s.tlsHandshakeDone;
+#endif
+
+    if (s.request.empty() && handshakeDone) return false;
+
     const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
         now - s.startTime);
     return elapsed.count() > timeoutMs;
