@@ -268,10 +268,10 @@ macro(add_grouped_tests GROUP_NAME SOURCES)
             target_link_options(${TEST_NAME} PRIVATE
                 /INCREMENTAL:NO
                 $<$<CONFIG:Debug>:/DEBUG>
+                /OPT:REF /OPT:ICF
             )
             set_target_properties(${TEST_NAME} PROPERTIES
                 MSVC_DEBUG_INFORMATION_FORMAT Embedded
-                UNITY_BUILD ON
             )
         endif()
 
