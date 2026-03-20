@@ -725,8 +725,11 @@ ServerResult HttpPollServer::onIdle() {
 
     // Periodically flush TLS errors (e.g., every 10 seconds under load)
     const auto now = std::chrono::steady_clock::now();
-    if (suppressedTlsErrors_ > 0 &&
-        std::chrono::duration_cast<std::chrono::seconds>(now - lastTlsErrorFlush_).count() >= 10) {
+    if (suppressedTlsErrors_ > 0
+        && std::chrono::duration_cast<std::chrono::seconds>(
+               now - lastTlsErrorFlush_)
+                .count()
+            >= 10) {
         flushTlsErrors();
     }
 
