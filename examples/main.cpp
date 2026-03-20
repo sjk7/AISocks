@@ -11,8 +11,6 @@
 #include <string>
 #include <cstring>
 #include <vector>
-#include <cstring>
-#include <sstream>
 
 using namespace aiSocks;
 
@@ -35,10 +33,8 @@ TransferResult currentResult;
 // Helper function to check if an address is in a typical LAN range
 bool isLikelyLanAddress(const std::string& address) {
     // Parse the address to check if it's in common LAN ranges
-    std::istringstream iss(address);
     int a, b, c, d;
-    char dot;
-    if (!(iss >> a >> dot >> b >> dot >> c >> dot >> d)) {
+    if (sscanf(address.c_str(), "%d.%d.%d.%d", &a, &b, &c, &d) != 4) {
         return false; // Invalid IP format
     }
 
@@ -61,10 +57,8 @@ bool isLikelyLanAddress(const std::string& address) {
 
 // Helper function to get priority score for address selection (higher = better)
 int getAddressPriority(const std::string& address) {
-    std::istringstream iss(address);
     int a, b, c, d;
-    char dot;
-    if (!(iss >> a >> dot >> b >> dot >> c >> dot >> d)) {
+    if (sscanf(address.c_str(), "%d.%d.%d.%d", &a, &b, &c, &d) != 4) {
         return -1; // Invalid IP
     }
 
