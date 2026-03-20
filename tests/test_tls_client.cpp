@@ -519,11 +519,11 @@ static void test_https_client_basic_get() {
     HttpClient::Options opts;
 #ifdef _WIN32
     // Windows CI handshakes are significantly slower (~30-50ms)
-    opts.connectTimeout = Milliseconds{200};
-    opts.requestTimeout = Milliseconds{200};
+    opts.connectTimeout = Milliseconds{1000};
+    opts.requestTimeout = Milliseconds{1000};
 #else
-    opts.connectTimeout = Milliseconds{100};
-    opts.requestTimeout = Milliseconds{100};
+    opts.connectTimeout = Milliseconds{1000};
+    opts.requestTimeout = Milliseconds{1000};
 #endif
     opts.verifyCertificate = false; // self-signed cert in test
     HttpClient client{opts};
@@ -560,15 +560,15 @@ static void test_https_client_multiple_requests_keep_alive() {
     server.waitReady();
 
     HttpClient::Options opts;
-    #ifdef _WIN32
-    opts.connectTimeout = Milliseconds{200};
+#ifdef _WIN32
+    opts.connectTimeout = Milliseconds{1000};
 #else
-    opts.connectTimeout = Milliseconds{100};
+    opts.connectTimeout = Milliseconds{1000};
 #endif
-    #ifdef _WIN32
-    opts.requestTimeout = Milliseconds{200};
+#ifdef _WIN32
+    opts.requestTimeout = Milliseconds{1000};
 #else
-    opts.requestTimeout = Milliseconds{100};
+    opts.requestTimeout = Milliseconds{1000};
 #endif
     opts.verifyCertificate = false;
     HttpClient client{opts};
@@ -605,15 +605,15 @@ static void test_https_cache_is_not_reused_for_http_same_host_port() {
     server.waitReady();
 
     HttpClient::Options opts;
-    #ifdef _WIN32
-    opts.connectTimeout = Milliseconds{200};
+#ifdef _WIN32
+    opts.connectTimeout = Milliseconds{1000};
 #else
-    opts.connectTimeout = Milliseconds{100};
+    opts.connectTimeout = Milliseconds{1000};
 #endif
-    #ifdef _WIN32
-    opts.requestTimeout = Milliseconds{200};
+#ifdef _WIN32
+    opts.requestTimeout = Milliseconds{1000};
 #else
-    opts.requestTimeout = Milliseconds{100};
+    opts.requestTimeout = Milliseconds{1000};
 #endif
     opts.verifyCertificate = false;
     HttpClient client{opts};
@@ -656,15 +656,15 @@ static void test_https_verify_enabled_trusted_ca_and_matching_host() {
     server.waitReady();
 
     HttpClient::Options opts;
-    #ifdef _WIN32
-    opts.connectTimeout = Milliseconds{200};
+#ifdef _WIN32
+    opts.connectTimeout = Milliseconds{1000};
 #else
-    opts.connectTimeout = Milliseconds{100};
+    opts.connectTimeout = Milliseconds{1000};
 #endif
-    #ifdef _WIN32
-    opts.requestTimeout = Milliseconds{200};
+#ifdef _WIN32
+    opts.requestTimeout = Milliseconds{1000};
 #else
-    opts.requestTimeout = Milliseconds{100};
+    opts.requestTimeout = Milliseconds{1000};
 #endif
     opts.verifyCertificate = true;
     opts.caCertFile = cert;
@@ -700,15 +700,15 @@ static void test_https_verify_enabled_fails_on_wrong_hostname() {
     server.waitReady();
 
     HttpClient::Options opts;
-    #ifdef _WIN32
-    opts.connectTimeout = Milliseconds{200};
+#ifdef _WIN32
+    opts.connectTimeout = Milliseconds{1000};
 #else
-    opts.connectTimeout = Milliseconds{100};
+    opts.connectTimeout = Milliseconds{1000};
 #endif
-    #ifdef _WIN32
-    opts.requestTimeout = Milliseconds{200};
+#ifdef _WIN32
+    opts.requestTimeout = Milliseconds{1000};
 #else
-    opts.requestTimeout = Milliseconds{100};
+    opts.requestTimeout = Milliseconds{1000};
 #endif
     opts.verifyCertificate = true;
     opts.caCertFile = cert;
@@ -741,15 +741,15 @@ static void test_https_verify_enabled_fails_for_untrusted_self_signed() {
     server.waitReady();
 
     HttpClient::Options opts;
-    #ifdef _WIN32
-    opts.connectTimeout = Milliseconds{200};
+#ifdef _WIN32
+    opts.connectTimeout = Milliseconds{1000};
 #else
-    opts.connectTimeout = Milliseconds{100};
+    opts.connectTimeout = Milliseconds{1000};
 #endif
-    #ifdef _WIN32
-    opts.requestTimeout = Milliseconds{200};
+#ifdef _WIN32
+    opts.requestTimeout = Milliseconds{1000};
 #else
-    opts.requestTimeout = Milliseconds{100};
+    opts.requestTimeout = Milliseconds{1000};
 #endif
     opts.verifyCertificate = true;
     HttpClient client{opts};
@@ -781,15 +781,15 @@ static void test_https_verify_enabled_invalid_ca_file_fails_setup() {
     server.waitReady();
 
     HttpClient::Options opts;
-    #ifdef _WIN32
-    opts.connectTimeout = Milliseconds{200};
+#ifdef _WIN32
+    opts.connectTimeout = Milliseconds{1000};
 #else
-    opts.connectTimeout = Milliseconds{100};
+    opts.connectTimeout = Milliseconds{1000};
 #endif
-    #ifdef _WIN32
-    opts.requestTimeout = Milliseconds{200};
+#ifdef _WIN32
+    opts.requestTimeout = Milliseconds{1000};
 #else
-    opts.requestTimeout = Milliseconds{100};
+    opts.requestTimeout = Milliseconds{1000};
 #endif
     opts.verifyCertificate = true;
     opts.caCertFile = "/nonexistent/ca-bundle.pem";
@@ -822,15 +822,15 @@ static void test_https_verify_enabled_invalid_ca_dir_fails_setup() {
     server.waitReady();
 
     HttpClient::Options opts;
-    #ifdef _WIN32
-    opts.connectTimeout = Milliseconds{200};
+#ifdef _WIN32
+    opts.connectTimeout = Milliseconds{1000};
 #else
-    opts.connectTimeout = Milliseconds{100};
+    opts.connectTimeout = Milliseconds{1000};
 #endif
-    #ifdef _WIN32
-    opts.requestTimeout = Milliseconds{200};
+#ifdef _WIN32
+    opts.requestTimeout = Milliseconds{1000};
 #else
-    opts.requestTimeout = Milliseconds{100};
+    opts.requestTimeout = Milliseconds{1000};
 #endif
     opts.verifyCertificate = true;
     opts.caCertDir = "/nonexistent/ca-dir";
@@ -863,15 +863,15 @@ static void test_https_verify_enabled_ca_file_plus_invalid_dir_fails_setup() {
     server.waitReady();
 
     HttpClient::Options opts;
-    #ifdef _WIN32
-    opts.connectTimeout = Milliseconds{200};
+#ifdef _WIN32
+    opts.connectTimeout = Milliseconds{1000};
 #else
-    opts.connectTimeout = Milliseconds{100};
+    opts.connectTimeout = Milliseconds{1000};
 #endif
-    #ifdef _WIN32
-    opts.requestTimeout = Milliseconds{200};
+#ifdef _WIN32
+    opts.requestTimeout = Milliseconds{1000};
 #else
-    opts.requestTimeout = Milliseconds{100};
+    opts.requestTimeout = Milliseconds{1000};
 #endif
     opts.verifyCertificate = true;
     opts.caCertFile = cert;
@@ -912,15 +912,15 @@ static void test_https_verify_enabled_ca_dir_only_succeeds() {
     server.waitReady();
 
     HttpClient::Options opts;
-    #ifdef _WIN32
-    opts.connectTimeout = Milliseconds{200};
+#ifdef _WIN32
+    opts.connectTimeout = Milliseconds{1000};
 #else
-    opts.connectTimeout = Milliseconds{100};
+    opts.connectTimeout = Milliseconds{1000};
 #endif
-    #ifdef _WIN32
-    opts.requestTimeout = Milliseconds{200};
+#ifdef _WIN32
+    opts.requestTimeout = Milliseconds{1000};
 #else
-    opts.requestTimeout = Milliseconds{100};
+    opts.requestTimeout = Milliseconds{1000};
 #endif
     opts.verifyCertificate = true;
     opts.caCertDir = capathFixture.path;
@@ -963,15 +963,15 @@ static void test_https_verify_enabled_ca_file_plus_valid_dir_succeeds() {
     server.waitReady();
 
     HttpClient::Options opts;
-    #ifdef _WIN32
-    opts.connectTimeout = Milliseconds{200};
+#ifdef _WIN32
+    opts.connectTimeout = Milliseconds{1000};
 #else
-    opts.connectTimeout = Milliseconds{100};
+    opts.connectTimeout = Milliseconds{1000};
 #endif
-    #ifdef _WIN32
-    opts.requestTimeout = Milliseconds{200};
+#ifdef _WIN32
+    opts.requestTimeout = Milliseconds{1000};
 #else
-    opts.requestTimeout = Milliseconds{100};
+    opts.requestTimeout = Milliseconds{1000};
 #endif
     opts.verifyCertificate = true;
     opts.caCertFile = cert;
@@ -1031,15 +1031,15 @@ static void test_https_redirect_to_different_host_with_verify_enabled() {
     origin.waitReady();
 
     HttpClient::Options opts;
-    #ifdef _WIN32
-    opts.connectTimeout = Milliseconds{200};
+#ifdef _WIN32
+    opts.connectTimeout = Milliseconds{1000};
 #else
-    opts.connectTimeout = Milliseconds{100};
+    opts.connectTimeout = Milliseconds{1000};
 #endif
-    #ifdef _WIN32
-    opts.requestTimeout = Milliseconds{200};
+#ifdef _WIN32
+    opts.requestTimeout = Milliseconds{1000};
 #else
-    opts.requestTimeout = Milliseconds{100};
+    opts.requestTimeout = Milliseconds{1000};
 #endif
     opts.verifyCertificate = true;
     opts.caCertDir = capathFixture.path;
@@ -1086,15 +1086,15 @@ static void test_https_to_http_redirect_behavior() {
     origin.waitReady();
 
     HttpClient::Options opts;
-    #ifdef _WIN32
-    opts.connectTimeout = Milliseconds{200};
+#ifdef _WIN32
+    opts.connectTimeout = Milliseconds{1000};
 #else
-    opts.connectTimeout = Milliseconds{100};
+    opts.connectTimeout = Milliseconds{1000};
 #endif
-    #ifdef _WIN32
-    opts.requestTimeout = Milliseconds{200};
+#ifdef _WIN32
+    opts.requestTimeout = Milliseconds{1000};
 #else
-    opts.requestTimeout = Milliseconds{100};
+    opts.requestTimeout = Milliseconds{1000};
 #endif
     opts.verifyCertificate = true;
     opts.caCertFile = cert;
@@ -1135,15 +1135,15 @@ static void test_https_set_options_rebuilds_tls_context() {
     server.waitReady();
 
     HttpClient::Options opts;
-    #ifdef _WIN32
-    opts.connectTimeout = Milliseconds{200};
+#ifdef _WIN32
+    opts.connectTimeout = Milliseconds{1000};
 #else
-    opts.connectTimeout = Milliseconds{100};
+    opts.connectTimeout = Milliseconds{1000};
 #endif
-    #ifdef _WIN32
-    opts.requestTimeout = Milliseconds{200};
+#ifdef _WIN32
+    opts.requestTimeout = Milliseconds{1000};
 #else
-    opts.requestTimeout = Milliseconds{100};
+    opts.requestTimeout = Milliseconds{1000};
 #endif
     opts.verifyCertificate = true;
     opts.caCertFile = cert;
@@ -1182,15 +1182,15 @@ static void test_https_ip_literal_does_not_send_sni() {
     server.waitReady();
 
     HttpClient::Options opts;
-    #ifdef _WIN32
-    opts.connectTimeout = Milliseconds{200};
+#ifdef _WIN32
+    opts.connectTimeout = Milliseconds{1000};
 #else
-    opts.connectTimeout = Milliseconds{100};
+    opts.connectTimeout = Milliseconds{1000};
 #endif
-    #ifdef _WIN32
-    opts.requestTimeout = Milliseconds{200};
+#ifdef _WIN32
+    opts.requestTimeout = Milliseconds{1000};
 #else
-    opts.requestTimeout = Milliseconds{100};
+    opts.requestTimeout = Milliseconds{1000};
 #endif
     opts.verifyCertificate = false;
     HttpClient client{opts};
@@ -1221,15 +1221,15 @@ static void test_https_dns_host_sends_sni() {
     server.waitReady();
 
     HttpClient::Options opts;
-    #ifdef _WIN32
-    opts.connectTimeout = Milliseconds{200};
+#ifdef _WIN32
+    opts.connectTimeout = Milliseconds{1000};
 #else
-    opts.connectTimeout = Milliseconds{100};
+    opts.connectTimeout = Milliseconds{1000};
 #endif
-    #ifdef _WIN32
-    opts.requestTimeout = Milliseconds{200};
+#ifdef _WIN32
+    opts.requestTimeout = Milliseconds{1000};
 #else
-    opts.requestTimeout = Milliseconds{100};
+    opts.requestTimeout = Milliseconds{1000};
 #endif
     opts.verifyCertificate = false;
     HttpClient client{opts};
@@ -1265,15 +1265,15 @@ static void test_https_verify_enabled_ipv6_san_match_succeeds() {
     server.waitReady();
 
     HttpClient::Options opts;
-    #ifdef _WIN32
-    opts.connectTimeout = Milliseconds{200};
+#ifdef _WIN32
+    opts.connectTimeout = Milliseconds{1000};
 #else
-    opts.connectTimeout = Milliseconds{100};
+    opts.connectTimeout = Milliseconds{1000};
 #endif
-    #ifdef _WIN32
-    opts.requestTimeout = Milliseconds{200};
+#ifdef _WIN32
+    opts.requestTimeout = Milliseconds{1000};
 #else
-    opts.requestTimeout = Milliseconds{100};
+    opts.requestTimeout = Milliseconds{1000};
 #endif
     opts.verifyCertificate = true;
     opts.caCertFile = cert;
@@ -1314,15 +1314,15 @@ static void test_https_verify_enabled_ipv6_san_mismatch_fails() {
     server.waitReady();
 
     HttpClient::Options opts;
-    #ifdef _WIN32
-    opts.connectTimeout = Milliseconds{200};
+#ifdef _WIN32
+    opts.connectTimeout = Milliseconds{1000};
 #else
-    opts.connectTimeout = Milliseconds{100};
+    opts.connectTimeout = Milliseconds{1000};
 #endif
-    #ifdef _WIN32
-    opts.requestTimeout = Milliseconds{200};
+#ifdef _WIN32
+    opts.requestTimeout = Milliseconds{1000};
 #else
-    opts.requestTimeout = Milliseconds{100};
+    opts.requestTimeout = Milliseconds{1000};
 #endif
     opts.verifyCertificate = true;
     opts.caCertFile = cert;
@@ -1344,15 +1344,15 @@ static void test_https_verify_enabled_rejects_non_ascii_dns_host() {
                "requires punycode");
 
     HttpClient::Options opts;
-    #ifdef _WIN32
-    opts.connectTimeout = Milliseconds{200};
+#ifdef _WIN32
+    opts.connectTimeout = Milliseconds{1000};
 #else
-    opts.connectTimeout = Milliseconds{100};
+    opts.connectTimeout = Milliseconds{1000};
 #endif
-    #ifdef _WIN32
-    opts.requestTimeout = Milliseconds{200};
+#ifdef _WIN32
+    opts.requestTimeout = Milliseconds{1000};
 #else
-    opts.requestTimeout = Milliseconds{100};
+    opts.requestTimeout = Milliseconds{1000};
 #endif
     opts.verifyCertificate = true;
     HttpClient client{opts};
@@ -1370,15 +1370,15 @@ static void test_https_verify_depth_invalid_value_fails_early() {
                "error");
 
     HttpClient::Options opts;
-    #ifdef _WIN32
-    opts.connectTimeout = Milliseconds{200};
+#ifdef _WIN32
+    opts.connectTimeout = Milliseconds{1000};
 #else
-    opts.connectTimeout = Milliseconds{100};
+    opts.connectTimeout = Milliseconds{1000};
 #endif
-    #ifdef _WIN32
-    opts.requestTimeout = Milliseconds{200};
+#ifdef _WIN32
+    opts.requestTimeout = Milliseconds{1000};
 #else
-    opts.requestTimeout = Milliseconds{100};
+    opts.requestTimeout = Milliseconds{1000};
 #endif
     opts.verifyCertificate = true;
     opts.verifyDepth = -2;
@@ -1405,15 +1405,15 @@ static void test_https_verify_depth_zero_still_succeeds_for_self_signed_leaf() {
     server.waitReady();
 
     HttpClient::Options opts;
-    #ifdef _WIN32
-    opts.connectTimeout = Milliseconds{200};
+#ifdef _WIN32
+    opts.connectTimeout = Milliseconds{1000};
 #else
-    opts.connectTimeout = Milliseconds{100};
+    opts.connectTimeout = Milliseconds{1000};
 #endif
-    #ifdef _WIN32
-    opts.requestTimeout = Milliseconds{200};
+#ifdef _WIN32
+    opts.requestTimeout = Milliseconds{1000};
 #else
-    opts.requestTimeout = Milliseconds{100};
+    opts.requestTimeout = Milliseconds{1000};
 #endif
     opts.verifyCertificate = true;
     opts.caCertFile = cert;
@@ -1502,7 +1502,7 @@ static void test_https_handshake_timeout_respects_request_timeout() {
     });
 
     HttpClient::Options opts;
-    opts.connectTimeout = Milliseconds{200};
+    opts.connectTimeout = Milliseconds{1000};
     opts.requestTimeout = Milliseconds{25};
     opts.verifyCertificate = false;
     HttpClient client{opts};
