@@ -305,6 +305,7 @@ jobs:
         env:
           CC: ${{ matrix.cc }}
           CXX: ${{ matrix.cxx }}
+          COMPILER: ${{ matrix.compiler }}
           SANITIZER_FLAGS: ${{ matrix.sanitizer_flags }}
           ENABLE_TLS: ${{ matrix.enable_tls || 'OFF' }}
         run: |
@@ -320,11 +321,13 @@ jobs:
             -DBUILD_EXAMPLES=OFF
             -DAISOCKS_ENABLE_TLS=${ENABLE_TLS}
           )
-          if [[ "$RUNNER_OS" == "Windows" && "${{ matrix.build_type }}" == "RelWithDebInfo" ]]; then
-            # Use CMake's MSVC debug-info knob to request /Z7 without passing
-            # raw /-style flags through Git Bash argument conversion.
+          if [[ "$RUNNER_OS" == "Windows" && "$COMPILER" == "msvc" ]]; then
+            # Optimize MSVC builds for speed and avoid PDB contention.
+            # Use /Z7 (Embedded) and /MP (Multi-processor compilation).
             CMAKE_ARGS+=(
               "-DCMAKE_MSVC_DEBUG_INFORMATION_FORMAT=Embedded"
+              "-DCMAKE_CXX_FLAGS=/MP"
+              "-DCMAKE_C_FLAGS=/MP"
             )
           fi
           if [[ "$ENABLE_TLS" == "ON" ]]; then
