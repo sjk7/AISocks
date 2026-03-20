@@ -125,14 +125,7 @@ add_subdirectory(lib)
 add_executable(aiSocksExample examples/main.cpp)
 target_link_libraries(aiSocksExample PRIVATE aiSocksLib)
 if(MSVC)
-    target_compile_options(aiSocksExample PRIVATE 
-        /utf-8 /MP
-        $<$<OR:$<CONFIG:Debug>,$<CONFIG:RelWithDebInfo>>:/Z7>
-    )
-    target_link_options(aiSocksExample PRIVATE
-        $<$<OR:$<CONFIG:Debug>,$<CONFIG:RelWithDebInfo>>:/DEBUG:FASTLINK>
-        $<$<OR:$<CONFIG:Debug>,$<CONFIG:RelWithDebInfo>>:/INCREMENTAL:NO>
-    )
+    target_compile_options(aiSocksExample PRIVATE /utf-8 /MP)
 else()
     # Ensure debug symbols in Debug builds for Clang
     if(CMAKE_BUILD_TYPE STREQUAL "Debug")
@@ -218,7 +211,6 @@ message(STATUS "aiSocks Configuration:")
 message(STATUS "  Version: ${PROJECT_VERSION}")
 message(STATUS "  C++ Standard: ${CMAKE_CXX_STANDARD}")
 message(STATUS "  Build Examples: ${BUILD_EXAMPLES}")
-message(STATUS "  Build Tests: ${BUILD_TESTS}")
 message(STATUS "  TLS Enabled: ${AISOCKS_ENABLE_TLS}")
 if(AISOCKS_ENABLE_TLS)
     message(STATUS "  OpenSSL Version: ${OPENSSL_VERSION}")

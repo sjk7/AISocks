@@ -261,11 +261,34 @@ jobs:
             Write-Host "ninja already present"
           }
 
-      - name: Install OpenSSL (Windows / vcpkg)
+      - name: Cache vcpkg packages (Windows TLS)
         if: runner.os == 'Windows' && matrix.enable_tls == 'ON'
-        shell: pwsh
+        uses: actions/cache@v4
+        with:
+          path: |
+            vcpkg
+            ~/.cache/vcpkg
+          key: vcpkg-openssl-${{ runner.os }}-${{ hashFiles('.github/workflows/ci.yml') }}
+          restore-keys: |
+            vcpkg-openssl-${{ runner.os }}-
+
+      - name: Bootstrap vcpkg (Windows TLS)
+        if: runner.os == 'Windows' && matrix.enable_tls == 'ON'
+        shell: bash
         run: |
-          vcpkg install openssl:x64-windows
+          if [[ ! -d vcpkg ]]; then
+            git clone --depth=1 https://github.com/microsoft/vcpkg.git vcpkg
+            ./vcpkg/bootstrap-vcpkg.sh -disableMetrics
+          else
+            echo "[ci] vcpkg cache hit; skipping clone"
+          fi
+
+      - name: Install OpenSSL via vcpkg (Windows TLS)
+        if: runner.os == 'Windows' && matrix.enable_tls == 'ON'
+        shell: bash
+        run: |
+          ./vcpkg/vcpkg install openssl:x64-windows
+          ./vcpkg/vcpkg integrate remove || true
 
       # Set up MSVC compiler environment (cl.exe, link.exe in PATH)
       - name: Set up MSVC environment
@@ -282,7 +305,6 @@ jobs:
         env:
           CC: ${{ matrix.cc }}
           CXX: ${{ matrix.cxx }}
-          COMPILER: ${{ matrix.compiler }}
           SANITIZER_FLAGS: ${{ matrix.sanitizer_flags }}
           ENABLE_TLS: ${{ matrix.enable_tls || 'OFF' }}
         run: |
@@ -290,15 +312,6 @@ jobs:
             echo "Invalid matrix.enable_tls='$ENABLE_TLS' (expected ON or OFF)" >&2
             exit 1
           fi
-
-          if [[ "$RUNNER_OS" == "Windows" ]]; then
-            # Ensure we use MSVC by default on Windows runners.
-            # Some GitHub runners have MinGW in the PATH which can lead to
-            # unintentional GCC-based builds if Ninja picks it up first.
-            export CC=cl.exe
-            export CXX=cl.exe
-          fi
-
           CMAKE_ARGS=(
             -S . -B build
             -G "${{ matrix.cmake_generator }}"
@@ -307,18 +320,11 @@ jobs:
             -DBUILD_EXAMPLES=OFF
             -DAISOCKS_ENABLE_TLS=${ENABLE_TLS}
           )
-          if [[ "$RUNNER_OS" == "Windows" && "$COMPILER" == "msvc" ]]; then
-            # Optimize Windows builds for speed and avoid PDB locking issues.
-            # 1. Use /Z7 (Embedded) for debug info to avoid central .pdb contention.
-            # 2. Use /DEBUG:FASTLINK to speed up the linking phase.
-            # 3. Disable incremental linking (/INCREMENTAL:NO) for cleaner, faster CI builds.
+          if [[ "$RUNNER_OS" == "Windows" && "${{ matrix.build_type }}" == "RelWithDebInfo" ]]; then
+            # Use CMake's MSVC debug-info knob to request /Z7 without passing
+            # raw /-style flags through Git Bash argument conversion.
             CMAKE_ARGS+=(
-              "-DCMAKE_C_COMPILER=cl.exe"
-              "-DCMAKE_CXX_COMPILER=cl.exe"
               "-DCMAKE_MSVC_DEBUG_INFORMATION_FORMAT=Embedded"
-              "-DCMAKE_EXE_LINKER_FLAGS=/DEBUG:FASTLINK /INCREMENTAL:NO"
-              "-DCMAKE_SHARED_LINKER_FLAGS=/DEBUG:FASTLINK /INCREMENTAL:NO"
-              "-DCMAKE_MODULE_LINKER_FLAGS=/DEBUG:FASTLINK /INCREMENTAL:NO"
             )
           fi
           if [[ "$ENABLE_TLS" == "ON" ]]; then
@@ -328,9 +334,66 @@ jobs:
                 "-DOPENSSL_ROOT_DIR=$OPENSSL_PREFIX"
               )
             elif [[ "$RUNNER_OS" == "Windows" ]]; then
+              OPENSSL_ROOT_DIR_WIN="/c/Program Files/OpenSSL-Win64"
+              if [[ ! -d "$OPENSSL_ROOT_DIR_WIN" ]]; then
+                OPENSSL_ROOT_DIR_WIN="/c/Program Files/OpenSSL"
+              fi
+
+              # Chocolatey OpenSSL layouts vary across versions; pass explicit
+              # import library paths so FindOpenSSL can always resolve Crypto.
+              OPENSSL_SSL_LIBRARY_WIN=""
+              OPENSSL_CRYPTO_LIBRARY_WIN=""
+
+              for _cand in \
+                "$OPENSSL_ROOT_DIR_WIN/lib/libssl.lib" \
+                "$OPENSSL_ROOT_DIR_WIN/lib/VC/x64/MD/libssl.lib" \
+                "$OPENSSL_ROOT_DIR_WIN/lib/VC/static/libssl.lib" \
+                "$OPENSSL_ROOT_DIR_WIN/lib/ssl.lib" \
+                "$OPENSSL_ROOT_DIR_WIN/lib/VC/x64/MD/ssl.lib" \
+                "$OPENSSL_ROOT_DIR_WIN/lib/VC/static/ssl.lib"; do
+                if [[ -f "$_cand" ]]; then
+                  OPENSSL_SSL_LIBRARY_WIN="$_cand"
+                  break
+                fi
+              done
+
+              for _cand in \
+                "$OPENSSL_ROOT_DIR_WIN/lib/libcrypto.lib" \
+                "$OPENSSL_ROOT_DIR_WIN/lib/VC/x64/MD/libcrypto.lib" \
+                "$OPENSSL_ROOT_DIR_WIN/lib/VC/static/libcrypto.lib" \
+                "$OPENSSL_ROOT_DIR_WIN/lib/crypto.lib" \
+                "$OPENSSL_ROOT_DIR_WIN/lib/VC/x64/MD/crypto.lib" \
+                "$OPENSSL_ROOT_DIR_WIN/lib/VC/static/crypto.lib"; do
+                if [[ -f "$_cand" ]]; then
+                  OPENSSL_CRYPTO_LIBRARY_WIN="$_cand"
+                  break
+                fi
+              done
+
+              if [[ -z "$OPENSSL_SSL_LIBRARY_WIN" || -z "$OPENSSL_CRYPTO_LIBRARY_WIN" ]]; then
+                echo "Failed to resolve OpenSSL libraries under: $OPENSSL_ROOT_DIR_WIN" >&2
+                find "$OPENSSL_ROOT_DIR_WIN" -maxdepth 5 -type f \( -iname "*ssl*.lib" -o -iname "*crypto*.lib" \) -print || true
+                exit 1
+              fi
+
               CMAKE_ARGS+=(
-                "-DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake"
+                "-DOPENSSL_ROOT_DIR=$OPENSSL_ROOT_DIR_WIN"
+                "-DOPENSSL_SSL_LIBRARY=$OPENSSL_SSL_LIBRARY_WIN"
+                "-DOPENSSL_CRYPTO_LIBRARY=$OPENSSL_CRYPTO_LIBRARY_WIN"
               )
+
+              # Prefer vcpkg-provided OpenSSL when bootstrapped earlier in the
+              # workflow. This makes the Windows TLS leg reproducible and
+              # provides a CMake-friendly OpenSSL layout.
+              VCPKG_TOOLCHAIN="${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake"
+              if [[ -f "$VCPKG_TOOLCHAIN" ]]; then
+                CMAKE_ARGS+=(
+                  "-DCMAKE_TOOLCHAIN_FILE=$VCPKG_TOOLCHAIN"
+                  "-DOPENSSL_ROOT_DIR=${{ github.workspace }}/vcpkg/installed/x64-windows"
+                )
+              else
+                echo "[ci] vcpkg toolchain not present; falling back to Program Files OpenSSL discovery"
+              fi
             fi
           fi
           if [[ -n "$SANITIZER_FLAGS" ]]; then
@@ -376,8 +439,16 @@ jobs:
         run: |
           if [[ "$RUNNER_OS" == "Windows" && "$ENABLE_TLS" == "ON" ]]; then
             export AISOCKS_TLS_DEBUG=1
-            # Add vcpkg DLLs to path
-            export PATH="C:/vcpkg/installed/x64-windows/bin:$PATH"
+            OPENSSL_BIN="/c/Program Files/OpenSSL-Win64/bin"
+            if [[ ! -d "$OPENSSL_BIN" ]]; then
+              OPENSSL_BIN="/c/Program Files/OpenSSL/bin"
+            fi
+            echo "[ci-debug] OPENSSL_BIN=$OPENSSL_BIN"
+            if [[ -d "$OPENSSL_BIN" ]]; then
+              echo "[ci-debug] OpenSSL bin contents:"
+              ls -la "$OPENSSL_BIN" || true
+            fi
+            export PATH="$OPENSSL_BIN:$PATH"
 
             echo "[ci-debug] Running focused verbose TLS test"
             ctest -V -R test_tls_client --output-on-failure --timeout ${{ matrix.ctest_timeout || 60 }}

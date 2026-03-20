@@ -18,6 +18,7 @@
 #include <cassert>
 #include <chrono>
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <vector>
 #ifndef _WIN32
