@@ -83,7 +83,7 @@ namespace {
     static constexpr int64_t kDnsGateSleepMs = 5;
     std::atomic<size_t> g_activeDnsWorkers{0};
 #ifdef AISOCKS_TESTING
-    std::atomic<int64_t> g_dnsTestDelayMs{0};
+    [[maybe_unused]] std::atomic<int64_t> g_dnsTestDelayMs{0};
 #endif
 
     [[maybe_unused]] static bool acquireDnsWorkerSlot_(
