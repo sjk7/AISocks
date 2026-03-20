@@ -262,6 +262,7 @@ jobs:
           }
 
       - name: Cache vcpkg packages (Windows TLS)
+        id: vcpkg_cache
         if: runner.os == 'Windows' && matrix.enable_tls == 'ON'
         uses: actions/cache@v4
         with:
@@ -271,6 +272,20 @@ jobs:
           key: vcpkg-openssl-${{ runner.os }}-${{ hashFiles('.github/workflows/ci.yml') }}
           restore-keys: |
             vcpkg-openssl-${{ runner.os }}-
+
+      - name: OpenSSL (Windows / Chocolatey fallback)
+        if: runner.os == 'Windows' && matrix.enable_tls == 'ON'
+        shell: bash
+        run: |
+          # Use the pre-installed OpenSSL on the runner if available
+          if [[ -d "/c/Program Files/OpenSSL-Win64" ]]; then
+             echo "Using pre-installed OpenSSL-Win64"
+          elif [[ -d "/c/Program Files/OpenSSL" ]]; then
+             echo "Using pre-installed OpenSSL"
+          else
+             echo "Installing OpenSSL via Chocolatey..."
+             choco install openssl -y --no-progress
+          fi
 
       - name: Bootstrap vcpkg (Windows TLS)
         if: runner.os == 'Windows' && matrix.enable_tls == 'ON'
@@ -284,7 +299,7 @@ jobs:
           fi
 
       - name: Install OpenSSL via vcpkg (Windows TLS)
-        if: runner.os == 'Windows' && matrix.enable_tls == 'ON'
+        if: runner.os == 'Windows' && matrix.enable_tls == 'ON' && steps.vcpkg_cache.outputs.cache-hit != 'true'
         shell: bash
         run: |
           ./vcpkg/vcpkg install openssl:x64-windows --x-install-root=vcpkg_installed
