@@ -159,8 +159,45 @@ std::unique_ptr<TlsContext> TlsContext::create(Mode mode, std::string* error) {
 #ifdef SSL_OP_NO_TLSv1_1
     opts |= SSL_OP_NO_TLSv1_1;
 #endif
+
+    // Performance optimizations:
+    // 1. Prioritize server cipher preference to ensure fast AEAD ciphers are
+    // selected.
+    opts |= SSL_OP_CIPHER_SERVER_PREFERENCE;
+
+    // 2. Enable session tickets for stateless session resumption if possible.
+    // (Note: default is enabled, but we ensure it's not disabled).
+    opts &= ~SSL_OP_NO_TICKET;
+
     SSL_CTX_set_options(ctx, opts);
     SSL_CTX_set_min_proto_version(ctx, TLS1_2_VERSION);
+
+    // TLS Session Caching:
+    // Enable internal session cache for stateful resumption.
+    if (mode == Mode::Server) {
+        SSL_CTX_set_session_cache_mode(ctx, SSL_SESS_CACHE_SERVER);
+        // Set a unique session ID context for this application to prevent
+        // session reuse issues across different applications.
+        const unsigned char sid_ctx[] = "aisocks_server";
+        SSL_CTX_set_session_id_context(ctx, sid_ctx, sizeof(sid_ctx));
+    }
+
+    // Modern High-Performance Ciphers:
+    // Prefer AES-GCM and ChaCha20-Poly1305 which have hardware acceleration on
+    // most modern CPUs (including Apple Silicon).
+#if OPENSSL_VERSION_NUMBER >= 0x10101000L
+    // TLS 1.3 ciphersuites (ordered by preference)
+    SSL_CTX_set_ciphersuites(ctx,
+        "TLS_AES_256_GCM_SHA384:TLS_CHACHA20_POLY1305_SHA256:TLS_AES_128_GCM_"
+        "SHA256");
+#endif
+
+    // TLS 1.2 cipher list (ordered by preference, focusing on ECDHE-ECDSA/RSA
+    // with GCM/ChaCha)
+    SSL_CTX_set_cipher_list(ctx,
+        "ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:"
+        "ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:"
+        "ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256");
 
 #if OPENSSL_VERSION_NUMBER >= 0x10100000L
     // Prefer a conservative security level (2) where OpenSSL supports it.
