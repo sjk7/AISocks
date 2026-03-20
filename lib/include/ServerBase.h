@@ -166,6 +166,30 @@ enum class ServerResult {
 // accepting has stopped.
 // ---------------------------------------------------------------------------
 
+// A lightweight policy to filter incoming connections.
+// Allows for run-time rule injection without complex inheritance.
+struct AcceptPolicy {
+    using FilterFunc = std::function<bool(const std::string& peerAddress)>;
+
+    // Default: allow everyone
+    FilterFunc filter = [](const std::string&) { return true; };
+
+    // Common configurations:
+    static AcceptPolicy allowAll() {
+        return { [](const std::string&) { return true; } };
+    }
+
+    static AcceptPolicy denyAll() {
+        return { [](const std::string&) { return false; } };
+    }
+
+    static AcceptPolicy blacklist(const std::vector<std::string>& denied) {
+        return { [denied](const std::string& addr) {
+            return std::find(denied.begin(), denied.end(), addr) == denied.end();
+        } };
+    }
+};
+
 // Strategy policy for coordinating server-wide orchestration.
 struct ServerOrchestrator {
     // Keepalive log throttle state — initialised to epoch so the first
@@ -173,6 +197,7 @@ struct ServerOrchestrator {
     std::chrono::steady_clock::time_point lastLogTime{};
     size_t pendingLogCount{0};
     size_t peakClients{0};
+    AcceptPolicy policy{};
 
     // Logging behavior for timeout events.
     void onClientsTimedOut(size_t count) {
@@ -376,14 +401,12 @@ template <typename ClientData> class ServerBase {
         return ep.isSuccess() ? ep.value().port : Port::any;
     }
 
-    // Current number of connected clients.
-    size_t clientCount() const { return clientFds_.size(); }
+    // Access the coordination logic and policies.
+    ServerOrchestrator& getOrchestrator() { return orchestrator_; }
+    const ServerOrchestrator& getOrchestrator() const { return orchestrator_; }
 
-    // Peak concurrent client count since server started.
-    size_t peakClientCount() const { return orchestrator_.peakClients; }
-
-    // Mark a client socket as active (resets the keep-alive idle timer).
-    // Call this after a successful read or write.
+    // Access the underlying listening socket (e.g. to set socket options).
+    TcpSocket& getSocket() {
     //
     // How this interacts with the timeout heap:
     //   We update lastActivity in the ClientEntry, then push a *new*
@@ -489,9 +512,12 @@ template <typename ClientData> class ServerBase {
     // Called immediately after a new connection is accepted from the OS but
     // BEFORE it is registered with the poller.  Return true to accept the
     // connection; return false to silently drop it (the socket is closed).
-    // Override in derived classes to implement IP-level access control.
-    virtual bool onAcceptFilter(const std::string& /*peerAddress*/) {
-        return true;
+    //
+    // The filter checks the orchestrator's AcceptPolicy first. If allowed,
+    // this virtual method is called to allow legacy inheritance-based
+    // filtering.
+    virtual bool onAcceptFilter(const std::string& peerAddress) {
+        return orchestrator_.policy.filter(peerAddress);
     }
     // Called when a poll error event fires on a client socket.
     // sock is still valid at this point.

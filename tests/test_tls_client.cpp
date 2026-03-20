@@ -124,8 +124,8 @@ class TestHttpsServer : public HttpPollServer {
 
     void waitReady() {
         std::unique_lock<std::mutex> lk(readyMtx_);
-        const bool ready = readyCv_.wait_for(
-            lk, std::chrono::milliseconds{10}, [this] { return ready_.load(); });
+        const bool ready = readyCv_.wait_for(lk, std::chrono::milliseconds{10},
+            [this] { return ready_.load(); });
         REQUIRE_MSG(ready, "server readiness timed out");
     }
 
@@ -248,8 +248,8 @@ class TestHttpServer : public HttpPollServer {
 
     void waitReady() {
         std::unique_lock<std::mutex> lk(readyMtx_);
-        const bool ready = readyCv_.wait_for(
-            lk, std::chrono::milliseconds{10}, [this] { return ready_.load(); });
+        const bool ready = readyCv_.wait_for(lk, std::chrono::milliseconds{10},
+            [this] { return ready_.load(); });
         REQUIRE_MSG(ready, "server readiness timed out");
     }
 
@@ -284,8 +284,8 @@ class TestHttpsFileServer : public HttpsFileServer {
 
     void waitReady() {
         std::unique_lock<std::mutex> lk(readyMtx_);
-        const bool ready = readyCv_.wait_for(
-            lk, std::chrono::milliseconds{10}, [this] { return ready_.load(); });
+        const bool ready = readyCv_.wait_for(lk, std::chrono::milliseconds{10},
+            [this] { return ready_.load(); });
         REQUIRE_MSG(ready, "server readiness timed out");
     }
 
