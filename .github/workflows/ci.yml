@@ -261,49 +261,11 @@ jobs:
             Write-Host "ninja already present"
           }
 
-      - name: Cache vcpkg packages (Windows TLS)
-        id: vcpkg_cache
+      - name: Install OpenSSL (Windows / vcpkg)
         if: runner.os == 'Windows' && matrix.enable_tls == 'ON'
-        uses: actions/cache@v4
-        with:
-          path: |
-            vcpkg
-            ~/.cache/vcpkg
-          key: vcpkg-openssl-${{ runner.os }}-${{ hashFiles('.github/workflows/ci.yml') }}
-          restore-keys: |
-            vcpkg-openssl-${{ runner.os }}-
-
-      - name: OpenSSL (Windows / Chocolatey fallback)
-        if: runner.os == 'Windows' && matrix.enable_tls == 'ON'
-        shell: bash
+        shell: pwsh
         run: |
-          # Use the pre-installed OpenSSL on the runner if available
-          if [[ -d "/c/Program Files/OpenSSL-Win64" ]]; then
-             echo "Using pre-installed OpenSSL-Win64"
-          elif [[ -d "/c/Program Files/OpenSSL" ]]; then
-             echo "Using pre-installed OpenSSL"
-          else
-             echo "Installing OpenSSL via Chocolatey..."
-             choco install openssl -y --no-progress
-          fi
-
-      - name: Bootstrap vcpkg (Windows TLS)
-        if: runner.os == 'Windows' && matrix.enable_tls == 'ON'
-        shell: bash
-        run: |
-          if [[ ! -d vcpkg ]]; then
-            git clone --depth=1 https://github.com/microsoft/vcpkg.git vcpkg
-            ./vcpkg/bootstrap-vcpkg.sh -disableMetrics
-          else
-            echo "[ci] vcpkg cache hit; skipping clone"
-          fi
-
-      - name: Install OpenSSL via vcpkg (Windows TLS)
-        if: runner.os == 'Windows' && matrix.enable_tls == 'ON' && steps.vcpkg_cache.outputs.cache-hit != 'true'
-        shell: bash
-        run: |
-          ./vcpkg/vcpkg install openssl:x64-windows --x-install-root=vcpkg_installed
-          ./vcpkg/vcpkg integrate remove || true
+          vcpkg install openssl:x64-windows
 
       # Set up MSVC compiler environment (cl.exe, link.exe in PATH)
       - name: Set up MSVC environment
@@ -354,66 +316,9 @@ jobs:
                 "-DOPENSSL_ROOT_DIR=$OPENSSL_PREFIX"
               )
             elif [[ "$RUNNER_OS" == "Windows" ]]; then
-              OPENSSL_ROOT_DIR_WIN="/c/Program Files/OpenSSL-Win64"
-              if [[ ! -d "$OPENSSL_ROOT_DIR_WIN" ]]; then
-                OPENSSL_ROOT_DIR_WIN="/c/Program Files/OpenSSL"
-              fi
-
-              # Chocolatey OpenSSL layouts vary across versions; pass explicit
-              # import library paths so FindOpenSSL can always resolve Crypto.
-              OPENSSL_SSL_LIBRARY_WIN=""
-              OPENSSL_CRYPTO_LIBRARY_WIN=""
-
-              for _cand in \
-                "$OPENSSL_ROOT_DIR_WIN/lib/libssl.lib" \
-                "$OPENSSL_ROOT_DIR_WIN/lib/VC/x64/MD/libssl.lib" \
-                "$OPENSSL_ROOT_DIR_WIN/lib/VC/static/libssl.lib" \
-                "$OPENSSL_ROOT_DIR_WIN/lib/ssl.lib" \
-                "$OPENSSL_ROOT_DIR_WIN/lib/VC/x64/MD/ssl.lib" \
-                "$OPENSSL_ROOT_DIR_WIN/lib/VC/static/ssl.lib"; do
-                if [[ -f "$_cand" ]]; then
-                  OPENSSL_SSL_LIBRARY_WIN="$_cand"
-                  break
-                fi
-              done
-
-              for _cand in \
-                "$OPENSSL_ROOT_DIR_WIN/lib/libcrypto.lib" \
-                "$OPENSSL_ROOT_DIR_WIN/lib/VC/x64/MD/libcrypto.lib" \
-                "$OPENSSL_ROOT_DIR_WIN/lib/VC/static/libcrypto.lib" \
-                "$OPENSSL_ROOT_DIR_WIN/lib/crypto.lib" \
-                "$OPENSSL_ROOT_DIR_WIN/lib/VC/x64/MD/crypto.lib" \
-                "$OPENSSL_ROOT_DIR_WIN/lib/VC/static/crypto.lib"; do
-                if [[ -f "$_cand" ]]; then
-                  OPENSSL_CRYPTO_LIBRARY_WIN="$_cand"
-                  break
-                fi
-              done
-
-              if [[ -z "$OPENSSL_SSL_LIBRARY_WIN" || -z "$OPENSSL_CRYPTO_LIBRARY_WIN" ]]; then
-                echo "Failed to resolve OpenSSL libraries under: $OPENSSL_ROOT_DIR_WIN" >&2
-                find "$OPENSSL_ROOT_DIR_WIN" -maxdepth 5 -type f \( -iname "*ssl*.lib" -o -iname "*crypto*.lib" \) -print || true
-                exit 1
-              fi
-
               CMAKE_ARGS+=(
-                "-DOPENSSL_ROOT_DIR=$OPENSSL_ROOT_DIR_WIN"
-                "-DOPENSSL_SSL_LIBRARY=$OPENSSL_SSL_LIBRARY_WIN"
-                "-DOPENSSL_CRYPTO_LIBRARY=$OPENSSL_CRYPTO_LIBRARY_WIN"
+                "-DCMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake"
               )
-
-              # Prefer vcpkg-provided OpenSSL when bootstrapped earlier in the
-              # workflow. This makes the Windows TLS leg reproducible and
-              # provides a CMake-friendly OpenSSL layout.
-              VCPKG_TOOLCHAIN="${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake"
-              if [[ -f "$VCPKG_TOOLCHAIN" ]]; then
-                CMAKE_ARGS+=(
-                  "-DCMAKE_TOOLCHAIN_FILE=$VCPKG_TOOLCHAIN"
-                  "-DOPENSSL_ROOT_DIR=${{ github.workspace }}/vcpkg/installed/x64-windows"
-                )
-              else
-                echo "[ci] vcpkg toolchain not present; falling back to Program Files OpenSSL discovery"
-              fi
             fi
           fi
           if [[ -n "$SANITIZER_FLAGS" ]]; then
@@ -459,16 +364,8 @@ jobs:
         run: |
           if [[ "$RUNNER_OS" == "Windows" && "$ENABLE_TLS" == "ON" ]]; then
             export AISOCKS_TLS_DEBUG=1
-            OPENSSL_BIN="/c/Program Files/OpenSSL-Win64/bin"
-            if [[ ! -d "$OPENSSL_BIN" ]]; then
-              OPENSSL_BIN="/c/Program Files/OpenSSL/bin"
-            fi
-            echo "[ci-debug] OPENSSL_BIN=$OPENSSL_BIN"
-            if [[ -d "$OPENSSL_BIN" ]]; then
-              echo "[ci-debug] OpenSSL bin contents:"
-              ls -la "$OPENSSL_BIN" || true
-            fi
-            export PATH="$OPENSSL_BIN:$PATH"
+            # Add vcpkg DLLs to path
+            export PATH="C:/vcpkg/installed/x64-windows/bin:$PATH"
 
             echo "[ci-debug] Running focused verbose TLS test"
             ctest -V -R test_tls_client --output-on-failure --timeout ${{ matrix.ctest_timeout || 60 }}
