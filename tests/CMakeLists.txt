@@ -115,7 +115,7 @@ if(NOT APPLE)
         target_compile_options(test_pch_host PRIVATE
             /utf-8
             $<$<CONFIG:Release>:/O1>
-            $<$<CONFIG:Debug>:/Z7>
+            $<$<OR:$<CONFIG:Debug>,$<CONFIG:RelWithDebInfo>>:/Z7>
             $<$<CONFIG:Debug>:/Od>
         )
     endif()
@@ -179,12 +179,12 @@ foreach(TEST_NAME ${TEST_SOURCES})
         target_compile_options(${TEST_NAME} PRIVATE
             /utf-8          # treat source as UTF-8 (handles em dashes in comments)
             $<$<CONFIG:Release>:/O1>
-            $<$<CONFIG:Debug>:/Z7>
+            $<$<OR:$<CONFIG:Debug>,$<CONFIG:RelWithDebInfo>>:/Z7>
             $<$<CONFIG:Debug>:/Od>
         )
         target_link_options(${TEST_NAME} PRIVATE
-            $<$<CONFIG:Debug>:/DEBUG:FASTLINK>
-            $<$<CONFIG:Debug>:/INCREMENTAL:NO>
+            $<$<OR:$<CONFIG:Debug>,$<CONFIG:RelWithDebInfo>>:/DEBUG:FASTLINK>
+            $<$<OR:$<CONFIG:Debug>,$<CONFIG:RelWithDebInfo>>:/INCREMENTAL:NO>
         )
     endif()
 
@@ -224,7 +224,7 @@ if(APPLE)
         target_compile_options(test_http_poll_server_mac_pch_host PRIVATE
             /utf-8
             $<$<CONFIG:Release>:/O1>
-            $<$<CONFIG:Debug>:/Z7>
+            $<$<OR:$<CONFIG:Debug>,$<CONFIG:RelWithDebInfo>>:/Z7>
             $<$<CONFIG:Debug>:/Od>
         )
     endif()
@@ -258,12 +258,12 @@ if(APPLE)
         target_compile_options(test_http_poll_server_mac_pch PRIVATE
             /utf-8
             $<$<CONFIG:Release>:/O1>
-            $<$<CONFIG:Debug>:/Z7>
+            $<$<OR:$<CONFIG:Debug>,$<CONFIG:RelWithDebInfo>>:/Z7>
             $<$<CONFIG:Debug>:/Od>
         )
         target_link_options(test_http_poll_server_mac_pch PRIVATE
-            $<$<CONFIG:Debug>:/DEBUG:FASTLINK>
-            $<$<CONFIG:Debug>:/INCREMENTAL:NO>
+            $<$<OR:$<CONFIG:Debug>,$<CONFIG:RelWithDebInfo>>:/DEBUG:FASTLINK>
+            $<$<OR:$<CONFIG:Debug>,$<CONFIG:RelWithDebInfo>>:/INCREMENTAL:NO>
         )
     endif()
 
