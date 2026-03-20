@@ -491,7 +491,7 @@ ServerResult HttpPollServer::onReadable(TcpSocket& sock, HttpClientState& s) {
             }
             s.request.append(buf, static_cast<size_t>(n));
 
-            if (s.responseView.empty()) {
+            if (s.responseView.empty()) { //-V547
                 if (runRequestFrameInspectionStage_(sock, s, stageOut))
                     return stageOut;
             }
@@ -608,10 +608,13 @@ bool HttpPollServer::runRequestFrameInspectionStage_(
         || frame == RequestFrameStatus::Complete) {
         // Consume exactly one request so any pipelined tail remains queued
         // for the next response cycle.
-        if (frame == RequestFrameStatus::BadRequest)
+        if (frame == RequestFrameStatus::BadRequest) {
             consumed = s.request.size();
-        if (consumeRequestMessage_(s.request, consumed)
-            && consumed < s.request.size()) {
+        } else {
+            consumeRequestMessage_(s.request, consumed);
+        }
+
+        if (consumed < s.request.size()) {
             s.queuedRequest.append(
                 s.request.data() + consumed, s.request.size() - consumed);
             s.request.resize(consumed);

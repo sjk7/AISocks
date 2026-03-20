@@ -56,7 +56,9 @@ int main() {
         REQUIRE(srv.setReuseAddress(true));
         REQUIRE(srv.bind("127.0.0.1", Port{0}));
         REQUIRE(srv.listen(1));
-        auto port = srv.getLocalEndpoint().value().port;
+        auto srvEndpoint = srv.getLocalEndpoint();
+        const auto& endpoint = srvEndpoint.value();
+        auto port = endpoint.port;
 
         std::thread t([&]() {
             std::this_thread::sleep_for(std::chrono::milliseconds(10));

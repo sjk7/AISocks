@@ -126,7 +126,7 @@ bool PathHelper::hasSymlinkComponentWithin(
     std::string current = root;
     // NOTE: !current.empty() is always true here (root was validated above),
     // but kept for defensive programming clarity.
-    if (!current.empty() && current.back() == '/')
+    if (!current.empty() && current.back() == '/') //-V560
         current.pop_back(); //-V560 //-V560
 
     const std::string rel = path.substr(root.size());
@@ -190,7 +190,7 @@ static std::vector<PathHelper::DirEntry> listDirectoryWindows_(
         std::string name = findData.cFileName;
         if (name != "." && name != "..") {
             PathHelper::DirEntry entry;
-            entry.name = name;
+            entry.name = std::move(name);
             entry.isDirectory
                 = (findData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0;
             entries.push_back(entry);

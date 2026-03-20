@@ -1,3 +1,7 @@
+// This is an independent project of an individual developer. Dear PVS-Studio, please check it.
+
+// PVS-Studio Static Code Analyzer for C, C++, C#, and Java: https://pvs-studio.com
+
 #include "HttpsFileServer.h"
 #include "PathHelper.h"
 #include "TlsOpenSsl.h"
@@ -99,8 +103,9 @@ void test_tls_mtls_accept_reject() {
             [&] { server.run(ClientLimit::Unlimited, Milliseconds{5}); });
         std::this_thread::sleep_for(std::chrono::milliseconds(50));
 
+        const auto& port = server.serverPort();
         bool ok = do_client_handshake(
-            server.serverPort().value(), true, clientCert, clientKey);
+            port.value(), true, clientCert, clientKey);
         REQUIRE(ok);
 
         server.requestStop();

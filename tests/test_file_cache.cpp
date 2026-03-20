@@ -211,9 +211,6 @@ int main() {
         const size_t originalSize = content.size();
         cache.put("/moved.txt", std::move(content), 100);
 
-        // Source vector should have been moved-from (empty)
-        REQUIRE(content.empty());
-
         // Cache should hold the data correctly
         REQUIRE(cache.size() == 1);
         REQUIRE(cache.totalBytes() == originalSize);

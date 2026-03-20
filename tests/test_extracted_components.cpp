@@ -26,7 +26,7 @@ using namespace aiSocks;
 static void test_buildinfo_os() {
     BEGIN_TEST("BuildInfo::os() returns a known, non-empty string");
     const char* o = BuildInfo::os();
-    REQUIRE(o != nullptr);
+    REQUIRE(o != nullptr); //-V547
     REQUIRE(o[0] != '\0');
     // Must be one of the four known values.
     const bool known = (strcmp(o, "macOS") == 0 || strcmp(o, "Linux") == 0
@@ -45,7 +45,7 @@ static void test_buildinfo_os() {
 static void test_buildinfo_kind() {
     BEGIN_TEST("BuildInfo::kind() matches NDEBUG state");
     const char* k = BuildInfo::kind();
-    REQUIRE(k != nullptr);
+    REQUIRE(k != nullptr); //-V547
     REQUIRE(k[0] != '\0');
 #if defined(NDEBUG)
     REQUIRE(strcmp(k, "Release") == 0);

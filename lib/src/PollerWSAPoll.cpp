@@ -72,8 +72,9 @@ bool Poller::remove(const Socket& s) {
     if (handle == static_cast<uintptr_t>(-1)) return false;
     auto sock = static_cast<SOCKET>(handle);
 
-    auto it = pImpl_->index.find(sock);
-    if (it == pImpl_->index.end()) return true; // not found — benign
+    auto& index = pImpl_->index;
+    auto it = index.find(sock);
+    if (it == index.end()) return true; // not found — benign
 
     const size_t i = it->second;
     const size_t last = pImpl_->fds.size() - 1;
@@ -83,12 +84,12 @@ bool Poller::remove(const Socket& s) {
         pImpl_->fds[i] = pImpl_->fds[last];
         pImpl_->sockets[i] = pImpl_->sockets[last];
         // Update the index for the element that was moved.
-        pImpl_->index[pImpl_->fds[i].fd] = i;
+        index[pImpl_->fds[i].fd] = i;
     }
 
     pImpl_->fds.pop_back();
     pImpl_->sockets.pop_back();
-    pImpl_->index.erase(it);
+    index.erase(it);
     return true;
 }
 
@@ -129,12 +130,13 @@ static uint8_t translateWSAPollBits_(SHORT rev) {
 
 const std::vector<PollResult>& Poller::wait(Milliseconds timeout) {
     pImpl_->resultBuffer.clear();
-    if (pImpl_->fds.empty()) return pImpl_->resultBuffer;
+    auto& fds = pImpl_->fds;
+    if (fds.empty()) return pImpl_->resultBuffer;
 
     const int timeoutMs = toWSAPollTimeout_(timeout);
 
     // WSAPoll modifies revents in-place; clear them first.
-    for (auto& pfd : pImpl_->fds) {
+    for (auto& pfd : fds) {
         pfd.revents = 0;
     }
 

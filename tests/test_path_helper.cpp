@@ -335,7 +335,7 @@ int main() {
         // Should handle gracefully (either stop at null or reject)
         bool within = PathHelper::isPathWithin(pathWithNull, "test_path_root");
         // Should not allow escape
-        REQUIRE(within == false || within == true); // No crash required
+        REQUIRE(within == false || within == true); // No crash required //-V560
     }
 
     // Test 34: Security - extremely long path

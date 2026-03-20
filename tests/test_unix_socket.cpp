@@ -187,9 +187,10 @@ int main() {
 
         auto ep = srvResult.value().getLocalEndpoint();
         REQUIRE(ep.isSuccess());
-        REQUIRE(ep.value().address == kSockPath);
-        REQUIRE(ep.value().port == Port{0});
-        REQUIRE(ep.value().family == AddressFamily::Unix);
+        const auto& epValue = ep.value();
+        REQUIRE(epValue.address == kSockPath);
+        REQUIRE(epValue.port == Port{0});
+        REQUIRE(epValue.family == AddressFamily::Unix);
     }
 
     BEGIN_TEST(
@@ -364,9 +365,10 @@ int main() {
             auto cliResult
                 = SocketFactory::createUnixClient(UnixPath{kSockPath});
             REQUIRE(cliResult.isSuccess());
-            cliResult.value().sendAll("ok!", 3);
+            auto& client = cliResult.value();
+            client.sendAll("ok!", 3);
             // Close before next iteration so accept() unblocks for this client
-            cliResult.value().close();
+            client.close();
         }
         serverThread.join();
 
@@ -485,14 +487,15 @@ int main() {
         waitReady(ready);
         auto cliResult = SocketFactory::createUnixClient(UnixPath{kSockPath});
         REQUIRE(cliResult.isSuccess());
-        REQUIRE(cliResult.value().setReceiveTimeout(Milliseconds{1000}));
+        auto& cliValue = cliResult.value();
+        REQUIRE(cliValue.setReceiveTimeout(Milliseconds{1000}));
 
         std::vector<char> buf(kWant, 0);
-        bool ok = cliResult.value().receiveAll(buf.data(), kWant);
+        bool ok = cliValue.receiveAll(buf.data(), kWant);
         serverThread.join();
 
         REQUIRE(!ok); // must fail — EOF before all bytes arrived
-        auto err = cliResult.value().getLastError();
+        auto err = cliValue.getLastError();
         REQUIRE(err == SocketError::ConnectionReset
             || err == SocketError::Timeout
             || err == SocketError::ReceiveFailed);

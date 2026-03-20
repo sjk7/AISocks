@@ -159,7 +159,7 @@ static void test_security_headers_disabled() {
     // When enabled is false the caller does not append; verify the block itself
     // is non-null and non-empty so the contract is clear.
     const char* block = FileServerUtils::securityHeadersBlock();
-    REQUIRE(block != nullptr);
+    REQUIRE(block != nullptr); //-V547
     REQUIRE(block[0] != '\0');
     // Simulate the disabled path: nothing appended -> empty string
     std::string result;

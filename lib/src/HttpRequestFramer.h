@@ -91,7 +91,7 @@ inline bool parseContentLengthWithLimit(std::string_view value, size_t& out,
     if (ec != std::errc{} || ptr != value.data() + value.size()) return false;
 
     if (parsed > static_cast<unsigned long long>(maxAllowedBytes)
-        || parsed > static_cast<unsigned long long>(SIZE_MAX)) {
+        || parsed > static_cast<unsigned long long>(SIZE_MAX)) { //-V560
         overflow = true;
         return false;
     }

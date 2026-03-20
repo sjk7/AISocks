@@ -15,19 +15,21 @@ const FileCache::CachedFile* FileCache::get(
         return nullptr;
     }
 
-    if (it->second.lastModified != currentModTime) {
-        totalBytes_ -= it->second.size;
-        lruList_.erase(it->second.lruIt);
+    auto& entry = it->second;
+
+    if (entry.lastModified != currentModTime) {
+        totalBytes_ -= entry.size;
+        lruList_.erase(entry.lruIt);
         cache_.erase(it);
         return nullptr;
     }
 
     // Promote to MRU only when not already at the front.
-    if (it->second.lruIt != lruList_.begin()) {
+    if (entry.lruIt != lruList_.begin()) {
         updateLRU(it);
     }
     ++cacheHits_;
-    return &it->second;
+    return &entry;
 }
 
 void FileCache::put(const std::string& filePath,

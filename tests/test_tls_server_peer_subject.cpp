@@ -1,3 +1,7 @@
+// This is an independent project of an individual developer. Dear PVS-Studio, please check it.
+
+// PVS-Studio Static Code Analyzer for C, C++, C#, and Java: https://pvs-studio.com
+
 #include "HttpsFileServer.h"
 #include "PathHelper.h"
 #include "TlsOpenSsl.h"
@@ -112,10 +116,13 @@ void test_tls_server_peer_subject() {
             &] { server.run(ClientLimit::Unlimited, Milliseconds{5}); });
         std::this_thread::sleep_for(std::chrono::milliseconds(50));
 
-        auto resp = do_client_request(server.serverPort().value(), true,
+        const auto& port = server.serverPort();
+        auto resp = do_client_request(port.value(), true,
             clientCert, clientKey);
         REQUIRE(resp.has_value());
-        REQUIRE(!resp->empty());
+        if (resp.has_value()) {
+            REQUIRE(!resp->empty());
+        }
 
         server.requestStop();
         serverThread.join();
@@ -169,12 +176,14 @@ void test_tls_server_peer_subject() {
 
         auto resp = do_client_request(server.serverPort().value(), false);
         REQUIRE(resp.has_value());
-        // Body may include headers; ensure subject portion is empty by
-        // checking the response contains an HTTP status and an empty body
-        REQUIRE(resp->find("\r\n\r\n") != std::string::npos);
-        const auto pos = resp->find("\r\n\r\n");
-        const std::string body = resp->substr(pos + 4);
-        REQUIRE(body.empty());
+        if (resp.has_value()) {
+            // Body may include headers; ensure subject portion is empty by
+            // checking the response contains an HTTP status and an empty body
+            REQUIRE(resp->find("\r\n\r\n") != std::string::npos);
+            const auto pos = resp->find("\r\n\r\n");
+            const std::string body = resp->substr(pos + 4);
+            REQUIRE(body.empty());
+        }
 
         server.requestStop();
         serverThread.join();

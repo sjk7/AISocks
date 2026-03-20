@@ -230,10 +230,8 @@ class HttpsPollServer : public HttpPollServer {
                 "[tls][init] loadCertificateChain failed reason=%s cert=%s "
                 "key=%s\n",
                 tlsInitError_.empty() ? "<empty>" : tlsInitError_.c_str(),
-                tls.certChainFile.empty() ? "<empty>"
-                                          : tls.certChainFile.c_str(),
-                tls.privateKeyFile.empty() ? "<empty>"
-                                           : tls.privateKeyFile.c_str());
+                tls.certChainFile.c_str(),
+                tls.privateKeyFile.c_str());
             return;
         }
 
@@ -318,8 +316,7 @@ class HttpsPollServer : public HttpPollServer {
 
         // Configure client certificate verification if requested.
         if (tls.clientAuth != TlsServerConfig::ClientAuthMode::None) {
-            bool verifyPeer
-                = tls.clientAuth != TlsServerConfig::ClientAuthMode::None;
+            bool verifyPeer = true;
             bool loadDefaults = tls.caFile.empty() && tls.caDir.empty();
             std::string verErr;
             if (!ctx->configureVerifyPeer(verifyPeer, loadDefaults, tls.caFile,

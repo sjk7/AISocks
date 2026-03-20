@@ -150,7 +150,28 @@ class SocketImpl {
     SocketImpl(SocketHandle handle, SocketType type, AddressFamily family);
 
     private:
-    friend struct BlockingGuard; // internal RAII helper in SocketImpl.cpp
+    struct BlockingGuard {
+        SocketImpl& impl_;
+#ifdef _WIN32
+        bool wasBlocking_;
+        BlockingGuard(SocketImpl& impl);
+        ~BlockingGuard();
+#else
+        int savedFlags_;
+        BlockingGuard(SocketImpl& impl);
+        ~BlockingGuard();
+#endif
+    };
+
+    struct EvFdGuard {
+        int& fd_;
+        explicit EvFdGuard(int& fd) : fd_(fd) {}
+        ~EvFdGuard();
+    };
+
+    friend struct BlockingGuard;
+    friend struct EvFdGuard;
+
     SocketHandle socketHandle;
     SocketType socketType;
     AddressFamily addressFamily;

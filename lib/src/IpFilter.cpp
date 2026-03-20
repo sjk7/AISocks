@@ -68,7 +68,7 @@ bool IpFilter::parseCidr(const std::string& rule, CidrRule& out) {
 
         addr <<= static_cast<unsigned>(8 * (4 - octets));
         const unsigned prefixLen = static_cast<unsigned>(octets * 8);
-        out.mask = (prefixLen == 0u) ? 0u : (0xFFFFFFFFu << (32u - prefixLen));
+        out.mask = (prefixLen == 0u) ? 0u : (0xFFFFFFFFu << (32u - prefixLen)); //-V547
         out.network = addr & out.mask;
         return true;
     }

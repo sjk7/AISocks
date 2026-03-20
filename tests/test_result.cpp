@@ -1,8 +1,6 @@
-// This is an independent project of an individual developer. Dear PVS-Studio,
-// //-V002 please check it.
+// This is an independent project of an individual developer. Dear PVS-Studio, please check it.
 
-// PVS-Studio Static Code Analyzer for C, C++, C#, and Java:
-// https://pvs-studio.com
+// PVS-Studio Static Code Analyzer for C, C++, C#, and Java: https://pvs-studio.com
 
 // Comprehensive tests for Result<T> - exception-free error handling
 // Tests success/error state, copy/move semantics, lazy message construction
@@ -175,7 +173,7 @@ int main() {
         Result<int> result1(SocketError::ListenFailed, "Listen failed");
         Result<int> result2(42);
 
-        result2 = result1;
+        result2 = std::move(result1);
         REQUIRE(result2.isError());
         REQUIRE(result2.error() == SocketError::ListenFailed);
     }
@@ -302,9 +300,10 @@ int main() {
         Result<std::vector<int>> result(std::move(vec));
 
         REQUIRE(result.isSuccess());
-        REQUIRE(result.value().size() == 5);
-        REQUIRE(result.value()[0] == 1);
-        REQUIRE(result.value()[4] == 5);
+        const auto& resultVec = result.value();
+        REQUIRE(resultVec.size() == 5);
+        REQUIRE(resultVec[0] == 1);
+        REQUIRE(resultVec[4] == 5);
     }
 
     // Test 21: Socket type - Result<TcpSocket>
@@ -713,8 +712,7 @@ int main() {
         REQUIRE(copy.error() == SocketError::Timeout);
 
         // copy assignment
-        Result<void> dst = Result<void>::success();
-        dst = src;
+        Result<void> dst = src;
         REQUIRE(dst.isError());
         REQUIRE(dst.error() == SocketError::Timeout);
 

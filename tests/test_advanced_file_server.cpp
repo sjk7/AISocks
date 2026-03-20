@@ -512,7 +512,7 @@ void testCacheHitsOnRepeatedRequest() {
         std::string request = BehavioralTestHelper::makeHttpRequest(
             "GET", "/script.js", "YWRtaW46c2VjcmV0");
         HttpClientState state;
-        state.request = request;
+        state.request = request; //-V820
         server.buildResponse(state);
         std::string status
             = BehavioralTestHelper::extractStatus(state.responseBuf);
@@ -530,7 +530,7 @@ void testCacheHitsOnRepeatedRequest() {
         std::string request = BehavioralTestHelper::makeHttpRequest(
             "GET", "/script.js", "YWRtaW46c2VjcmV0");
         HttpClientState state;
-        state.request = request;
+        state.request = request; //-V820
         server.buildResponse(state);
         std::string status
             = BehavioralTestHelper::extractStatus(state.responseBuf);
@@ -546,7 +546,7 @@ void testCacheHitsOnRepeatedRequest() {
         std::string request = BehavioralTestHelper::makeHttpRequest(
             "GET", "/script.js", "YWRtaW46c2VjcmV0");
         HttpClientState state;
-        state.request = request;
+        state.request = request; //-V820
         server.buildResponse(state);
     }
     TestFramework::assert_true(
@@ -567,7 +567,7 @@ void testQueryStringBypassesCache() {
         std::string request = BehavioralTestHelper::makeHttpRequest(
             "GET", "/script.js?cacheBust=123", "YWRtaW46c2VjcmV0");
         HttpClientState state;
-        state.request = request;
+        state.request = request; //-V820
 
         server.buildResponse(state);
         std::string status
@@ -584,7 +584,7 @@ void testQueryStringBypassesCache() {
         std::string request = BehavioralTestHelper::makeHttpRequest(
             "GET", "/script.js", "YWRtaW46c2VjcmV0");
         HttpClientState state;
-        state.request = request;
+        state.request = request; //-V820
 
         server.buildResponse(state);
         std::string status
@@ -664,7 +664,7 @@ void testAccessLogBrowserTailBehavior() {
         std::string request = BehavioralTestHelper::makeHttpRequest(
             "GET", "/access.log", "YWRtaW46c2VjcmV0");
         HttpClientState state;
-        state.request = request;
+        state.request = request; //-V820
         state.peerAddress = "127.0.0.1";
 
         server.buildResponse(state);
@@ -693,7 +693,7 @@ void testAccessLogBrowserTailBehavior() {
         std::string request = BehavioralTestHelper::makeHttpRequest(
             "GET", "/access.log", "YWRtaW46c2VjcmV0");
         HttpClientState state;
-        state.request = request;
+        state.request = request; //-V820
         state.peerAddress = "198.51.100.24";
 
         server.buildResponse(state);
@@ -721,7 +721,7 @@ void testLargeFileBypassesCacheForHotPath() {
     std::string request = BehavioralTestHelper::makeHttpRequest(
         "GET", "/large.bin", "YWRtaW46c2VjcmV0");
     HttpClientState state;
-    state.request = request;
+    state.request = request; //-V820
 
     server.buildResponse(state);
 
@@ -776,7 +776,7 @@ void testAuthenticationBehavior() {
         std::string request = BehavioralTestHelper::makeHttpRequest(
             "GET", "/", "YWRtaW46c2VjcmV0");
         HttpClientState state;
-        state.request = request;
+        state.request = request; //-V820
 
         server.buildResponse(state);
         std::string response = state.responseBuf;
@@ -795,7 +795,7 @@ void testAuthenticationBehavior() {
         std::string request = BehavioralTestHelper::makeHttpRequest(
             "GET", "/", "d3Jvbmc6Y3JlZGVudGlhbHM=");
         HttpClientState state;
-        state.request = request;
+        state.request = request; //-V820
 
         server.buildResponse(state);
         std::string response = state.responseBuf;
@@ -815,7 +815,7 @@ void testAuthenticationBehavior() {
         std::string request
             = BehavioralTestHelper::makeHttpRequest("GET", "/", "");
         HttpClientState state;
-        state.request = request;
+        state.request = request; //-V820
 
         server.buildResponse(state);
         std::string response = state.responseBuf;
@@ -843,7 +843,7 @@ void testFileServingBehavior() {
         std::string request = BehavioralTestHelper::makeHttpRequest(
             "GET", "/index.html", "YWRtaW46c2VjcmV0");
         HttpClientState state;
-        state.request = request;
+        state.request = request; //-V820
 
         server.buildResponse(state);
         std::string response = state.responseBuf;
@@ -869,7 +869,7 @@ void testFileServingBehavior() {
         std::string request = BehavioralTestHelper::makeHttpRequest(
             "GET", "/style.css", "YWRtaW46c2VjcmV0");
         HttpClientState state;
-        state.request = request;
+        state.request = request; //-V820
 
         server.buildResponse(state);
         std::string response = state.responseBuf;
@@ -891,7 +891,7 @@ void testFileServingBehavior() {
         std::string request = BehavioralTestHelper::makeHttpRequest(
             "GET", "/script.js", "YWRtaW46c2VjcmV0");
         HttpClientState state;
-        state.request = request;
+        state.request = request; //-V820
 
         server.buildResponse(state);
         std::string response = state.responseBuf;
@@ -922,7 +922,7 @@ void testErrorHandlingBehavior() {
         std::string request = BehavioralTestHelper::makeHttpRequest(
             "GET", "/nonexistent.html", "YWRtaW46c2VjcmV0");
         HttpClientState state;
-        state.request = request;
+        state.request = request; //-V820
 
         server.buildResponse(state);
         std::string status
@@ -940,7 +940,7 @@ void testErrorHandlingBehavior() {
         std::string request = BehavioralTestHelper::makeHttpRequest(
             "GET", "/subdir/", "YWRtaW46c2VjcmV0");
         HttpClientState state;
-        state.request = request;
+        state.request = request; //-V820
 
         server.buildResponse(state);
         std::string status
@@ -955,7 +955,7 @@ void testErrorHandlingBehavior() {
         std::string request = BehavioralTestHelper::makeHttpRequest(
             "GET", "/config.conf", "YWRtaW46c2VjcmV0");
         HttpClientState state;
-        state.request = request;
+        state.request = request; //-V820
 
         server.buildResponse(state);
         std::string status
@@ -973,7 +973,7 @@ void testErrorHandlingBehavior() {
         std::string request = BehavioralTestHelper::makeHttpRequest(
             "GET", "/debug.log", "YWRtaW46c2VjcmV0");
         HttpClientState state;
-        state.request = request;
+        state.request = request; //-V820
 
         server.buildResponse(state);
         std::string status
@@ -988,7 +988,7 @@ void testErrorHandlingBehavior() {
         std::string request = BehavioralTestHelper::makeHttpRequest(
             "GET", "/.htpasswd", "YWRtaW46c2VjcmV0");
         HttpClientState state;
-        state.request = request;
+        state.request = request; //-V820
 
         server.buildResponse(state);
         std::string status
@@ -1008,7 +1008,7 @@ void testErrorHandlingBehavior() {
         std::string request = BehavioralTestHelper::makeHttpRequest(
             "GET", "/.env", "YWRtaW46c2VjcmV0");
         HttpClientState state;
-        state.request = request;
+        state.request = request; //-V820
 
         server.buildResponse(state);
         std::string status
@@ -1023,7 +1023,7 @@ void testErrorHandlingBehavior() {
         std::string request = BehavioralTestHelper::makeHttpRequest(
             "GET", "/.nonexistent", "YWRtaW46c2VjcmV0");
         HttpClientState state;
-        state.request = request;
+        state.request = request; //-V820
 
         server.buildResponse(state);
         std::string status
@@ -1054,7 +1054,7 @@ void testInvalidMethodsBehavior() {
                               "Authorization: Basic YWRtaW46c2VjcmV0\r\n\r\n";
 
         HttpClientState state;
-        state.request = request;
+        state.request = request; //-V820
 
         server.buildResponse(state);
         std::string status
@@ -1074,7 +1074,7 @@ void testInvalidMethodsBehavior() {
                               "Authorization: Basic YWRtaW46c2VjcmV0\r\n\r\n";
 
         HttpClientState state;
-        state.request = request;
+        state.request = request; //-V820
 
         server.buildResponse(state);
         std::string status
@@ -1091,7 +1091,7 @@ void testInvalidMethodsBehavior() {
                               "Authorization: Basic YWRtaW46c2VjcmV0\r\n\r\n";
 
         HttpClientState state;
-        state.request = request;
+        state.request = request; //-V820
 
         server.buildResponse(state);
         std::string status
@@ -1114,7 +1114,7 @@ void testMalformedRequestsBehavior() {
     {
         std::string request = "GET /index.html\r\nHost: localhost\r\n\r\n";
         HttpClientState state;
-        state.request = request;
+        state.request = request; //-V820
 
         server.buildResponse(state);
         std::string status
@@ -1128,7 +1128,7 @@ void testMalformedRequestsBehavior() {
     {
         std::string request = "";
         HttpClientState state;
-        state.request = request;
+        state.request = request; //-V820
 
         server.buildResponse(state);
         std::string status
@@ -1142,7 +1142,7 @@ void testMalformedRequestsBehavior() {
     {
         std::string request = "   \r\n\r\n";
         HttpClientState state;
-        state.request = request;
+        state.request = request; //-V820
 
         server.buildResponse(state);
         std::string status
@@ -1167,7 +1167,7 @@ void testPathTraversalBehavior() {
         std::string request = BehavioralTestHelper::makeHttpRequest(
             "GET", "/../etc/passwd", "YWRtaW46c2VjcmV0");
         HttpClientState state;
-        state.request = request;
+        state.request = request; //-V820
 
         server.buildResponse(state);
         std::string status
@@ -1190,7 +1190,7 @@ void testPathTraversalBehavior() {
         std::string request = BehavioralTestHelper::makeHttpRequest(
             "GET", "/%2e%2e/secret/data", "YWRtaW46c2VjcmV0");
         HttpClientState state;
-        state.request = request;
+        state.request = request; //-V820
 
         server.buildResponse(state);
         std::string status
@@ -1205,7 +1205,7 @@ void testPathTraversalBehavior() {
         std::string request = BehavioralTestHelper::makeHttpRequest(
             "GET", "/../../../../../../etc/passwd", "YWRtaW46c2VjcmV0");
         HttpClientState state;
-        state.request = request;
+        state.request = request; //-V820
 
         server.buildResponse(state);
         std::string status
@@ -1227,9 +1227,9 @@ void testAuthenticationFailuresBehavior() {
     // Unhappy Path: Wrong password
     {
         std::string request = BehavioralTestHelper::makeHttpRequest(
-            "GET", "/index.html", "YWRtaW46d3JvbmdwYXNz"); // admin:wrongpass
+            "GET", "/index.html", "YWRtaW46d3Jvbmc6Y3JlZGVudGlhbHM"); // admin:wrongpass
         HttpClientState state;
-        state.request = request;
+        state.request = request; //-V820
 
         server.buildResponse(state);
         std::string status
@@ -1249,11 +1249,11 @@ void testAuthenticationFailuresBehavior() {
         std::string request = BehavioralTestHelper::makeHttpRequest(
             "GET", "/index.html", "dXNlcjpzZWNyZXQ="); // user:secret
         HttpClientState state;
-        state.request = request;
+        state.request = request; //-V820
 
         server.buildResponse(state);
-        std::string status
-            = BehavioralTestHelper::extractStatus(state.responseBuf);
+        std::string response = state.responseBuf;
+        std::string status = BehavioralTestHelper::extractStatus(response);
 
         TestFramework::assert_contains(
             status, "401", "Wrong username should return 401");
@@ -1266,7 +1266,7 @@ void testAuthenticationFailuresBehavior() {
                               "Authorization: InvalidFormat\r\n\r\n";
 
         HttpClientState state;
-        state.request = request;
+        state.request = request; //-V820
 
         server.buildResponse(state);
         std::string status
@@ -1281,7 +1281,7 @@ void testAuthenticationFailuresBehavior() {
         std::string request
             = BehavioralTestHelper::makeHttpRequest("GET", "/index.html", "");
         HttpClientState state;
-        state.request = request;
+        state.request = request; //-V820
 
         server.buildResponse(state);
         std::string status
@@ -1309,7 +1309,7 @@ void testHeadMethodBehavior() {
         std::string request = BehavioralTestHelper::makeHttpRequest(
             "HEAD", "/index.html", "YWRtaW46c2VjcmV0");
         HttpClientState state;
-        state.request = request;
+        state.request = request; //-V820
 
         server.buildResponse(state);
         std::string status
@@ -1331,7 +1331,7 @@ void testHeadMethodBehavior() {
         std::string request = BehavioralTestHelper::makeHttpRequest(
             "HEAD", "/style.css", "YWRtaW46c2VjcmV0");
         HttpClientState state;
-        state.request = request;
+        state.request = request; //-V820
 
         server.buildResponse(state);
         std::string status
@@ -1350,7 +1350,7 @@ void testHeadMethodBehavior() {
         std::string request = BehavioralTestHelper::makeHttpRequest(
             "HEAD", "/missing.txt", "YWRtaW46c2VjcmV0");
         HttpClientState state;
-        state.request = request;
+        state.request = request; //-V820
 
         server.buildResponse(state);
         std::string status
@@ -1365,7 +1365,7 @@ void testHeadMethodBehavior() {
         std::string request
             = BehavioralTestHelper::makeHttpRequest("HEAD", "/index.html", "");
         HttpClientState state;
-        state.request = request;
+        state.request = request; //-V820
 
         server.buildResponse(state);
         std::string status
@@ -1392,7 +1392,7 @@ void testRangeRequestBehavior() {
                               "Range: bytes=0-5\r\n\r\n";
 
         HttpClientState state;
-        state.request = request;
+        state.request = request; //-V820
 
         server.buildResponse(state);
         std::string status
@@ -1412,7 +1412,7 @@ void testRangeRequestBehavior() {
                               "Range: bytes=99999-99999\r\n\r\n";
 
         HttpClientState state;
-        state.request = request;
+        state.request = request; //-V820
 
         server.buildResponse(state);
         std::string status
@@ -1438,7 +1438,7 @@ void testCachingHeadersBehavior() {
         std::string request = BehavioralTestHelper::makeHttpRequest(
             "GET", "/index.html", "YWRtaW46c2VjcmV0");
         HttpClientState state;
-        state.request = request;
+        state.request = request; //-V820
 
         server.buildResponse(state);
         std::string lastModified = BehavioralTestHelper::extractHeader(
@@ -1459,7 +1459,7 @@ void testCachingHeadersBehavior() {
               "If-Modified-Since: Mon, 01 Jan 2020 00:00:00 GMT\r\n\r\n";
 
         HttpClientState state;
-        state.request = request;
+        state.request = request; //-V820
 
         server.buildResponse(state);
         std::string status
@@ -1475,7 +1475,7 @@ void testCachingHeadersBehavior() {
         std::string request = BehavioralTestHelper::makeHttpRequest(
             "GET", "/script.js", "YWRtaW46c2VjcmV0");
         HttpClientState state;
-        state.request = request;
+        state.request = request; //-V820
 
         server.buildResponse(state);
         std::string cacheControl = BehavioralTestHelper::extractHeader(
@@ -1503,7 +1503,7 @@ void testMimeTypeBehavior() {
         std::string request = BehavioralTestHelper::makeHttpRequest(
             "GET", "/index.html", "YWRtaW46c2VjcmV0");
         HttpClientState state;
-        state.request = request;
+        state.request = request; //-V820
 
         server.buildResponse(state);
         std::string contentType = BehavioralTestHelper::extractHeader(
@@ -1518,7 +1518,7 @@ void testMimeTypeBehavior() {
         std::string request = BehavioralTestHelper::makeHttpRequest(
             "GET", "/style.css", "YWRtaW46c2VjcmV0");
         HttpClientState state;
-        state.request = request;
+        state.request = request; //-V820
 
         server.buildResponse(state);
         std::string contentType = BehavioralTestHelper::extractHeader(
@@ -1533,7 +1533,7 @@ void testMimeTypeBehavior() {
         std::string request = BehavioralTestHelper::makeHttpRequest(
             "GET", "/script.js", "YWRtaW46c2VjcmV0");
         HttpClientState state;
-        state.request = request;
+        state.request = request; //-V820
 
         server.buildResponse(state);
         std::string contentType = BehavioralTestHelper::extractHeader(
@@ -1548,7 +1548,7 @@ void testMimeTypeBehavior() {
         std::string request = BehavioralTestHelper::makeHttpRequest(
             "GET", "/subdir/readme.txt", "YWRtaW46c2VjcmV0");
         HttpClientState state;
-        state.request = request;
+        state.request = request; //-V820
 
         server.buildResponse(state);
         std::string contentType = BehavioralTestHelper::extractHeader(
@@ -1575,7 +1575,7 @@ void testConcurrencyBehavior() {
             std::string request = BehavioralTestHelper::makeHttpRequest(
                 "GET", "/index.html", "YWRtaW46c2VjcmV0");
             HttpClientState state;
-            state.request = request;
+            state.request = request; //-V820
 
             server.buildResponse(state);
             std::string status
@@ -1605,7 +1605,7 @@ void testConcurrencyBehavior() {
             std::string request = BehavioralTestHelper::makeHttpRequest(
                 "GET", path, "YWRtaW46c2VjcmV0");
             HttpClientState state; // Fresh state for each request
-            state.request = request;
+            state.request = request; //-V820
 
             server.buildResponse(state);
             std::string response = state.responseBuf;
@@ -1630,7 +1630,7 @@ void testConcurrencyBehavior() {
             std::string request = BehavioralTestHelper::makeHttpRequest(
                 "GET", "/index.html", "YWRtaW46c2VjcmV0");
             HttpClientState state;
-            state.request = request;
+            state.request = request; //-V820
 
             try {
                 server.buildResponse(state);
@@ -1639,8 +1639,9 @@ void testConcurrencyBehavior() {
                 if (status.find("200") != std::string::npos) {
                     successCount++;
                 }
-            } catch (...) {
-                // Catch to prevent test from crashing
+            } catch (const std::exception& e) {
+                // Expected occasional failures under stress
+                (void)e;
             }
         }
 

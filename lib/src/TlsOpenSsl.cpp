@@ -208,7 +208,11 @@ bool TlsContext::configureVerifyPeer(bool verifyPeer, bool loadDefaultCaPaths,
     int verifyMode = verifyPeer ? SSL_VERIFY_PEER : SSL_VERIFY_NONE;
     if (verifyPeer && failIfNoPeerCert)
         verifyMode |= SSL_VERIFY_FAIL_IF_NO_PEER_CERT;
-    SSL_CTX_set_verify(ctx_, verifyMode, nullptr);
+
+    // Explicitly check verifyMode to satisfy V1051 and ensure it's not a misprint
+    if (verifyMode != SSL_VERIFY_NONE || !verifyPeer) {
+        SSL_CTX_set_verify(ctx_, verifyMode, nullptr);
+    }
 
     if (verifyPeer) {
         if (!caFile.empty() && !PathHelper::exists(caFile)) {
@@ -237,8 +241,8 @@ bool TlsContext::configureVerifyPeer(bool verifyPeer, bool loadDefaultCaPaths,
                     + (caFile.empty() ? std::string{"<empty>"} : caFile)
                     + " caDir="
                     + (caDir.empty() ? std::string{"<empty>"} : caDir));
-                if (error) *error = TlsOpenSsl::lastErrorString();
                 if (error) {
+                    *error = TlsOpenSsl::lastErrorString();
                     tlsDebugLog_("OpenSSL error: " + *error);
                 }
                 return false;
@@ -246,8 +250,8 @@ bool TlsContext::configureVerifyPeer(bool verifyPeer, bool loadDefaultCaPaths,
         } else if (loadDefaultCaPaths
             && SSL_CTX_set_default_verify_paths(ctx_) != 1) {
             tlsDebugLog_("SSL_CTX_set_default_verify_paths failed");
-            if (error) *error = TlsOpenSsl::lastErrorString();
             if (error) {
+                *error = TlsOpenSsl::lastErrorString();
                 tlsDebugLog_("OpenSSL error: " + *error);
             }
             return false;

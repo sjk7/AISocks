@@ -1,3 +1,8 @@
+// This is an independent project of an individual developer. Dear PVS-Studio, please check it.
+
+// PVS-Studio Static Code Analyzer for C, C++, C#, and Java: https://pvs-studio.com
+ 
+
 // dual_http_https_server.cpp
 // Example: Run both HTTP and HTTPS servers in one process using aiSocks
 
@@ -15,7 +20,7 @@ int main(int argc, char** argv) {
     std::string wwwRoot = "./www";
     uint16_t httpPort = 8080;
 #ifdef AISOCKS_ENABLE_TLS
-    uint16_t httpsPort = 8443;
+    uint16_t httpsPort = 443;
 #endif
     if (argc > 1) {
         wwwRoot = argv[1];
@@ -31,7 +36,7 @@ int main(int argc, char** argv) {
 
     // Shared config for both servers
     HttpFileServer::Config config;
-    config.documentRoot = wwwRoot;
+    config.documentRoot = wwwRoot; //-V820
     config.indexFile = "index.html";
     config.enableDirectoryListing = true;
     config.enableETag = true;

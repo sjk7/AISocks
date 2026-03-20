@@ -1,3 +1,7 @@
+// This is an independent project of an individual developer. Dear PVS-Studio, please check it.
+
+// PVS-Studio Static Code Analyzer for C, C++, C#, and Java: https://pvs-studio.com
+
 // Tests for HttpResponseParser (feed-based incremental parser).
 //
 // Coverage goals:
@@ -42,7 +46,7 @@ static void test_simple_200() {
     HttpResponseParser p;
     auto state = p.feed(raw.data(), raw.size());
     REQUIRE(state == HttpResponseParser::State::Complete);
-    REQUIRE(p.response().valid);
+    REQUIRE(p.response().valid); //-V807
     REQUIRE(p.response().statusCode == 200);
     CHECK_FIELD("version", p.response().version(), "HTTP/1.1");
     CHECK_FIELD("statusText", p.response().statusText(), "OK");
@@ -161,9 +165,10 @@ static void test_bare_lf_line_endings() {
     HttpResponseParser p;
     auto state = p.feed(raw.data(), raw.size());
     REQUIRE(state == HttpResponseParser::State::Complete);
-    REQUIRE(p.response().statusCode == 200);
-    CHECK_FIELD("x-foo", *p.response().header("x-foo"), "bar");
-    CHECK_FIELD("body", p.response().body(), "World");
+    const auto& resp = p.response();
+    REQUIRE(resp.statusCode == 200);
+    CHECK_FIELD("x-foo", *resp.header("x-foo"), "bar");
+    CHECK_FIELD("body", resp.body(), "World");
 }
 
 // ---------------------------------------------------------------------------
@@ -230,7 +235,8 @@ static void test_reset_keepalive() {
 
     p.feed(r2.data(), r2.size());
     REQUIRE(p.isComplete());
-    REQUIRE(p.response().statusCode == 201);
+    const auto& resp2 = p.response();
+    REQUIRE(resp2.statusCode == 201);
     CHECK_FIELD("second body", p.response().body(), "B");
 }
 

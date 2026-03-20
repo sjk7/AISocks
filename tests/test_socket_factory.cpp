@@ -150,7 +150,10 @@ int main() {
         uint16_t p19902 = 0;
         {
             auto ep = first_result.value().getLocalEndpoint();
-            p19902 = ep.isSuccess() ? ep.value().port.value() : 0;
+            if (ep.isSuccess()) {
+                const auto& endpoint = ep.value();
+                p19902 = endpoint.port.value();
+            }
         }
         REQUIRE(p19902 != 0);
 
@@ -171,7 +174,8 @@ int main() {
         REQUIRE(sock.isValid());
         auto ep = sock.getLocalEndpoint();
         REQUIRE(ep.isSuccess());
-        REQUIRE(ep.value().port.value() != 0);
+        const auto& epValue = ep.value();
+        REQUIRE(epValue.port.value() != 0);
     }
 
     // Test 10: createUdpServer + send/receive round-trip via factory

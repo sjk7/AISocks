@@ -253,8 +253,9 @@ static void run_happy_path_tests(ServerGuard& sg) {
         auto r = client.get(sg.baseUrl() + "/hello");
         REQUIRE(r.isSuccess());
         if (!r.isSuccess()) return;
-        REQUIRE(r.value().statusCode() == 200);
-        REQUIRE(r.value().body().find("/hello") != std::string_view::npos);
+        const auto& response = r.value();
+        REQUIRE(response.statusCode() == 200);
+        REQUIRE(response.body().find("/hello") != std::string_view::npos);
     }
 
     BEGIN_TEST("HttpClient GET: echo server body contains request path");
@@ -262,7 +263,8 @@ static void run_happy_path_tests(ServerGuard& sg) {
         auto r = client.get(sg.baseUrl() + "/ping");
         REQUIRE(r.isSuccess());
         if (!r.isSuccess()) return;
-        REQUIRE(r.value().body().find("/ping") != std::string_view::npos);
+        const auto& rValue = r.value();
+        REQUIRE(rValue.body().find("/ping") != std::string_view::npos);
     }
 
     BEGIN_TEST("HttpClient: multiple sequential GETs to same server succeed");

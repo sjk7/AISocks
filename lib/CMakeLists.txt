@@ -7,6 +7,9 @@ add_library(aiSocksLib STATIC
     src/TcpSocket.cpp
     src/UdpSocket.cpp
     src/SocketImpl.cpp
+    src/SocketImpl_Connect.cpp
+    src/SocketImpl_IO.cpp
+    src/SocketImpl_Options.cpp
     src/SocketImpl.h
     src/SocketImplHelpers.cpp
     src/SocketFactory.cpp

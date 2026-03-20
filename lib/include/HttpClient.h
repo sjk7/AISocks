@@ -248,15 +248,16 @@ class HttpClient {
         const size_t schemeEnd = base.find("://");
         if (schemeEnd == std::string::npos) return location;
 
-        const std::string scheme = base.substr(0, schemeEnd);
         const size_t authStart = schemeEnd + 3;
         const size_t pathStart = base.find('/', authStart);
         const std::string origin = (pathStart == std::string::npos)
             ? base
             : base.substr(0, pathStart);
 
-        if (location.size() >= 2 && location[0] == '/' && location[1] == '/')
+        if (location.size() >= 2 && location[0] == '/' && location[1] == '/') {
+            const std::string scheme = base.substr(0, schemeEnd);
             return scheme + ":" + location;
+        }
 
         if (location[0] == '/') return origin + location;
 
@@ -1055,7 +1056,7 @@ class HttpClient {
                                     cachedIsHttps_ = isHttps;
                                     cachedSocket_ = socket;
 #ifdef AISOCKS_ENABLE_TLS
-                                    cachedTlsSession_ = tlsSession;
+                                    cachedTlsSession_ = std::move(tlsSession);
 #endif
                                 } else {
                                     clearCachedConnection_();
@@ -1086,12 +1087,12 @@ class HttpClient {
                         const auto& resp = finalResult.value().response;
                         if (shouldKeepAlive_(resp)) {
                             if (!requestWantsClose) {
-                                cachedHost_ = host;
+                                cachedHost_ = host; //-V820
                                 cachedPort_ = port;
                                 cachedIsHttps_ = isHttps;
-                                cachedSocket_ = socket;
+                                cachedSocket_ = std::move(socket);
 #ifdef AISOCKS_ENABLE_TLS
-                                cachedTlsSession_ = tlsSession;
+                                cachedTlsSession_ = std::move(tlsSession);
 #endif
                             } else {
                                 clearCachedConnection_();
@@ -1108,17 +1109,16 @@ class HttpClient {
             }
 
             // Connection closed before response was complete.
-            if (!redirectDetected) {
-                if (reusedConnection && !retriedReusedConnection) {
-                    clearCachedConnection_();
-                    retriedReusedConnection = true;
-                    --redirectCount;
-                    continue;
-                }
+            // At this point redirectDetected is always false
+            if (reusedConnection && !retriedReusedConnection) {
                 clearCachedConnection_();
-                return Result<HttpClientResponse>::failure(
-                    SocketError::ConnectionReset, "Incomplete response");
+                retriedReusedConnection = true;
+                --redirectCount;
+                continue;
             }
+            clearCachedConnection_();
+            return Result<HttpClientResponse>::failure(
+                SocketError::ConnectionReset, "Incomplete response");
         }
 
         return Result<HttpClientResponse>::failure(

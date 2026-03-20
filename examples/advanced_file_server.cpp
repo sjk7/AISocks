@@ -36,6 +36,7 @@
 #include <cstdio>
 #include <chrono>
 #include <vector>
+#include <utility>
 
 using namespace aiSocks;
 
@@ -294,15 +295,14 @@ class CustomFileServer : public HttpFileServer {
 
         // For HEAD requests, just send headers
         if (request.method == "HEAD") {
-            state.responseBuf = response;
+            state.responseBuf = std::move(response);
             state.responseView = state.responseBuf;
             return;
         }
 
         // For GET requests, generate the file content
-        std::string headers = std::move(response);
-        state.responseBuf.reserve(headers.size() + fileSize);
-        state.responseBuf = headers;
+        state.responseBuf = std::move(response);
+        state.responseBuf.reserve(state.responseBuf.size() + fileSize);
 
         // Generate 500MB of repeating pattern data
         const char pattern[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
@@ -570,7 +570,7 @@ int main(int argc, char* argv[]) {
 
     // Configure the file server
     HttpFileServer::Config config;
-    config.documentRoot = root;
+    config.documentRoot = std::move(root);
     config.indexFile = "index.html";
     config.enableDirectoryListing = true;
     config.enableETag = true;

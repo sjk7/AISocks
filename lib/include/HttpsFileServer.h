@@ -169,8 +169,7 @@ class HttpsFileServer : public HttpFileServer {
 
         // Configure client certificate verification when requested.
         if (tls.clientAuth != TlsServerConfig::ClientAuthMode::None) {
-            bool verifyPeer
-                = tls.clientAuth != TlsServerConfig::ClientAuthMode::None;
+            bool verifyPeer = true;
             bool loadDefaults = tls.caFile.empty() && tls.caDir.empty();
             std::string verErr;
             if (!ctx->configureVerifyPeer(verifyPeer, loadDefaults, tls.caFile,

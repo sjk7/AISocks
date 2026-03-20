@@ -1,3 +1,6 @@
+// This is an independent project of an individual developer. Dear PVS-Studio, please check it.
+
+// PVS-Studio Static Code Analyzer for C, C++, C#, and Java: https://pvs-studio.com
 // Regression tests for the 7 bugs/footguns fixed in commit 31f193c.
 //
 // 1. parseHexSize_ integer overflow (chunk-size SIZE_MAX wraps arithmetic)

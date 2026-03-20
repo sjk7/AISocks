@@ -50,7 +50,7 @@ static std::vector<std::string> splitLines(const std::string& s) {
         const size_t nl = s.find('\n', pos);
         const size_t end = (nl == std::string::npos) ? s.size() : nl;
         if (end > pos || nl != std::string::npos)
-            lines.push_back(s.substr(pos, end - pos));
+            lines.emplace_back(s.substr(pos, end - pos));
         if (nl == std::string::npos) break;
         pos = nl + 1;
     }

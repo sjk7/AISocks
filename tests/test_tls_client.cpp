@@ -955,10 +955,11 @@ static void test_https_redirect_to_different_host_with_verify_enabled() {
 
     REQUIRE(result.isSuccess());
     if (!result.isSuccess()) return;
-    REQUIRE(result.value().statusCode() == 200);
-    REQUIRE(result.value().finalUrl == location);
-    REQUIRE(result.value().redirectChain.size() == 1);
-    REQUIRE(result.value().redirectChain.front() == location);
+    const auto& response = result.value();
+    REQUIRE(response.statusCode() == 200);
+    REQUIRE(response.finalUrl == location);
+    REQUIRE(response.redirectChain.size() == 1);
+    REQUIRE(response.redirectChain.front() == location);
 }
 
 static void test_https_to_http_redirect_behavior() {
@@ -1001,11 +1002,12 @@ static void test_https_to_http_redirect_behavior() {
 
     REQUIRE(result.isSuccess());
     if (!result.isSuccess()) return;
-    REQUIRE(result.value().statusCode() == 200);
-    REQUIRE(result.value().finalUrl == location);
-    REQUIRE(result.value().redirectChain.size() == 1);
-    REQUIRE(result.value().redirectChain.front() == location);
-    REQUIRE(result.value().body().find("downgrade") != std::string_view::npos);
+    const auto& response = result.value();
+    REQUIRE(response.statusCode() == 200);
+    REQUIRE(response.finalUrl == location);
+    REQUIRE(response.redirectChain.size() == 1);
+    REQUIRE(response.redirectChain.front() == location);
+    REQUIRE(response.body().find("downgrade") != std::string_view::npos);
 }
 
 static void test_https_set_options_rebuilds_tls_context() {

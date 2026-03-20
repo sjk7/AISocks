@@ -184,7 +184,8 @@ static void test_null_byte() {
     std::string encoded = enc(mixed); // Should be "a%00z"
     std::string decoded = dec(encoded); // Should be "az" (null byte stripped)
     // Debug: check the sizes
-    REQUIRE_MSG(mixed.size() == 3, "original string should have 3 bytes");
+    const size_t originalSize = mixed.size();
+    REQUIRE_MSG(originalSize == 3, "original string should have 3 bytes");
     REQUIRE_MSG(encoded == "a%00z", "encoded should be a%00z");
     REQUIRE_MSG(decoded.size() == 2 && decoded[0] == 'a' && decoded[1] == 'z', 
                 "null byte stripped from decoded string for security");

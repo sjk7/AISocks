@@ -1,3 +1,6 @@
+// This is an independent project of an individual developer. Dear PVS-Studio, please check it.
+
+// PVS-Studio Static Code Analyzer for C, C++, C#, and Java: https://pvs-studio.com
 #include "HttpsFileServer.h"
 #include "PathHelper.h"
 #include "TlsOpenSsl.h"
@@ -75,6 +78,8 @@ void test_tls_graceful_shutdown() {
 
     auto res = client_connect_tls(server.serverPort().value());
     REQUIRE(res.has_value());
+    if (!res.has_value()) return; // Extra check for analyzer
+
     auto sess = std::move(res->first);
     TcpSocket sock = std::move(res->second);
 

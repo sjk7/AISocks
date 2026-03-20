@@ -326,7 +326,7 @@ HttpResponseParser::State HttpResponseParser::processChunked_() {
             return state_;
         }
 
-        if (decodedBody_.size() > kMaxBodyLen - chunkSize) {
+        if (chunkSize > kMaxBodyLen || decodedBody_.size() > kMaxBodyLen - chunkSize) {
             markError_();
             return state_;
         }

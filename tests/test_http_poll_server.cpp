@@ -287,11 +287,17 @@ int main() {
     BEGIN_TEST("Response mode: useStaticResponse flag works");
     {
         TestHttpServer server(ServerBind{"127.0.0.1", Port{0}});
+        bool initialValue = server.useStaticResponse;
+
         server.useStaticResponse = false;
-        REQUIRE(server.useStaticResponse == false);
+        REQUIRE(server.useStaticResponse == false); //-V547
 
         server.useStaticResponse = true;
-        REQUIRE(server.useStaticResponse == true);
+        REQUIRE(server.useStaticResponse == true); //-V547
+
+        // Restore to verify we can toggle back
+        server.useStaticResponse = initialValue;
+        REQUIRE(server.useStaticResponse == initialValue);
     }
 
     // Test 3: Dynamic response mode

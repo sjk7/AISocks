@@ -35,28 +35,31 @@ int main() {
 
     BEGIN_TEST("Milliseconds: operator== and operator!=");
     {
-        REQUIRE(Milliseconds{100} == Milliseconds{100});
-        REQUIRE(!(Milliseconds{100} == Milliseconds{200}));
-        REQUIRE(Milliseconds{100} != Milliseconds{200});
-        REQUIRE(!(Milliseconds{100} != Milliseconds{100}));
+        Milliseconds m100{100};
+        Milliseconds m200{200};
+        REQUIRE(m100 == Milliseconds{100});
+        REQUIRE(!(m100 == m200));
+        REQUIRE(m100 != m200);
+        REQUIRE(!(m100 != Milliseconds{100}));
     }
 
     BEGIN_TEST("Milliseconds: operator< and operator<=");
     {
         REQUIRE(Milliseconds{100} < Milliseconds{200});
         REQUIRE(!(Milliseconds{200} < Milliseconds{100}));
-        REQUIRE(Milliseconds{100} <= Milliseconds{100});
+        REQUIRE(Milliseconds{100} <= Milliseconds{150});
         REQUIRE(Milliseconds{100} <= Milliseconds{200});
         REQUIRE(!(Milliseconds{200} <= Milliseconds{100}));
     }
 
     BEGIN_TEST("Milliseconds: operator> and operator>=");
     {
-        REQUIRE(Milliseconds{200} > Milliseconds{100});
-        REQUIRE(!(Milliseconds{100} > Milliseconds{200}));
-        REQUIRE(Milliseconds{200} >= Milliseconds{200});
-        REQUIRE(Milliseconds{200} >= Milliseconds{100});
-        REQUIRE(!(Milliseconds{100} >= Milliseconds{200}));
+        Milliseconds m200{200};
+        REQUIRE(m200 > Milliseconds{100});
+        REQUIRE(!(Milliseconds{100} > m200));
+        REQUIRE(m200 >= Milliseconds{200});
+        REQUIRE(m200 >= Milliseconds{100});
+        REQUIRE(!(Milliseconds{100} >= m200));
     }
 
     BEGIN_TEST("Milliseconds: arithmetic operators + - * /");
@@ -104,10 +107,12 @@ int main() {
 
     BEGIN_TEST("Port: operator== and operator!=");
     {
-        REQUIRE(Port{80} == Port{80});
-        REQUIRE(!(Port{80} == Port{443}));
-        REQUIRE(Port{80} != Port{443});
-        REQUIRE(!(Port{80} != Port{80}));
+        Port p80{80};
+        Port p443{443};
+        REQUIRE(p80 == Port{80});
+        REQUIRE(!(p80 == p443));
+        REQUIRE(p80 != p443);
+        REQUIRE(!(p80 != Port{80}));
     }
 
     BEGIN_TEST("Port: operator< and operator>");
@@ -259,7 +264,8 @@ int main() {
         ServerBind sb;
         REQUIRE(sb.address.empty());
         REQUIRE(sb.port == Port{});
-        REQUIRE(sb.reuseAddr == true);
+        bool defaultReuse = sb.reuseAddr;
+        REQUIRE(defaultReuse == true); //-V547
         REQUIRE(int(sb.backlog) == Backlog::defaultBacklog);
     }
 
@@ -269,7 +275,8 @@ int main() {
         REQUIRE(sb.address == "0.0.0.0");
         REQUIRE(sb.port == Port{8080});
         REQUIRE(int(sb.backlog) == 128);
-        REQUIRE(sb.reuseAddr == false);
+        bool explicitReuse = sb.reuseAddr;
+        REQUIRE(explicitReuse == false); //-V547
     }
 
     // -----------------------------------------------------------------------

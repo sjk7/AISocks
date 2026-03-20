@@ -211,7 +211,7 @@ void testPathTraversalAttacks() {
     {
         std::string request = makeRequest("GET", "/../secret/passwords.txt");
         HttpClientState state;
-        state.request = request;
+        state.request = request; //-V820
 
         server.testBuildResponse(state);
         std::string status = extractStatus(state.responseBuf);
@@ -230,7 +230,7 @@ void testPathTraversalAttacks() {
         std::string request
             = makeRequest("GET", "/%2e%2e/secret/passwords.txt");
         HttpClientState state;
-        state.request = request;
+        state.request = request; //-V820
 
         server.testBuildResponse(state);
         std::string status = extractStatus(state.responseBuf);
@@ -249,7 +249,7 @@ void testPathTraversalAttacks() {
         std::string request
             = makeRequest("GET", "/%252e%252e/secret/passwords.txt");
         HttpClientState state;
-        state.request = request;
+        state.request = request; //-V820
 
         server.testBuildResponse(state);
         std::string status = extractStatus(state.responseBuf);
@@ -268,7 +268,7 @@ void testPathTraversalAttacks() {
     {
         std::string request = makeRequest("GET", "/..\\secret\\passwords.txt");
         HttpClientState state;
-        state.request = request;
+        state.request = request; //-V820
 
         server.testBuildResponse(state);
         std::string status = extractStatus(state.responseBuf);
@@ -287,7 +287,7 @@ void testPathTraversalAttacks() {
     {
         std::string request = makeRequest("GET", "/etc/passwd");
         HttpClientState state;
-        state.request = request;
+        state.request = request; //-V820
 
         server.testBuildResponse(state);
         std::string status = extractStatus(state.responseBuf);
@@ -314,7 +314,7 @@ void testXSSAttacks() {
     {
         std::string request = makeRequest("GET", "/");
         HttpClientState state;
-        state.request = request;
+        state.request = request; //-V820
 
         server.testBuildResponse(state);
         std::string body = extractBody(state.responseBuf);
@@ -331,7 +331,7 @@ void testXSSAttacks() {
         std::string request
             = makeRequest("GET", "/<script>alert(document.cookie)</script>");
         HttpClientState state;
-        state.request = request;
+        state.request = request; //-V820
 
         server.testBuildResponse(state);
         std::string body = extractBody(state.responseBuf);
@@ -353,7 +353,7 @@ void testSecurityHeaders() {
 
     std::string request = makeRequest("GET", "/index.html");
     HttpClientState state;
-    state.request = request;
+    state.request = request; //-V820
 
     server.testBuildResponse(state);
     std::string response = state.responseBuf;
@@ -383,7 +383,7 @@ void testInformationLeakage() {
     {
         std::string request = makeRequest("GET", "/nonexistent.html");
         HttpClientState state;
-        state.request = request;
+        state.request = request; //-V820
 
         server.testBuildResponse(state);
         std::string body = extractBody(state.responseBuf);
@@ -401,7 +401,7 @@ void testInformationLeakage() {
 
         std::string request = makeRequest("GET", "/");
         HttpClientState state;
-        state.request = request;
+        state.request = request; //-V820
 
         server2.testBuildResponse(state);
         std::string body = extractBody(state.responseBuf);
@@ -488,7 +488,7 @@ void testURLDecodingIssues() {
 
         std::string request = makeRequest("GET", "/file+name.txt");
         HttpClientState state;
-        state.request = request;
+        state.request = request; //-V820
 
         server.testBuildResponse(state);
         std::string status = extractStatus(state.responseBuf);
@@ -522,7 +522,7 @@ void testMethodValidation() {
         request += " /index.html HTTP/1.1\r\nHost: localhost\r\n\r\n";
 
         HttpClientState state;
-        state.request = request;
+        state.request = request; //-V820
 
         server.testBuildResponse(state);
         std::string status = extractStatus(state.responseBuf);
@@ -547,7 +547,7 @@ void testFileTypeRestrictions() {
     {
         std::string request = makeRequest("GET", "/large.bin");
         HttpClientState state;
-        state.request = request;
+        state.request = request; //-V820
 
         server.testBuildResponse(state);
         std::string status = extractStatus(state.responseBuf);

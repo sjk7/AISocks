@@ -67,8 +67,7 @@ static void test_slowloris_protection() {
     // Poll every 1ms until the server disconnects us (deadline: 2s)
     const auto deadline
         = std::chrono::steady_clock::now() + std::chrono::seconds{2};
-    while (!server.disconnected) {
-        if (std::chrono::steady_clock::now() >= deadline) break;
+    while (!server.disconnected && std::chrono::steady_clock::now() < deadline) {
         // Poke the server so onReadable fires and it can check the timeout
         char extra = 'X';
         client.send(&extra, 1);

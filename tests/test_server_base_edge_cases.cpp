@@ -349,15 +349,19 @@ int main() {
         // Connect one client
         auto client1 = connectClient(port, Milliseconds{70});
         REQUIRE(client1 != nullptr);
-        client1->setBlocking(true);
+        if (client1) {
+            client1->setBlocking(true);
+        }
 
         // Verify client is connected
         REQUIRE(server.atomicClientCount_.load() <= 1);
 
         // Send a message and wait for it to be processed
-        const char* msg = "hello";
-        client1->sendAll(msg, strlen(msg));
-        server.waitForMessages(1);
+        if (client1) {
+            const char* msg = "hello";
+            client1->sendAll(msg, strlen(msg));
+            server.waitForMessages(1);
+        }
 
         server.requestStop();
         serverThread.join();
@@ -672,10 +676,12 @@ int main() {
         // Connect and send data to prove the server is still alive.
         auto client = connectClient(port, Milliseconds{200});
         REQUIRE(client != nullptr);
-        client->setBlocking(true);
-        client->sendAll("ping", 4);
-        server.waitForMessages(1);
-        REQUIRE(server.totalMessagesReceived.load() > 0);
+        if (client) {
+            client->setBlocking(true);
+            client->sendAll("ping", 4);
+            server.waitForMessages(1);
+            REQUIRE(server.totalMessagesReceived.load() > 0);
+        }
 
         // onIdle() still must not have fired.
         REQUIRE(server.idleCallCount.load() == 0);
@@ -730,11 +736,13 @@ int main() {
         server.setRejectNewConnections(false);
         auto acceptedClient = connectClient(port, Milliseconds{120});
         REQUIRE(acceptedClient != nullptr);
-        acceptedClient->setBlocking(true);
-        REQUIRE(acceptedClient->sendAll("ok", 2));
+        if (acceptedClient) {
+            acceptedClient->setBlocking(true);
+            REQUIRE(acceptedClient->sendAll("ok", 2));
 
-        server.waitForMessages(1);
-        REQUIRE(server.totalMessagesReceived.load() > 0);
+            server.waitForMessages(1);
+            REQUIRE(server.totalMessagesReceived.load() > 0);
+        }
 
         server.requestStop();
         serverThread.join();

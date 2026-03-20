@@ -1,8 +1,6 @@
-// This is an independent project of an individual developer. Dear PVS-Studio,
-// please check it.
+// This is an independent project of an individual developer. Dear PVS-Studio, please check it.
 
-// PVS-Studio Static Code Analyzer for C, C++, and Java:
-// https://pvs-studio.com
+// PVS-Studio Static Code Analyzer for C, C++, C#, and Java: https://pvs-studio.com
 
 // ---------------------------------------------------------------------------
 // http_client_example.cpp -- Demonstration of HttpClient usage
@@ -33,7 +31,7 @@ int main() {
         printf(
             "   Status: %d %s\n", resp.statusCode(), resp.statusText().data());
         printf("   Content-Type: %s\n", resp.contentType().data());
-        printf("   Body size: %zu bytes\n", resp.body().size());
+        printf("   Body size: %zu bytes\n", resp.body().size()); //-V807
 
         // Print first 200 characters of body
         if (resp.body().size() > 0) {
