@@ -24,6 +24,7 @@
 #include "CallIntervalTracker.h"
 #include "HttpRequest.h"
 #include "IpFilter.h"
+#include "ProtocolDispatcher.h"
 #include "ServerBase.h"
 #include <array>
 #include <chrono>
@@ -398,10 +399,16 @@ class HttpPollServer : public ServerBase<HttpClientState> {
         return sock.sendChunked(data, len);
     }
 
+    // Returns true when the slowloris deadline has expired.
+    bool slowlorisExpired(const HttpClientState& s,
+        std::chrono::steady_clock::time_point now, int timeoutMs) const;
+
     private:
     IpFilter* ipFilter_{nullptr};
     AccessLogger* accessLogger_{nullptr};
     int slowlorisTimeoutMs_{SLOWLORIS_TIMEOUT_MS};
+
+    std::unique_ptr<ProtocolDispatcher<HttpClientState>> protocolDispatcher_;
 
     ServerResult onReadable(TcpSocket& sock, HttpClientState& s) final;
     ServerResult onWritable(TcpSocket& sock, HttpClientState& s) final;
@@ -417,6 +424,8 @@ class HttpPollServer : public ServerBase<HttpClientState> {
     void resetAfterSend_(HttpClientState& s);
 
     CallIntervalTracker tracker_;
+
+    friend class HttpProtocolDispatcher;
 };
 
 } // namespace aiSocks

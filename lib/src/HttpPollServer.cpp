@@ -3,6 +3,7 @@
 // https://pvs-studio.com
 
 #include "HttpPollServer.h"
+#include "HttpProtocolDispatcher.h"
 
 #include "BuildInfo.h"
 #include "FileIO.h"
@@ -215,6 +216,10 @@ void HttpPollServer::run(ClientLimit maxClients, Milliseconds timeout) {
     fflush(stdout);
 #endif
 
+    if (!protocolDispatcher_) {
+        protocolDispatcher_ = std::make_unique<HttpProtocolDispatcher>(*this);
+    }
+
     ServerBase<HttpClientState>::run(maxClients, timeout);
     if (accessLogger_) accessLogger_->flush(); // drain any buffered log entries
 
@@ -374,8 +379,8 @@ static bool resolveKeepAlive_(const HttpRequest& req) {
 // milliseconds have elapsed since the first byte arrived but headers are still
 // incomplete. `now` is passed in from the recv loop (already computed once per
 // iteration).
-static bool isSlowlorisTimeout_(const HttpClientState& s,
-    std::chrono::steady_clock::time_point now, int timeoutMs) {
+bool HttpPollServer::slowlorisExpired(const HttpClientState& s,
+    std::chrono::steady_clock::time_point now, int timeoutMs) const {
     if (!s.dataView.empty()) return false; // already responding
     if (s.request.empty()) return false;
     const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
@@ -455,76 +460,17 @@ void HttpPollServer::dispatchBuildResponse(HttpClientState& s) {
 }
 
 ServerResult HttpPollServer::onReadable(TcpSocket& sock, HttpClientState& s) {
-    char buf[RECV_BUF_SIZE];
-    for (;;) {
-        ServerResult stageOut = ServerResult::KeepConnection;
-        if (runTlsHandshakeStage_(sock, s, stageOut)) return stageOut;
-
-        // Slowloris protection: drop if headers not received within 5 seconds.
-        // Clock is read once per loop iteration and reused by the timeout
-        // check.
-        const auto now = std::chrono::steady_clock::now();
-        // Use a tighter slowloris window under high load to shed stalled
-        // partial-request senders faster and reduce tail latency.
-        const int effectiveSlowloris
-            = (clientCount() > SLOWLORIS_HIGH_LOAD_THRESHOLD)
-            ? SLOWLORIS_TIMEOUT_MS_HIGH_LOAD
-            : slowlorisTimeoutMs_;
-        if (isSlowlorisTimeout_(s, now, effectiveSlowloris))
-            return ServerResult::Disconnect;
-
-        int n = tlsRead(sock, s, buf, sizeof(buf));
-
-        if (n > 0) {
-            touchClient(sock, now);
-
-            // If a response is already in-flight, park incoming bytes as the
-            // next pipelined request payload and process them after send.
-            if (!s.dataView.empty()) {
-                s.queuedRequest.append(buf, static_cast<size_t>(n));
-                continue;
-            }
-
-            if (s.request.empty()) {
-                // Start a new slowloris window for each new request.
-                s.startTime = now;
-            }
-            s.request.append(buf, static_cast<size_t>(n));
-
-            if (s.dataView.empty()) { //-V547
-                if (runRequestFrameInspectionStage_(sock, s, stageOut))
-                    return stageOut;
-            }
-        } else if (n == 0) {
-            return ServerResult::Disconnect;
-        } else {
-#ifdef AISOCKS_ENABLE_TLS
-            if (isTlsMode(s) && s.tlsSession) {
-                const int tlsErr = s.tlsSession->getLastErrorCode(n);
-                if (tlsErr == SSL_ERROR_WANT_READ
-                    || tlsErr == SSL_ERROR_WANT_WRITE) {
-                    setClientWritable(sock, tlsErr == SSL_ERROR_WANT_WRITE);
-                    break;
-                }
-            }
-#endif
-            const auto err = sock.getLastError();
-            if (err == SocketError::WouldBlock || err == SocketError::Timeout)
-                break;
-            return ServerResult::Disconnect;
-        }
+    if (protocolDispatcher_) {
+        return protocolDispatcher_->onReadable(sock, s);
     }
-    return ServerResult::KeepConnection;
+    return ServerResult::Disconnect;
 }
 
 ServerResult HttpPollServer::onWritable(TcpSocket& sock, HttpClientState& s) {
-    while (true) {
-        ServerResult stageOut = ServerResult::KeepConnection;
-        if (runTlsHandshakeStage_(sock, s, stageOut)) return stageOut;
-        if (s.dataView.empty()) return ServerResult::KeepConnection;
-        if (runSendStreamStage_(sock, s, stageOut)) return stageOut;
-        if (runPipelineContinuationStage_(sock, s, stageOut)) return stageOut;
+    if (protocolDispatcher_) {
+        return protocolDispatcher_->onWritable(sock, s);
     }
+    return ServerResult::Disconnect;
 }
 
 bool HttpPollServer::runTlsHandshakeStage_(
@@ -573,8 +519,7 @@ bool HttpPollServer::runRequestFrameInspectionStage_(
     }
 
     if (frame == RequestFrameStatus::HeaderTooLarge) {
-        s.dataBuf = makeResponse(
-            "HTTP/1.1 431 Request Header Fields Too Large",
+        s.dataBuf = makeResponse("HTTP/1.1 431 Request Header Fields Too Large",
             "text/plain; charset=utf-8", "Header section too large.\n", false);
         s.dataView = s.dataBuf;
         s.closeAfterSend = true;
@@ -634,15 +579,14 @@ bool HttpPollServer::runSendStreamStage_(
     if (!s.responseStarted && !s.interimResponse) {
         s.responseStarted = true;
         if (s.responseStatusCode == 0)
-            s.responseStatusCode
-                = AccessLogger::extractStatusCode(s.dataView);
+            s.responseStatusCode = AccessLogger::extractStatusCode(s.dataView);
         if (s.responseBytesPlanned == 0)
             s.responseBytesPlanned = s.dataView.size();
         onResponseBegin(s);
     }
 
-    int sent = tlsWrite(sock, s, s.dataView.data() + s.sent,
-        s.dataView.size() - s.sent);
+    int sent = tlsWrite(
+        sock, s, s.dataView.data() + s.sent, s.dataView.size() - s.sent);
 
     if (sent > 0) {
         touchClient(sock, std::chrono::steady_clock::now());
