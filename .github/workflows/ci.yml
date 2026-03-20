@@ -261,35 +261,6 @@ jobs:
             Write-Host "ninja already present"
           }
 
-      - name: Cache vcpkg (Windows)
-        if: runner.os == 'Windows' && matrix.enable_tls == 'ON'
-        uses: actions/cache@v4
-        with:
-          path: |
-            vcpkg
-            ~/.cache/vcpkg
-          key: vcpkg-openssl-${{ runner.os }}-${{ hashFiles('.github/workflows/ci.yml') }}
-          restore-keys: |
-            vcpkg-openssl-${{ runner.os }}-
-
-      - name: Bootstrap vcpkg (Windows)
-        if: runner.os == 'Windows' && matrix.enable_tls == 'ON'
-        shell: bash
-        run: |
-          if [[ ! -d vcpkg ]]; then
-            git clone --depth=1 https://github.com/microsoft/vcpkg.git vcpkg
-            ./vcpkg/bootstrap-vcpkg.sh -disableMetrics
-          else
-            echo "[ci] vcpkg cache hit; skipping clone"
-          fi
-
-      - name: Install OpenSSL (Windows)
-        if: runner.os == 'Windows' && matrix.enable_tls == 'ON'
-        shell: bash
-        run: |
-          ./vcpkg/vcpkg install openssl:x64-windows
-          ./vcpkg/vcpkg integrate remove || true
-
       # Set up MSVC compiler environment (cl.exe, link.exe in PATH)
       - name: Set up MSVC environment
         if: startsWith(matrix.compiler, 'msvc')
@@ -390,19 +361,6 @@ jobs:
                 "-DOPENSSL_SSL_LIBRARY=$OPENSSL_SSL_LIBRARY_WIN"
                 "-DOPENSSL_CRYPTO_LIBRARY=$OPENSSL_CRYPTO_LIBRARY_WIN"
               )
-
-              # Prefer vcpkg-provided OpenSSL when bootstrapped earlier in the
-              # workflow. This makes the Windows TLS leg reproducible and
-              # provides a CMake-friendly OpenSSL layout.
-              VCPKG_TOOLCHAIN="${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake"
-              if [[ -f "$VCPKG_TOOLCHAIN" ]]; then
-                CMAKE_ARGS+=(
-                  "-DCMAKE_TOOLCHAIN_FILE=$VCPKG_TOOLCHAIN"
-                  "-DOPENSSL_ROOT_DIR=${{ github.workspace }}/vcpkg/installed/x64-windows"
-                )
-              else
-                echo "[ci] vcpkg toolchain not present; falling back to Program Files OpenSSL discovery"
-              fi
             fi
           fi
           if [[ -n "$SANITIZER_FLAGS" ]]; then
