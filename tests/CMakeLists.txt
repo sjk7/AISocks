@@ -115,7 +115,7 @@ if(NOT APPLE)
         target_compile_options(test_pch_host PRIVATE
             /utf-8
             $<$<CONFIG:Release>:/O1>
-            $<$<CONFIG:Debug>:/Zi>
+            $<$<CONFIG:Debug>:/Z7>
             $<$<CONFIG:Debug>:/Od>
         )
     endif()
