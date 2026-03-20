@@ -717,7 +717,30 @@ void HttpPollServer::resetAfterSend_(HttpClientState& s) {
 ServerResult HttpPollServer::onIdle() {
     tracker_.record(clientCount(), peakClientCount());
     if (accessLogger_) accessLogger_->flush();
+
+    // Periodically flush TLS errors (e.g., every 10 seconds under load)
+    const auto now = std::chrono::steady_clock::now();
+    if (suppressedTlsErrors_ > 0 &&
+        std::chrono::duration_cast<std::chrono::seconds>(now - lastTlsErrorFlush_).count() >= 10) {
+        flushTlsErrors();
+    }
+
     return ServerBase<HttpClientState>::onIdle();
+}
+
+void HttpPollServer::recordTlsHandshakeSuppressed() {
+    suppressedTlsErrors_++;
+}
+
+void HttpPollServer::flushTlsErrors() {
+    if (suppressedTlsErrors_ > 0) {
+        if (accessLogger_) {
+            // Internal log entry for suppressed handshake errors
+            accessLogger_->logHandshakeSuppression(suppressedTlsErrors_);
+        }
+        suppressedTlsErrors_ = 0;
+    }
+    lastTlsErrorFlush_ = std::chrono::steady_clock::now();
 }
 
 } // namespace aiSocks

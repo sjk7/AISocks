@@ -62,6 +62,9 @@ class AccessLogger {
     // entries are lost.
     void flush();
 
+    // Log a summary message for TLS handshake suppression during load.
+    void logHandshakeSuppression(uint64_t count);
+
     // ---- static helpers used by the wiring code -------------------------
 
     // Extract the first request line from a raw HTTP request buffer.

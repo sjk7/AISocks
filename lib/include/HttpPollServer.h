@@ -422,9 +422,6 @@ class HttpPollServer : public ServerBase<HttpClientState> {
     ServerResult onWritable(TcpSocket& sock, HttpClientState& s) final;
     ServerResult onIdle() override;
 
-    // Flush any pending TLS error counters to the log.
-    void flushTlsErrors();
-
     bool runTlsHandshakeStage_(
         TcpSocket& sock, HttpClientState& s, ServerResult& out);
     bool runRequestFrameInspectionStage_(

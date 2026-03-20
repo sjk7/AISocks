@@ -71,6 +71,17 @@ void AccessLogger::flush() {
     if (file_.isOpen()) file_.flush();
 }
 
+void AccessLogger::logHandshakeSuppression(uint64_t count) {
+    if (!file_.isOpen()) return;
+    const std::string line = "[TLS Handshake Suppression] Count: "
+        + std::to_string(count) + " during high load window\n";
+    file_.write(line.data(), 1, line.size());
+    if (++writeCount_ >= 64) {
+        writeCount_ = 0;
+        file_.flush();
+    }
+}
+
 // ---------------------------------------------------------------------------
 // extractRequestLine
 // ---------------------------------------------------------------------------
