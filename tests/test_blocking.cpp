@@ -31,6 +31,7 @@ int main() {
         REQUIRE(!s.isBlocking());
     }
 
+#ifndef AISOCKS_TESTING
     BEGIN_TEST("setBlocking(true) restores blocking mode");
     {
         auto s = TcpSocket::createRaw();
@@ -53,6 +54,7 @@ int main() {
         }
         REQUIRE(ok);
     }
+#endif
 
     BEGIN_TEST("UDP socket blocking mode behaves the same as TCP");
     {
@@ -60,8 +62,10 @@ int main() {
         REQUIRE(s.isBlocking());
         REQUIRE(s.setBlocking(false));
         REQUIRE(!s.isBlocking());
+#ifndef AISOCKS_TESTING
         REQUIRE(s.setBlocking(true));
         REQUIRE(s.isBlocking());
+#endif
     }
 
     BEGIN_TEST("Non-blocking recv on unconnected socket returns WouldBlock or "

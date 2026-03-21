@@ -281,9 +281,6 @@ static void test_poller_async_connect() {
             "no Poller poll needed");
     }
 
-    // Restore blocking mode before using the socket normally.
-    REQUIRE(client.setBlocking(true));
-
     // Accept the connection on the server side.
     auto srvConn = srv.accept();
     REQUIRE(srvConn != nullptr);
@@ -291,11 +288,11 @@ static void test_poller_async_connect() {
     // Round-trip: server sends, client receives.
     if (srvConn) {
         const std::string msg = "async-connected";
+        // In non-blocking mode, sendAll and receiveAll will retry on EAGAIN/EWOULDBLOCK.
         REQUIRE(srvConn->sendAll(msg.data(), msg.size()));
         char buf[64]{};
-        int n = client.receive(buf, sizeof(buf) - 1);
-        REQUIRE(n == static_cast<int>(msg.size()));
-        REQUIRE(std::string(buf, static_cast<size_t>(n)) == msg);
+        REQUIRE(client.receiveAll(buf, msg.size()));
+        REQUIRE(std::string(buf, msg.size()) == msg);
     }
 }
 

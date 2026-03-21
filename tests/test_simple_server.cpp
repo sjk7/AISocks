@@ -222,12 +222,12 @@ static void test_accept_clients() {
         serverReady.store(true);
         server.acceptClients(
             [&](TcpSocket& sock) {
-                // acceptClients sets the socket non-blocking; make it blocking
-                // so receive() waits for the client's data to arrive.
-                sock.setBlocking(true);
+                // acceptClients sets the socket non-blocking. Use receiveAll
+                // to handle EAGAIN gracefully while echoing.
                 char buf[64] = {};
-                int n = sock.receive(buf, sizeof(buf));
-                if (n > 0) sock.send(buf, n); // echo
+                if (sock.receiveAll(buf, 4)) {
+                    sock.sendAll(buf, 4); // echo
+                }
                 ++callbackCount;
             },
             ClientLimit{2});

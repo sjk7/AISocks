@@ -501,7 +501,7 @@ int main() {
     test_partial_io_and_eintr();
     test_tls_policy_enforcement();
     test_tls_invalid_files();
-    // test_dns_failure_result();
+    test_dns_failure_result();
     test_socket_option_failure();
     test_hostile_http_parsing();
     test_abrupt_disconnect();

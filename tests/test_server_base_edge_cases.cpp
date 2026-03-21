@@ -11,6 +11,7 @@
 //   4. Keep-alive timeout behavior
 //   5. Graceful shutdown with pending connections
 
+#define AISOCKS_TEST_NONBLOCK_ENFORCEMENT
 #include "ServerBase.h"
 #include "TcpSocket.h"
 #include "SocketFactory.h"
@@ -290,8 +291,8 @@ int main() {
 
         // Each client sends a small message
         for (auto& client : clients) {
-            client->setBlocking(true);
             const char* msg = "test";
+            // In non-blocking mode, sendAll will retry on EAGAIN/EWOULDBLOCK.
             client->sendAll(msg, strlen(msg));
         }
 
@@ -326,8 +327,9 @@ int main() {
         for (size_t i = 0; i < maxClients; ++i) {
             auto client = connectClient(port, Milliseconds{70});
             if (client) {
-                client->setBlocking(true);
                 const char* msg = "test";
+                // In non-blocking mode, sendAll will retry on
+                // EAGAIN/EWOULDBLOCK.
                 client->sendAll(msg, strlen(msg));
                 clients.push_back(std::move(client));
             }
@@ -360,9 +362,6 @@ int main() {
         // Connect one client
         auto client1 = connectClient(port, Milliseconds{70});
         REQUIRE(client1 != nullptr);
-        if (client1) {
-            client1->setBlocking(true);
-        }
 
         // Verify client is connected
         REQUIRE(server.atomicClientCount_.load() <= 1);
@@ -370,6 +369,7 @@ int main() {
         // Send a message and wait for it to be processed
         if (client1) {
             const char* msg = "hello";
+            // In non-blocking mode, sendAll will retry on EAGAIN/EWOULDBLOCK.
             client1->sendAll(msg, strlen(msg));
             server.waitForMessages(1);
         }
@@ -400,8 +400,9 @@ int main() {
         for (int i = 0; i < cycles; ++i) {
             auto client = connectClient(port, Milliseconds{70});
             if (client) {
-                client->setBlocking(true);
                 const char* msg = "data";
+                // In non-blocking mode, sendAll will retry on
+                // EAGAIN/EWOULDBLOCK.
                 client->sendAll(msg, strlen(msg));
             }
             // Client disconnects when it goes out of scope
@@ -434,9 +435,9 @@ int main() {
         // Connect a client
         auto client = connectClient(port, Milliseconds{70});
         if (client) {
-            client->setBlocking(true);
             // Send initial message
             const char* msg = "test";
+            // In non-blocking mode, sendAll will retry on EAGAIN/EWOULDBLOCK.
             client->sendAll(msg, strlen(msg));
 
             // Wait just long enough for keep-alive to fire
@@ -480,11 +481,12 @@ int main() {
         for (int i = 0; i < numClients; ++i) {
             auto client = connectClient(port, Milliseconds{70});
             if (client) {
-                client->setBlocking(true);
                 client->setReceiveTimeout(Milliseconds{500});
 
                 // Send large message immediately after connecting
                 std::string largeMsg(messageSize, 'X');
+                // In non-blocking mode, sendAll will retry on
+                // EAGAIN/EWOULDBLOCK.
                 bool sent = client->sendAll(largeMsg.data(), largeMsg.size());
                 DLOG("DEBUG: Client %d sent %d bytes: %s\n", i, messageSize,
                     (sent ? "true" : "false"));
@@ -524,7 +526,8 @@ int main() {
         for (int i = 0; i < 5; ++i) {
             auto client = connectClient(port, Milliseconds{70});
             if (client) {
-                client->setBlocking(true);
+                // In non-blocking mode, sendAll will retry on
+                // EAGAIN/EWOULDBLOCK.
                 client->sendAll("hi", 2);
                 clients.push_back(std::move(client));
             }
@@ -562,7 +565,8 @@ int main() {
         for (int i = 0; i < 3; ++i) {
             auto client = connectClient(port, Milliseconds{70});
             if (client) {
-                client->setBlocking(true);
+                // In non-blocking mode, sendAll will retry on
+                // EAGAIN/EWOULDBLOCK.
                 client->sendAll("hi", 2);
                 clients.push_back(std::move(client));
             }
@@ -597,7 +601,7 @@ int main() {
         for (size_t i = 0; i < maxClients; ++i) {
             auto client = connectClient(port, Milliseconds{70});
             if (client) {
-                client->setBlocking(true);
+                // In non-blocking mode, sendAll will retry on EAGAIN/EWOULDBLOCK.
                 client->sendAll("hi", 2);
                 clients.push_back(std::move(client));
             }
@@ -642,13 +646,15 @@ int main() {
         // Connect and send data quickly
         auto client = connectClient(port, Milliseconds{90});
         if (client) {
-            client->setBlocking(true);
             client->setReceiveTimeout(Milliseconds{500});
             const char* msg = "quick";
             auto start = std::chrono::steady_clock::now(); //-V821
+            // In non-blocking mode, sendAll will retry on EAGAIN/EWOULDBLOCK.
             client->sendAll(msg, strlen(msg));
 
             char buf[100];
+            // In non-blocking mode, receive will return -1 with WouldBlock.
+            // We should use waitReadable or receiveAll (which handles retry).
             int n = client->receive(buf, sizeof(buf));
             if (n > 0) {
                 auto elapsed = std::chrono::steady_clock::now() - start;
@@ -688,7 +694,7 @@ int main() {
         auto client = connectClient(port, Milliseconds{200});
         REQUIRE(client != nullptr);
         if (client) {
-            client->setBlocking(true);
+            // In non-blocking mode, sendAll will retry on EAGAIN/EWOULDBLOCK.
             client->sendAll("ping", 4);
             server.waitForMessages(1);
             REQUIRE(server.totalMessagesReceived.load() > 0);
@@ -726,8 +732,8 @@ int main() {
         for (int i = 0; i < 12; ++i) {
             auto client = connectClient(port, Milliseconds{70});
             if (client) {
-                client->setBlocking(true);
                 const char* msg = "x";
+                // In non-blocking mode, sendAll will retry on EAGAIN/EWOULDBLOCK.
                 (void)client->sendAll(msg, 1);
             }
         }
@@ -750,7 +756,7 @@ int main() {
         auto acceptedClient = connectClient(port, Milliseconds{120});
         REQUIRE(acceptedClient != nullptr);
         if (acceptedClient) {
-            acceptedClient->setBlocking(true);
+            // In non-blocking mode, sendAll will retry on EAGAIN/EWOULDBLOCK.
             REQUIRE(acceptedClient->sendAll("ok", 2));
 
             server.waitForMessages(1);

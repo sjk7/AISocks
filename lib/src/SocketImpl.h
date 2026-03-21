@@ -11,6 +11,8 @@
 #include "Result.h"
 #include <chrono>
 #include <vector>
+#include <cassert>
+#include <cstdio>
 
 #ifdef _WIN32
 #ifndef NOMINMAX

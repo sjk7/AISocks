@@ -293,7 +293,9 @@ void SocketImpl::propagateSocketProps(SocketImpl& child) const {
     // Blocking mode: POSIX does not guarantee that ::accept() inherits
     // O_NONBLOCK — on Linux and macOS the returned fd is always blocking.
     // Explicitly match the listener's mode so the child is consistent.
+#define AISOCKS_INTERNAL_CALL
     child.setBlocking(blockingMode);
+#undef AISOCKS_INTERNAL_CALL
 
     // Server-wide socket policies: options set once on the listening socket
     // that should apply to every accepted connection.
