@@ -6,6 +6,7 @@
 
 #pragma once
 
+#include <atomic>
 #include <memory>
 #include <string>
 #include <vector>
@@ -20,10 +21,12 @@ struct ssl_st;
 namespace aiSocks {
 
 // TLS handshake metrics collected across a server lifetime.
+// Counter fields are atomic so the server thread can increment them
+// while another thread observes them (e.g. waitUntil in tests).
 struct TlsMetrics {
-    uint64_t handshakeSuccessCount{0};
-    uint64_t handshakeFailureCount{0};
-    uint64_t handshakeTimeoutCount{0};
+    std::atomic<uint64_t> handshakeSuccessCount{0};
+    std::atomic<uint64_t> handshakeFailureCount{0};
+    std::atomic<uint64_t> handshakeTimeoutCount{0};
     // Distribution: protocol name -> count (e.g., "TLSv1.2", "TLSv1.3")
     std::map<std::string, uint64_t> protocolDistribution;
     // Distribution: cipher name -> count
