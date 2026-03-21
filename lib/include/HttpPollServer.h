@@ -406,6 +406,8 @@ class HttpPollServer : public ServerBase<HttpClientState> {
     bool slowlorisExpired(const HttpClientState& s,
         std::chrono::steady_clock::time_point now, int timeoutMs) const;
 
+    ServerResult onIdle() override;
+
     private:
     IpFilter* ipFilter_{nullptr};
     AccessLogger* accessLogger_{nullptr};
@@ -420,7 +422,6 @@ class HttpPollServer : public ServerBase<HttpClientState> {
 
     ServerResult onReadable(TcpSocket& sock, HttpClientState& s) final;
     ServerResult onWritable(TcpSocket& sock, HttpClientState& s) final;
-    ServerResult onIdle() override;
 
     bool runTlsHandshakeStage_(
         TcpSocket& sock, HttpClientState& s, ServerResult& out);
