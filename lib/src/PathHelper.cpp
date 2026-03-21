@@ -15,7 +15,6 @@
 #ifdef _WIN32
 #include <direct.h>
 #include <windows.h>
-#define stat _stat64
 #ifndef S_ISDIR
 #define S_ISDIR(m) (((m) & _S_IFMT) == _S_IFDIR)
 #endif
@@ -325,33 +324,33 @@ std::string PathHelper::joinPath(
 
 namespace {
 
-bool createDirectorySingle_(const std::string& path) {
+    bool createDirectorySingle_(const std::string& path) {
 #ifdef _WIN32
-    if (_mkdir(path.c_str()) == 0) return true;
-    if (errno == EEXIST) return PathHelper::isDirectory(path);
-    return false;
+        if (_mkdir(path.c_str()) == 0) return true;
+        if (errno == EEXIST) return PathHelper::isDirectory(path);
+        return false;
 #else
-    if (mkdir(path.c_str(), 0755) == 0) return true;
-    if (errno == EEXIST) return PathHelper::isDirectory(path);
-    return false;
+        if (mkdir(path.c_str(), 0755) == 0) return true;
+        if (errno == EEXIST) return PathHelper::isDirectory(path);
+        return false;
 #endif
-}
+    }
 
-bool removeFileOrSymlink_(const std::string& path) {
+    bool removeFileOrSymlink_(const std::string& path) {
 #ifdef _WIN32
-    return DeleteFileA(path.c_str()) != 0;
+        return DeleteFileA(path.c_str()) != 0;
 #else
-    return unlink(path.c_str()) == 0;
+        return unlink(path.c_str()) == 0;
 #endif
-}
+    }
 
-bool removeDirectorySingle_(const std::string& path) {
+    bool removeDirectorySingle_(const std::string& path) {
 #ifdef _WIN32
-    return RemoveDirectoryA(path.c_str()) != 0;
+        return RemoveDirectoryA(path.c_str()) != 0;
 #else
-    return rmdir(path.c_str()) == 0;
+        return rmdir(path.c_str()) == 0;
 #endif
-}
+    }
 
 } // namespace
 
