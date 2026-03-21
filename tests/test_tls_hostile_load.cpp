@@ -136,8 +136,9 @@ void test_tls_hostile_stalled_handshake_load() {
     auto result = client.get(url);
 
     // Wait until at least one stalled handshake times out.
-    // We check this AFTER the valid client request to ensure the server 
-    // had a chance to process the background timeouts while serving a real client.
+    // We check this AFTER the valid client request to ensure the server
+    // had a chance to process the background timeouts while serving a real
+    // client.
     const bool timeoutOccurred = waitUntil(
         [&server]() {
             return server.getTlsMetrics().handshakeTimeoutCount > 0;

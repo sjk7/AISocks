@@ -213,7 +213,7 @@ class HttpsPollServer : public HttpPollServer {
                     return ServerResult::KeepConnection;
                 const auto elapsed
                     = std::chrono::duration_cast<std::chrono::milliseconds>(
-                          now - s.startTime)
+                        now - s.startTime)
                           .count();
                 if (elapsed > tlsHandshakeTimeoutMs_) {
                     std::fprintf(stderr,

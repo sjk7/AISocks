@@ -584,9 +584,9 @@ template <typename ClientData> class ServerBase {
     // immediately (onDisconnect is called, socket shut down).  Iteration
     // uses a snapshot of the fd list so disconnecting during the sweep is
     // safe.  Must only be called from the server thread (e.g. onIdle).
-    template <typename Fn>
-    void sweepClients(Fn&& fn) {
-        const auto fds = clientFds_; // snapshot — safe to disconnect during iter
+    template <typename Fn> void sweepClients(Fn&& fn) {
+        const auto fds
+            = clientFds_; // snapshot — safe to disconnect during iter
         for (uintptr_t fd : fds) {
             ClientEntry* ce = findClient(fd);
             if (!ce) continue;
