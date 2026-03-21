@@ -43,6 +43,7 @@ namespace {
 
     void tlsDebugLog_(const std::string& msg) {
         if (!tlsDebugEnabled_()) return;
+        // AISocks: Security hardening verification - CI trigger
         std::fprintf(stderr, "[tls-debug] %s\n", msg.c_str());
     }
 } // namespace
