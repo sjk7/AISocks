@@ -78,7 +78,7 @@ void test_http_pipelining_partial() {
 
     TestSimpleHttpServer server(ServerBind{"127.0.0.1", Port::any});
     std::thread serverThread(
-        [&]() { server.run(ClientLimit::Default, Milliseconds{100}); });
+        [&]() { server.run(ClientLimit::Default, Milliseconds{1}); });
     server.waitReady();
     Port port = server.getLocalPort();
 
@@ -365,7 +365,7 @@ void test_hostile_http_parsing() {
     // are handled.
     TestSimpleHttpServer server(ServerBind{"127.0.0.1", Port::any});
     std::thread serverThread(
-        [&]() { server.run(ClientLimit::Default, Milliseconds{100}); });
+        [&]() { server.run(ClientLimit::Default, Milliseconds{1}); });
     server.waitReady();
     Port port = server.getLocalPort();
 
