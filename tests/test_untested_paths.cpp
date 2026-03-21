@@ -15,6 +15,8 @@
 #include "UrlCodec.h"
 #include "test_helpers.h"
 
+#define AISOCKS_TEST_NONBLOCK_ENFORCEMENT
+
 #ifdef AISOCKS_ENABLE_TLS
 #include "TlsOpenSsl.h"
 #endif
