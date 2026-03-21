@@ -49,6 +49,7 @@ set(TEST_SOURCES
     test_ip_filter
     test_access_logger
     test_untested_paths
+    test_dual_server_orchestrator
 )
 
 # Slow tests (disabled by default, enable with -DALLOW_SLOW_TESTS=ON)

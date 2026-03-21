@@ -5,13 +5,9 @@
 // https://pvs-studio.com
 
 // dual_http_https_server.cpp
-// Example: Run both HTTP and HTTPS servers in one process using aiSocks
+// Example: Run both HTTP and HTTPS servers in one process using DualServerOrchestrator
 
-#include "HttpFileServer.h"
-#ifdef AISOCKS_ENABLE_TLS
-#include "HttpsFileServer.h"
-#endif
-#include <thread>
+#include "DualServerOrchestrator.h"
 #include <cstdio>
 #include <string>
 
@@ -20,51 +16,39 @@ using namespace aiSocks;
 int main(int argc, char** argv) {
     std::string wwwRoot = "./www";
     uint16_t httpPort = 8080;
-#ifdef AISOCKS_ENABLE_TLS
-    uint16_t httpsPort = 443;
-#endif
-    if (argc > 1) {
-        wwwRoot = argv[1];
-    }
-    if (argc > 2) {
-        httpPort = static_cast<uint16_t>(std::stoi(argv[2]));
-    }
-#ifdef AISOCKS_ENABLE_TLS
-    if (argc > 3) {
-        httpsPort = static_cast<uint16_t>(std::stoi(argv[3]));
-    }
-#endif
+    uint16_t httpsPort = 8443;
+
+    if (argc > 1) wwwRoot = argv[1];
+    if (argc > 2) httpPort = static_cast<uint16_t>(std::stoi(argv[2]));
+    if (argc > 3) httpsPort = static_cast<uint16_t>(std::stoi(argv[3]));
 
     // Shared config for both servers
     HttpFileServer::Config config;
-    config.documentRoot = wwwRoot; //-V820
+    config.documentRoot = wwwRoot;
     config.indexFile = "index.html";
     config.enableDirectoryListing = true;
-    config.enableETag = true;
-    config.enableLastModified = true;
     config.enableSecurityHeaders = true;
-    config.maxFileSize = 50 * 1024 * 1024;
-    config.customHeaders["Server"] = "Dual-HTTP-HTTPS/1.0";
-    config.customHeaders["X-Content-Type-Options"] = "nosniff";
-    config.customHeaders["X-Frame-Options"] = "DENY";
+    config.customHeaders["Server"] = "Dual-Orchestrator/1.0";
 
-    // HTTP
-    HttpFileServer httpServer(ServerBind{"0.0.0.0", Port{httpPort}}, config);
-    std::thread httpThread(
-        [&] { httpServer.run(ClientLimit::Unlimited, Milliseconds{1}); });
+    DualServerOrchestrator::Ports ports{httpPort, httpsPort};
 
 #ifdef AISOCKS_ENABLE_TLS
-    // HTTPS
     TlsServerConfig tls{"server-cert.pem", "server-key.pem"};
-    HttpsFileServer httpsServer(
-        ServerBind{"0.0.0.0", Port{httpsPort}}, config, tls);
-    std::thread httpsThread(
-        [&] { httpsServer.run(ClientLimit::Unlimited, Milliseconds{1}); });
+    DualServerOrchestrator orchestrator(ports, config, &tls);
+#else
+    DualServerOrchestrator orchestrator(ports, config, nullptr);
 #endif
 
-    httpThread.join();
-#ifdef AISOCKS_ENABLE_TLS
-    httpsThread.join();
-#endif
+    if (!orchestrator.isValid()) {
+        fprintf(stderr, "Failed to start servers (check ports or certificates)\n");
+        return 1;
+    }
+
+    printf("Starting dual servers on port %u (HTTP) and %u (HTTPS)...\n", 
+           ports.http, ports.https);
+
+    orchestrator.run(); // Blocks until completion
+
     return 0;
 }
+

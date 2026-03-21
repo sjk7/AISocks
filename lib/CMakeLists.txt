@@ -27,6 +27,7 @@ add_library(aiSocksLib STATIC
     src/UrlCodec.cpp
     src/IpFilter.cpp
     src/AccessLogger.cpp
+    src/DualServerOrchestrator.cpp
 )
 
 if(AISOCKS_ENABLE_TLS)
