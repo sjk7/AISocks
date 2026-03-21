@@ -11,6 +11,11 @@
 #include "HttpFileServer.h"
 #include "FileServerUtils.h"
 #include "test_helpers.h"
+
+#ifdef AISOCKS_ENABLE_TLS
+#include "TlsOpenSsl.h"
+#endif
+
 #include <thread>
 #include <chrono>
 #include <vector>
@@ -104,8 +109,10 @@ void test_http_cache_precedence() {
     // We test the logic in HttpFileServer::checkCacheConditions_ directly if possible,
     // or via a mock since it relies on file system state.
     
+#ifdef AISOCKS_ENABLE_TLS
     TlsContext::Mode mode = TlsContext::Mode::Server; // Dummy for type alignment
     (void)mode;
+#endif
 
     // Precedence test: ETag vs Modified-Since
     // According to RFC 7232, If-None-Match (ETag) takes precedence.
@@ -136,6 +143,7 @@ void test_http_cache_precedence() {
 void test_tls_alpn_negotiation_manual() {
     BEGIN_TEST("test_tls_alpn_negotiation_manual");
     
+#ifdef AISOCKS_ENABLE_TLS
     if (!TlsOpenSsl::initialize()) return;
 
     auto ctx = TlsContext::create(TlsContext::Mode::Server);
@@ -150,6 +158,7 @@ void test_tls_alpn_negotiation_manual() {
     REQUIRE(ok);
 #else
     (void)ok;
+#endif
 #endif
 }
 
@@ -209,6 +218,7 @@ void test_partial_io_and_eintr() {
 void test_tls_policy_enforcement() {
     BEGIN_TEST("test_tls_policy_enforcement");
 
+#ifdef AISOCKS_ENABLE_TLS
     const std::string repoRoot = repoRootFromFile(__FILE__);
     const std::string cert = repoRoot + "/tests/certs/test_cert.pem";
     const std::string key = repoRoot + "/tests/certs/test_key.pem";
@@ -254,6 +264,7 @@ void test_tls_policy_enforcement() {
         bool ok = ctx->applyPolicy(policy);
         REQUIRE(ok);
     }
+#endif
 }
 
 int main() {
