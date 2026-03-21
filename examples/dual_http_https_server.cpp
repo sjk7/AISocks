@@ -5,7 +5,8 @@
 // https://pvs-studio.com
 
 // dual_http_https_server.cpp
-// Example: Run both HTTP and HTTPS servers in one process using DualServerOrchestrator
+// Example: Run both HTTP and HTTPS servers in one process using
+// DualServerOrchestrator
 
 #include "DualServerOrchestrator.h"
 #include <cstdio>
@@ -40,15 +41,15 @@ int main(int argc, char** argv) {
 #endif
 
     if (!orchestrator.isValid()) {
-        fprintf(stderr, "Failed to start servers (check ports or certificates)\n");
+        fprintf(
+            stderr, "Failed to start servers (check ports or certificates)\n");
         return 1;
     }
 
-    printf("Starting dual servers on port %u (HTTP) and %u (HTTPS)...\n", 
-           ports.http, ports.https);
+    printf("Starting dual servers on port %u (HTTP) and %u (HTTPS)...\n",
+        ports.http, ports.https);
 
     orchestrator.run(); // Blocks until SIGINT/SIGTERM or error
 
     return 0;
 }
-

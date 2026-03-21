@@ -51,14 +51,19 @@ static uint32_t interestToEpollEvents(PollEvent interest) {
 }
 
 // Returns the epoll_wait() timeout in milliseconds.
-//   == 0  → -1 (block forever: epoll_wait with -1 waits indefinitely)
+//   == 0  → 100ms (never block forever, always check stop flags)
 //   < 0   → 1ms minimum (avoid busy-spin)
-//   > 0   → value clamped to INT_MAX
+//   > 0   → value capped at 100ms
+// The 100ms cap ensures run() can check the stop flag even for long
+// timeouts. On POSIX, while signals interrupt epoll_wait(), having a periodic
+// return provides a fallback.
 static int toEpollTimeout_(Milliseconds timeout) {
+    static constexpr int64_t MAX_WAIT_MS = 100;
     int64_t ms = timeout.count;
-    if (ms == 0) return -1; // block forever
-    if (ms < 0) return 1;
-    return static_cast<int>(std::min(ms, static_cast<int64_t>(INT_MAX)));
+    if (ms <= 0) ms = MAX_WAIT_MS; // No infinite wait, always check stop flags
+    if (ms > MAX_WAIT_MS) ms = MAX_WAIT_MS;
+
+    return static_cast<int>(ms);
 }
 
 // Translates raw epoll event flags into the platform-neutral PollEvent mask.

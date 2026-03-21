@@ -11,7 +11,9 @@
 #ifdef AISOCKS_ENABLE_TLS
 #include "HttpsFileServer.h"
 #else
-namespace aiSocks { struct TlsServerConfig {}; }
+namespace aiSocks {
+struct TlsServerConfig {};
+} // namespace aiSocks
 #endif
 
 #include <memory>
@@ -20,13 +22,14 @@ namespace aiSocks { struct TlsServerConfig {}; }
 namespace aiSocks {
 
 /**
- * @brief Orchestrates both an HTTP and optional HTTPS file server in a single process.
- * 
- * Provides a "compiler firewall" (PImpl) to keep threading and internal 
+ * @brief Orchestrates both an HTTP and optional HTTPS file server in a single
+ * process.
+ *
+ * Provides a "compiler firewall" (PImpl) to keep threading and internal
  * server details out of the public header.
  */
 class DualServerOrchestrator {
-public:
+    public:
     struct Ports {
         uint16_t http = 8080;
         uint16_t https = 8443;
@@ -34,14 +37,14 @@ public:
 
     /**
      * @brief Construct a new orchestrator.
-     * 
+     *
      * @param ports Ports to listen on.
      * @param config Shared configuration for both servers.
      * @param tls Optional TLS configuration.
      */
     DualServerOrchestrator(const Ports& ports,
-                          const HttpFileServer::Config& config,
-                          const TlsServerConfig* tls = nullptr);
+        const HttpFileServer::Config& config,
+        const TlsServerConfig* tls = nullptr);
 
     ~DualServerOrchestrator();
 
@@ -56,12 +59,13 @@ public:
     void setIpFilter(IpFilter* filter);
 
     /**
-     * @brief Run both servers. Blocks until stop() is called or signals are received.
+     * @brief Run both servers. Blocks until stop() is called or signals are
+     * received.
      * @param limit Connection limit per server.
      * @param timeout Poller timeout.
      */
-    void run(ClientLimit limit = ClientLimit::Default, 
-             Milliseconds timeout = Milliseconds{10});
+    void run(ClientLimit limit = ClientLimit::Default,
+        Milliseconds timeout = Milliseconds{10});
 
     /**
      * @brief Gracefully stop both servers.
@@ -73,7 +77,7 @@ public:
      */
     bool isValid() const;
 
-private:
+    private:
     struct Impl;
     std::unique_ptr<Impl> pimpl_;
 };

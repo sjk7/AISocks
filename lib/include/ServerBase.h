@@ -353,9 +353,21 @@ template <typename ClientData> class ServerBase {
         Milliseconds timeout = poll_min) {
         if (!prepare(maxClients)) return;
 
-        while (poll(timeout)) {
-            // continue until stop condition met
-        }
+        // [AISOCKS] Optimization: If running the default loop (not using poll() 
+        // step-by-step), use the loop_.run() directly. This is more efficient 
+        // and avoids the "early return" logic inside poll().
+        loop_.run(
+            timeout,
+            [&](TcpSocket& sock, PollEvent ev) {
+                return handleSocketEvent_(
+                    sock, ev, accepting_, maxClients_, acceptedCount_);
+            },
+            [&](bool idle) {
+                return handleAfterBatch_(idle, accepting_, maxClients_);
+            },
+            [&]() -> bool {
+                return stopRequested() || (!accepting_ && clientFds_.empty());
+            });
 
         finish();
     }

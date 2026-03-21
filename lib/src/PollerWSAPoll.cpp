@@ -94,17 +94,16 @@ bool Poller::remove(const Socket& s) {
 }
 
 // Returns the WSAPoll() timeout in milliseconds.
-//   == 0  → -1 (block forever: WSAPoll with -1 waits indefinitely)
+//   == 0  → 100ms (never block forever on Windows, always check stop flags)
 //   < 0   → 1ms minimum (avoid busy-spin)
 //   > 0   → value capped at 100ms
 // The 100ms cap ensures run() can check the stop flag even for long
 // timeouts.  On Windows, std::signal handlers fire on a separate thread,
 // so WSAPoll must return frequently enough for the stop flag to be observed.
 static int toWSAPollTimeout_(Milliseconds timeout) {
-    int64_t ms = timeout.count;
-    if (ms == 0) return -1; // block forever
-    if (ms < 0) ms = 1;
     static constexpr int MAX_WAIT_MS = 100;
+    int64_t ms = timeout.count;
+    if (ms <= 0) return MAX_WAIT_MS; // Return default cap for infinite/0 wait
     return (ms > MAX_WAIT_MS) ? MAX_WAIT_MS : static_cast<int>(ms);
 }
 

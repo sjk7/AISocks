@@ -124,6 +124,15 @@ Result<TcpSocket> SocketFactory::createTcpServer(
             "bind() failed - address already in use or invalid",
             captureLastError(), false);
 
+    // [AISOCKS] CRITICAL: Enforce non-blocking on Windows/Linux/macOS before
+    // first accept.
+    // AISocks servers are strictly non-blocking.  Failure to set this mode
+    // before starting the poll loop will cause accept() to block on
+    // connection spikes, stalling the entire event loop.
+#define AISOCKS_INTERNAL_CALL
+    socket.setBlocking(false);
+#undef AISOCKS_INTERNAL_CALL
+
     if (!socket.listen(config.backlog))
         return Result<TcpSocket>::failure(socket.getLastError(),
             ("listen(backlog=" + std::to_string(config.backlog) + ")").c_str(),

@@ -258,11 +258,12 @@ bool SocketImpl::listen(int backlog) {
 }
 
 void SocketImpl::propagateSocketProps(SocketImpl& child) const {
-    // Blocking mode: POSIX does not guarantee that ::accept() inherits
-    // O_NONBLOCK — on Linux and macOS the returned fd is always blocking.
-    // Explicitly match the listener's mode so the child is consistent.
+    // [AISOCKS] CRITICAL: Enforce non-blocking for all accepted clients.
+    // AISocks is a poll-driven, single-threaded (per loop) library. Any
+    // blocking socket in the poller sets will cause the entire server to
+    // hang, leading to CI timeouts and production stalls.
 #define AISOCKS_INTERNAL_CALL
-    child.setBlocking(blockingMode);
+    child.setBlocking(false); // ALWAYS non-blocking for accepted clients
 #undef AISOCKS_INTERNAL_CALL
 
     // Server-wide socket policies: options set once on the listening socket
