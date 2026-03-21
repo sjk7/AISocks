@@ -601,7 +601,8 @@ int main() {
         for (size_t i = 0; i < maxClients; ++i) {
             auto client = connectClient(port, Milliseconds{70});
             if (client) {
-                // In non-blocking mode, sendAll will retry on EAGAIN/EWOULDBLOCK.
+                // In non-blocking mode, sendAll will retry on
+                // EAGAIN/EWOULDBLOCK.
                 client->sendAll("hi", 2);
                 clients.push_back(std::move(client));
             }
@@ -733,7 +734,8 @@ int main() {
             auto client = connectClient(port, Milliseconds{70});
             if (client) {
                 const char* msg = "x";
-                // In non-blocking mode, sendAll will retry on EAGAIN/EWOULDBLOCK.
+                // In non-blocking mode, sendAll will retry on
+                // EAGAIN/EWOULDBLOCK.
                 (void)client->sendAll(msg, 1);
             }
         }

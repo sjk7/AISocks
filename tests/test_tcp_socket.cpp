@@ -71,8 +71,7 @@ static void test_happy_construction() {
             REQUIRE(peer->isValid());
         });
 
-        TcpSocket c(AddressFamily::IPv4,
-            ConnectArgs{"127.0.0.1", port});
+        TcpSocket c(AddressFamily::IPv4, ConnectArgs{"127.0.0.1", port});
         REQUIRE(c.isValid());
 
         srvThread.join();
