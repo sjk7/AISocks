@@ -43,7 +43,7 @@ static void test_happy_construction() {
 
     BEGIN_TEST("TcpSocket: ServerBind ctor binds and listens in one step");
     {
-        TcpSocket srv(AddressFamily::IPv4, ServerBind{"127.0.0.1", Port::any});
+        TcpSocket srv(AddressFamily::IPv4, ServerBind{"127.0.0.1", Port::any, ""});
         REQUIRE(srv.isValid());
         auto ep = srv.getLocalEndpoint();
         REQUIRE(ep.isSuccess());
@@ -286,7 +286,7 @@ static void test_sad_construction() {
     {
         // First server should succeed
         TcpSocket first(AddressFamily::IPv4,
-            ServerBind{"127.0.0.1", Port::any, Backlog{5}, false});
+            ServerBind{"127.0.0.1", Port::any, Backlog{5, ""}, false});
         REQUIRE(first.isValid());
         uint16_t firstPort = 0;
         {
@@ -297,7 +297,7 @@ static void test_sad_construction() {
 
         // Second server should fail
         auto result = SocketFactory::createTcpServer(AddressFamily::IPv4,
-            ServerBind{"127.0.0.1", Port{firstPort}, Backlog{5}, false});
+            ServerBind{"127.0.0.1", Port{firstPort, ""}, Backlog{5}, false});
         REQUIRE(result.isError());
         REQUIRE(result.error() != SocketError::None);
     }
@@ -307,7 +307,7 @@ static void test_sad_construction() {
     BEGIN_TEST("TcpSocket(ServerBind): fails on invalid bind address");
     {
         auto result = SocketFactory::createTcpServer(
-            AddressFamily::IPv4, ServerBind{"999.999.999.999", Port::any});
+            AddressFamily::IPv4, ServerBind{"999.999.999.999", Port::any, ""});
         REQUIRE(result.isError());
         REQUIRE(result.error() == SocketError::BindFailed);
     }

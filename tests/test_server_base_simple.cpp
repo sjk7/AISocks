@@ -35,7 +35,7 @@ struct SimpleState {
 class SimpleServer : public ServerBase<SimpleState> {
     public:
     explicit SimpleServer(Port port)
-        : ServerBase<SimpleState>(ServerBind{"127.0.0.1", port, Backlog{5}}) {}
+        : ServerBase<SimpleState>(ServerBind{"127.0.0.1", port, Backlog{5, ""}}) {}
 
     std::atomic<size_t> atomicClientCount_{0};
 

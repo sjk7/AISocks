@@ -56,7 +56,7 @@ int main() {
     BEGIN_TEST("SocketFactory::createTcpServer succeeds");
     {
         auto result = SocketFactory::createTcpServer(
-            ServerBind{"127.0.0.1", Port::any});
+            ServerBind{"127.0.0.1", Port::any, ""});
         REQUIRE(result.isSuccess());
         auto& server = result.value();
         REQUIRE(server.isValid());
@@ -86,7 +86,7 @@ int main() {
         // Start server in background
         std::thread server_thread([&srvPort]() {
             auto srv_result = SocketFactory::createTcpServer(
-                ServerBind{"127.0.0.1", Port::any});
+                ServerBind{"127.0.0.1", Port::any, ""});
             if (srv_result.isSuccess()) {
                 auto ep = srv_result.value().getLocalEndpoint();
                 if (ep.isSuccess()) srvPort.store(ep.value().port.value());
@@ -145,7 +145,7 @@ int main() {
     {
         // First server (Port::any — OS picks an ephemeral port)
         auto first_result = SocketFactory::createTcpServer(
-            ServerBind{"127.0.0.1", Port::any, Backlog{5}, false});
+            ServerBind{"127.0.0.1", Port::any, Backlog{5, ""}, false});
         REQUIRE(first_result.isSuccess());
         uint16_t p19902 = 0;
         {
@@ -159,7 +159,7 @@ int main() {
 
         // Second server tries the same port without reuseAddr — must fail.
         auto second_result = SocketFactory::createTcpServer(
-            ServerBind{"127.0.0.1", Port{p19902}, Backlog{5}, false});
+            ServerBind{"127.0.0.1", Port{p19902, ""}, Backlog{5}, false});
         REQUIRE(second_result.isError());
         REQUIRE(second_result.error() != SocketError::None);
     }
@@ -168,7 +168,7 @@ int main() {
     BEGIN_TEST("SocketFactory::createUdpServer succeeds and is bound");
     {
         auto result = SocketFactory::createUdpServer(
-            ServerBind{"127.0.0.1", Port::any});
+            ServerBind{"127.0.0.1", Port::any, ""});
         REQUIRE(result.isSuccess());
         auto& sock = result.value();
         REQUIRE(sock.isValid());
@@ -182,7 +182,7 @@ int main() {
     BEGIN_TEST("SocketFactory::createUdpServer: client sends, server receives");
     {
         auto srv_result = SocketFactory::createUdpServer(
-            ServerBind{"127.0.0.1", Port::any});
+            ServerBind{"127.0.0.1", Port::any, ""});
         REQUIRE(srv_result.isSuccess());
         auto& srv = srv_result.value();
         REQUIRE(srv.setReceiveTimeout(Milliseconds{2000}));
@@ -211,7 +211,7 @@ int main() {
     BEGIN_TEST("SocketFactory::createUdpServer: bidirectional echo");
     {
         auto srv_result = SocketFactory::createUdpServer(
-            ServerBind{"127.0.0.1", Port::any});
+            ServerBind{"127.0.0.1", Port::any, ""});
         REQUIRE(srv_result.isSuccess());
         auto& srv = srv_result.value();
         REQUIRE(srv.setReceiveTimeout(Milliseconds{2000}));

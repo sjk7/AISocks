@@ -37,7 +37,7 @@ class SimpleEchoServer : public ServerBase<SimpleEchoState> {
     public:
     explicit SimpleEchoServer(Port port)
         : ServerBase<SimpleEchoState>(
-              ServerBind{"127.0.0.1", port, Backlog{5}}) {}
+              ServerBind{"127.0.0.1", port, Backlog{5, ""}}) {}
 
     std::atomic<size_t> atomicClientCount_{0};
 

@@ -66,7 +66,7 @@ struct MinimalState {
 class MinimalServer : public ServerBase<MinimalState> {
     public:
     explicit MinimalServer(Port port)
-        : ServerBase<MinimalState>(ServerBind{"127.0.0.1", port, Backlog{5}}) {}
+        : ServerBase<MinimalState>(ServerBind{"127.0.0.1", port, Backlog{5, ""}}) {}
 
     std::atomic<size_t> atomicClientCount_{0};
     std::atomic<int> readEvents_{0};

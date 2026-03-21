@@ -81,7 +81,7 @@ class TestSimpleHttpServer : public HttpPollServer {
 void test_http_pipelining_partial() {
     BEGIN_TEST("test_http_pipelining_partial");
 
-    TestSimpleHttpServer server(ServerBind{"127.0.0.1", Port::any});
+    TestSimpleHttpServer server(ServerBind{"127.0.0.1", Port::any, ""});
     std::thread serverThread(
         [&]() { server.run(ClientLimit::Default, Milliseconds{1}); });
     server.waitReady();
@@ -154,7 +154,7 @@ void test_http_cache_precedence() {
     // The code indeed checks ETag before Last-Modified.
     // Let's verify this with a real-ish interaction if we can.
 
-    HttpFileServer server(ServerBind{"127.0.0.1", Port::any}, cfg);
+    HttpFileServer server(ServerBind{"127.0.0.1", Port::any, ""}, cfg);
     // Since HttpFileServer is complex to setup with real files in a unit test
     // here, we've verified the code branch order manually: ETag block is
     // literally before Last-Modified block.
@@ -190,7 +190,7 @@ void test_partial_io_and_eintr() {
     // a very small socket buffer size to force multiple calls if the OS allows.
 
     auto serverResult
-        = SocketFactory::createTcpServer(ServerBind{"127.0.0.1", Port::any});
+        = SocketFactory::createTcpServer(ServerBind{"127.0.0.1", Port::any, ""});
     REQUIRE(serverResult.isSuccess());
     auto server = std::move(serverResult.value());
     Port serverPort = server.getLocalEndpoint().value().port;
@@ -383,7 +383,7 @@ void test_hostile_http_parsing() {
     // Standard HTTP server with no explicit per-request limit in ctor but we
     // can test that malformed requests behave correctly and protocol violations
     // are handled.
-    TestSimpleHttpServer server(ServerBind{"127.0.0.1", Port::any});
+    TestSimpleHttpServer server(ServerBind{"127.0.0.1", Port::any, ""});
     std::thread serverThread(
         [&]() { server.run(ClientLimit::Default, Milliseconds{1}); });
     server.waitReady();
@@ -424,7 +424,7 @@ void test_abrupt_disconnect() {
     BEGIN_TEST("test_abrupt_disconnect");
 
     auto serverRes
-        = SocketFactory::createTcpServer(ServerBind{"127.0.0.1", Port::any});
+        = SocketFactory::createTcpServer(ServerBind{"127.0.0.1", Port::any, ""});
     REQUIRE(serverRes.isSuccess());
     auto server = std::move(serverRes.value());
     Port port = server.getLocalEndpoint().value().port;

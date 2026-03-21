@@ -77,7 +77,7 @@ class TrackingServer : public SimpleServer {
 static void test_validity() {
     BEGIN_TEST("SimpleServer: isValid() true on valid bind");
     {
-        SimpleServer s(ServerBind{"127.0.0.1", Port::any});
+        SimpleServer s(ServerBind{"127.0.0.1", Port::any, ""});
         REQUIRE(s.isValid());
         REQUIRE(serverPort(s) != Port::any); // OS chose a real port
     }
@@ -86,7 +86,7 @@ static void test_validity() {
     {
         // Test bind failure directly without fatal exit
         auto result = SocketFactory::createTcpServer(
-            AddressFamily::IPv4, ServerBind{"999.999.999.999", Port::any});
+            AddressFamily::IPv4, ServerBind{"999.999.999.999", Port::any, ""});
         REQUIRE(result.isError());
     }
 }
@@ -102,7 +102,7 @@ static void test_poll_clients_echo() {
     std::string echoed;
     std::atomic<bool> serverReady{false};
 
-    SimpleServer server(ServerBind{"127.0.0.1", Port::any, Backlog{5}});
+    SimpleServer server(ServerBind{"127.0.0.1", Port::any, Backlog{5, ""}});
     REQUIRE(server.isValid());
     Port port = serverPort(server);
     REQUIRE(port != Port::any);
@@ -159,7 +159,7 @@ static void test_poll_clients_disconnect_on_false() {
     std::atomic<bool> serverReady{false};
     std::atomic<bool> callbackFired{false};
 
-    TrackingServer server(ServerBind{"127.0.0.1", Port::any, Backlog{5}});
+    TrackingServer server(ServerBind{"127.0.0.1", Port::any, Backlog{5, ""}});
     REQUIRE(server.isValid());
     Port port = serverPort(server);
     REQUIRE(port != Port::any);
@@ -212,7 +212,7 @@ static void test_accept_clients() {
     std::atomic<int> callbackCount{0};
     std::atomic<bool> serverReady{false};
 
-    SimpleServer server(ServerBind{"127.0.0.1", Port::any, Backlog{5}});
+    SimpleServer server(ServerBind{"127.0.0.1", Port::any, Backlog{5, ""}});
     REQUIRE(server.isValid());
     Port port = serverPort(server);
     REQUIRE(port != Port::any);

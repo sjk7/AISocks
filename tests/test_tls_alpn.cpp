@@ -81,7 +81,7 @@ void test_tls_alpn_selection() {
     // server prefers http/1.1 over h2
     tls.alpnProtocols = {"http/1.1", "h2"};
 
-    TestHttpsFileServer server{ServerBind{"127.0.0.1", Port{0}}, cfg, tls};
+    TestHttpsFileServer server{ServerBind{"127.0.0.1", Port{0, ""}}, cfg, tls};
     if (!server.tlsReady()) {
         const std::string initErr = server.tlsInitError();
         if (initErr.find("ALPN unsupported") != std::string::npos) {

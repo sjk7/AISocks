@@ -65,7 +65,7 @@ int main() {
         "Discovery: UDP query returns HTTP port, TCP client gets 200 OK");
     {
         // --- HTTP server ---
-        DiscoveryTestServer httpServer(ServerBind{"127.0.0.1", Port{0}});
+        DiscoveryTestServer httpServer(ServerBind{"127.0.0.1", Port{0, ""}});
         REQUIRE(httpServer.isValid());
 
         std::thread httpThread([&httpServer]() {
@@ -79,7 +79,7 @@ int main() {
         // --- UDP beacon: bound before the beacon thread starts so the kernel
         //     queues any early datagrams in the socket's receive buffer. ---
         auto beaconResult = SocketFactory::createUdpServer(
-            AddressFamily::IPv4, ServerBind{"127.0.0.1", Port{0}});
+            AddressFamily::IPv4, ServerBind{"127.0.0.1", Port{0, ""}});
         REQUIRE(beaconResult.isSuccess());
         auto& beacon = beaconResult.value();
         REQUIRE(beacon.setReceiveTimeout(Milliseconds{500}));

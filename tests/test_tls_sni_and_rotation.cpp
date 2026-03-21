@@ -80,7 +80,7 @@ void test_tls_sni_and_rotation() {
         tls.certChainFile = cert;
         tls.privateKeyFile = key;
 
-        ReadyHttpsFileServer server{ServerBind{"127.0.0.1", Port{0}}, cfg, tls};
+        ReadyHttpsFileServer server{ServerBind{"127.0.0.1", Port{0, ""}}, cfg, tls};
         REQUIRE(server.tlsReady());
 
         std::thread serverThread(
