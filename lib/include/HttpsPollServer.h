@@ -146,16 +146,11 @@ class HttpsPollServer : public HttpPollServer {
         }
 
         const int e = s.tlsSession->getLastErrorCode(r);
-        if (e == SSL_ERROR_WANT_READ) {
-            s.tlsWantsWrite = false;
-            return ServerResult::KeepConnection;
-        }
-        if (e == SSL_ERROR_WANT_WRITE) {
-            s.tlsWantsWrite = true;
-            return ServerResult::KeepConnection;
-        }
 
         // Check handshake timeout (separate from HTTP header timeout).
+        // This MUST run before the WANT_READ/WANT_WRITE early returns:
+        // stalled clients that never send TLS bytes produce SSL_ERROR_WANT_READ
+        // on every poll wake and would never reach the timeout check otherwise.
         if (tlsHandshakeTimeoutMs_ > 0) {
             const auto now = std::chrono::steady_clock::now();
             const auto elapsed
@@ -163,16 +158,23 @@ class HttpsPollServer : public HttpPollServer {
                     now - s.startTime)
                       .count();
             if (elapsed > tlsHandshakeTimeoutMs_) {
-                // Log detailed OpenSSL error if available.
                 const std::string opensslErr = TlsOpenSsl::lastErrorString();
                 std::fprintf(stderr,
                     "[tls] handshake timeout after %lld ms sslErr=%s\n",
                     static_cast<long long>(elapsed),
                     opensslErr.empty() ? "<empty>" : opensslErr.c_str());
-                // Record timeout metric.
                 ++tlsMetrics_.handshakeTimeoutCount;
                 return ServerResult::Disconnect;
             }
+        }
+
+        if (e == SSL_ERROR_WANT_READ) {
+            s.tlsWantsWrite = false;
+            return ServerResult::KeepConnection;
+        }
+        if (e == SSL_ERROR_WANT_WRITE) {
+            s.tlsWantsWrite = true;
+            return ServerResult::KeepConnection;
         }
 
         // Non-retry TLS error -> disconnect. Surface OpenSSL details to logs.
@@ -197,6 +199,33 @@ class HttpsPollServer : public HttpPollServer {
         size_t len) override {
         if (!s.tlsSession) return 0;
         return s.tlsSession->write(data, static_cast<int>(len));
+    }
+
+    // Sweep for stalled TLS handshakes on every idle tick.  Clients that
+    // never send any TLS bytes are never readable in the poller, so
+    // doTlsHandshakeStep() is never called for them — the only way to
+    // enforce the handshake timeout for truly-stalled clients is here.
+    ServerResult onIdle() override {
+        if (tlsHandshakeTimeoutMs_ > 0) {
+            const auto now = std::chrono::steady_clock::now();
+            sweepClients([&](TcpSocket& /*sock*/, HttpClientState& s) {
+                if (s.tlsHandshakeDone || !s.tlsSession)
+                    return ServerResult::KeepConnection;
+                const auto elapsed
+                    = std::chrono::duration_cast<std::chrono::milliseconds>(
+                          now - s.startTime)
+                          .count();
+                if (elapsed > tlsHandshakeTimeoutMs_) {
+                    std::fprintf(stderr,
+                        "[tls] idle sweep: handshake timeout after %lld ms\n",
+                        static_cast<long long>(elapsed));
+                    ++tlsMetrics_.handshakeTimeoutCount;
+                    return ServerResult::Disconnect;
+                }
+                return ServerResult::KeepConnection;
+            });
+        }
+        return HttpPollServer::onIdle();
     }
 
     private:

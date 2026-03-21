@@ -579,6 +579,22 @@ template <typename ClientData> class ServerBase {
     // no need to call ServerBase::onIdle() from overrides.
     virtual ServerResult onIdle() { return ServerResult::KeepConnection; }
 
+    // Iterate every active client and invoke fn(TcpSocket&, ClientData&).
+    // If fn returns ServerResult::Disconnect the client is disconnected
+    // immediately (onDisconnect is called, socket shut down).  Iteration
+    // uses a snapshot of the fd list so disconnecting during the sweep is
+    // safe.  Must only be called from the server thread (e.g. onIdle).
+    template <typename Fn>
+    void sweepClients(Fn&& fn) {
+        const auto fds = clientFds_; // snapshot — safe to disconnect during iter
+        for (uintptr_t fd : fds) {
+            ClientEntry* ce = findClient(fd);
+            if (!ce) continue;
+            if (fn(*ce->socket, ce->data) == ServerResult::Disconnect)
+                disconnectClient_(fd, *ce);
+        }
+    }
+
     private:
     struct ClientEntry {
         std::unique_ptr<TcpSocket> socket;
