@@ -99,6 +99,11 @@ bool DualServerOrchestrator::isValid() const {
         if (!pimpl_->httpsServer->isValid()) return false;
     }
 #endif
+    if (!anyRequested) {
+        fprintf(stderr,
+            "DualServerOrchestrator: warning: both HTTP and HTTPS are "
+            "disabled — no server will run.\n");
+    }
     return anyRequested;
 }
 

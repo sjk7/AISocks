@@ -85,6 +85,90 @@ int main() {
         REQUIRE(true);
     }
 
+    // Enable/disable combinations -------------------------------------------
+
+    // HTTP-only (enableHttp=true, enableHttps=false)
+    BEGIN_TEST("Enable flags: HTTP-only (http=on, https=off)");
+    {
+        DualServerOrchestrator::Ports ports;
+        ports.http = 0;
+        ports.https = 0;
+        ports.enableHttp = true;
+        ports.enableHttps = false;
+        DualServerOrchestrator orchestrator(ports, config, nullptr);
+        REQUIRE(orchestrator.isValid());
+
+        std::thread t([&] { orchestrator.run(ClientLimit::Low, Milliseconds{1}); });
+        std::this_thread::sleep_for(50ms);
+        orchestrator.stop();
+        t.join();
+    }
+
+    // HTTPS-only (enableHttp=false, enableHttps=true) — needs TLS build
+    BEGIN_TEST("Enable flags: HTTPS-only (http=off, https=on)");
+    {
+#ifdef AISOCKS_ENABLE_TLS
+        DualServerOrchestrator::Ports ports;
+        ports.http = 0;
+        ports.https = 0;
+        ports.enableHttp = false;
+        ports.enableHttps = true;
+        TlsServerConfig tls(
+            "tests/certs/server-cert.pem", "tests/certs/server-key.pem");
+        DualServerOrchestrator orchestrator(ports, config, &tls);
+        REQUIRE(orchestrator.isValid());
+
+        std::thread t([&] { orchestrator.run(ClientLimit::Low, Milliseconds{1}); });
+        std::this_thread::sleep_for(50ms);
+        orchestrator.stop();
+        t.join();
+#else
+        // Without TLS support enableHttps is always ignored — nothing to test.
+        REQUIRE(true);
+#endif
+    }
+
+    // Both enabled (http=on, https=on) — the default
+    BEGIN_TEST("Enable flags: Both enabled (http=on, https=on)");
+    {
+        DualServerOrchestrator::Ports ports;
+        ports.http = 0;
+        ports.https = 0;
+        ports.enableHttp = true;
+        ports.enableHttps = true;
+#ifdef AISOCKS_ENABLE_TLS
+        TlsServerConfig tls(
+            "tests/certs/server-cert.pem", "tests/certs/server-key.pem");
+        DualServerOrchestrator orchestrator(ports, config, &tls);
+#else
+        DualServerOrchestrator orchestrator(ports, config, nullptr);
+#endif
+        REQUIRE(orchestrator.isValid());
+
+        std::thread t([&] { orchestrator.run(ClientLimit::Low, Milliseconds{1}); });
+        std::this_thread::sleep_for(50ms);
+        orchestrator.stop();
+        t.join();
+    }
+
+    // Neither enabled (http=off, https=off) — isValid() must return false and warn
+    BEGIN_TEST("Enable flags: Neither enabled (http=off, https=off) -> invalid");
+    {
+        DualServerOrchestrator::Ports ports;
+        ports.http = 0;
+        ports.https = 0;
+        ports.enableHttp = false;
+        ports.enableHttps = false;
+        DualServerOrchestrator orchestrator(ports, config, nullptr);
+
+        // isValid() must be false and should have printed a warning to stderr.
+        REQUIRE(!orchestrator.isValid());
+
+        // run() should return immediately with nothing to do.
+        orchestrator.run(ClientLimit::Low, Milliseconds{1});
+        REQUIRE(true);
+    }
+
     printf("\nDualServerOrchestrator tests complete.\n");
     return 0;
 }
