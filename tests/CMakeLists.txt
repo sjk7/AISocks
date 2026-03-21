@@ -48,6 +48,7 @@ set(TEST_SOURCES
     test_dns_resolution_gate
     test_ip_filter
     test_access_logger
+    test_untested_paths
 )
 
 # Slow tests (disabled by default, enable with -DALLOW_SLOW_TESTS=ON)
@@ -187,6 +188,7 @@ set(MISC_TESTS
     test_ip_filter
     test_access_logger
     test_simple_client
+    test_untested_paths
 )
 
 if(AISOCKS_ENABLE_TLS)
