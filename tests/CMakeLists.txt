@@ -155,6 +155,7 @@ set(SERVER_TESTS
     test_server_launchpad
     test_server_signal
     test_extracted_components
+    test_dual_server_orchestrator
 )
 
 set(HTTP_TESTS
