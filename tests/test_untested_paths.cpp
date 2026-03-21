@@ -41,8 +41,9 @@ using namespace aiSocks;
 using namespace std::chrono_literals;
 
 #ifdef AISOCKS_ENABLE_TLS
+#include "PathHelper.h"
 static std::string repoRootFromFile(const char* file) {
-    std::string path = file;
+    std::string path = PathHelper::normalizePath(file);
     const std::string marker = "/tests/";
     const size_t pos = path.rfind(marker);
     if (pos != std::string::npos) return path.substr(0, pos);
@@ -194,7 +195,8 @@ void test_partial_io_and_eintr() {
     auto server = std::move(serverResult.value());
     Port serverPort = server.getLocalEndpoint().value().port;
 
-    std::vector<char> sendData(32 * 1024, 'A'); // 32KB is enough for partial I/O testing
+    std::vector<char> sendData(
+        32 * 1024, 'A'); // 32KB is enough for partial I/O testing
     std::vector<char> recvData(32 * 1024, 0);
 
     std::thread serverThread([&]() {
