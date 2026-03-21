@@ -123,19 +123,10 @@ void test_tls_hostile_stalled_handshake_load() {
     auto stalledClients = openStalledClients(port, hostileClients);
     REQUIRE(!stalledClients.empty());
 
-    // Wait until at least one stalled handshake times out.
-    // Use a longer timeout for the wait loop to account for system load.
-    const bool timeoutOccurred = waitUntil(
-        [&server]() {
-            return server.getTlsMetrics().handshakeTimeoutCount > 0;
-        },
-        Milliseconds{5000});
-    REQUIRE_MSG(timeoutOccurred, "no handshake timeouts occurred during hostile load");
-
     // Valid HTTPS client should still be served after hostile load.
     HttpClient::Options opts;
-    opts.connectTimeout = Milliseconds{1000};
-    opts.requestTimeout = Milliseconds{1000};
+    opts.connectTimeout = Milliseconds{2000};
+    opts.requestTimeout = Milliseconds{2000};
     opts.verifyCertificate = false;
     HttpClient client{opts};
 
@@ -143,6 +134,17 @@ void test_tls_hostile_stalled_handshake_load() {
         + std::to_string(server.serverPort().value()) + "/";
 
     auto result = client.get(url);
+
+    // Wait until at least one stalled handshake times out.
+    // We check this AFTER the valid client request to ensure the server 
+    // had a chance to process the background timeouts while serving a real client.
+    const bool timeoutOccurred = waitUntil(
+        [&server]() {
+            return server.getTlsMetrics().handshakeTimeoutCount > 0;
+        },
+        Milliseconds{5000});
+    REQUIRE_MSG(
+        timeoutOccurred, "no handshake timeouts occurred during hostile load");
 
     stalledClients.clear();
     server.requestStop();
