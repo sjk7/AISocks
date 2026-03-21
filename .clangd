@@ -14,7 +14,6 @@ CompileFlags:
   # compile_commands.json is regenerated after a clean.
   Add:
     - "-Ilib/include"
-    - "-Iexamples"
   # Remove Windows-specific Clang flags that confuse clangd
   # Also remove PCH flags to avoid circular dependency when parsing headers
   # that are themselves included in the PCH (e.g., TcpSocket.h in test_pch.h)

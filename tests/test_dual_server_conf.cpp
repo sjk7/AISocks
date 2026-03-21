@@ -8,11 +8,12 @@
 // Unit tests for the server_conf.h config file parser used by
 // dual_http_https_server.
 
-#include "server_conf.h"
+#include "ServerConf.h"
 #include "test_helpers.h"
 #include <cstdio>
 #include <fstream>
 #include <string>
+#include <iostream>
 
 // ---------------------------------------------------------------------------
 // Helpers

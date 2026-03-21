@@ -38,7 +38,7 @@
 // If no --config flag is given, ./server.conf is tried silently.
 
 #include "DualServerOrchestrator.h"
-#include "server_conf.h"
+#include "ServerConf.h"
 #include <cstdio>
 #include <string>
 
