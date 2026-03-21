@@ -402,8 +402,8 @@ void test_abrupt_disconnect() {
 
     std::thread t([&]() {
         auto connRes = server.accept();
-        if (connRes.isSuccess()) {
-            auto& conn = connRes.value();
+        if (connRes) {
+            auto& conn = *connRes;
             conn.send("part", 4);
             // Internal socket will close when conn goes out of scope and t joins
         }
