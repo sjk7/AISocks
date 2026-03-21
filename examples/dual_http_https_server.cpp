@@ -47,7 +47,7 @@ int main(int argc, char** argv) {
     printf("Starting dual servers on port %u (HTTP) and %u (HTTPS)...\n", 
            ports.http, ports.https);
 
-    orchestrator.run(); // Blocks until completion
+    orchestrator.run(); // Blocks until SIGINT/SIGTERM or error
 
     return 0;
 }
