@@ -292,6 +292,9 @@ static void test_poller_async_connect() {
         // In non-blocking mode, sendAll and receiveAll will retry on EAGAIN/EWOULDBLOCK.
         REQUIRE(srvConn->sendAll(msg.data(), msg.size()));
         char buf[64]{};
+        // Explicitly wait for readability before receiving to ensure data is there
+        // even on slow CI environments where loopback isn't instantaneous
+        REQUIRE(client.waitReadable(Milliseconds{500}));
         REQUIRE(client.receiveAll(buf, msg.size()));
         REQUIRE(std::string(buf, msg.size()) == msg);
     }
