@@ -33,6 +33,9 @@ class DualServerOrchestrator {
     struct Ports {
         uint16_t http = 8080;
         uint16_t https = 8443;
+        bool enableHttp = true; ///< Set false to skip the HTTP server entirely.
+        bool enableHttps
+            = true; ///< Set false to skip the HTTPS server entirely.
     };
 
     /**

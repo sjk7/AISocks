@@ -7,37 +7,136 @@
 // dual_http_https_server.cpp
 // Example: Run both HTTP and HTTPS servers in one process using
 // DualServerOrchestrator
+//
+// Usage:
+//   dual_http_https_server [--config <file>] [www_root] [http_port]
+//   [https_port]
+//
+// Config file (key = value, # comments):
+//   www_root         = ./www
+//   http_port        = 8080
+//   https_port       = 8443
+//   cert             = server-cert.pem
+//   key              = server-key.pem
+//   enable_http      = true       # set false to run HTTPS-only
+//   enable_https     = true       # set false to run HTTP-only
+//   index_file       = index.html
+//   directory_listing = true
+//
+// Precedence: built-in defaults < config file < command-line positional args.
+// If no --config flag is given, ./server.conf is tried silently.
 
 #include "DualServerOrchestrator.h"
 #include <cstdio>
+#include <fstream>
 #include <string>
 
 using namespace aiSocks;
 
-int main(int argc, char** argv) {
+// ---------------------------------------------------------------------------
+// Config
+// ---------------------------------------------------------------------------
+struct ServerConf {
     std::string wwwRoot = "./www";
     uint16_t httpPort = 8080;
     uint16_t httpsPort = 8443;
+    std::string cert = "server-cert.pem";
+    std::string key = "server-key.pem";
+    bool enableHttp = true;
+    bool enableHttps = true;
+    std::string indexFile = "index.html";
+    bool directoryListing = true;
+};
 
-    if (argc > 1) wwwRoot = argv[1];
-    if (argc > 2) httpPort = static_cast<uint16_t>(std::stoi(argv[2]));
-    if (argc > 3) httpsPort = static_cast<uint16_t>(std::stoi(argv[3]));
+static std::string trim(const std::string& s) {
+    const auto b = s.find_first_not_of(" \t\r\n");
+    if (b == std::string::npos) return {};
+    const auto e = s.find_last_not_of(" \t\r\n");
+    return s.substr(b, e - b + 1);
+}
 
-    // Shared config for both servers
-    HttpFileServer::Config config;
-    config.documentRoot = wwwRoot;
-    config.indexFile = "index.html";
-    config.enableDirectoryListing = true;
-    config.enableSecurityHeaders = true;
-    config.customHeaders["Server"] = "Dual-Orchestrator/1.0";
+static bool parseBool(const std::string& v) {
+    return v == "1" || v == "true" || v == "yes" || v == "on";
+}
 
-    DualServerOrchestrator::Ports ports{httpPort, httpsPort};
+static bool loadConf(const std::string& path, ServerConf& conf) {
+    std::ifstream f(path);
+    if (!f.is_open()) return false;
+    std::string line;
+    while (std::getline(f, line)) {
+        const auto comment = line.find('#');
+        if (comment != std::string::npos) line.erase(comment);
+        const auto eq = line.find('=');
+        if (eq == std::string::npos) continue;
+        const auto k = trim(line.substr(0, eq));
+        const auto v = trim(line.substr(eq + 1));
+        if (k.empty() || v.empty()) continue;
+        if (k == "www_root")
+            conf.wwwRoot = v;
+        else if (k == "http_port")
+            conf.httpPort = static_cast<uint16_t>(std::stoi(v));
+        else if (k == "https_port")
+            conf.httpsPort = static_cast<uint16_t>(std::stoi(v));
+        else if (k == "cert")
+            conf.cert = v;
+        else if (k == "key")
+            conf.key = v;
+        else if (k == "enable_http")
+            conf.enableHttp = parseBool(v);
+        else if (k == "enable_https")
+            conf.enableHttps = parseBool(v);
+        else if (k == "index_file")
+            conf.indexFile = v;
+        else if (k == "directory_listing")
+            conf.directoryListing = parseBool(v);
+        else
+            fprintf(stderr, "Warning: unknown config key '%s'\n", k.c_str());
+    }
+    return true;
+}
+
+int main(int argc, char** argv) {
+    ServerConf conf;
+
+    // Config file: --config <path> wins; otherwise ./server.conf is tried
+    // silently.
+    int argStart = 1;
+    if (argc > 2 && std::string(argv[1]) == "--config") {
+        if (!loadConf(argv[2], conf)) {
+            fprintf(
+                stderr, "Error: could not open config file '%s'\n", argv[2]);
+            return 1;
+        }
+        argStart = 3;
+    } else {
+        loadConf("server.conf", conf); // silent — file is optional
+    }
+
+    // Positional args override config file values.
+    if (argc > argStart) conf.wwwRoot = argv[argStart];
+    if (argc > argStart + 1)
+        conf.httpPort = static_cast<uint16_t>(std::stoi(argv[argStart + 1]));
+    if (argc > argStart + 2)
+        conf.httpsPort = static_cast<uint16_t>(std::stoi(argv[argStart + 2]));
+
+    HttpFileServer::Config httpCfg;
+    httpCfg.documentRoot = conf.wwwRoot;
+    httpCfg.indexFile = conf.indexFile;
+    httpCfg.enableDirectoryListing = conf.directoryListing;
+    httpCfg.enableSecurityHeaders = true;
+    httpCfg.customHeaders["Server"] = "Dual-Orchestrator/1.0";
+
+    DualServerOrchestrator::Ports ports;
+    ports.http = conf.httpPort;
+    ports.https = conf.httpsPort;
+    ports.enableHttp = conf.enableHttp;
+    ports.enableHttps = conf.enableHttps;
 
 #ifdef AISOCKS_ENABLE_TLS
-    TlsServerConfig tls{"server-cert.pem", "server-key.pem"};
-    DualServerOrchestrator orchestrator(ports, config, &tls);
+    TlsServerConfig tls{conf.cert, conf.key};
+    DualServerOrchestrator orchestrator(ports, httpCfg, &tls);
 #else
-    DualServerOrchestrator orchestrator(ports, config, nullptr);
+    DualServerOrchestrator orchestrator(ports, httpCfg, nullptr);
 #endif
 
     if (!orchestrator.isValid()) {
@@ -46,8 +145,9 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    printf("Starting dual servers on port %u (HTTP) and %u (HTTPS)...\n",
-        ports.http, ports.https);
+    if (conf.enableHttp) printf("HTTP  listening on port %u\n", conf.httpPort);
+    if (conf.enableHttps)
+        printf("HTTPS listening on port %u\n", conf.httpsPort);
 
     orchestrator.run(); // Blocks until SIGINT/SIGTERM or error
 

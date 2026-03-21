@@ -21,13 +21,15 @@ struct DualServerOrchestrator::Impl {
 
     Impl(const Ports& ports, const HttpFileServer::Config& config,
         const TlsServerConfig* tls) {
-        ServerBind httpBind;
-        httpBind.address = "0.0.0.0";
-        httpBind.port = Port{ports.http};
-        httpBind.serverName = "HTTP";
-        httpServer = std::make_unique<HttpFileServer>(httpBind, config);
+        if (ports.enableHttp) {
+            ServerBind httpBind;
+            httpBind.address = "0.0.0.0";
+            httpBind.port = Port{ports.http};
+            httpBind.serverName = "HTTP";
+            httpServer = std::make_unique<HttpFileServer>(httpBind, config);
+        }
 #ifdef AISOCKS_ENABLE_TLS
-        if (tls) {
+        if (tls && ports.enableHttps) {
             ServerBind httpsBind;
             httpsBind.address = "0.0.0.0";
             httpsBind.port = Port{ports.https};
@@ -84,13 +86,20 @@ void DualServerOrchestrator::stop() {
 }
 
 bool DualServerOrchestrator::isValid() const {
-    bool valid = pimpl_->httpServer && pimpl_->httpServer->isValid();
+    // Every server that was requested (non-null) must have started
+    // successfully, and at least one server must have been requested.
+    bool anyRequested = false;
+    if (pimpl_->httpServer) {
+        anyRequested = true;
+        if (!pimpl_->httpServer->isValid()) return false;
+    }
 #ifdef AISOCKS_ENABLE_TLS
     if (pimpl_->httpsServer) {
-        valid = valid && pimpl_->httpsServer->isValid();
+        anyRequested = true;
+        if (!pimpl_->httpsServer->isValid()) return false;
     }
 #endif
-    return valid;
+    return anyRequested;
 }
 
 } // namespace aiSocks
