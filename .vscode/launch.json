@@ -123,6 +123,15 @@
         "${workspaceFolder}": "${workspaceFolder}"
       },
       "preLaunchTask": "Build test_efficiency"
+    },
+    {
+      "name": "Debug dual_http_https_server",
+      "type": "lldb",
+      "request": "launch",
+      "program": "${command:cmake.launchTargetPath}",
+      "args": [],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal"
     }
   ]
 }

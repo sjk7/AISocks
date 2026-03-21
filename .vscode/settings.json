@@ -19,6 +19,10 @@
     "-DBUILD_EXAMPLES=ON",
     "-DBUILD_TESTS=ON"
   ],
+  "cmake.debugConfig": {
+    "type": "lldb",
+    "console": "integratedTerminal"
+  },
   "cmake.autoRestartBuild": true,
   "cmake.enableTraceLogging": true,
   "githubPullRequests.notifications": "pullRequests",
