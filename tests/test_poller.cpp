@@ -6,6 +6,7 @@
 
 // Tests: Poller  platform-native readiness notification (kqueue/epoll/WSAPoll)
 
+#define AISOCKS_TEST_NONBLOCK_ENFORCEMENT
 #include "Poller.h"
 #include "TcpSocket.h"
 #include "test_helpers.h"

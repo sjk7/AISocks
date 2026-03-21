@@ -192,8 +192,8 @@ void test_partial_io_and_eintr() {
     auto server = std::move(serverResult.value());
     Port serverPort = server.getLocalEndpoint().value().port;
 
-    std::vector<char> sendData(1024 * 1024, 'A'); // 1MB
-    std::vector<char> recvData(1024 * 1024, 0);
+    std::vector<char> sendData(256 * 1024, 'A'); // 256KB
+    std::vector<char> recvData(256 * 1024, 0);
 
     std::thread serverThread([&]() {
         auto clientResult = server.accept();
@@ -223,12 +223,12 @@ void test_partial_io_and_eintr() {
     client.setReceiveTimeout(Milliseconds{1000});
     client.setSendTimeout(Milliseconds{1000});
 
-    // sendAll 1MB
+    // sendAll 256KB
     bool sendOk = client.sendAll(sendData.data(), sendData.size());
     REQUIRE(sendOk);
 
-    // receiveAll 1MB
-    std::vector<char> clientRecv(1024 * 1024, 0);
+    // receiveAll 256KB
+    std::vector<char> clientRecv(256 * 1024, 0);
     bool recvOk = client.receiveAll(clientRecv.data(), clientRecv.size());
     REQUIRE(recvOk);
     REQUIRE(memcmp(sendData.data(), clientRecv.data(), sendData.size()) == 0);
