@@ -203,6 +203,8 @@ void test_partial_io_and_eintr() {
         // Try to set small buffers to force partial sends if possible
         client->setSendBufferSize(1024);
         client->setReceiveBufferSize(1024);
+        client->setReceiveTimeout(Milliseconds{1000});
+        client->setSendTimeout(Milliseconds{1000});
 
         // Standard receiveAll should handle whatever the OS throws at it
         bool ok = client->receiveAll(recvData.data(), recvData.size());
@@ -218,6 +220,8 @@ void test_partial_io_and_eintr() {
 
     client.setSendBufferSize(1024);
     client.setReceiveBufferSize(1024);
+    client.setReceiveTimeout(Milliseconds{1000});
+    client.setSendTimeout(Milliseconds{1000});
 
     // sendAll 1MB
     bool sendOk = client.sendAll(sendData.data(), sendData.size());
