@@ -187,6 +187,20 @@ jobs:
             ctest_timeout: 120
             tier: full
 
+          # ASan + UBSan + TLS — exercises the TLS handshake path under sanitizers
+          - os: ubuntu-latest
+            compiler: clang (asan+ubsan+tls)
+            cc: clang
+            cxx: clang++
+            cmake_generator: Ninja
+            build_type: Debug
+            sanitizer_flags: "-fsanitize=address,undefined -fno-omit-frame-pointer"
+            asan_options: "detect_leaks=1:strict_string_checks=1:detect_stack_use_after_return=1"
+            ubsan_options: "print_stacktrace=1:halt_on_error=1"
+            enable_tls: "ON"
+            ctest_timeout: 120
+            tier: full
+
           # TSan
           - os: ubuntu-latest
             compiler: clang (tsan)
@@ -196,6 +210,19 @@ jobs:
             build_type: Debug
             sanitizer_flags: "-fsanitize=thread -fno-omit-frame-pointer"
             tsan_options: "halt_on_error=1:second_deadlock_stack=1"
+            ctest_timeout: 180
+            tier: full
+
+          # TSan + TLS — exercises the TLS handshake path under thread sanitizer
+          - os: ubuntu-latest
+            compiler: clang (tsan+tls)
+            cc: clang
+            cxx: clang++
+            cmake_generator: Ninja
+            build_type: Debug
+            sanitizer_flags: "-fsanitize=thread -fno-omit-frame-pointer"
+            tsan_options: "halt_on_error=1:second_deadlock_stack=1"
+            enable_tls: "ON"
             ctest_timeout: 180
             tier: full
 
