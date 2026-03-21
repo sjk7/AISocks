@@ -48,17 +48,19 @@ static std::string repoRootFromFile(const char* file) {
 
 // Reusable test server from test_http_poll_server.cpp logic
 class TestSimpleHttpServer : public HttpPollServer {
-public:
+    public:
     std::atomic<bool> ready_{false};
     void onReady() override { ready_.store(true, std::memory_order_release); }
 
     void waitReady() const {
         const auto deadline = std::chrono::steady_clock::now() + 2s;
-        while (!ready_.load(std::memory_order_acquire) && std::chrono::steady_clock::now() < deadline)
+        while (!ready_.load(std::memory_order_acquire)
+            && std::chrono::steady_clock::now() < deadline)
             std::this_thread::sleep_for(1ms);
     }
 
-    explicit TestSimpleHttpServer(const ServerBind& bind) : HttpPollServer(bind) {}
+    explicit TestSimpleHttpServer(const ServerBind& bind)
+        : HttpPollServer(bind) {}
 
     void buildResponse(HttpClientState& state) override {
         state.dataBuf = "HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nOK";
@@ -75,17 +77,19 @@ void test_http_pipelining_partial() {
     BEGIN_TEST("test_http_pipelining_partial");
 
     TestSimpleHttpServer server(ServerBind{"127.0.0.1", Port::any});
-    std::thread serverThread([&]() { server.run(ClientLimit::Default, Milliseconds{10}); });
+    std::thread serverThread(
+        [&]() { server.run(ClientLimit::Default, Milliseconds{10}); });
     server.waitReady();
     Port port = server.getLocalPort();
 
-    auto clientResult = SocketFactory::createTcpClient(AddressFamily::IPv4, ConnectArgs{"127.0.0.1", port});
+    auto clientResult = SocketFactory::createTcpClient(
+        AddressFamily::IPv4, ConnectArgs{"127.0.0.1", port});
     REQUIRE(clientResult.isSuccess());
     auto& client = clientResult.value();
 
     // Send 1.5 requests: Full Request A + Start of Request B
     std::string requestA = "GET /a HTTP/1.1\r\nHost: localhost\r\n\r\n";
-    std::string partialB = "GET /b HTT"; 
+    std::string partialB = "GET /b HTT";
     std::string fullRequest = requestA + partialB;
 
     REQUIRE(client.sendAll(fullRequest.data(), fullRequest.size()));
@@ -114,23 +118,25 @@ void test_http_pipelining_partial() {
 void test_http_cache_precedence() {
     BEGIN_TEST("test_http_cache_precedence");
 
-    // We test the logic in HttpFileServer::checkCacheConditions_ directly if possible,
-    // or via a mock since it relies on file system state.
-    
+    // We test the logic in HttpFileServer::checkCacheConditions_ directly if
+    // possible, or via a mock since it relies on file system state.
+
 #ifdef AISOCKS_ENABLE_TLS
-    TlsContext::Mode mode = TlsContext::Mode::Server; // Dummy for type alignment
+    TlsContext::Mode mode
+        = TlsContext::Mode::Server; // Dummy for type alignment
     (void)mode;
 #endif
 
     // Precedence test: ETag vs Modified-Since
     // According to RFC 7232, If-None-Match (ETag) takes precedence.
-    
+
     HttpFileServer::Config cfg;
     cfg.enableETag = true;
     cfg.enableLastModified = true;
-    
-    // We'll use a dummy HttpFileServer instance to call its protected/private members via a helper if needed,
-    // but here we can just verify the logic flow in HttpFileServer.cpp:243
+
+    // We'll use a dummy HttpFileServer instance to call its protected/private
+    // members via a helper if needed, but here we can just verify the logic
+    // flow in HttpFileServer.cpp:243
     /*
     if (config_.enableETag && !fileInfo.etag.empty()) {
         auto it = request.headers.find("if-none-match");
@@ -142,15 +148,16 @@ void test_http_cache_precedence() {
     */
     // The code indeed checks ETag before Last-Modified.
     // Let's verify this with a real-ish interaction if we can.
-    
+
     HttpFileServer server(ServerBind{"127.0.0.1", Port::any}, cfg);
-    // Since HttpFileServer is complex to setup with real files in a unit test here,
-    // we've verified the code branch order manually: ETag block is literally before Last-Modified block.
+    // Since HttpFileServer is complex to setup with real files in a unit test
+    // here, we've verified the code branch order manually: ETag block is
+    // literally before Last-Modified block.
 }
 
 void test_tls_alpn_negotiation_manual() {
     BEGIN_TEST("test_tls_alpn_negotiation_manual");
-    
+
 #ifdef AISOCKS_ENABLE_TLS
     if (!TlsOpenSsl::initialize()) return;
 
@@ -290,7 +297,8 @@ void test_tls_invalid_files() {
     REQUIRE(!err.empty());
 
     // 2. Directory instead of file
-    std::string tmpDir = PathHelper::joinPath(PathHelper::tempDirectory(), "aisocks_test_dir");
+    std::string tmpDir
+        = PathHelper::joinPath(PathHelper::tempDirectory(), "aisocks_test_dir");
     PathHelper::createDirectories(tmpDir);
     ok = ctx->loadCertificateChain(tmpDir, tmpDir, &err);
     REQUIRE(!ok);
@@ -298,7 +306,8 @@ void test_tls_invalid_files() {
     PathHelper::removeAll(tmpDir);
 
     // 3. Invalid PEM content (just some junk text)
-    std::string junkFile = PathHelper::joinPath(PathHelper::tempDirectory(), "junk.pem");
+    std::string junkFile
+        = PathHelper::joinPath(PathHelper::tempDirectory(), "junk.pem");
     {
         std::ofstream f(junkFile);
         f << "This is not a PEM certificate\n";
@@ -314,8 +323,8 @@ void test_dns_failure_result() {
     BEGIN_TEST("test_dns_failure_result");
 
     // Attempt to connect to a clearly invalid domain
-    auto result = SocketFactory::createTcpClient(
-        AddressFamily::IPv4, ConnectArgs{"this.is.not.a.valid.domain.name.example", Port(80)});
+    auto result = SocketFactory::createTcpClient(AddressFamily::IPv4,
+        ConnectArgs{"this.is.not.a.valid.domain.name.example", Port(80)});
 
     REQUIRE(!result.isSuccess());
     REQUIRE(result.error() == SocketError::ConnectFailed);
@@ -323,7 +332,8 @@ void test_dns_failure_result() {
     // Verify error message presence/formatting
     std::string msg = result.message();
     REQUIRE(!msg.empty());
-    // On most systems, this will contain "Host not found" or similar from gai_strerror
+    // On most systems, this will contain "Host not found" or similar from
+    // gai_strerror
 }
 
 void test_socket_option_failure() {
@@ -332,13 +342,15 @@ void test_socket_option_failure() {
     auto s = TcpSocket::createRaw(AddressFamily::IPv4);
     REQUIRE(s.isValid());
 
-    // Force a failure in setsockopt by using an invalid level/option combination if possible,
-    // or just verify that our result wrapper handles the failure if we could trigger it.
-    // However, most standard options are robust. We'll use an invalid level.
+    // Force a failure in setsockopt by using an invalid level/option
+    // combination if possible, or just verify that our result wrapper handles
+    // the failure if we could trigger it. However, most standard options are
+    // robust. We'll use an invalid level.
 #ifndef _WIN32
     int val = 1;
     // Level -1 is invalid
-    int ret = setsockopt(static_cast<int>(s.getNativeHandle()), -1, 0, &val, sizeof(val));
+    int ret = setsockopt(
+        static_cast<int>(s.getNativeHandle()), -1, 0, &val, sizeof(val));
     if (ret == -1) {
         // This confirms our assumption that we can trigger a failure.
     }
