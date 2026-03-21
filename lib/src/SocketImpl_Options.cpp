@@ -24,25 +24,24 @@ bool SocketImpl::setBlocking(bool blocking) {
     // it's almost always a bug that will lead to CI timeouts.
     if (blocking) {
 #ifdef AISOCKS_INTERNAL_CALL
-        // Internal library paths (propagateSocketProps, BlockingGuard) are exempt
+        // Internal library paths (propagateSocketProps, BlockingGuard) are
+        // exempt
 #else
-        // Use a volatile check or similar to avoid macro evaluation issues
-        // if AISOCKS_INTERNAL_CALL is not defined at call sites
-        // In this project, we use macro definitions in the .cpp files before calling.
-        
         // [AISOCKS] Internal library calls to setBlocking(true) are permitted
         // during short-lived helper operations (like BlockingGuard).
         // Actual application code in tests must never use blocking mode.
 #ifndef NDEBUG
         // In debug builds, assert early.
-        // We check a thread-local or static flag if necessary, but for now
-        // the macro-based exclusion is what was intended.
-        // If we reach here and blocking is true, it's a test bug.
-        // assert(!blocking && "FATAL: AISocks sockets must remain non-blocking in tests");
+        assert(!blocking
+            && "FATAL: AISocks sockets must remain non-blocking in tests to "
+               "avoid CI hangs.");
 #else
         // In release/RelWithDebInfo builds where assert is disabled, print a
         // loud warning.
-        // fprintf(stderr, "\n[AISOCKS WARNING] Fatal: Socket set to BLOCKING mode.\n");
+        fprintf(stderr,
+            "\n[AISOCKS WARNING] Fatal: Socket set to BLOCKING mode. "
+            "This is forbidden in AISocks server-side components as it causes "
+            "CI timeouts.\n");
 #endif
 #endif
     }

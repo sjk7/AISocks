@@ -211,6 +211,12 @@ namespace {
 } // namespace
 
 void HttpPollServer::run(ClientLimit maxClients, Milliseconds timeout) {
+    // HttpPollServer relies on non-blocking I/O for its state-machine.
+    // Ensure the listening socket is correctly configured before starting.
+    if (getSocket().isBlocking()) {
+        getSocket().setBlocking(false);
+    }
+
 #ifndef NDEBUG
     printf("[DEBUG] HttpPollServer::run() - Starting server\n");
     fflush(stdout);
@@ -246,6 +252,13 @@ void HttpPollServer::printStartupBanner() {
 // onClientConnected — store peer IP in per-connection state
 // ---------------------------------------------------------------------------
 void HttpPollServer::onClientConnected(TcpSocket& sock, HttpClientState& s) {
+    // Sockets in the poll server MUST remain non-blocking.
+    // We enforce this here so even if a user manages to get hold of the
+    // client socket, we keep it in the correct mode for the infrastructure.
+    if (sock.isBlocking()) {
+        sock.setBlocking(false);
+    }
+
     auto ep = sock.getPeerEndpoint();
     if (ep.isSuccess()) s.peerAddress = ep.value().address;
     if (isTlsMode(s)) onTlsClientConnected(sock, s);
