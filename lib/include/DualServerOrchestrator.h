@@ -10,6 +10,8 @@
 #include "HttpFileServer.h"
 #ifdef AISOCKS_ENABLE_TLS
 #include "HttpsFileServer.h"
+#else
+namespace aiSocks { struct TlsServerConfig {}; }
 #endif
 
 #include <memory>
@@ -37,7 +39,7 @@ public:
      * @param config Shared configuration for both servers.
      * @param tls Optional TLS configuration.
      */
-    DualServerOrchestrator(const Ports& ports, 
+    DualServerOrchestrator(const Ports& ports,
                           const HttpFileServer::Config& config,
                           const TlsServerConfig* tls = nullptr);
 
