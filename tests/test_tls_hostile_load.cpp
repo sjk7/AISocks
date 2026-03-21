@@ -124,16 +124,18 @@ void test_tls_hostile_stalled_handshake_load() {
     REQUIRE(!stalledClients.empty());
 
     // Wait until at least one stalled handshake times out.
-    (void)waitUntil(
+    // Use a longer timeout for the wait loop to account for system load.
+    const bool timeoutOccurred = waitUntil(
         [&server]() {
             return server.getTlsMetrics().handshakeTimeoutCount > 0;
         },
-        Milliseconds{100});
+        Milliseconds{2000});
+    REQUIRE_MSG(timeoutOccurred, "no handshake timeouts occurred during hostile load");
 
     // Valid HTTPS client should still be served after hostile load.
     HttpClient::Options opts;
-    opts.connectTimeout = Milliseconds{500};
-    opts.requestTimeout = Milliseconds{500};
+    opts.connectTimeout = Milliseconds{1000};
+    opts.requestTimeout = Milliseconds{1000};
     opts.verifyCertificate = false;
     HttpClient client{opts};
 
