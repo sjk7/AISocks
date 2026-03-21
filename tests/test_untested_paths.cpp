@@ -11,6 +11,8 @@
 #include "HttpFileServer.h"
 #include "FileServerUtils.h"
 #include "PathHelper.h"
+#include "FileIO.h"
+#include "UrlCodec.h"
 #include "test_helpers.h"
 
 #ifdef AISOCKS_ENABLE_TLS
@@ -322,18 +324,21 @@ void test_tls_invalid_files() {
 void test_dns_failure_result() {
     BEGIN_TEST("test_dns_failure_result");
 
-    // Attempt to connect to a clearly invalid domain
+    // Attempt to connect to a clearly invalid domain with a short timeout to
+    // prevent long CI hangs if the OS DNS resolver is slow.
     auto result = SocketFactory::createTcpClient(AddressFamily::IPv4,
-        ConnectArgs{"this.is.not.a.valid.domain.name.example", Port(80)});
+        ConnectArgs{"this.is.not.a.valid.domain.name.example", Port(80),
+            Milliseconds{500}});
 
     REQUIRE(!result.isSuccess());
-    REQUIRE(result.error() == SocketError::ConnectFailed);
+    // It might be Timeout or ConnectFailed depending on how fast the OS rejects
+    // it.
+    REQUIRE((result.error() == SocketError::ConnectFailed
+             || result.error() == SocketError::Timeout));
 
     // Verify error message presence/formatting
     std::string msg = result.message();
     REQUIRE(!msg.empty());
-    // On most systems, this will contain "Host not found" or similar from
-    // gai_strerror
 }
 
 void test_socket_option_failure() {
@@ -433,6 +438,58 @@ void test_abrupt_disconnect() {
     if (t.joinable()) t.join();
 }
 
+void test_file_io_defensive() {
+    BEGIN_TEST("test_file_io_defensive");
+
+    // 1. Failed open (empty mode)
+    {
+        File f("some_file", "");
+        REQUIRE(!f.isOpen());
+    }
+
+    // 2. Open non-existent for read
+    {
+        File f("/tmp/definitely_not_a_real_file_12345", "r");
+        REQUIRE(!f.isOpen());
+    }
+
+    // 3. Write to closed file
+    {
+        File f;
+        REQUIRE(!f.write("data", 1, 4));
+        REQUIRE(!f.writeString("data"));
+        REQUIRE(!f.printf("%d", 1));
+        REQUIRE(!f.flush());
+    }
+
+    // 4. Seek on closed file
+    {
+        File f;
+        REQUIRE(!f.seek(0, SEEK_SET));
+        REQUIRE(f.tell() == -1);
+    }
+}
+
+void test_url_codec_defensive() {
+    BEGIN_TEST("test_url_codec_defensive");
+
+    // 1. Malformed percent encoding at end of string
+    REQUIRE(urlDecode("abc%") == "abc%");
+    REQUIRE(urlDecode("abc%1") == "abc%1");
+
+    // 2. Invalid hex in percent encoding
+    REQUIRE(urlDecode("abc%G1") == "abc%G1");
+    REQUIRE(urlDecode("abc%1G") == "abc%1G");
+
+    // 3. urlDecodePath vs urlDecode (plus treatment)
+    // RFC 3986: '+' is a literal in path, but a space in query
+    REQUIRE(urlDecode("a+b") == "a b");
+    REQUIRE(urlDecodePath("a+b") == "a+b");
+
+    // 4. urlEncode of already safe characters
+    REQUIRE(urlEncode("abc-._~") == "abc-._~");
+}
+
 int main() {
     test_http_pipelining_partial();
     test_http_cache_precedence();
@@ -444,5 +501,7 @@ int main() {
     test_socket_option_failure();
     test_hostile_http_parsing();
     test_abrupt_disconnect();
+    test_file_io_defensive();
+    test_url_codec_defensive();
     return test_summary();
 }
