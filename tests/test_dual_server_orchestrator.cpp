@@ -98,7 +98,8 @@ int main() {
         DualServerOrchestrator orchestrator(ports, config, nullptr);
         REQUIRE(orchestrator.isValid());
 
-        std::thread t([&] { orchestrator.run(ClientLimit::Low, Milliseconds{1}); });
+        std::thread t(
+            [&] { orchestrator.run(ClientLimit::Low, Milliseconds{1}); });
         std::this_thread::sleep_for(50ms);
         orchestrator.stop();
         t.join();
@@ -118,7 +119,8 @@ int main() {
         DualServerOrchestrator orchestrator(ports, config, &tls);
         REQUIRE(orchestrator.isValid());
 
-        std::thread t([&] { orchestrator.run(ClientLimit::Low, Milliseconds{1}); });
+        std::thread t(
+            [&] { orchestrator.run(ClientLimit::Low, Milliseconds{1}); });
         std::this_thread::sleep_for(50ms);
         orchestrator.stop();
         t.join();
@@ -145,14 +147,17 @@ int main() {
 #endif
         REQUIRE(orchestrator.isValid());
 
-        std::thread t([&] { orchestrator.run(ClientLimit::Low, Milliseconds{1}); });
+        std::thread t(
+            [&] { orchestrator.run(ClientLimit::Low, Milliseconds{1}); });
         std::this_thread::sleep_for(50ms);
         orchestrator.stop();
         t.join();
     }
 
-    // Neither enabled (http=off, https=off) — isValid() must return false and warn
-    BEGIN_TEST("Enable flags: Neither enabled (http=off, https=off) -> invalid");
+    // Neither enabled (http=off, https=off) — isValid() must return false and
+    // warn
+    BEGIN_TEST(
+        "Enable flags: Neither enabled (http=off, https=off) -> invalid");
     {
         DualServerOrchestrator::Ports ports;
         ports.http = 0;
