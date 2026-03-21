@@ -202,14 +202,16 @@ struct ServerOrchestrator {
     AcceptPolicy policy{};
 
     // Logging behavior for timeout events.
-    void onClientsTimedOut(size_t count) {
+    void onClientsTimedOut(size_t count, const std::string& prefix) {
         if (count == 0) return;
         pendingLogCount += count;
         auto now = std::chrono::steady_clock::now();
         if (now - lastLogTime >= std::chrono::minutes{1}) {
-            std::printf("[keepalive] closed %zu idle connection%s in the last "
-                        "minute\n",
-                pendingLogCount, pendingLogCount == 1 ? "" : "s");
+            std::printf(
+                "%s[keepalive] closed %zu idle connection%s in the last "
+                "minute\n",
+                prefix.c_str(), pendingLogCount,
+                pendingLogCount == 1 ? "" : "s");
             pendingLogCount = 0;
             lastLogTime = now;
         }
@@ -219,10 +221,11 @@ struct ServerOrchestrator {
         if (current > peakClients) peakClients = current;
     }
 
-    void finalizeLog() {
+    void finalizeLog(const std::string& prefix) {
         if (pendingLogCount > 0) {
-            std::printf("[keepalive] closed %zu idle connection%s total\n",
-                pendingLogCount, pendingLogCount == 1 ? "" : "s");
+            std::printf("%s[keepalive] closed %zu idle connection%s total\n",
+                prefix.c_str(), pendingLogCount,
+                pendingLogCount == 1 ? "" : "s");
             pendingLogCount = 0;
         }
     }
@@ -254,7 +257,10 @@ template <typename ClientData> class ServerBase {
     // The detailed error information is moved into the result parameter.
     explicit ServerBase(const ServerBind& args,
         AddressFamily family = AddressFamily::IPv4,
-        Result<TcpSocket>* result = nullptr) {
+        Result<TcpSocket>* result = nullptr)
+        : serverName_(args.serverName)
+        , serverNamePrefix_(
+              args.serverName.empty() ? "" : "[" + args.serverName + "] ") {
         // Pre-size the sparse fd→client table to the process fd ceiling
         // here in the constructor, before any threading or accept() calls.
         // run() can then insert and erase clients in O(1) without ever
@@ -269,12 +275,15 @@ template <typename ClientData> class ServerBase {
             // Sockets default to blocking mode, so we must explicitly set
             // non-blocking for the server listener.
             if (!listener_->setBlocking(false))
-                printf("Warning: Failed to set non-blocking mode on server "
-                       "socket\n");
+                printf("%sWarning: Failed to set non-blocking mode on server "
+                       "socket\n",
+                    serverNamePrefix_.c_str());
             // Set server-wide policies on the listener so accepted sockets
             // inherit them via propagateSocketProps.
             if (!listener_->setNoDelay(true))
-                printf("Warning: Failed to set TCP_NODELAY on server socket\n");
+                printf(
+                    "%sWarning: Failed to set TCP_NODELAY on server socket\n",
+                    serverNamePrefix_.c_str());
             (void)listener_->setReceiveBufferSize(256 * 1024);
             (void)listener_->setSendBufferSize(256 * 1024);
         } else {
@@ -287,14 +296,15 @@ template <typename ClientData> class ServerBase {
             // explicitly suppressed by the caller (e.g. negative tests).
             if (args.logStartupErrors) {
                 fprintf(stderr,
-                    "FATAL: SocketFactory::createTcpServer() failed with "
+                    "%sFATAL: SocketFactory::createTcpServer() failed with "
                     "error code %d: %s\n",
+                    serverNamePrefix_.c_str(),
                     static_cast<int>(createResult.error()),
                     createResult.message().c_str());
                 fprintf(stderr,
-                    "FATAL: Cannot start server - port %d is already in "
+                    "%sFATAL: Cannot start server - port %d is already in "
                     "use or invalid\n",
-                    args.port.value());
+                    serverNamePrefix_.c_str(), args.port.value());
             }
             // exit(1); // NO! Bad form!
         }
@@ -341,39 +351,105 @@ template <typename ClientData> class ServerBase {
     // ServerResult::StopServer from one of the, or if CTRL+C is detected.
     virtual void run(ClientLimit maxClients = ClientLimit::Default,
         Milliseconds timeout = poll_min) {
-        runFailed_.store(false, std::memory_order_relaxed); // reset for re-use
+        if (!prepare(maxClients)) return;
+
+        while (poll(timeout)) {
+            // continue until stop condition met
+        }
+
+        finish();
+    }
+
+    /**
+     * @brief Prepares the server for a run loop.
+     *
+     * This method performs the initialization logic that was previously buried
+     * in the monolithic run() loop. It must be called once before the first
+     * call to poll().
+     *
+     * @param maxClients Optional limit on concurrent connections.
+     * @return true if initialization succeeded and poll() can be called.
+     * @return false if initialization failed (e.g. socket already in use).
+     */
+    bool prepare(ClientLimit maxClients = ClientLimit::Default) {
+        runFailed_.store(false, std::memory_order_relaxed);
         if (!isValid()) {
             onReady();
-            return;
-        } // socket bad at construction
+            return false;
+        }
+
         if (!initLoop_()) {
             runFailed_.store(true, std::memory_order_relaxed);
             onReady();
-            return;
+            return false;
         }
 
         reserveCapacity_(maxClients);
 
-        bool accepting = true;
-        size_t accepted = 0;
+        accepting_ = true;
+        acceptedCount_ = 0;
+        maxClients_ = maxClients;
 
         onReady();
+        return true;
+    }
 
+    /**
+     * @brief Performs a single iteration of the server's event loop.
+     *
+     * This is the "Step" or "Tick" API used for non-blocking multiplexing.
+     * It waits for events up to the specified timeout, processes them,
+     * handles timeouts/keep-alives, and returns control to the caller.
+     *
+     * @param timeout Time to wait for events. -1 (poll_min) for ~1ms.
+     * @return true if the server is still active and poll() should be called
+     * again.
+     * @return false if the server has stopped (requested stop, signal, or no
+     * clients).
+     */
+    bool poll(Milliseconds timeout = poll_min) {
+        bool continueLoop = true;
+
+        // Single-batch run with a predicate that causes immediate exit after
+        // processing the ready set.
         loop_.run(
             timeout,
             [&](TcpSocket& sock, PollEvent ev) {
-                return handleSocketEvent_(
-                    sock, ev, accepting, maxClients, accepted);
+                if (!handleSocketEvent_(
+                        sock, ev, accepting_, maxClients_, acceptedCount_)) {
+                    continueLoop = false;
+                    return false;
+                }
+                return true;
             },
             [&](bool idle) {
-                return handleAfterBatch_(idle, accepting, maxClients);
+                if (!handleAfterBatch_(idle, accepting_, maxClients_)) {
+                    continueLoop = false;
+                    return false;
+                }
+                return false; // STOP AFTER ONE BATCH
             },
             [&]() -> bool {
+                // Primary stop condition
                 return stop_.load(std::memory_order_relaxed)
-                    || (!accepting && clientFds_.empty());
+                    || (!accepting_ && clientFds_.empty());
             });
 
-        logShutdownInfo_(accepting);
+        if (!continueLoop) return false;
+
+        // Re-check stop condition for caller
+        return !stop_.load(std::memory_order_relaxed)
+            && (accepting_ || !clientFds_.empty());
+    }
+
+    /**
+     * @brief Performs post-run cleanup.
+     *
+     * Call this after poll() returns false to log shutdown info and
+     * disconnect any remaining clients.
+     */
+    void finish() {
+        logShutdownInfo_(accepting_);
         disconnectAllClients_();
     }
 
@@ -539,7 +615,7 @@ template <typename ClientData> class ServerBase {
     // connections. Default: accumulates count and prints at most once per
     // minute.
     virtual void onClientsTimedOut(size_t count) {
-        orchestrator_.onClientsTimedOut(count);
+        orchestrator_.onClientsTimedOut(count, serverNamePrefix_);
     }
 
     // Called when a newly accepted socket cannot be registered with the
@@ -633,6 +709,12 @@ template <typename ClientData> class ServerBase {
 
     std::atomic<bool> stop_{false};
     std::atomic<bool> runFailed_{false};
+
+    // Server loop state for poll()
+    bool accepting_{true};
+    size_t acceptedCount_{0};
+    ClientLimit maxClients_{ClientLimit::Default};
+
 #ifdef SERVER_STATS
     size_t max_clients_{0};
 #endif
@@ -657,6 +739,8 @@ template <typename ClientData> class ServerBase {
 
     bool handleSignals_{true}; // per-instance opt-out; see setHandleSignals()
     PollEventLoop loop_;
+    std::string serverName_;
+    std::string serverNamePrefix_;
     std::unique_ptr<TcpSocket> listener_;
     // Flat O(1)-by-fd client table.  Replaces unordered_map to eliminate
     // hashing, pointer chasing, and rehash pauses under load.
@@ -736,8 +820,9 @@ template <typename ClientData> class ServerBase {
             : stoppedBySignal ? "shutdown signal received (Ctrl+C / SIGTERM)"
             : noMore ? "client limit reached and all clients disconnected"
                      : "unknown";
-        printf("\nServer stopped gracefully: %s.\n", reason);
-        orchestrator_.finalizeLog();
+        printf("\n%sServer stopped gracefully: %s.\n",
+            serverNamePrefix_.c_str(), reason);
+        orchestrator_.finalizeLog(serverNamePrefix_);
     }
 
     // Disconnect every remaining client and clear the active-fd list.

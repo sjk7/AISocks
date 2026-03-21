@@ -171,7 +171,13 @@ Result<bool> SocketFactory::isPortAvailable(
             socket_result.error(), socket_result.message().c_str(), 0, false);
     }
 
-    ServerBind bind_config{address, port, Backlog{1}, false};
+    ServerBind bind_config;
+    bind_config.address = address;
+    bind_config.port = port;
+    bind_config.backlog = Backlog{1};
+    bind_config.reuseAddr = false;
+    bind_config.logStartupErrors = true;
+    bind_config.serverName = "";
     auto bind_result
         = bindSocket(std::move(socket_result.value()), bind_config);
 

@@ -321,6 +321,7 @@ struct ServerBind {
     Backlog backlog{};
     bool reuseAddr = true;
     bool logStartupErrors = true;
+    std::string serverName; // Name for logging/identification
 };
 
 // Creates a connected client socket: socket()  connect()

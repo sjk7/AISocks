@@ -19,11 +19,21 @@ struct DualServerOrchestrator::Impl {
 #endif
     std::atomic<bool> running{false};
 
-    Impl(const Ports& ports, const HttpFileServer::Config& config, const TlsServerConfig* tls) {
-        httpServer = std::make_unique<HttpFileServer>(ServerBind{"0.0.0.0", Port{ports.http}}, config);
+    Impl(const Ports& ports, const HttpFileServer::Config& config,
+        const TlsServerConfig* tls) {
+        ServerBind httpBind;
+        httpBind.address = "0.0.0.0";
+        httpBind.port = Port{ports.http};
+        httpBind.serverName = "HTTP";
+        httpServer = std::make_unique<HttpFileServer>(httpBind, config);
 #ifdef AISOCKS_ENABLE_TLS
         if (tls) {
-            httpsServer = std::make_unique<HttpsFileServer>(ServerBind{"0.0.0.0", Port{ports.https}}, config, *tls);
+            ServerBind httpsBind;
+            httpsBind.address = "0.0.0.0";
+            httpsBind.port = Port{ports.https};
+            httpsBind.serverName = "HTTPS";
+            httpsServer
+                = std::make_unique<HttpsFileServer>(httpsBind, config, *tls);
         }
 #else
         (void)tls; // Silence unused parameter warning on non-TLS builds
@@ -31,9 +41,8 @@ struct DualServerOrchestrator::Impl {
     }
 };
 
-DualServerOrchestrator::DualServerOrchestrator(const Ports& ports, 
-                                             const HttpFileServer::Config& config,
-                                             const TlsServerConfig* tls)
+DualServerOrchestrator::DualServerOrchestrator(const Ports& ports,
+    const HttpFileServer::Config& config, const TlsServerConfig* tls)
     : pimpl_(std::make_unique<Impl>(ports, config, tls)) {}
 
 DualServerOrchestrator::~DualServerOrchestrator() {
