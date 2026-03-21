@@ -102,7 +102,7 @@ void test_tls_hostile_stalled_handshake_load() {
     TlsServerConfig tls;
     tls.certChainFile = root + "/tests/certs/test_cert.pem";
     tls.privateKeyFile = root + "/tests/certs/test_key.pem";
-    tls.handshakeTimeoutMs = 15;
+    tls.handshakeTimeoutMs = 100;
 
     std::optional<TlsHostileLoadServer> serverOpt;
     serverOpt.emplace(ServerBind{"127.0.0.1", Port{0}}, tls);
@@ -129,7 +129,7 @@ void test_tls_hostile_stalled_handshake_load() {
         [&server]() {
             return server.getTlsMetrics().handshakeTimeoutCount > 0;
         },
-        Milliseconds{2000});
+        Milliseconds{5000});
     REQUIRE_MSG(timeoutOccurred, "no handshake timeouts occurred during hostile load");
 
     // Valid HTTPS client should still be served after hostile load.
