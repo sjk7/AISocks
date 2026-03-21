@@ -296,24 +296,19 @@ jobs:
             -DAISOCKS_ENABLE_TLS=${ENABLE_TLS}
             -DCMAKE_UNITY_BUILD=ON
           )
-          # ── Windows: lld-link for ALL Windows legs (msvc, msvc (tls), clang-cl).
-          # lld-link is pre-installed on GitHub Windows runners and is 2-5× faster
-          # than link.exe. We prefix flags with a space to stop Git Bash mangling
-          # them as filesystem paths.
-          if [[ "$RUNNER_OS" == "Windows" ]]; then
+          # ── Windows MSVC legs: lld-link + embedded debug info + parallel compile.
+          # /fuse-ld=lld is MSVC/link.exe syntax — do NOT apply to clang-cl or MinGW.
+          # lld-link is pre-installed on GitHub Windows runners (2-5× faster than link.exe).
+          # We prefix flags with a space to stop Git Bash mangling them as filesystem paths.
+          if [[ "$RUNNER_OS" == "Windows" && "$COMPILER" == msvc* ]]; then
             CMAKE_ARGS+=(
+              "-DCMAKE_MSVC_DEBUG_INFORMATION_FORMAT=Embedded"
+              "-DCMAKE_CXX_FLAGS= /MP /EHsc"
+              "-DCMAKE_C_FLAGS= /MP /EHsc"
               "-DCMAKE_EXE_LINKER_FLAGS= /fuse-ld=lld"
               "-DCMAKE_SHARED_LINKER_FLAGS= /fuse-ld=lld"
               "-DCMAKE_MODULE_LINKER_FLAGS= /fuse-ld=lld"
             )
-            # MSVC-only extras: embed debug info (/Z7) and parallel compilation (/MP).
-            if [[ "$COMPILER" == msvc* ]]; then
-              CMAKE_ARGS+=(
-                "-DCMAKE_MSVC_DEBUG_INFORMATION_FORMAT=Embedded"
-                "-DCMAKE_CXX_FLAGS= /MP /EHsc"
-                "-DCMAKE_C_FLAGS= /MP /EHsc"
-              )
-            fi
           fi
 
           # ── Linux: lld is pre-installed on ubuntu-latest runners.
