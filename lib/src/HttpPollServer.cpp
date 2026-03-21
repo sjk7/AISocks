@@ -213,8 +213,10 @@ namespace {
 void HttpPollServer::run(ClientLimit maxClients, Milliseconds timeout) {
     // HttpPollServer relies on non-blocking I/O for its state-machine.
     // Ensure the listening socket is correctly configured before starting.
-    if (getSocket().isBlocking()) {
-        getSocket().setBlocking(false);
+    if (isValid()) {
+        if (getSocket().isBlocking()) {
+            getSocket().setBlocking(false);
+        }
     }
 
 #ifndef NDEBUG
