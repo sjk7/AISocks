@@ -25,19 +25,21 @@ int main() {
     {
         DualServerOrchestrator::Ports ports{0, 0}; // Ephemeral ports
 #ifdef AISOCKS_ENABLE_TLS
-        TlsServerConfig tls("tests/certs/server-cert.pem", "tests/certs/server-key.pem");
+        TlsServerConfig tls(
+            "tests/certs/server-cert.pem", "tests/certs/server-key.pem");
         DualServerOrchestrator orchestrator(ports, config, &tls);
 #else
         DualServerOrchestrator orchestrator(ports, config, nullptr);
 #endif
-        
+
         REQUIRE(orchestrator.isValid());
-        
-        std::thread runThread([&] { orchestrator.run(ClientLimit::Low, Milliseconds{1}); });
-        
+
+        std::thread runThread(
+            [&] { orchestrator.run(ClientLimit::Low, Milliseconds{1}); });
+
         std::this_thread::sleep_for(100ms); // Let them bind
         orchestrator.stop();
-        
+
         if (runThread.joinable()) runThread.join();
         REQUIRE(true); // Reached here = no deadlock
     }
@@ -59,10 +61,10 @@ int main() {
 
         DualServerOrchestrator::Ports ports{takenPort, 0};
         DualServerOrchestrator orchestrator(ports, config, nullptr);
-        
+
         // isValid() should be false if either server fails to bind
         REQUIRE(!orchestrator.isValid());
-        
+
         // run() should return immediately if invalid (no threads spawned)
         orchestrator.run(ClientLimit::Low, Milliseconds{1});
         REQUIRE(true);
@@ -77,10 +79,10 @@ int main() {
         DualServerOrchestrator::Ports ports{0, 0};
         DualServerOrchestrator orchestrator(ports, config, nullptr);
         orchestrator.setIpFilter(&filter);
-        
-        // Verification is implicit: if setIpFilter didn't crash and 
+
+        // Verification is implicit: if setIpFilter didn't crash and
         // the pointer was distributed correctly, it's successful.
-        REQUIRE(true); 
+        REQUIRE(true);
     }
 
     printf("\nDualServerOrchestrator tests complete.\n");
