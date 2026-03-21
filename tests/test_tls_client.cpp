@@ -92,7 +92,7 @@ class TestHttpsServer : public HttpPollServer {
     explicit TestHttpsServer(const std::string& certPath,
         const std::string& keyPath, const std::string& bindHost = "127.0.0.1",
         AddressFamily family = AddressFamily::IPv4)
-        : HttpPollServer(ServerBind{bindHost, Port{0, ""}}, family) {
+        : HttpPollServer(ServerBind{bindHost, Port{0}}, family) {
         setHandleSignals(false);
 
         std::string err;
@@ -242,7 +242,7 @@ class RedirectHttpsServer : public TestHttpsServer {
 class TestHttpServer : public HttpPollServer {
     public:
     explicit TestHttpServer(const std::string& body = "Hello, HTTP!")
-        : HttpPollServer(ServerBind{"127.0.0.1", Port{0, ""}}), body_(body) {
+        : HttpPollServer(ServerBind{"127.0.0.1", Port{0}}), body_(body) {
         setHandleSignals(false);
     }
 
@@ -1487,7 +1487,7 @@ static void test_https_handshake_timeout_respects_request_timeout() {
     BEGIN_TEST("HttpClient HTTPS handshake is bounded by requestTimeout");
 
     auto listenerResult = SocketFactory::createTcpServer(
-        AddressFamily::IPv4, ServerBind{"127.0.0.1", Port{0, ""}});
+        AddressFamily::IPv4, ServerBind{"127.0.0.1", Port{0}});
     REQUIRE(listenerResult.isSuccess());
     if (!listenerResult.isSuccess()) return;
     TcpSocket listener = std::move(listenerResult.value());
@@ -1613,7 +1613,7 @@ static void test_https_file_server_slow_reader_does_not_starve_other_clients() {
     tls.certChainFile = cert;
     tls.privateKeyFile = key;
 
-    TestHttpsFileServer server{ServerBind{"127.0.0.1", Port{0, ""}}, cfg, tls};
+    TestHttpsFileServer server{ServerBind{"127.0.0.1", Port{0}}, cfg, tls};
     REQUIRE(server.tlsReady());
 
     std::thread serverThread(
@@ -1678,7 +1678,7 @@ static void test_https_server_handshake_timeout_drops_stalled_clients() {
     tls.privateKeyFile = key;
     tls.handshakeTimeoutMs = 20; // short timeout for test
 
-    TestHttpsFileServer server{ServerBind{"127.0.0.1", Port{0, ""}}, cfg, tls};
+    TestHttpsFileServer server{ServerBind{"127.0.0.1", Port{0}}, cfg, tls};
     REQUIRE(server.tlsReady());
 
     std::thread serverThread(

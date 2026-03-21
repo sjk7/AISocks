@@ -45,7 +45,7 @@ int main() {
 
     std::cout << "Starting Performance Audit (10k connections)..." << std::endl;
 
-    BenchServer server(ServerBind{"127.0.0.1", Port{0, ""}});
+    BenchServer server(ServerBind{"127.0.0.1", Port{0}});
     if (!server.isValid()) {
         std::cerr << "Failed to create server" << std::endl;
         return 1;

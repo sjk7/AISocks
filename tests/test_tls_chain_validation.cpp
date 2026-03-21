@@ -42,7 +42,7 @@ void test_tls_chain_validation_requires_full_chain() {
     tls.privateKeyFile = key;
     tls.requireFullChain = true;
 
-    HttpsFileServer server{ServerBind{"127.0.0.1", Port{0, ""}}, cfg, tls};
+    HttpsFileServer server{ServerBind{"127.0.0.1", Port{0}}, cfg, tls};
     REQUIRE(!server.tlsReady());
 }
 
@@ -61,7 +61,7 @@ void test_tls_chain_validation_allows_single_cert_when_not_required() {
     tls.privateKeyFile = key;
     tls.requireFullChain = false;
 
-    HttpsFileServer server{ServerBind{"127.0.0.1", Port{0, ""}}, cfg, tls};
+    HttpsFileServer server{ServerBind{"127.0.0.1", Port{0}}, cfg, tls};
     REQUIRE(server.tlsReady());
     REQUIRE(server.isValid());
 }
@@ -76,7 +76,7 @@ void test_tls_chain_validation_missing_chain_file_fails() {
     tls.privateKeyFile = "/nonexistent/private_key.pem";
     tls.requireFullChain = false;
 
-    HttpsFileServer server{ServerBind{"127.0.0.1", Port{0, ""}}, cfg, tls};
+    HttpsFileServer server{ServerBind{"127.0.0.1", Port{0}}, cfg, tls};
     REQUIRE(!server.tlsReady());
 }
 
@@ -114,7 +114,7 @@ void test_tls_chain_validation_accepts_generated_full_chain_when_required() {
     tls.privateKeyFile = key;
     tls.requireFullChain = true;
 
-    HttpsFileServer server{ServerBind{"127.0.0.1", Port{0, ""}}, cfg, tls};
+    HttpsFileServer server{ServerBind{"127.0.0.1", Port{0}}, cfg, tls};
     REQUIRE(server.tlsReady());
     REQUIRE(server.isValid());
 

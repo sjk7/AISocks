@@ -100,7 +100,7 @@ class TimedServer : public ServerBase<int> {
     std::atomic<int> timeoutClosedCount{0};
 
     explicit TimedServer(Port port, Milliseconds keepAlive = KEEP_ALIVE)
-        : ServerBase<int>(ServerBind{"127.0.0.1", port, Backlog{16, ""}}) {
+        : ServerBase<int>(ServerBind{"127.0.0.1", port, Backlog{16}}) {
         setKeepAliveTimeout(keepAlive);
     }
 

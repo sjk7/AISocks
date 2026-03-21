@@ -105,7 +105,7 @@ void test_tls_hostile_stalled_handshake_load() {
     tls.handshakeTimeoutMs = 100;
 
     std::optional<TlsHostileLoadServer> serverOpt;
-    serverOpt.emplace(ServerBind{"127.0.0.1", Port{0, ""}}, tls);
+    serverOpt.emplace(ServerBind{"127.0.0.1", Port{0}}, tls);
     auto& server = *serverOpt;
 
     REQUIRE(server.isValid());

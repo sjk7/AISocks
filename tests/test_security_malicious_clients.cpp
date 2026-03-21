@@ -205,7 +205,7 @@ void testPathTraversalAttacks() {
 
     HttpFileServer::Config config;
     config.documentRoot = "test_secure/public";
-    TestableHttpFileServer server(ServerBind{"127.0.0.1", Port{0, ""}}, config);
+    TestableHttpFileServer server(ServerBind{"127.0.0.1", Port{0}}, config);
 
     // Attack 1: Basic dot-dot-slash
     {
@@ -307,7 +307,7 @@ void testXSSAttacks() {
     HttpFileServer::Config config;
     config.documentRoot = "test_secure/xss"; // no index.html → always lists dir
     config.enableDirectoryListing = true;
-    TestableHttpFileServer server(ServerBind{"127.0.0.1", Port{0, ""}}, config);
+    TestableHttpFileServer server(ServerBind{"127.0.0.1", Port{0}}, config);
 
     // Attack 1: XSS in directory listing via malicious filename
     // Uses '&' in filename (valid on all filesystems, needs HTML escaping)
@@ -349,7 +349,7 @@ void testSecurityHeaders() {
     HttpFileServer::Config config;
     config.documentRoot = "test_secure/public";
     config.enableSecurityHeaders = true;
-    TestableHttpFileServer server(ServerBind{"127.0.0.1", Port{0, ""}}, config);
+    TestableHttpFileServer server(ServerBind{"127.0.0.1", Port{0}}, config);
 
     std::string request = makeRequest("GET", "/index.html");
     HttpClientState state;
@@ -377,7 +377,7 @@ void testInformationLeakage() {
     HttpFileServer::Config config;
     config.documentRoot = "test_secure/public";
     config.hideServerVersion = true;
-    TestableHttpFileServer server(ServerBind{"127.0.0.1", Port{0, ""}}, config);
+    TestableHttpFileServer server(ServerBind{"127.0.0.1", Port{0}}, config);
 
     // Test error page doesn't leak server version
     {
@@ -397,7 +397,7 @@ void testInformationLeakage() {
     {
         config.enableDirectoryListing = true;
         TestableHttpFileServer server2(
-            ServerBind{"127.0.0.1", Port{0, ""}}, config);
+            ServerBind{"127.0.0.1", Port{0}}, config);
 
         std::string request = makeRequest("GET", "/");
         HttpClientState state;
@@ -477,7 +477,7 @@ void testURLDecodingIssues() {
 
     HttpFileServer::Config config;
     config.documentRoot = "test_secure/public";
-    TestableHttpFileServer server(ServerBind{"127.0.0.1", Port{0, ""}}, config);
+    TestableHttpFileServer server(ServerBind{"127.0.0.1", Port{0}}, config);
 
     // Test that + is NOT treated as space in paths (RFC 3986)
     {
@@ -510,7 +510,7 @@ void testMethodValidation() {
 
     HttpFileServer::Config config;
     config.documentRoot = "test_secure/public";
-    TestableHttpFileServer server(ServerBind{"127.0.0.1", Port{0, ""}}, config);
+    TestableHttpFileServer server(ServerBind{"127.0.0.1", Port{0}}, config);
 
     // Test that only GET and HEAD are allowed
     const char* methods[]
@@ -541,7 +541,7 @@ void testFileTypeRestrictions() {
     HttpFileServer::Config config;
     config.documentRoot = "test_secure/public";
     config.maxFileSize = 1024 * 1024; // 1MB max
-    TestableHttpFileServer server(ServerBind{"127.0.0.1", Port{0, ""}}, config);
+    TestableHttpFileServer server(ServerBind{"127.0.0.1", Port{0}}, config);
 
     // Test that large files are rejected
     {

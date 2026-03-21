@@ -169,7 +169,7 @@ int main() {
     {
         g_serverSignalStop.store(false);
 
-        SignalTestServer server(ServerBind{"127.0.0.1", Port{0, ""}});
+        SignalTestServer server(ServerBind{"127.0.0.1", Port{0}});
         REQUIRE(server.isValid());
 
         server.setHandleSignals(true);
@@ -197,7 +197,7 @@ int main() {
     // Test 8: ServerBase API exists
     BEGIN_TEST("Server API: setHandleSignals method exists");
     {
-        SignalTestServer server(ServerBind{"127.0.0.1", Port{0, ""}});
+        SignalTestServer server(ServerBind{"127.0.0.1", Port{0}});
         REQUIRE(server.isValid());
 
         server.setHandleSignals(false);

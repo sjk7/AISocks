@@ -543,8 +543,9 @@ void test_http_100_continue() {
     REQUIRE(n > 0);
     response = std::string(buf, n);
     // Note: If buildResponse didn't run, check 405 error
-    REQUIRE((response.find("HTTP/1.1 200 OK") != std::string::npos || 
-             response.find("HTTP/1.1 405 Method Not Allowed") != std::string::npos));
+    REQUIRE((response.find("HTTP/1.1 200 OK") != std::string::npos
+        || response.find("HTTP/1.1 405 Method Not Allowed")
+            != std::string::npos));
 
     server.requestStop();
     if (serverThread.joinable()) serverThread.join();

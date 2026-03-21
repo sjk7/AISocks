@@ -76,7 +76,7 @@ void test_tls_policy_negotiation() {
     tls.maxProtoVersion = TLS1_2_VERSION; // force TLS 1.2 for negotiation
     tls.tls12CipherList = "ECDHE-RSA-AES128-GCM-SHA256";
 
-    HttpsFileServer server{ServerBind{"127.0.0.1", Port{0, ""}}, cfg, tls};
+    HttpsFileServer server{ServerBind{"127.0.0.1", Port{0}}, cfg, tls};
     REQUIRE(server.tlsReady());
     std::thread serverThread(
         [&] { server.run(ClientLimit::Unlimited, Milliseconds{1}); });

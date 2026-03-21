@@ -136,7 +136,7 @@ void test_tls_server_peer_subject() {
         tls.clientAuth = TlsServerConfig::ClientAuthMode::Require;
         tls.caFile = clientCert;
 
-        PeerSubjectServer server{ServerBind{"127.0.0.1", Port{0, ""}}, cfg, tls};
+        PeerSubjectServer server{ServerBind{"127.0.0.1", Port{0}}, cfg, tls};
         REQUIRE(server.tlsReady());
         std::thread serverThread(
             [&] { server.run(ClientLimit::Unlimited, Milliseconds{1}); });
@@ -165,7 +165,7 @@ void test_tls_server_peer_subject() {
         tls.clientAuth = TlsServerConfig::ClientAuthMode::Require;
         tls.caFile = clientCert;
 
-        PeerSubjectServer server{ServerBind{"127.0.0.1", Port{0, ""}}, cfg, tls};
+        PeerSubjectServer server{ServerBind{"127.0.0.1", Port{0}}, cfg, tls};
         REQUIRE(server.tlsReady());
         std::thread serverThread(
             [&] { server.run(ClientLimit::Unlimited, Milliseconds{1}); });
@@ -194,7 +194,7 @@ void test_tls_server_peer_subject() {
         tls.clientAuth = TlsServerConfig::ClientAuthMode::Optional;
         tls.caFile = clientCert;
 
-        PeerSubjectServer server{ServerBind{"127.0.0.1", Port{0, ""}}, cfg, tls};
+        PeerSubjectServer server{ServerBind{"127.0.0.1", Port{0}}, cfg, tls};
         REQUIRE(server.tlsReady());
         std::thread serverThread(
             [&] { server.run(ClientLimit::Unlimited, Milliseconds{1}); });

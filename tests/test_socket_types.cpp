@@ -262,7 +262,7 @@ int main() {
     BEGIN_TEST("ServerBind: default construction");
     {
         ServerBind sb;
-        REQUIRE(sb.address.empty());
+        REQUIRE(sb.address == "0.0.0.0");
         REQUIRE(sb.port == Port{});
         bool defaultReuse = sb.reuseAddr;
         REQUIRE(defaultReuse == true); //-V547

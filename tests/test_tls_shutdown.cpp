@@ -70,7 +70,7 @@ void test_tls_graceful_shutdown() {
     tls.privateKeyFile = serverKey;
     tls.clientAuth = TlsServerConfig::ClientAuthMode::Optional;
 
-    HttpsFileServer server{ServerBind{"127.0.0.1", Port{0, ""}}, cfg, tls};
+    HttpsFileServer server{ServerBind{"127.0.0.1", Port{0}}, cfg, tls};
     REQUIRE(server.tlsReady());
     std::thread serverThread(
         [&] { server.run(ClientLimit::Unlimited, Milliseconds{1}); });

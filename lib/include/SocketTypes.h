@@ -316,12 +316,12 @@ struct NetworkInterface {
 // Creates a server socket: socket()  [SO_REUSEADDR]  bind()  listen()
 // Returns invalid socket if any step fails - check isValid().
 struct ServerBind {
-    std::string address; // e.g. "0.0.0.0", "127.0.0.1", "::1"
+    std::string address = "0.0.0.0"; // e.g. "0.0.0.0", "127.0.0.1", "::1"
     Port port{};
     Backlog backlog{};
     bool reuseAddr = true;
     bool logStartupErrors = true;
-    std::string serverName; // Name for logging/identification
+    std::string serverName = ""; // Name for logging/identification
 };
 
 // Creates a connected client socket: socket()  connect()

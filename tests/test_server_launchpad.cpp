@@ -112,7 +112,7 @@ static void test_plain_server_launchpad_smoke() {
     std::optional<PlainLaunchpadServer> serverOpt;
     {
         Stopwatch constructionTimer{"[timing] launchpad plain construction"};
-        serverOpt.emplace(ServerBind{"127.0.0.1", Port{0, ""}});
+        serverOpt.emplace(ServerBind{"127.0.0.1", Port{0}});
     }
     auto& server = *serverOpt;
     REQUIRE(server.isValid());
@@ -163,7 +163,7 @@ static void test_tls_server_launchpad_smoke() {
     std::optional<TlsLaunchpadServer> serverOpt;
     {
         Stopwatch constructionTimer{"[timing] launchpad tls construction"};
-        serverOpt.emplace(ServerBind{"127.0.0.1", Port{0, ""}}, tls);
+        serverOpt.emplace(ServerBind{"127.0.0.1", Port{0}}, tls);
     }
     auto& server = *serverOpt;
     REQUIRE(server.isValid());
