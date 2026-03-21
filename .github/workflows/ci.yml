@@ -293,20 +293,31 @@ jobs:
             -DAISOCKS_ENABLE_TLS=${ENABLE_TLS}
             -DCMAKE_UNITY_BUILD=ON
           )
-          if [[ "$RUNNER_OS" == "Windows" && "$COMPILER" == "msvc" ]]; then
-            # Optimize MSVC builds for speed and avoid PDB contention.
-            # Use /Z7 (Embedded) and /MP (Multi-processor compilation).
-            # We use lld-link (pre-installed on GH Windows runners) for 2-5x faster linking.
-            # We prefix the flags with space to prevent Git Bash from thinking
-            # these are paths it needs to "fix".
+          # ── Windows: lld-link for ALL Windows legs (msvc, msvc (tls), clang-cl).
+          # lld-link is pre-installed on GitHub Windows runners and is 2-5× faster
+          # than link.exe. We prefix flags with a space to stop Git Bash mangling
+          # them as filesystem paths.
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
             CMAKE_ARGS+=(
-              "-DCMAKE_MSVC_DEBUG_INFORMATION_FORMAT=Embedded"
-              "-DCMAKE_CXX_FLAGS= /MP /EHsc"
-              "-DCMAKE_C_FLAGS= /MP /EHsc"
               "-DCMAKE_EXE_LINKER_FLAGS= /fuse-ld=lld"
               "-DCMAKE_SHARED_LINKER_FLAGS= /fuse-ld=lld"
               "-DCMAKE_MODULE_LINKER_FLAGS= /fuse-ld=lld"
             )
+            # MSVC-only extras: embed debug info (/Z7) and parallel compilation (/MP).
+            if [[ "$COMPILER" == msvc* ]]; then
+              CMAKE_ARGS+=(
+                "-DCMAKE_MSVC_DEBUG_INFORMATION_FORMAT=Embedded"
+                "-DCMAKE_CXX_FLAGS= /MP /EHsc"
+                "-DCMAKE_C_FLAGS= /MP /EHsc"
+              )
+            fi
+          fi
+
+          # ── Linux: lld is pre-installed on ubuntu-latest runners.
+          # Accumulate into LINKER_FLAGS so sanitizer flags can be appended below.
+          LINKER_FLAGS=""
+          if [[ "$RUNNER_OS" == "Linux" ]]; then
+            LINKER_FLAGS="-fuse-ld=lld"
           fi
           if [[ "$ENABLE_TLS" == "ON" ]]; then
             if [[ "$RUNNER_OS" == "macOS" ]]; then
@@ -364,11 +375,19 @@ jobs:
               )
             fi
           fi
+          # Sanitizer flags: append to accumulated LINKER_FLAGS so lld is preserved.
           if [[ -n "$SANITIZER_FLAGS" ]]; then
             CMAKE_ARGS+=(
               "-DCMAKE_C_FLAGS=$SANITIZER_FLAGS"
               "-DCMAKE_CXX_FLAGS=$SANITIZER_FLAGS"
-              "-DCMAKE_EXE_LINKER_FLAGS=$SANITIZER_FLAGS"
+            )
+            LINKER_FLAGS="${LINKER_FLAGS:+$LINKER_FLAGS }$SANITIZER_FLAGS"
+          fi
+          if [[ -n "$LINKER_FLAGS" ]]; then
+            CMAKE_ARGS+=(
+              "-DCMAKE_EXE_LINKER_FLAGS=$LINKER_FLAGS"
+              "-DCMAKE_SHARED_LINKER_FLAGS=$LINKER_FLAGS"
+              "-DCMAKE_MODULE_LINKER_FLAGS=$LINKER_FLAGS"
             )
           fi
           cmake "${CMAKE_ARGS[@]}"
