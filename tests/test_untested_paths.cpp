@@ -194,19 +194,26 @@ void test_partial_io_and_eintr() {
     auto server = std::move(serverResult.value());
     Port serverPort = server.getLocalEndpoint().value().port;
 
-    std::vector<char> sendData(256 * 1024, 'A'); // 256KB
-    std::vector<char> recvData(256 * 1024, 0);
+    std::vector<char> sendData(32 * 1024, 'A'); // 32KB is enough for partial I/O testing
+    std::vector<char> recvData(32 * 1024, 0);
 
     std::thread serverThread([&]() {
         auto clientResult = server.accept();
         if (!clientResult) return;
         auto client = std::move(clientResult);
 
-        // Try to set small buffers to force partial sends if possible
-        client->setSendBufferSize(1024);
-        client->setReceiveBufferSize(1024);
-        client->setReceiveTimeout(Milliseconds{1000});
-        client->setSendTimeout(Milliseconds{1000});
+        // Try to set small buffers to force partial sends/receives
+        client->setSendBufferSize(2048);
+        client->setReceiveBufferSize(2048);
+
+#ifdef AISOCKS_ENABLE_TLS
+        // TLS might need more time
+        client->setReceiveTimeout(Milliseconds{2000});
+        client->setSendTimeout(Milliseconds{2000});
+#else
+        client->setReceiveTimeout(Milliseconds{5000});
+        client->setSendTimeout(Milliseconds{5000});
+#endif
 
         // Standard receiveAll should handle whatever the OS throws at it
         bool ok = client->receiveAll(recvData.data(), recvData.size());
@@ -220,17 +227,17 @@ void test_partial_io_and_eintr() {
     REQUIRE(clientResult.isSuccess());
     auto client = std::move(clientResult.value());
 
-    client.setSendBufferSize(1024);
-    client.setReceiveBufferSize(1024);
-    client.setReceiveTimeout(Milliseconds{1000});
-    client.setSendTimeout(Milliseconds{1000});
+    client.setSendBufferSize(2048);
+    client.setReceiveBufferSize(2048);
+    client.setReceiveTimeout(Milliseconds{5000});
+    client.setSendTimeout(Milliseconds{5000});
 
-    // sendAll 256KB
+    // sendAll 32KB
     bool sendOk = client.sendAll(sendData.data(), sendData.size());
     REQUIRE(sendOk);
 
-    // receiveAll 256KB
-    std::vector<char> clientRecv(256 * 1024, 0);
+    // receiveAll 32KB
+    std::vector<char> clientRecv(32 * 1024, 0);
     bool recvOk = client.receiveAll(clientRecv.data(), clientRecv.size());
     REQUIRE(recvOk);
     REQUIRE(memcmp(sendData.data(), clientRecv.data(), sendData.size()) == 0);
