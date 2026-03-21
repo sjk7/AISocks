@@ -77,38 +77,6 @@ SocketImpl::EvFdGuard::~EvFdGuard() {
 }
 
 namespace {
-    // DNS lookups can block for a long time; cap detached resolver workers to
-    // prevent unbounded thread growth under repeated connection attempts.
-    static constexpr size_t kMaxConcurrentDnsWorkers = 4;
-    static constexpr int64_t kDnsGateSleepMs = 5;
-    std::atomic<size_t> g_activeDnsWorkers{0};
-#ifdef AISOCKS_TESTING
-    [[maybe_unused]] std::atomic<int64_t> g_dnsTestDelayMs{0};
-#endif
-
-    [[maybe_unused]] static bool acquireDnsWorkerSlot_(
-        std::chrono::steady_clock::time_point deadline) {
-        for (;;) {
-            size_t cur = g_activeDnsWorkers.load(std::memory_order_relaxed);
-            while (cur < kMaxConcurrentDnsWorkers) {
-                if (g_activeDnsWorkers.compare_exchange_weak(cur, cur + 1,
-                        std::memory_order_acq_rel, std::memory_order_relaxed))
-                    return true;
-            }
-            if (std::chrono::steady_clock::now() >= deadline) return false;
-            std::this_thread::sleep_for(
-                std::chrono::milliseconds(kDnsGateSleepMs));
-        }
-    }
-
-    static void releaseDnsWorkerSlot_() noexcept {
-        g_activeDnsWorkers.fetch_sub(1, std::memory_order_acq_rel);
-    }
-
-    struct DnsSlotGuard {
-        ~DnsSlotGuard() { releaseDnsWorkerSlot_(); }
-    };
-
 #if defined(_WIN32) && defined(AISOCKS_TESTING)
     static bool traceUnixCloseEnabled_() {
         static const bool enabled = []() {

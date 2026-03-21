@@ -24,7 +24,8 @@
                 "CMAKE_BUILD_TYPE": "Debug",
                 "BUILD_EXAMPLES": "ON",
                 "BUILD_TESTS": "ON",
-                "AISOCKS_ENABLE_TLS": "ON"
+                "AISOCKS_ENABLE_TLS": "ON",
+                "CMAKE_UNITY_BUILD": "ON"
             }
         },
         {

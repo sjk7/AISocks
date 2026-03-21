@@ -291,6 +291,7 @@ jobs:
             -DBUILD_TESTS=ON
             -DBUILD_EXAMPLES=OFF
             -DAISOCKS_ENABLE_TLS=${ENABLE_TLS}
+            -DCMAKE_UNITY_BUILD=ON
           )
           if [[ "$RUNNER_OS" == "Windows" && "$COMPILER" == "msvc" ]]; then
             # Optimize MSVC builds for speed and avoid PDB contention.
