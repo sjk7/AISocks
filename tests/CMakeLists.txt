@@ -50,6 +50,7 @@ set(TEST_SOURCES
     test_access_logger
     test_untested_paths
     test_dual_server_orchestrator
+    test_dual_server_conf
 )
 
 # Slow tests (disabled by default, enable with -DALLOW_SLOW_TESTS=ON)
@@ -191,6 +192,7 @@ set(MISC_TESTS
     test_access_logger
     test_simple_client
     test_untested_paths
+    test_dual_server_conf
 )
 
 if(AISOCKS_ENABLE_TLS)
@@ -292,6 +294,12 @@ add_grouped_tests(server "${SERVER_TESTS}")
 add_grouped_tests(http "${HTTP_TESTS}")
 add_grouped_tests(file "${FILE_TESTS}")
 add_grouped_tests(misc "${MISC_TESTS}")
+
+# test_dual_server_conf needs the examples/ directory for server_conf.h.
+target_include_directories(test_dual_server_conf PRIVATE
+    ${CMAKE_SOURCE_DIR}/examples
+)
+
 if(AISOCKS_ENABLE_TLS)
     add_grouped_tests(tls "${TLS_TESTS}")
 endif()

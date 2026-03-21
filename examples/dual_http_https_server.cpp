@@ -9,7 +9,8 @@
 // DualServerOrchestrator
 //
 // Usage:
-//   dual_http_https_server [--config <file>] [www_root] [http_port] [https_port]
+//   dual_http_https_server [--config <file>] [www_root] [http_port]
+//   [https_port]
 //
 // PRECEDENCE (lowest to highest -- later values override earlier ones):
 //   1. Built-in defaults (see ServerConf below)
@@ -37,73 +38,11 @@
 // If no --config flag is given, ./server.conf is tried silently.
 
 #include "DualServerOrchestrator.h"
+#include "server_conf.h"
 #include <cstdio>
-#include <fstream>
 #include <string>
 
 using namespace aiSocks;
-
-// ---------------------------------------------------------------------------
-// Config
-// ---------------------------------------------------------------------------
-struct ServerConf {
-    std::string wwwRoot = "./www";
-    uint16_t httpPort = 8080;
-    uint16_t httpsPort = 8443;
-    std::string cert = "server-cert.pem";
-    std::string key = "server-key.pem";
-    bool enableHttp = true;
-    bool enableHttps = true;
-    std::string indexFile = "index.html";
-    bool directoryListing = true;
-};
-
-static std::string trim(const std::string& s) {
-    const auto b = s.find_first_not_of(" \t\r\n");
-    if (b == std::string::npos) return {};
-    const auto e = s.find_last_not_of(" \t\r\n");
-    return s.substr(b, e - b + 1);
-}
-
-static bool parseBool(const std::string& v) {
-    return v == "1" || v == "true" || v == "yes" || v == "on";
-}
-
-static bool loadConf(const std::string& path, ServerConf& conf) {
-    std::ifstream f(path);
-    if (!f.is_open()) return false;
-    std::string line;
-    while (std::getline(f, line)) {
-        const auto comment = line.find('#');
-        if (comment != std::string::npos) line.erase(comment);
-        const auto eq = line.find('=');
-        if (eq == std::string::npos) continue;
-        const auto k = trim(line.substr(0, eq));
-        const auto v = trim(line.substr(eq + 1));
-        if (k.empty() || v.empty()) continue;
-        if (k == "www_root")
-            conf.wwwRoot = v;
-        else if (k == "http_port")
-            conf.httpPort = static_cast<uint16_t>(std::stoi(v));
-        else if (k == "https_port")
-            conf.httpsPort = static_cast<uint16_t>(std::stoi(v));
-        else if (k == "cert")
-            conf.cert = v;
-        else if (k == "key")
-            conf.key = v;
-        else if (k == "enable_http")
-            conf.enableHttp = parseBool(v);
-        else if (k == "enable_https")
-            conf.enableHttps = parseBool(v);
-        else if (k == "index_file")
-            conf.indexFile = v;
-        else if (k == "directory_listing")
-            conf.directoryListing = parseBool(v);
-        else
-            fprintf(stderr, "Warning: unknown config key '%s'\n", k.c_str());
-    }
-    return true;
-}
 
 int main(int argc, char** argv) {
     ServerConf conf;
@@ -112,14 +51,14 @@ int main(int argc, char** argv) {
     // silently.
     int argStart = 1;
     if (argc > 2 && std::string(argv[1]) == "--config") {
-        if (!loadConf(argv[2], conf)) {
+        if (!loadServerConf(argv[2], conf)) {
             fprintf(
                 stderr, "Error: could not open config file '%s'\n", argv[2]);
             return 1;
         }
         argStart = 3;
     } else {
-        loadConf("server.conf", conf); // silent — file is optional
+        loadServerConf("server.conf", conf); // silent — file is optional
     }
 
     // Command-line positional args take highest precedence -- they always
