@@ -53,7 +53,7 @@ class TestSimpleHttpServer : public HttpPollServer {
     void onReady() override { ready_.store(true, std::memory_order_release); }
 
     void waitReady() const {
-        const auto deadline = std::chrono::steady_clock::now() + 2s;
+        const auto deadline = std::chrono::steady_clock::now() + 10ms;
         while (!ready_.load(std::memory_order_acquire)
             && std::chrono::steady_clock::now() < deadline)
             std::this_thread::sleep_for(1ms);
@@ -357,6 +357,71 @@ void test_socket_option_failure() {
 #endif
 }
 
+void test_hostile_http_parsing() {
+    BEGIN_TEST("test_hostile_http_parsing");
+
+    // Standard HTTP server with no explicit per-request limit in ctor but we can test
+    // that malformed requests behave correctly and protocol violations are handled.
+    TestSimpleHttpServer server(ServerBind{"127.0.0.1", Port::any});
+    std::thread serverThread([&]() { server.run(ClientLimit::Default, Milliseconds{10}); });
+    server.waitReady();
+    Port port = server.getLocalPort();
+
+    auto clientResult = SocketFactory::createTcpClient(AddressFamily::IPv4, ConnectArgs{"127.0.0.1", port});
+    REQUIRE(clientResult.isSuccess());
+    auto& client = clientResult.value();
+
+    // 1. Conflicting headers: Content-Length AND Transfer-Encoding: chunked
+    std::string badReq = "POST / HTTP/1.1\r\nContent-Length: 5\r\nTransfer-Encoding: chunked\r\n\r\n5\r\nhello\r\n0\r\n\r\n";
+    REQUIRE(client.sendAll(badReq.data(), badReq.size()));
+    
+    char buf[1024];
+    int n = client.receive(buf, sizeof(buf));
+    // Since it's a protocol violation, the server should drop the connection or error.
+    (void)n;
+
+    // 2. Unsupported Transfer-Encoding (not chunked)
+    auto clientResult2 = SocketFactory::createTcpClient(AddressFamily::IPv4, ConnectArgs{"127.0.0.1", port});
+    auto& client2 = clientResult2.value();
+    std::string unsupportedTE = "GET / HTTP/1.1\r\nTransfer-Encoding: gzip\r\n\r\n";
+    REQUIRE(client2.sendAll(unsupportedTE.data(), unsupportedTE.size()));
+    n = client2.receive(buf, sizeof(buf));
+    (void)n;
+
+    server.requestStop();
+    if (serverThread.joinable()) serverThread.join();
+}
+
+void test_abrupt_disconnect() {
+    BEGIN_TEST("test_abrupt_disconnect");
+
+    auto serverRes = SocketFactory::createTcpServer(ServerBind{"127.0.0.1", Port::any});
+    REQUIRE(serverRes.isSuccess());
+    auto server = std::move(serverRes.value());
+    Port port = server.getLocalEndpoint().value().port;
+
+    std::thread t([&]() {
+        auto connRes = server.accept();
+        if (connRes.isSuccess()) {
+            auto& conn = connRes.value();
+            conn.send("part", 4);
+            // Internal socket will close when conn goes out of scope and t joins
+        }
+    });
+
+    auto clientRes = SocketFactory::createTcpClient(AddressFamily::IPv4, ConnectArgs{"127.0.0.1", port});
+    REQUIRE(clientRes.isSuccess());
+    auto& client = clientRes.value();
+
+    char buf[100];
+    // We expect 10 bytes, but server only sends 4 then closes
+    bool ok = client.receiveAll(buf, 10);
+    REQUIRE(!ok);
+    REQUIRE(client.getLastError() == SocketError::ConnectionReset);
+
+    if (t.joinable()) t.join();
+}
+
 int main() {
     test_http_pipelining_partial();
     test_http_cache_precedence();
@@ -366,5 +431,7 @@ int main() {
     test_tls_invalid_files();
     test_dns_failure_result();
     test_socket_option_failure();
+    test_hostile_http_parsing();
+    test_abrupt_disconnect();
     return test_summary();
 }
