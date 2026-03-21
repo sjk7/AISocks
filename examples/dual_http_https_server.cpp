@@ -9,21 +9,31 @@
 // DualServerOrchestrator
 //
 // Usage:
-//   dual_http_https_server [--config <file>] [www_root] [http_port]
-//   [https_port]
+//   dual_http_https_server [--config <file>] [www_root] [http_port] [https_port]
 //
-// Config file (key = value, # comments):
-//   www_root         = ./www
-//   http_port        = 8080
-//   https_port       = 8443
-//   cert             = server-cert.pem
-//   key              = server-key.pem
-//   enable_http      = true       # set false to run HTTPS-only
-//   enable_https     = true       # set false to run HTTP-only
-//   index_file       = index.html
+// PRECEDENCE (lowest to highest -- later values override earlier ones):
+//   1. Built-in defaults (see ServerConf below)
+//   2. Config file  -- ./server.conf loaded silently if present, OR
+//                      the file given with --config <file> (error if missing)
+//   3. Command-line positional args  -- ALWAYS WIN over the config file
+//
+// Example: if server.conf has  http_port = 9090  but you run:
+//   dual_http_https_server ./www 8080
+// the port will be 8080, not 9090.
+//
+// Config file keys (key = value, # comments):
+//   www_root          = ./www
+//   http_port         = 8080
+//   https_port        = 8443
+//   cert              = server-cert.pem
+//   key               = server-key.pem
+//   enable_http       = true    # false -> HTTPS-only
+//   enable_https      = true    # false -> HTTP-only
+//   index_file        = index.html
 //   directory_listing = true
 //
-// Precedence: built-in defaults < config file < command-line positional args.
+// NOTE: enable_http / enable_https can only be set via the config file;
+//       there are no positional CLI equivalents for those two flags.
 // If no --config flag is given, ./server.conf is tried silently.
 
 #include "DualServerOrchestrator.h"
@@ -112,7 +122,10 @@ int main(int argc, char** argv) {
         loadConf("server.conf", conf); // silent — file is optional
     }
 
-    // Positional args override config file values.
+    // Command-line positional args take highest precedence -- they always
+    // override whatever was read from the config file.  This means you can
+    // keep a server.conf for day-to-day defaults and still override specific
+    // values on the command line without having to edit the file.
     if (argc > argStart) conf.wwwRoot = argv[argStart];
     if (argc > argStart + 1)
         conf.httpPort = static_cast<uint16_t>(std::stoi(argv[argStart + 1]));
