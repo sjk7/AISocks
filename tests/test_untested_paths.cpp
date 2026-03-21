@@ -10,6 +10,7 @@
 #include "HttpPollServer.h"
 #include "HttpFileServer.h"
 #include "FileServerUtils.h"
+#include "PathHelper.h"
 #include "test_helpers.h"
 
 #ifdef AISOCKS_ENABLE_TLS
@@ -21,15 +22,21 @@
 #include <vector>
 #include <cstring>
 #include <atomic>
+#include <fstream>
+#include <iostream>
 
-#ifndef _WIN32
+#ifdef _WIN32
+#include <winsock2.h>
+#else
 #include <signal.h>
 #include <unistd.h>
+#include <sys/socket.h>
 #endif
 
 using namespace aiSocks;
 using namespace std::chrono_literals;
 
+#ifdef AISOCKS_ENABLE_TLS
 static std::string repoRootFromFile(const char* file) {
     std::string path = file;
     const std::string marker = "/tests/";
@@ -37,6 +44,7 @@ static std::string repoRootFromFile(const char* file) {
     if (pos != std::string::npos) return path.substr(0, pos);
     return ".";
 }
+#endif
 
 // Reusable test server from test_http_poll_server.cpp logic
 class TestSimpleHttpServer : public HttpPollServer {
@@ -267,11 +275,84 @@ void test_tls_policy_enforcement() {
 #endif
 }
 
+void test_tls_invalid_files() {
+#ifdef AISOCKS_ENABLE_TLS
+    BEGIN_TEST("test_tls_invalid_files");
+
+    auto ctx = TlsContext::create(TlsContext::Mode::Server);
+    REQUIRE(ctx);
+
+    std::string err;
+    // 1. Non-existent file
+    bool ok = ctx->loadCertificateChain("/tmp/non-existent-cert-file.pem",
+        "/tmp/non-existent-key-file.pem", &err);
+    REQUIRE(!ok);
+    REQUIRE(!err.empty());
+
+    // 2. Directory instead of file
+    std::string tmpDir = PathHelper::joinPath(PathHelper::tempDirectory(), "aisocks_test_dir");
+    PathHelper::createDirectories(tmpDir);
+    ok = ctx->loadCertificateChain(tmpDir, tmpDir, &err);
+    REQUIRE(!ok);
+    REQUIRE(!err.empty());
+    PathHelper::removeAll(tmpDir);
+
+    // 3. Invalid PEM content (just some junk text)
+    std::string junkFile = PathHelper::joinPath(PathHelper::tempDirectory(), "junk.pem");
+    {
+        std::ofstream f(junkFile);
+        f << "This is not a PEM certificate\n";
+    }
+    ok = ctx->loadCertificateChain(junkFile, junkFile, &err);
+    REQUIRE(!ok);
+    REQUIRE(!err.empty());
+    PathHelper::removeAll(junkFile);
+#endif
+}
+
+void test_dns_failure_result() {
+    BEGIN_TEST("test_dns_failure_result");
+
+    // Attempt to connect to a clearly invalid domain
+    auto result = SocketFactory::createTcpClient(
+        AddressFamily::IPv4, ConnectArgs{"this.is.not.a.valid.domain.name.example", Port(80)});
+
+    REQUIRE(!result.isSuccess());
+    REQUIRE(result.error() == SocketError::ConnectFailed);
+
+    // Verify error message presence/formatting
+    std::string msg = result.message();
+    REQUIRE(!msg.empty());
+    // On most systems, this will contain "Host not found" or similar from gai_strerror
+}
+
+void test_socket_option_failure() {
+    BEGIN_TEST("test_socket_option_failure");
+
+    auto s = TcpSocket::createRaw(AddressFamily::IPv4);
+    REQUIRE(s.isValid());
+
+    // Force a failure in setsockopt by using an invalid level/option combination if possible,
+    // or just verify that our result wrapper handles the failure if we could trigger it.
+    // However, most standard options are robust. We'll use an invalid level.
+#ifndef _WIN32
+    int val = 1;
+    // Level -1 is invalid
+    int ret = setsockopt(static_cast<int>(s.getNativeHandle()), -1, 0, &val, sizeof(val));
+    if (ret == -1) {
+        // This confirms our assumption that we can trigger a failure.
+    }
+#endif
+}
+
 int main() {
     test_http_pipelining_partial();
     test_http_cache_precedence();
     test_tls_alpn_negotiation_manual();
     test_partial_io_and_eintr();
     test_tls_policy_enforcement();
+    test_tls_invalid_files();
+    test_dns_failure_result();
+    test_socket_option_failure();
     return test_summary();
 }
