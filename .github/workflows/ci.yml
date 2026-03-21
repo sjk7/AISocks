@@ -209,14 +209,17 @@ jobs:
       # ------------------------------------------------------------------ #
       # 2. Install system dependencies                                      #
       # ------------------------------------------------------------------ #
-      - name: Install Ninja (Linux)
+      - name: Install Ninja + lld (Linux)
         if: runner.os == 'Linux'
         run: |
-          if command -v ninja >/dev/null 2>&1; then
-            echo "ninja already present"
+          PKGS=""
+          command -v ninja >/dev/null 2>&1 || PKGS="$PKGS ninja-build"
+          command -v lld   >/dev/null 2>&1 || PKGS="$PKGS lld"
+          if [[ -n "$PKGS" ]]; then
+            sudo apt-get update -q
+            sudo apt-get install -y $PKGS
           else
-            sudo apt-get update
-            sudo apt-get install -y ninja-build
+            echo "ninja and lld already present"
           fi
 
       - name: Install OpenSSL (Linux)
