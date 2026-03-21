@@ -67,7 +67,7 @@ class NoTimeoutServer : public ServerBase<NoTimeoutState> {
     public:
     explicit NoTimeoutServer(Port port)
         : ServerBase<NoTimeoutState>(
-              ServerBind{"127.0.0.1", port, Backlog{5, ""}}) {
+              ServerBind{"127.0.0.1", port, Backlog{5}}) {
         // Don't set keep-alive timeout
     }
 

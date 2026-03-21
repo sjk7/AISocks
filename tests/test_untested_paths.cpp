@@ -81,7 +81,7 @@ class TestSimpleHttpServer : public HttpPollServer {
 void test_http_pipelining_partial() {
     BEGIN_TEST("test_http_pipelining_partial");
 
-    TestSimpleHttpServer server(ServerBind{"127.0.0.1", Port::any, ""});
+    TestSimpleHttpServer server(ServerBind{"127.0.0.1", Port::any});
     std::thread serverThread(
         [&]() { server.run(ClientLimit::Default, Milliseconds{1}); });
     server.waitReady();
@@ -154,7 +154,7 @@ void test_http_cache_precedence() {
     // The code indeed checks ETag before Last-Modified.
     // Let's verify this with a real-ish interaction if we can.
 
-    HttpFileServer server(ServerBind{"127.0.0.1", Port::any, ""}, cfg);
+    HttpFileServer server(ServerBind{"127.0.0.1", Port::any}, cfg);
     // Since HttpFileServer is complex to setup with real files in a unit test
     // here, we've verified the code branch order manually: ETag block is
     // literally before Last-Modified block.
@@ -190,7 +190,7 @@ void test_partial_io_and_eintr() {
     // a very small socket buffer size to force multiple calls if the OS allows.
 
     auto serverResult
-        = SocketFactory::createTcpServer(ServerBind{"127.0.0.1", Port::any, ""});
+        = SocketFactory::createTcpServer(ServerBind{"127.0.0.1", Port::any});
     REQUIRE(serverResult.isSuccess());
     auto server = std::move(serverResult.value());
     Port serverPort = server.getLocalEndpoint().value().port;
@@ -383,7 +383,7 @@ void test_hostile_http_parsing() {
     // Standard HTTP server with no explicit per-request limit in ctor but we
     // can test that malformed requests behave correctly and protocol violations
     // are handled.
-    TestSimpleHttpServer server(ServerBind{"127.0.0.1", Port::any, ""});
+    TestSimpleHttpServer server(ServerBind{"127.0.0.1", Port::any});
     std::thread serverThread(
         [&]() { server.run(ClientLimit::Default, Milliseconds{1}); });
     server.waitReady();
@@ -424,7 +424,7 @@ void test_abrupt_disconnect() {
     BEGIN_TEST("test_abrupt_disconnect");
 
     auto serverRes
-        = SocketFactory::createTcpServer(ServerBind{"127.0.0.1", Port::any, ""});
+        = SocketFactory::createTcpServer(ServerBind{"127.0.0.1", Port::any});
     REQUIRE(serverRes.isSuccess());
     auto server = std::move(serverRes.value());
     Port port = server.getLocalEndpoint().value().port;
@@ -505,6 +505,76 @@ void test_url_codec_defensive() {
     REQUIRE(urlEncode("abc-._~") == "abc-._~");
 }
 
+void test_http_100_continue() {
+    BEGIN_TEST("test_http_100_continue");
+
+    TestSimpleHttpServer server(ServerBind{"127.0.0.1", Port::any});
+    std::thread serverThread(
+        [&]() { server.run(ClientLimit::Default, Milliseconds{10}); });
+    server.waitReady();
+    Port port = server.getLocalPort();
+
+    auto clientResult = SocketFactory::createTcpClient(
+        AddressFamily::IPv4, ConnectArgs{"127.0.0.1", port});
+    REQUIRE(clientResult.isSuccess());
+    auto& client = clientResult.value();
+
+    // Send headers with Expect: 100-continue but NO body yet
+    std::string headers = "GET /test HTTP/1.1\r\n"
+                          "Host: localhost\r\n"
+                          "Content-Length: 5\r\n"
+                          "Expect: 100-continue\r\n\r\n";
+    REQUIRE(client.sendAll(headers.data(), headers.size()));
+
+    // We should receive 100 Continue
+    char buf[1024];
+    int n = client.receive(buf, sizeof(buf));
+    REQUIRE(n > 0);
+    std::string response(buf, n);
+    REQUIRE(response.find("HTTP/1.1 100 Continue") != std::string::npos);
+
+    // Now send the body
+    std::string body = "hello";
+    REQUIRE(client.sendAll(body.data(), body.size()));
+
+    // Since GET with body is unusual but we forced a 200 OK in buildResponse
+    // We should receive 200 OK
+    n = client.receive(buf, sizeof(buf));
+    REQUIRE(n > 0);
+    response = std::string(buf, n);
+    // Note: If buildResponse didn't run, check 405 error
+    REQUIRE((response.find("HTTP/1.1 200 OK") != std::string::npos || 
+             response.find("HTTP/1.1 405 Method Not Allowed") != std::string::npos));
+
+    server.requestStop();
+    if (serverThread.joinable()) serverThread.join();
+}
+
+void test_file_symlink_protection() {
+#ifndef _WIN32
+    BEGIN_TEST("test_file_symlink_protection");
+
+    std::string target = "target.txt";
+    std::string link = "link.txt";
+    {
+        std::ofstream f(target);
+        f << "secret content";
+    }
+    ::unlink(link.c_str());
+    if (::symlink(target.c_str(), link.c_str()) != 0) {
+        return; // Skip if symlinks not supported/fail
+    }
+
+    // Opening with aiSocks::File (which uses O_NOFOLLOW on POSIX for read-only)
+    File f(link.c_str(), "r");
+    // It should fail to open because it's a symlink and we use O_NOFOLLOW
+    REQUIRE(!f.isOpen());
+
+    ::unlink(target.c_str());
+    ::unlink(link.c_str());
+#endif
+}
+
 int main() {
     test_http_pipelining_partial();
     test_http_cache_precedence();
@@ -518,5 +588,7 @@ int main() {
     test_abrupt_disconnect();
     test_file_io_defensive();
     test_url_codec_defensive();
+    test_http_100_continue();
+    test_file_symlink_protection();
     return test_summary();
 }

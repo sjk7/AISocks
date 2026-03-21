@@ -82,7 +82,7 @@ class EdgeCaseServer : public ServerBase<EdgeCaseState> {
     public:
     explicit EdgeCaseServer(Port port)
         : ServerBase<EdgeCaseState>(
-              ServerBind{"127.0.0.1", port, Backlog{10, ""}}) {
+              ServerBind{"127.0.0.1", port, Backlog{10}}) {
         setKeepAliveTimeout(SHORT_KEEP_ALIVE);
         setHandleSignals(
             false); // Disable signal handling for parallel test execution
@@ -213,7 +213,7 @@ class EdgeCaseServer : public ServerBase<EdgeCaseState> {
 class InvalidInstanceServer : public ServerBase<EdgeCaseState> {
     public:
     explicit InvalidInstanceServer(Port port)
-        : ServerBase<EdgeCaseState>(ServerBind{"127.0.0.1", port, Backlog{10, ""},
+        : ServerBase<EdgeCaseState>(ServerBind{"127.0.0.1", port, Backlog{10},
               /*reuseAddr=*/true, /*logStartupErrors=*/false}) {}
 
     std::atomic<bool> onReadyCalled{false};

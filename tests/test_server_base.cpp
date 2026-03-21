@@ -51,7 +51,7 @@ struct EchoState {
 class EchoServer : public ServerBase<EchoState> {
     public:
     explicit EchoServer(Port port)
-        : ServerBase<EchoState>(ServerBind{"127.0.0.1", port, Backlog{5, ""}}) {
+        : ServerBase<EchoState>(ServerBind{"127.0.0.1", port, Backlog{5}}) {
         setKeepAliveTimeout(Milliseconds{0});
     }
 

@@ -26,7 +26,7 @@ using namespace aiSocks;
 // spawning the thread, eliminating hardcoded port numbers and race-free.
 static std::pair<std::thread, Port> startEchoServer(int clients = 1) {
     auto res = SocketFactory::createTcpServer(
-        ServerBind{"127.0.0.1", Port::any, Backlog{5, ""}});
+        ServerBind{"127.0.0.1", Port::any, Backlog{5}});
     if (!res.isSuccess()) return {std::thread{}, Port::any};
     Port port = Port::any;
     {
@@ -248,7 +248,7 @@ int main() {
         // A server that echoes two messages on the same connection.
         // Bind Port::any synchronously so we know the port before spawning.
         auto srvRes = SocketFactory::createTcpServer(
-            ServerBind{"127.0.0.1", Port::any, Backlog{2, ""}});
+            ServerBind{"127.0.0.1", Port::any, Backlog{2}});
         REQUIRE(srvRes.isSuccess());
         Port srvPort = Port::any;
         {
