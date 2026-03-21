@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: ["main", "master", "secure"]
+    branches: ["main", "master", "secure", "combosrv"]
     paths-ignore:
       - "**/*.md"
       - "docs/**"
@@ -10,7 +10,7 @@ on:
       - ".gitignore"
       - "LICENSE*"
   pull_request:
-    branches: ["main", "master", "secure"]
+    branches: ["main", "master", "secure", "combosrv"]
     paths-ignore:
       - "**/*.md"
       - "docs/**"
