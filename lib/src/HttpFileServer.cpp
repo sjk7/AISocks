@@ -70,8 +70,10 @@ namespace {
         response += std::to_string(contentSize);
         response += "\r\n";
         
-        // Add cache-control headers for JS files to prevent browser caching
+        // Add cache-control headers for JS and HTML files to prevent browser caching
         if ((filePath.size() >= 3 && filePath.substr(filePath.size() - 3) == ".js") ||
+            (filePath.size() >= 4 && filePath.substr(filePath.size() - 4) == ".htm") ||
+            (filePath.size() >= 5 && filePath.substr(filePath.size() - 5) == ".html") ||
             (filePath.size() >= 6 && filePath.substr(filePath.size() - 6) == ".mjs")) {
             response += "Cache-Control: no-store, no-cache, must-revalidate, max-age=0\r\n";
             response += "Pragma: no-cache\r\n";
