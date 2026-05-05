@@ -637,9 +637,6 @@ void HttpFileServer::handleSaveConfig(HttpClientState& state, const HttpRequest&
         }
     }
     
-    // Debug: log the JSON body
-    printf("DEBUG: JSON body received: %s\n", jsonBody.c_str());
-    
     // Parse JSON config
     Config newConfig = config_; // Start with current config
     
@@ -695,7 +692,6 @@ void HttpFileServer::handleSaveConfig(HttpClientState& state, const HttpRequest&
     // Update bind address and port if provided
     std::string newBindAddress = extractValue("bindAddress");
     int newHttpPort = extractNumber("httpPort");
-    printf("DEBUG: Extracted bindAddress='%s', httpPort=%d\n", newBindAddress.c_str(), newHttpPort);
     if (!newBindAddress.empty()) {
         bind_.address = newBindAddress;
     }
@@ -713,8 +709,6 @@ void HttpFileServer::handleSaveConfig(HttpClientState& state, const HttpRequest&
     configContent += "directoryListing=" + std::string(newConfig.enableDirectoryListing ? "true" : "false") + "\n";
     configContent += "logMaxSize=" + std::to_string(newConfig.logRotation.maxSizeBytes / (1024 * 1024)) + "\n";
     configContent += "logMaxFiles=" + std::to_string(newConfig.logRotation.maxFiles) + "\n";
-    
-    printf("DEBUG: Writing to server.conf:\n%s\n", configContent.c_str());
     
     File configFile("server.conf", "w");
     if (!configFile.isOpen()) {
