@@ -414,15 +414,28 @@ void HttpPollServer::dispatchBuildResponse(HttpClientState& s) {
     const size_t sp = s.request.find(' ');
     if (sp != std::string::npos && sp > 0) {
         const std::string_view m{s.request.data(), sp};
-        if (m != "GET" && m != "HEAD" && m != "POST") {
-            s.dataBuf = makeResponse("HTTP/1.1 405 Method Not Allowed",
-                "text/plain; charset=utf-8",
-                "405 Method Not Allowed\nOnly GET, HEAD, and POST are supported.\n",
-                false);
-            s.dataView = s.dataBuf;
-            s.closeAfterSend = true;
-            s.parsedRequest = HttpRequest{};
-            return;
+        // Extract path from request
+        size_t pathStart = s.request.find(' ', sp + 1);
+        if (pathStart != std::string::npos) {
+            size_t pathEnd = s.request.find(' ', pathStart + 1);
+            if (pathEnd == std::string::npos) {
+                pathEnd = s.request.find('\r', pathStart + 1);
+            }
+            if (pathEnd != std::string::npos) {
+                std::string_view path{s.request.data() + pathStart + 1, pathEnd - pathStart - 1};
+                // Allow POST for config API endpoints
+                bool isConfigAPI = (path == "/api/config/save" || path == "/api/config/ips" || path == "/api/config/current");
+                if (!isConfigAPI && m != "GET" && m != "HEAD") {
+                    s.dataBuf = makeResponse("HTTP/1.1 405 Method Not Allowed",
+                        "text/plain; charset=utf-8",
+                        "405 Method Not Allowed\nOnly GET, HEAD, and POST are supported.\n",
+                        false);
+                    s.dataView = s.dataBuf;
+                    s.closeAfterSend = true;
+                    s.parsedRequest = HttpRequest{};
+                    return;
+                }
+            }
         }
     }
 

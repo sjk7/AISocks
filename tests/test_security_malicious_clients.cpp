@@ -512,9 +512,10 @@ void testMethodValidation() {
     config.documentRoot = "test_secure/public";
     TestableHttpFileServer server(ServerBind{"127.0.0.1", Port{0}}, config);
 
-    // Test that only GET and HEAD are allowed
+    // Test that only GET and HEAD are allowed (except for config API POST)
     const char* methods[]
-        = {"POST", "PUT", "DELETE", "PATCH", "OPTIONS", "TRACE"};
+        = {"PUT", "DELETE", "PATCH", "OPTIONS", "TRACE"};
+    // Note: POST is tested separately for config API endpoints elsewhere
 
     for (const char* method : methods) {
         std::string request;
