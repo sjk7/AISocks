@@ -139,6 +139,9 @@ function validateConfig(config) {
     if (!config.bindAddress) {
         throw new Error('Bind address is required');
     }
+    if (config.httpPort === '' || config.httpPort === null || config.httpPort === undefined || isNaN(config.httpPort)) {
+        throw new Error('HTTP port must be a valid number');
+    }
     if (config.httpPort < 1 || config.httpPort > 65535) {
         throw new Error('HTTP port must be between 1 and 65535');
     }
