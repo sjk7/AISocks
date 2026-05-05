@@ -99,6 +99,15 @@ class CustomFileServer : public HttpFileServer {
 
     /// Override to add access logging
     void buildResponse(HttpClientState& state) override {
+        // Debug: log all POST requests
+        auto request = state.parsedRequest.valid
+            ? state.parsedRequest
+            : HttpRequest::parse(state.request);
+        if (request.method == "POST") {
+            logFile_.writeString("POST request received: " + request.path + " from " + state.peerAddress + "\n");
+            logFile_.flush();
+        }
+        
         // Root redirects to the public landing page (no auth required)
         if (state.parsedRequest.valid && state.parsedRequest.path == "/") {
             state.dataBuf = "HTTP/1.1 302 Found\r\nLocation: "
@@ -108,7 +117,7 @@ class CustomFileServer : public HttpFileServer {
         }
 
         // Parse request first
-        auto request = state.parsedRequest.valid
+        request = state.parsedRequest.valid
             ? std::move(state.parsedRequest)
             : HttpRequest::parse(state.request);
         state.parsedRequest = HttpRequest{};
