@@ -470,3 +470,6 @@ coverage-report/
 
 # Fuzzer slow-unit outputs
 slow-unit-*
+
+# CTest temporary files
+**/Testing/Temporary/
