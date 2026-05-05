@@ -124,6 +124,14 @@ class HttpFileServer : public HttpPollServer {
     /// Virtual method called when log rotation occurs - override for custom post-rotation handling
     virtual void onLogRotate(const std::string& rotatedFilePath);
     
+    /// Check if client address is local (loopback)
+    bool isLocalClient(const std::string& peerAddress) const;
+    
+    /// Config editor API handlers - override in derived classes for custom config handling
+    virtual void handleGetAvailableIPs(HttpClientState& state);
+    virtual void handleGetCurrentConfig(HttpClientState& state);
+    virtual void handleSaveConfig(HttpClientState& state, const HttpRequest& request);
+    
     File logFile_;
     LogRotation logRotation_;
 

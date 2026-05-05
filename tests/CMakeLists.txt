@@ -49,6 +49,7 @@ set(TEST_SOURCES
     test_ip_filter
     test_access_logger
     test_log_rotation
+    test_config_editor
     test_untested_paths
     test_dual_server_orchestrator
     test_dual_server_conf
@@ -178,6 +179,7 @@ set(FILE_TESTS
     test_path_helper
     test_file_server_utils
     test_log_rotation
+    test_config_editor
 )
 
 set(MISC_TESTS

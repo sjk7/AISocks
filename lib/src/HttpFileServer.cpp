@@ -9,6 +9,7 @@
 #include "FileIO.h"
 #include "HtmlPageGenerator.h"
 #include "PathHelper.h"
+#include "Socket.h"
 
 #include <array>
 #include <cstdint>
@@ -158,9 +159,37 @@ void HttpFileServer::buildResponse(HttpClientState& state) {
     // Log the request
     logRequest(request, state);
 
-    if (request.method != "GET" && request.method != "HEAD") {
+    // Config editor API endpoints (local only)
+    if (request.path == "/api/config/ips" && request.method == "GET") {
+        if (!isLocalClient(state.peerAddress)) {
+            sendError(state, 403, "Forbidden", "Config API is local only");
+            return;
+        }
+        handleGetAvailableIPs(state);
+        return;
+    }
+
+    if (request.path == "/api/config/current" && request.method == "GET") {
+        if (!isLocalClient(state.peerAddress)) {
+            sendError(state, 403, "Forbidden", "Config API is local only");
+            return;
+        }
+        handleGetCurrentConfig(state);
+        return;
+    }
+
+    if (request.path == "/api/config/save" && request.method == "POST") {
+        if (!isLocalClient(state.peerAddress)) {
+            sendError(state, 403, "Forbidden", "Config API is local only");
+            return;
+        }
+        handleSaveConfig(state, request);
+        return;
+    }
+
+    if (request.method != "GET" && request.method != "HEAD" && request.method != "POST") {
         sendError(state, 405, "Method Not Allowed",
-            "Only GET and HEAD methods are supported");
+            "Only GET, HEAD, and POST methods are supported");
         return;
     }
 
@@ -518,6 +547,90 @@ FileCache& HttpFileServer::getFileCache() {
 void HttpFileServer::onLogRotate(const std::string& rotatedFilePath) {
     // Default implementation does nothing - override in derived classes
     (void)rotatedFilePath;
+}
+
+bool HttpFileServer::isLocalClient(const std::string& peerAddress) const {
+    // Check if address is loopback (127.0.0.0/8 or ::1)
+    if (peerAddress.find("127.") == 0 || peerAddress == "::1" || peerAddress == "localhost") {
+        return true;
+    }
+    return false;
+}
+
+void HttpFileServer::handleGetAvailableIPs(HttpClientState& state) {
+    // Get available IP addresses from the library
+    std::vector<NetworkInterface> interfaces = Socket::getLocalAddresses();
+    
+    std::string json = R"({"ips": [)";
+    bool first = true;
+    for (const auto& iface : interfaces) {
+        if (!first) json += ", ";
+        json += "\"" + iface.address + "\"";
+        first = false;
+    }
+    json += "]}";
+    
+    std::string response;
+    response.reserve(256 + json.size());
+    response.append("HTTP/1.1 200 OK\r\n");
+    response.append("Content-Type: application/json\r\nContent-Length: ");
+    response += std::to_string(json.size());
+    response.append("\r\nAccess-Control-Allow-Origin: *\r\n\r\n");
+    response.append(json);
+    
+    state.dataBuf = std::move(response);
+    state.dataView = state.dataBuf;
+}
+
+void HttpFileServer::handleGetCurrentConfig(HttpClientState& state) {
+    // Return current HttpFileServer::Config as JSON
+    std::string json = "{";
+    json += "\"bindAddress\": \"0.0.0.0\", ";
+    json += "\"httpPort\": " + std::to_string(8080) + ", ";
+    json += "\"wwwRoot\": \"" + config_.documentRoot + "\", ";
+    json += "\"indexFile\": \"" + config_.indexFile + "\", ";
+    json += "\"enableDirectoryListing\": " + (config_.enableDirectoryListing ? std::string("true") : std::string("false")) + ", ";
+    json += "\"enableETag\": " + (config_.enableETag ? std::string("true") : std::string("false")) + ", ";
+    json += "\"enableLastModified\": " + (config_.enableLastModified ? std::string("true") : std::string("false")) + ", ";
+    json += "\"maxFileSize\": " + std::to_string(config_.maxFileSize) + ", ";
+    json += "\"enableCache\": " + (config_.enableCache ? std::string("true") : std::string("false")) + ", ";
+    json += "\"enableSecurityHeaders\": " + (config_.enableSecurityHeaders ? std::string("true") : std::string("false")) + ", ";
+    json += "\"hideServerVersion\": " + (config_.hideServerVersion ? std::string("true") : std::string("false")) + ", ";
+    json += "\"logPath\": \"" + config_.logPath + "\", ";
+    json += "\"enableLogging\": " + (config_.enableLogging ? std::string("true") : std::string("false")) + ", ";
+    json += "\"enableLogRotation\": " + (config_.logRotation.enabled ? std::string("true") : std::string("false")) + ", ";
+    json += "\"logMaxSizeBytes\": " + std::to_string(config_.logRotation.maxSizeBytes) + ", ";
+    json += "\"logMaxFiles\": " + std::to_string(config_.logRotation.maxFiles);
+    json += "}";
+    
+    std::string response;
+    response.reserve(256 + json.size());
+    response.append("HTTP/1.1 200 OK\r\n");
+    response.append("Content-Type: application/json\r\nContent-Length: ");
+    response += std::to_string(json.size());
+    response.append("\r\nAccess-Control-Allow-Origin: *\r\n\r\n");
+    response.append(json);
+    
+    state.dataBuf = std::move(response);
+    state.dataView = state.dataBuf;
+}
+
+void HttpFileServer::handleSaveConfig(HttpClientState& state, const HttpRequest& request) {
+    // For now, return a message indicating restart is needed
+    // Full implementation would parse JSON body and update config_
+    (void)request;
+    std::string json = R"({"success": false, "message": "Config editing via API not yet implemented. Edit config file manually and restart."})";
+    
+    std::string response;
+    response.reserve(256 + json.size());
+    response.append("HTTP/1.1 200 OK\r\n");
+    response.append("Content-Type: application/json\r\nContent-Length: ");
+    response += std::to_string(json.size());
+    response.append("\r\nAccess-Control-Allow-Origin: *\r\n\r\n");
+    response.append(json);
+    
+    state.dataBuf = std::move(response);
+    state.dataView = state.dataBuf;
 }
 
 void HttpFileServer::logRequest(const HttpRequest& request, const HttpClientState& state) {

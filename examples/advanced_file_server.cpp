@@ -573,6 +573,7 @@ class CustomFileServer : public HttpFileServer {
         return "";
     }
 };
+
 int main(int argc, char* argv[]) {
 
     printf("%s", ServerStrings::HEADER);
