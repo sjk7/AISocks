@@ -118,6 +118,19 @@ class CustomFileServer : public HttpFileServer {
             logRequest(request, state);
         }
 
+        // Config editor API endpoints (local only) - handle before public path check
+        if ((request.path == "/api/config/ips" && request.method == "GET") ||
+            (request.path == "/api/config/current" && request.method == "GET") ||
+            (request.path == "/api/config/save" && request.method == "POST")) {
+            if (!isLocalClient(state.peerAddress)) {
+                sendError(state, 403, "Forbidden", "Config API is local only");
+                return;
+            }
+            // Let base class handle the config API
+            HttpFileServer::buildResponse(state);
+            return;
+        }
+
         // Allow a small set of paths without authentication
         if (isPublicPath(request.path)) {
             HttpFileServer::buildResponse(state);
