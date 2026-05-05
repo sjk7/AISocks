@@ -4,18 +4,26 @@
 let availableIPs = [];
 let currentConfig = {};
 
-// Show status message
-function showStatus(message, type) {
-    const statusDiv = document.getElementById('status');
+// Show status message at top of page
+function showStatusTop(message, type) {
+    const statusDiv = document.getElementById('status-top');
     statusDiv.textContent = message;
-    statusDiv.className = 'status ' + type;
+    statusDiv.className = 'status status-top ' + type;
     statusDiv.style.display = 'block';
 }
 
-// Hide status message
+// Show status message next to button
+function showStatusButton(message, type) {
+    const statusDiv = document.getElementById('status-button');
+    statusDiv.textContent = message;
+    statusDiv.className = 'status status-button ' + type;
+    statusDiv.style.display = 'block';
+}
+
+// Hide status messages
 function hideStatus() {
-    const statusDiv = document.getElementById('status');
-    statusDiv.style.display = 'none';
+    document.getElementById('status-top').style.display = 'none';
+    document.getElementById('status-button').style.display = 'none';
 }
 
 // Fetch available IP addresses
@@ -74,7 +82,7 @@ function populateIPDropdown() {
 
 // Fetch current configuration
 async function fetchConfig() {
-    showStatus('Loading configuration...', 'loading');
+    showStatusTop('Loading configuration...', 'loading');
 
     try {
         const response = await fetch('/api/config/current');
@@ -93,7 +101,7 @@ async function fetchConfig() {
         hideStatus();
     } catch (error) {
         console.error('Error fetching config:', error);
-        showStatus('Failed to load configuration: ' + error.message, 'error');
+        showStatusTop('Failed to load configuration: ' + error.message, 'error');
     }
 }
 
@@ -180,7 +188,7 @@ async function saveConfig() {
         console.log('Config to save:', config);
         validateConfig(config);
 
-        showStatus('Saving configuration and restarting server...', 'loading');
+        showStatusButton('Saving configuration and restarting server...', 'loading');
 
         console.log('Sending POST to /api/config/save');
         const response = await fetch('/api/config/save', {
@@ -223,11 +231,11 @@ async function saveConfig() {
             throw new Error(result.message || 'Failed to save configuration');
         }
 
-        showStatus('Configuration saved successfully! Server is restarting...', 'success');
+        showStatusButton('Configuration saved successfully! Server is restarting...', 'success');
 
     } catch (error) {
         console.error('Error saving config:', error);
-        showStatus('Failed to save configuration: ' + error.message, 'error');
+        showStatusButton('Failed to save configuration: ' + error.message, 'error');
     }
 }
 

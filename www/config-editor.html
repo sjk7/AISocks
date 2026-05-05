@@ -175,6 +175,14 @@
             border: 1px solid #ffeaa7;
         }
 
+        .status-top {
+            margin-bottom: 20px;
+        }
+
+        .status-button {
+            margin-top: 10px;
+        }
+
         .footer {
             background: #2c3e50;
             color: white;
@@ -200,7 +208,7 @@
             <p>Configure your HttpFileServer settings</p>
         </div>
 
-        <div id="status" class="status"></div>
+        <div id="status-top" class="status status-top"></div>
 
         <div class="content">
             <div class="section">
@@ -307,6 +315,8 @@
                 <button class="btn-secondary" onclick="loadConfig()">Reload Config</button>
                 <button class="btn-primary" onclick="saveConfig()">Save & Restart Server</button>
             </div>
+
+            <div id="status-button" class="status status-button"></div>
         </div>
 
         <div class="footer">
