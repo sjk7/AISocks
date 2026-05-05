@@ -215,11 +215,6 @@ async function saveConfig() {
 
         showStatus('Configuration saved successfully! Server is restarting...', 'success');
 
-        // Redirect to testing guide after 3 seconds
-        setTimeout(() => {
-            window.location.href = '/testing-guide.html';
-        }, 3000);
-
     } catch (error) {
         console.error('Error saving config:', error);
         showStatus('Failed to save configuration: ' + error.message, 'error');
