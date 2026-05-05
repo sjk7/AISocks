@@ -216,6 +216,32 @@ int main() {
         }
     }
     
+    // Test 8: Save config with minimal/default values (no changes)
+    {
+        printf("Test 8: Save config with default values... ");
+        HttpFileServer::Config config;
+        config.documentRoot = "./www";
+        TestFileServer server(ServerBind{"127.0.0.1", Port{18087}}, config);
+        
+        HttpClientState state;
+        state.peerAddress = "127.0.0.1";
+        HttpRequest request;
+        request.valid = true;
+        request.method = "POST";
+        request.path = "/api/config/save";
+        
+        server.testHandleSaveConfig(state, request);
+        
+        std::string response(state.dataView.data(), state.dataView.size());
+        if (response.find("HTTP/1.1 200 OK") != std::string::npos) {
+            printf("PASSED\n");
+            passed++;
+        } else {
+            printf("FAILED (save with defaults failed)\n");
+            failed++;
+        }
+    }
+    
     printf("\nConfig editor API tests: %d passed, %d failed\n", passed, failed);
     return failed;
 }

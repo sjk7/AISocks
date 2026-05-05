@@ -620,7 +620,7 @@ void HttpFileServer::handleSaveConfig(HttpClientState& state, const HttpRequest&
     // For now, return a message indicating restart is needed
     // Full implementation would parse JSON body and update config_
     (void)request;
-    std::string json = R"({"success": false, "message": "Config editing via API not yet implemented. Please edit the config file manually and restart the server."})";
+    std::string json = R"({"success": false, "message": "Config editing via API is not yet implemented. To change server settings, edit the config file (e.g., server.conf) manually and restart the server."})";
     
     std::string response;
     response.reserve(256 + json.size());
