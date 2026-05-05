@@ -622,6 +622,7 @@ void HttpFileServer::handleGetCurrentConfig(HttpClientState& state) {
     std::string cert = "server-cert.pem";
     std::string key = "server-key.pem";
     bool directoryListing = true; // default
+    size_t logMaxSize = config_.logRotation.maxSizeBytes; // default to in-memory value
     
     std::ifstream confFile("server.conf");
     if (confFile.is_open()) {
@@ -646,6 +647,11 @@ void HttpFileServer::handleGetCurrentConfig(HttpClientState& state) {
                 }
             } else if (line.find("directory_listing=") == 0) {
                 directoryListing = (line.find("true") != std::string::npos);
+            } else if (line.find("log_max_size=") == 0) {
+                size_t pos = line.find('=');
+                if (pos != std::string::npos) {
+                    logMaxSize = std::stoull(line.substr(pos + 1)) * 1024 * 1024; // Convert MB to bytes
+                }
             }
         }
         confFile.close();
@@ -655,7 +661,8 @@ void HttpFileServer::handleGetCurrentConfig(HttpClientState& state) {
     json += "\"httpsPort\": " + std::to_string(httpsPort) + ", ";
     json += "\"cert\": \"" + cert + "\", ";
     json += "\"key\": \"" + key + "\", ";
-    json += "\"enableDirectoryListing\": " + (directoryListing ? std::string("true") : std::string("false"));
+    json += "\"enableDirectoryListing\": " + (directoryListing ? std::string("true") : std::string("false")) + ", ";
+    json += "\"logMaxSizeBytes\": " + std::to_string(logMaxSize);
     json += "}";
     
     std::string response;
