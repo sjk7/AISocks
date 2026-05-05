@@ -122,6 +122,10 @@ class CustomFileServer : public HttpFileServer {
         if ((request.path == "/api/config/ips" && request.method == "GET") ||
             (request.path == "/api/config/current" && request.method == "GET") ||
             (request.path == "/api/config/save" && request.method == "POST")) {
+            // Log for debugging
+            logFile_.writeString("Config API request: " + request.method + " " + request.path + " from " + state.peerAddress + "\n");
+            logFile_.flush();
+            
             if (!isLocalClient(state.peerAddress)) {
                 sendError(state, 403, "Forbidden", "Config API is local only");
                 return;
