@@ -414,10 +414,10 @@ void HttpPollServer::dispatchBuildResponse(HttpClientState& s) {
     const size_t sp = s.request.find(' ');
     if (sp != std::string::npos && sp > 0) {
         const std::string_view m{s.request.data(), sp};
-        if (m != "GET" && m != "HEAD") {
+        if (m != "GET" && m != "HEAD" && m != "POST") {
             s.dataBuf = makeResponse("HTTP/1.1 405 Method Not Allowed",
                 "text/plain; charset=utf-8",
-                "405 Method Not Allowed\nOnly GET and HEAD are supported.\n",
+                "405 Method Not Allowed\nOnly GET, HEAD, and POST are supported.\n",
                 false);
             s.dataView = s.dataBuf;
             s.closeAfterSend = true;
