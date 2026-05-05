@@ -755,6 +755,11 @@ void HttpFileServer::handleSaveConfig(HttpClientState& state, const HttpRequest&
     newConfig.logRotation.maxSizeBytes = extractNumber("logMaxSize"); // Value is already in bytes
     newConfig.logRotation.maxFiles = extractNumber("logMaxFiles");
     
+    // Debug: log extracted values
+    logFile_.writeString("DEBUG: Extracted logMaxSizeBytes: " + std::to_string(newConfig.logRotation.maxSizeBytes) + "\n");
+    logFile_.writeString("DEBUG: Extracted logMaxFiles: " + std::to_string(newConfig.logRotation.maxFiles) + "\n");
+    logFile_.flush();
+    
     // Update bind address and port if provided
     std::string newBindAddress = extractValue("bindAddress");
     int newHttpPort = extractNumber("httpPort");
