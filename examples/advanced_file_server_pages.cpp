@@ -282,7 +282,9 @@ std::string generateAccessLogTailPage(const std::string& tail) {
         "font-family: Arial, sans-serif; } pre { background: #030712; "
         "border: 1px solid #374151; border-radius: 8px; padding: 16px; "
         "overflow-x: auto; white-space: pre-wrap; } a { color: #93c5fd; }"
-        "</style></head><body>\n");
+        "</style>\n");
+    html.append("<script>window.onload = function() { window.scrollTo(0, document.body.scrollHeight); }</script>\n");
+    html.append("</head><body>\n");
     html.append("<h1>Access Log Tail</h1>\n");
     html.append("<div class=\"meta\">Visible only from local connections. "
                 "Auto-refreshes every 2 seconds.</div>\n");

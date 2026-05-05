@@ -68,7 +68,7 @@ std::string LogRotation::getRotatedPath(int index) const {
 
 bool LogRotation::removeRotatedFile(int index) {
     std::string path = getRotatedPath(index);
-#ifdef _WIN32
+#ifdef _MSC_VER
     return _remove(path.c_str()) == 0;
 #else
     return std::remove(path.c_str()) == 0;
@@ -76,7 +76,7 @@ bool LogRotation::removeRotatedFile(int index) {
 }
 
 bool LogRotation::renameFile(const std::string& from, const std::string& to) {
-#ifdef _WIN32
+#ifdef _MSC_VER
     return _rename(from.c_str(), to.c_str()) == 0;
 #else
     return std::rename(from.c_str(), to.c_str()) == 0;

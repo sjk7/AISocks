@@ -30,6 +30,7 @@
 
 #include "FileIO.h"
 
+#include <cstdint>
 #include <cstddef>
 #include <ctime>
 #include <string>
