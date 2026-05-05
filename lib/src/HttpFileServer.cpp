@@ -585,8 +585,6 @@ void HttpFileServer::handleGetAvailableIPs(HttpClientState& state) {
 void HttpFileServer::handleGetCurrentConfig(HttpClientState& state) {
     // Return current HttpFileServer::Config as JSON
     std::string json = "{";
-    json += "\"bindAddress\": \"0.0.0.0\", ";
-    json += "\"httpPort\": " + std::to_string(8080) + ", ";
     json += "\"wwwRoot\": \"" + config_.documentRoot + "\", ";
     json += "\"indexFile\": \"" + config_.indexFile + "\", ";
     json += "\"enableDirectoryListing\": " + (config_.enableDirectoryListing ? std::string("true") : std::string("false")) + ", ";

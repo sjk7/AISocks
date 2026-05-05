@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html>
+
 <head>
     <title>Config Editor</title>
     <style>
@@ -191,6 +192,7 @@
         }
     </style>
 </head>
+
 <body>
     <div class="container">
         <div class="header">
@@ -203,26 +205,6 @@
 
             <div class="section">
                 <h2>🌐 Server Settings</h2>
-                <div class="form-group">
-                    <label for="bindAddress">Bind Address</label>
-                    <select id="bindAddress">
-                        <option value="">Loading IPs...</option>
-                    </select>
-                </div>
-                <div class="row">
-                    <div class="col">
-                        <div class="form-group">
-                            <label for="httpPort">HTTP Port</label>
-                            <input type="number" id="httpPort" min="1" max="65535">
-                        </div>
-                    </div>
-                    <div class="col">
-                        <div class="form-group">
-                            <label for="httpsPort">HTTPS Port</label>
-                            <input type="number" id="httpsPort" min="1" max="65535">
-                        </div>
-                    </div>
-                </div>
                 <div class="form-group">
                     <label for="wwwRoot">Document Root</label>
                     <input type="text" id="wwwRoot">
@@ -314,4 +296,5 @@
 
     <script src="config-editor.js"></script>
 </body>
+
 </html>

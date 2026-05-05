@@ -41,7 +41,7 @@ async function fetchAvailableIPs() {
 function populateIPDropdown() {
     const select = document.getElementById('bindAddress');
     select.innerHTML = '';
-    
+
     availableIPs.forEach(ip => {
         const option = document.createElement('option');
         option.value = ip;
@@ -53,7 +53,7 @@ function populateIPDropdown() {
 // Fetch current configuration
 async function fetchConfig() {
     showStatus('Loading configuration...', 'loading');
-    
+
     try {
         const response = await fetch('/api/config/current');
         if (!response.ok) {
@@ -72,23 +72,20 @@ async function fetchConfig() {
 // Populate form with config values
 function populateForm(config) {
     // Server Settings
-    document.getElementById('bindAddress').value = config.bindAddress || '0.0.0.0';
-    document.getElementById('httpPort').value = config.httpPort || 8080;
-    document.getElementById('httpsPort').value = config.httpsPort || 8443;
     document.getElementById('wwwRoot').value = config.wwwRoot || './www';
-    
+
     // TLS Settings
     document.getElementById('cert').value = config.cert || 'server-cert.pem';
     document.getElementById('key').value = config.key || 'server-key.pem';
     document.getElementById('enableHttps').checked = config.enableHttps || false;
-    
+
     // Logging Settings
     document.getElementById('logPath').value = config.logPath || 'access.log';
     document.getElementById('enableLogging').checked = config.enableLogging !== false;
     document.getElementById('enableLogRotation').checked = config.enableLogRotation !== false;
     document.getElementById('logMaxSizeBytes').value = config.logMaxSizeBytes || 10485760;
     document.getElementById('logMaxFiles').value = config.logMaxFiles || 5;
-    
+
     // Display Settings
     document.getElementById('indexFile').value = config.indexFile || 'index.html';
     document.getElementById('directoryListing').checked = config.directoryListing !== false;
@@ -97,9 +94,6 @@ function populateForm(config) {
 // Get form values as config object
 function getFormValues() {
     return {
-        bindAddress: document.getElementById('bindAddress').value,
-        httpPort: parseInt(document.getElementById('httpPort').value) || 8080,
-        httpsPort: parseInt(document.getElementById('httpsPort').value) || 8443,
         wwwRoot: document.getElementById('wwwRoot').value,
         cert: document.getElementById('cert').value,
         key: document.getElementById('key').value,
@@ -116,15 +110,6 @@ function getFormValues() {
 
 // Validate config
 function validateConfig(config) {
-    if (!config.bindAddress) {
-        throw new Error('Bind address is required');
-    }
-    if (config.httpPort < 1 || config.httpPort > 65535) {
-        throw new Error('HTTP port must be between 1 and 65535');
-    }
-    if (config.httpsPort < 1 || config.httpsPort > 65535) {
-        throw new Error('HTTPS port must be between 1 and 65535');
-    }
     if (!config.wwwRoot) {
         throw new Error('Document root is required');
     }
@@ -142,9 +127,9 @@ async function saveConfig() {
     try {
         const config = getFormValues();
         validateConfig(config);
-        
+
         showStatus('Saving configuration and restarting server...', 'loading');
-        
+
         const response = await fetch('/api/config/save', {
             method: 'POST',
             headers: {
@@ -152,20 +137,20 @@ async function saveConfig() {
             },
             body: JSON.stringify(config)
         });
-        
+
         if (!response.ok) {
             const error = await response.json();
             throw new Error(error.error || 'Failed to save configuration');
         }
-        
+
         const result = await response.json();
         showStatus('Configuration saved successfully! Server is restarting...', 'success');
-        
+
         // Redirect to testing guide after 3 seconds
         setTimeout(() => {
             window.location.href = '/testing-guide.html';
         }, 3000);
-        
+
     } catch (error) {
         console.error('Error saving config:', error);
         showStatus('Failed to save configuration: ' + error.message, 'error');
@@ -179,6 +164,5 @@ function loadConfig() {
 
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', () => {
-    fetchAvailableIPs();
     fetchConfig();
 });
