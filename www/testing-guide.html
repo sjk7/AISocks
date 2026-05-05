@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>HttpFileServer - Testing Guide</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            margin: 0;
+            font-size: 2.5em;
+            font-weight: 300;
+        }
+
+        .header p {
+            margin: 10px 0 0 0;
+            opacity: 0.9;
+            font-size: 1.1em;
+        }
+
+        .content {
+            padding: 30px;
+        }
+
+        .section {
+            margin: 30px 0;
+            padding: 20px;
+            border-left: 4px solid #4facfe;
+            background: #f8f9fa;
+            border-radius: 0 8px 8px 0;
+        }
+
+        .section h2 {
+            color: #2c3e50;
+            margin-top: 0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .section h3 {
+            color: #34495e;
+            margin-top: 20px;
+        }
+
+        code {
+            background: #f1f2f6;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+            color: #e74c3c;
+        }
+
+        .url {
+            background: #2c3e50;
+            color: #ecf0f1;
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            display: inline-block;
+            margin: 5px 0;
+        }
+
+        .url a {
+            color: #5dade2;
+            font-weight: 500;
+        }
+
+        .url a:hover {
+            color: #85c1e9;
+        }
+
+        .checklist {
+            list-style: none;
+            padding: 0;
+        }
+
+        .checklist li {
+            margin: 8px 0;
+            padding: 8px 0;
+            border-bottom: 1px solid #ecf0f1;
+        }
+
+        .checklist li:before {
+            content: '✓ ';
+            color: #27ae60;
+            font-weight: bold;
+        }
+
+        .warning {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 4px;
+            padding: 12px;
+            margin: 10px 0;
+        }
+
+        .success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            border-radius: 4px;
+            padding: 12px;
+            margin: 10px 0;
+        }
+
+        a {
+            color: #2980b9;
+            text-decoration: none;
+        }
+
+        a:hover {
+            text-decoration: underline;
+            color: #3498db;
+        }
+
+        .footer {
+            background: #2c3e50;
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚀 HttpFileServer</h1>
+            <p>Complete Browser Testing Guide</p>
+        </div>
+
+        <div class="content">
+
+            <div class="section">
+                <h2>🔐 Authentication</h2>
+                <p><strong>Server Credentials:</strong></p>
+                <div class="url">Username: admin</div>
+                <div class="url">Password: secret</div>
+                <p>Browser will show a login dialog when you access any URL.</p>
+                <div class="success">✓ All requests are logged to <a href="/access.log"><code>access.log</code></a>
+                </div>
+                <p><strong>Public page</strong> (no login required):</p>
+                <div class="url"><a href="/public.html">/public.html</a></div>
+                <p><strong>Local browser log tail</strong> (loopback only):</p>
+                <div class="url"><a href="/access.log">/access.log</a></div>
+            </div>
+
+            <div class="section">
+                <h2>📄 File Serving</h2>
+                <h3>Test Files:</h3>
+                <div class="url"><a href="/index.html">/index.html</a></div>
+                <div class="url"><a href="/style.css">/style.css</a></div>
+                <div class="url"><a href="/app.js">/app.js</a> (view source)</div>
+                <div class="url"><a href="/demo.html">/demo.html</a> (runs app.js)</div>
+                <h3>Large File Download Test:</h3>
+                <div class="url"><a href="/large500MB.bin">/large500MB.bin</a> (500 MB binary file)</div>
+                <p>Files are served with correct MIME types and UTF-8 encoding. Large file tests download speed and
+                    keep-alive behavior.</p>
+            </div>
+
+            <div class="section">
+                <h2>📁 Directory Listing</h2>
+                <h3>Subdirectory:</h3>
+                <div class="url"><a href="/files/">/files/</a></div>
+                <p>Enhanced directory listings with file sizes, dates, and emoji icons. Click on files to view them
+                    (browser will display or download based on MIME type).</p>
+            </div>
+
+            <div class="section">
+                <h2>🚫 Access Control</h2>
+                <h3>Blocked Files (should return 403):</h3>
+                <div class="url"><a href="/config.conf">/config.conf</a></div>
+                <div class="url"><a href="/server.log">/server.log</a></div>
+                <div class="url"><a href="/temp.tmp">/temp.tmp</a></div>
+                <div class="warning">⚠️ These files are blocked by access control rules</div>
+            </div>
+
+            <div class="section">
+                <h2>⚡ Performance Features</h2>
+                <h3>1. File Cache:</h3>
+                <ul>
+                    <li>Enable with <code>config.enableCache = true</code></li>
+                    <li>Caches file content in memory for faster serving</li>
+                    <li>Auto-invalidates when file modification time changes</li>
+                    <li>Skips cache for URLs with query strings (<code>?param=value</code>)</li>
+                    <li>View cache stats: <code>server.getFileCache().size()</code> and <code>totalBytes()</code></li>
+                </ul>
+                <h3>2. ETag Support:</h3>
+                <ul>
+                    <li>Load any file twice</li>
+                    <li>Second request should return <code>304 Not Modified</code></li>
+                    <li>Check Network tab in browser dev tools</li>
+                </ul>
+                <h3>3. Last-Modified Headers:</h3>
+                <ul>
+                    <li>Check Response Headers in dev tools</li>
+                    <li>Should see <code>Last-Modified</code> field</li>
+                </ul>
+            </div>
+
+            <div class="section">
+                <h2>❌ Error Handling</h2>
+                <h3>Test Error Pages:</h3>
+                <div class="url"><a href="/nonexistent.html">/nonexistent.html</a> (404)</div>
+                <div class="url"><a href="/../etc/passwd">/../etc/passwd</a> (404 in browser*, 403 via curl
+                    --path-as-is)</div>
+                <p style="font-size: 0.9em; color: #666;">*Browsers normalize URLs before sending, so the server
+                    receives /etc/passwd (404). Use curl --path-as-is to test actual path traversal protection (403).
+                </p>
+                <p>Custom styled error pages with helpful information.</p>
+            </div>
+
+            <div class="section">
+                <h2>🔍 Developer Tools Testing</h2>
+                <h3>Open Chrome DevTools (F12):</h3>
+                <ul>
+                    <li><strong>Network Tab:</strong> See all requests, status codes, headers</li>
+                    <li><strong>Console Tab:</strong> Should see no errors for valid files</li>
+                    <li><strong>Application Tab:</strong> Check browser caching</li>
+                </ul>
+            </div>
+
+            <div class="section">
+                <h2>🛡️ Security Features</h2>
+                <ul>
+                    <li><strong>Path Traversal Protection:</strong> Blocks <code>../</code> attacks</li>
+                    <li><strong>Access Control:</strong> Blocks sensitive file types</li>
+                    <li><strong>Authentication:</strong> Basic auth required</li>
+                    <li><strong>Security Headers:</strong> X-Content-Type-Options, X-Frame-Options</li>
+                </ul>
+            </div>
+
+            <div class="section">
+                <h2>🧪 Testing Checklist</h2>
+                <ul class="checklist">
+                    <li>Authentication prompt appears</li>
+                    <li>Valid credentials grant access</li>
+                    <li>Invalid credentials show 401 error</li>
+                    <li>Directory listings show file metadata</li>
+                    <li>Files download with correct MIME types</li>
+                    <li>Sensitive files return 403 errors</li>
+                    <li>Non-existent files return 404 errors</li>
+                    <li>Path traversal attempts are blocked</li>
+                    <li>ETag headers work (304 responses)</li>
+                    <li>Access log records all requests</li>
+                    <li>Custom headers appear in responses</li>
+                </ul>
+            </div>
+
+        </div>
+        <div class="footer">
+            <p>Custom File Server | Built with aiSocks HttpFileServer</p>
+        </div>
+    </div>
+</body>
+
+</html>

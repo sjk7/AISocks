@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>JavaScript Demo - app.js</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+        .container { max-width: 800px; margin: 0 auto; background: white; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); padding: 30px; }
+        h1 { color: #2c3e50; margin-top: 0; }
+        .info { background: #e3f2fd; border-left: 4px solid #2196f3; padding: 15px; margin: 20px 0; border-radius: 4px; }
+        #output { background: #f5f5f5; border: 1px solid #ddd; padding: 15px; border-radius: 4px; min-height: 100px; font-family: 'Courier New', monospace; white-space: pre-wrap; }
+        button { background: #4CAF50; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-size: 16px; margin: 10px 5px 10px 0; }
+        button:hover { background: #45a049; }
+        .back-link { display: inline-block; margin-top: 20px; color: #3498db; text-decoration: none; }
+        .back-link:hover { text-decoration: underline; }
+    </style>
+    <script src="/app.js"></script>
+</head>
+<body>
+    <div class="container">
+        <h1>🎯 JavaScript Execution Demo</h1>
+        <div class="info">
+            <strong>ℹ️ Info:</strong> This page loads and executes <code>/app.js</code> using a <code>&lt;script src="/app.js"&gt;&lt;/script&gt;</code> tag.
+        </div>
+        <h2>Output:</h2>
+        <div id="output">Waiting for JavaScript to execute...</div>
+        <button onclick="testFunction()">Run Test Function</button>
+        <button onclick="location.reload()">Reload Page</button>
+        <p><a href="/" class="back-link">← Back to Testing Guide</a></p>
+    </div>
+    <script>
+        // Display that the script loaded
+        document.getElementById('output').textContent = 'app.js loaded successfully!\n\nClick "Run Test Function" to execute the test function from app.js';
+    </script>
+</body>
+</html>
