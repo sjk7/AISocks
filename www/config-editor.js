@@ -142,14 +142,23 @@ function validateConfig(config) {
     if (config.httpPort < 1 || config.httpPort > 65535) {
         throw new Error('HTTP port must be between 1 and 65535');
     }
-    if (!config.wwwRoot) {
-        throw new Error('Document root is required');
+    if (!config.wwwRoot || config.wwwRoot.trim() === '') {
+        throw new Error('Document root is required and cannot be empty');
     }
-    if (config.enableHttps && (!config.cert || !config.key)) {
-        throw new Error('Certificate and key files are required when HTTPS is enabled');
+    if (!config.indexFile || config.indexFile.trim() === '') {
+        throw new Error('Index file is required and cannot be empty');
+    }
+    if (config.enableHttps && (!config.cert || config.cert.trim() === '')) {
+        throw new Error('Certificate file is required when HTTPS is enabled');
+    }
+    if (config.enableHttps && (!config.key || config.key.trim() === '')) {
+        throw new Error('Key file is required when HTTPS is enabled');
     }
     if (config.logMaxFiles < 1) {
         throw new Error('Max log files must be at least 1');
+    }
+    if (config.logMaxSizeBytes < 1) {
+        throw new Error('Max log size must be at least 1');
     }
     return true;
 }
