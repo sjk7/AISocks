@@ -506,6 +506,8 @@ class CustomFileServer : public HttpFileServer {
     bool isPublicPath(const std::string& path) const {
         static const std::string publicPaths[] = {
             "/public.html",
+            "/config-editor.html",
+            "/config-editor.js",
         };
         for (const auto& p : publicPaths) {
             if (path == p) return true;
