@@ -508,6 +508,9 @@ class CustomFileServer : public HttpFileServer {
             "/public.html",
             "/config-editor.html",
             "/config-editor.js",
+            "/api/config/ips",
+            "/api/config/current",
+            "/api/config/save",
         };
         for (const auto& p : publicPaths) {
             if (path == p) return true;

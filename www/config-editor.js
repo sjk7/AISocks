@@ -171,7 +171,15 @@ async function saveConfig() {
         });
 
         if (!response.ok) {
-            throw new Error('Server returned error: ' + response.status);
+            if (response.status === 405) {
+                throw new Error('Method Not Allowed (405): The server does not support this operation. This may be due to authentication requirements or server configuration.');
+            } else if (response.status === 403) {
+                throw new Error('Forbidden (403): You do not have permission to access this resource. Config editing is restricted to local connections only.');
+            } else if (response.status === 404) {
+                throw new Error('Not Found (404): The config save endpoint is not available on this server.');
+            } else {
+                throw new Error('Server returned error: ' + response.status + ' ' + response.statusText);
+            }
         }
 
         const responseText = await response.text();
