@@ -712,14 +712,14 @@ void HttpFileServer::handleSaveConfig(HttpClientState& state, const HttpRequest&
     
     // Write config to server.conf file
     std::string configContent = "# Server configuration\n";
-    configContent += "bindAddress=" + bind_.address + "\n";
-    configContent += "httpPort=" + std::to_string(newHttpPort > 0 ? newHttpPort : bind_.port.value()) + "\n";
-    configContent += "wwwRoot=" + newConfig.documentRoot + "\n";
-    configContent += "indexFile=" + newConfig.indexFile + "\n";
-    configContent += "enableLogging=" + std::string(newConfig.enableLogging ? "true" : "false") + "\n";
-    configContent += "directoryListing=" + std::string(newConfig.enableDirectoryListing ? "true" : "false") + "\n";
-    configContent += "logMaxSize=" + std::to_string(newConfig.logRotation.maxSizeBytes / (1024 * 1024)) + "\n";
-    configContent += "logMaxFiles=" + std::to_string(newConfig.logRotation.maxFiles) + "\n";
+    configContent += "bind_address=" + bind_.address + "\n";
+    configContent += "http_port=" + std::to_string(newHttpPort > 0 ? newHttpPort : bind_.port.value()) + "\n";
+    configContent += "www_root=" + newConfig.documentRoot + "\n";
+    configContent += "index_file=" + newConfig.indexFile + "\n";
+    configContent += "enable_logging=" + std::string(newConfig.enableLogging ? "true" : "false") + "\n";
+    configContent += "directory_listing=" + std::string(newConfig.enableDirectoryListing ? "true" : "false") + "\n";
+    configContent += "log_max_size=" + std::to_string(newConfig.logRotation.maxSizeBytes / (1024 * 1024)) + "\n";
+    configContent += "log_max_files=" + std::to_string(newConfig.logRotation.maxFiles) + "\n";
     
     File configFile("server.conf", "w");
     if (!configFile.isOpen()) {
