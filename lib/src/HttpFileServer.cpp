@@ -752,7 +752,7 @@ void HttpFileServer::handleSaveConfig(HttpClientState& state, const HttpRequest&
     newConfig.indexFile = extractValue("indexFile");
     newConfig.enableLogging = extractBool("enableLogging");
     newConfig.enableDirectoryListing = extractBool("directoryListing");
-    newConfig.logRotation.maxSizeBytes = extractNumber("logMaxSize") * 1024 * 1024; // Convert MB to bytes
+    newConfig.logRotation.maxSizeBytes = extractNumber("logMaxSize"); // Value is already in bytes
     newConfig.logRotation.maxFiles = extractNumber("logMaxFiles");
     
     // Update bind address and port if provided
