@@ -625,6 +625,7 @@ void HttpFileServer::handleGetCurrentConfig(HttpClientState& state) {
     size_t logMaxSize = config_.logRotation.maxSizeBytes; // default to in-memory value
     bool enableLogRotation = config_.logRotation.enabled; // default to in-memory value
     std::string logPath = config_.logPath; // default to in-memory value
+    bool enableLogging = config_.enableLogging; // default to in-memory value
     
     std::ifstream confFile("server.conf");
     if (confFile.is_open()) {
@@ -662,11 +663,14 @@ void HttpFileServer::handleGetCurrentConfig(HttpClientState& state) {
                 if (pos != std::string::npos) {
                     logPath = line.substr(pos + 1);
                 }
+            } else if (line.find("enable_logging=") == 0) {
+                enableLogging = (line.find("true") != std::string::npos);
             }
         }
         confFile.close();
     }
     
+    json += "\"enableLogging\": " + (enableLogging ? std::string("true") : std::string("false")) + ", ";
     json += "\"enableHttps\": " + (enableHttps ? std::string("true") : std::string("false")) + ", ";
     json += "\"httpsPort\": " + std::to_string(httpsPort) + ", ";
     json += "\"cert\": \"" + cert + "\", ";
