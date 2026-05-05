@@ -752,6 +752,21 @@ int main(int argc, char* argv[]) {
         printf(ServerStrings::STARTING, conf.bindAddress.c_str(), conf.httpPort);
         printf("%s%s\n", ServerStrings::SERVING_FROM, config.documentRoot.c_str());
         printf(ServerStrings::PUBLIC_PAGE, conf.bindAddress.c_str(), conf.httpPort);
+        
+        // Print browser testing guide
+        printf("%s", ServerStrings::GUIDE_HEADER);
+        printf("%s", ServerStrings::AUTH_SECTION);
+        printf("%s", ServerStrings::DIR_SECTION);
+        printf("%s", ServerStrings::FILE_SECTION);
+        printf("%s", ServerStrings::ACCESS_SECTION);
+        printf("%s", ServerStrings::MIME_SECTION);
+        printf("%s", ServerStrings::PERF_SECTION);
+        printf("%s", ServerStrings::ERROR_SECTION);
+        printf("%s", ServerStrings::DEVTOOLS_SECTION);
+        printf("%s", ServerStrings::LOG_SECTION);
+        printf("%s", ServerStrings::CHECKLIST_SECTION);
+        printf("%s", ServerStrings::FEATURES_SECTION);
+        printf("%s", ServerStrings::PRESS_CTRL_C);
 
         server.run(ClientLimit::Unlimited);
 
