@@ -13,11 +13,11 @@ namespace ServerStrings {
 // Server startup messages
 inline const char* HEADER = "\n=== Custom HTTP File Server Example ===\n";
 inline const char* STARTING
-    = "Custom HTTP File Server starting on http://localhost:%d/\n";
+    = "Custom HTTP File Server starting on http://%s:%d/\n";
 inline const char* SERVING_FROM = "Serving files from: ";
 inline const char* BUILD_INFO_PREFIX = "Build: ";
 inline const char* MAX_CLIENTS_PREFIX = "Max concurrent clients: ";
-inline const char* PUBLIC_PAGE = "Public page (no auth): http://localhost:%d/public.html\n";
+inline const char* PUBLIC_PAGE = "Public page (no auth): http://%s:%d/public.html\n";
 
 // Browser testing guide
 inline const char* GUIDE_HEADER = "\n=== BROWSER TESTING GUIDE ===\n";

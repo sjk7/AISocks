@@ -749,9 +749,9 @@ int main(int argc, char* argv[]) {
             return 1;
         }
 
-        printf(ServerStrings::STARTING, conf.httpPort);
+        printf(ServerStrings::STARTING, conf.bindAddress.c_str(), conf.httpPort);
         printf("%s%s\n", ServerStrings::SERVING_FROM, config.documentRoot.c_str());
-        printf(ServerStrings::PUBLIC_PAGE, conf.httpPort);
+        printf(ServerStrings::PUBLIC_PAGE, conf.bindAddress.c_str(), conf.httpPort);
 
         server.run(ClientLimit::Unlimited);
 
