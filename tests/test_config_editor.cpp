@@ -73,13 +73,38 @@ int main() {
         }
     }
     
-    // Test 2: handleGetCurrentConfig
+    // Test 2: handleGetCurrentConfig includes bindAddress and httpPort
     {
-        printf("Test 2: handleGetCurrentConfig... ");
+        printf("Test 2: handleGetCurrentConfig includes bindAddress and httpPort... ");
         HttpFileServer::Config config;
         config.documentRoot = "./www";
         config.enableLogging = true;
         TestFileServer server(ServerBind{"127.0.0.1", Port{18081}}, config);
+        
+        HttpClientState state;
+        state.peerAddress = "127.0.0.1";
+        
+        server.testHandleGetCurrentConfig(state);
+        
+        std::string response(state.dataView.data(), state.dataView.size());
+        if (response.find("\"bindAddress\": \"127.0.0.1\"") != std::string::npos && 
+            response.find("\"httpPort\": 18081") != std::string::npos &&
+            response.find("HTTP/1.1 200 OK") != std::string::npos) {
+            printf("PASSED\n");
+            passed++;
+        } else {
+            printf("FAILED (bindAddress or httpPort missing)\n");
+            failed++;
+        }
+    }
+    
+    // Test 3: handleGetCurrentConfig includes wwwRoot and enableLogging
+    {
+        printf("Test 3: handleGetCurrentConfig includes wwwRoot and enableLogging... ");
+        HttpFileServer::Config config;
+        config.documentRoot = "./www";
+        config.enableLogging = true;
+        TestFileServer server(ServerBind{"127.0.0.1", Port{18082}}, config);
         
         HttpClientState state;
         state.peerAddress = "127.0.0.1";
@@ -98,12 +123,37 @@ int main() {
         }
     }
     
-    // Test 3: handleSaveConfig
+    // Test 4: handleGetAvailableIPs returns actual IPs from library
     {
-        printf("Test 3: handleSaveConfig... ");
+        printf("Test 4: handleGetAvailableIPs returns actual IPs from library... ");
         HttpFileServer::Config config;
         config.documentRoot = "./www";
-        TestFileServer server(ServerBind{"127.0.0.1", Port{18082}}, config);
+        TestFileServer server(ServerBind{"127.0.0.1", Port{18083}}, config);
+        
+        HttpClientState state;
+        state.peerAddress = "127.0.0.1";
+        
+        server.testHandleGetAvailableIPs(state);
+        
+        std::string response(state.dataView.data(), state.dataView.size());
+        // Check that we get at least localhost IP
+        if (response.find("\"ips\":") != std::string::npos && 
+            (response.find("127.0.0.1") != std::string::npos || response.find("::1") != std::string::npos) &&
+            response.find("HTTP/1.1 200 OK") != std::string::npos) {
+            printf("PASSED\n");
+            passed++;
+        } else {
+            printf("FAILED (no IPs returned)\n");
+            failed++;
+        }
+    }
+    
+    // Test 5: handleSaveConfig
+    {
+        printf("Test 5: handleSaveConfig... ");
+        HttpFileServer::Config config;
+        config.documentRoot = "./www";
+        TestFileServer server(ServerBind{"127.0.0.1", Port{18084}}, config);
         
         HttpClientState state;
         state.peerAddress = "127.0.0.1";
@@ -124,12 +174,12 @@ int main() {
         }
     }
     
-    // Test 4: Local-only access check (via isLocalClient helper)
+    // Test 6: Local-only access check (via isLocalClient helper)
     {
-        printf("Test 4: Local-only access check... ");
+        printf("Test 6: Local-only access check... ");
         HttpFileServer::Config config;
         config.documentRoot = "./www";
-        TestFileServer server(ServerBind{"127.0.0.1", Port{18083}}, config);
+        TestFileServer server(ServerBind{"127.0.0.1", Port{18085}}, config);
         
         bool isLocal = server.testIsLocalClient("127.0.0.1");
         bool isNonLocal = server.testIsLocalClient("192.168.1.1");
@@ -139,6 +189,29 @@ int main() {
             passed++;
         } else {
             printf("FAILED (isLocalClient check incorrect)\n");
+            failed++;
+        }
+    }
+    
+    // Test 7: Different bind addresses (0.0.0.0)
+    {
+        printf("Test 7: Config with 0.0.0.0 bind address... ");
+        HttpFileServer::Config config;
+        config.documentRoot = "./www";
+        TestFileServer server(ServerBind{"0.0.0.0", Port{18086}}, config);
+        
+        HttpClientState state;
+        state.peerAddress = "127.0.0.1";
+        
+        server.testHandleGetCurrentConfig(state);
+        
+        std::string response(state.dataView.data(), state.dataView.size());
+        if (response.find("\"bindAddress\": \"0.0.0.0\"") != std::string::npos && 
+            response.find("HTTP/1.1 200 OK") != std::string::npos) {
+            printf("PASSED\n");
+            passed++;
+        } else {
+            printf("FAILED (0.0.0.0 not in config)\n");
             failed++;
         }
     }
