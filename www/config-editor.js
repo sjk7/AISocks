@@ -156,12 +156,15 @@ function validateConfig(config) {
 
 // Save configuration
 async function saveConfig() {
+    console.log('saveConfig() called');
     try {
         const config = getFormValues();
+        console.log('Config to save:', config);
         validateConfig(config);
 
         showStatus('Saving configuration and restarting server...', 'loading');
 
+        console.log('Sending POST to /api/config/save');
         const response = await fetch('/api/config/save', {
             method: 'POST',
             headers: {
@@ -169,6 +172,8 @@ async function saveConfig() {
             },
             body: JSON.stringify(config)
         });
+
+        console.log('Response received:', response.status, response.statusText);
 
         if (!response.ok) {
             if (response.status === 405) {
