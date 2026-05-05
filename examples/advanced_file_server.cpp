@@ -417,8 +417,6 @@ class CustomFileServer : public HttpFileServer {
     }
 
     void logRequest(const HttpRequest& request, const HttpClientState& state) {
-        (void)state; // Suppress unused parameter warning - available for future
-                     // enhancements
         if (!logFile_.isOpen()) return;
 
         auto now = std::chrono::system_clock::now();
@@ -427,28 +425,63 @@ class CustomFileServer : public HttpFileServer {
 #ifdef _WIN32
         struct tm timeinfo = {};
         localtime_s(&timeinfo, &time_t);
-        logFile_.printf("%04d-%02d-%02d %02d:%02d:%02d %s %s from client\n",
-            static_cast<int>(timeinfo.tm_year + 1900),
-            static_cast<int>(timeinfo.tm_mon + 1),
+        char timebuf[32];
+        snprintf(timebuf, sizeof(timebuf), "[%02d/%s/%04d:%02d:%02d:%02d +0000]",
             static_cast<int>(timeinfo.tm_mday),
+            (timeinfo.tm_mon == 0) ? "Jan" :
+            (timeinfo.tm_mon == 1) ? "Feb" :
+            (timeinfo.tm_mon == 2) ? "Mar" :
+            (timeinfo.tm_mon == 3) ? "Apr" :
+            (timeinfo.tm_mon == 4) ? "May" :
+            (timeinfo.tm_mon == 5) ? "Jun" :
+            (timeinfo.tm_mon == 6) ? "Jul" :
+            (timeinfo.tm_mon == 7) ? "Aug" :
+            (timeinfo.tm_mon == 8) ? "Sep" :
+            (timeinfo.tm_mon == 9) ? "Oct" :
+            (timeinfo.tm_mon == 10) ? "Nov" : "Dec",
+            static_cast<int>(timeinfo.tm_year + 1900),
             static_cast<int>(timeinfo.tm_hour),
             static_cast<int>(timeinfo.tm_min),
-            static_cast<int>(timeinfo.tm_sec), request.method.c_str(),
-            request.path.c_str());
+            static_cast<int>(timeinfo.tm_sec));
 #else
         struct tm* timeinfo = localtime(&time_t);
-        logFile_.printf(
-            "%04d-%02d-%02d %02d:%02d:%02d %.*s %s from client\n", //-V111
-                                                                   ////-V111
-            static_cast<int>(timeinfo->tm_year + 1900),
-            static_cast<int>(timeinfo->tm_mon + 1),
-            static_cast<int>(timeinfo->tm_mday),
-            static_cast<int>(timeinfo->tm_hour),
-            static_cast<int>(timeinfo->tm_min),
-            static_cast<int>(timeinfo->tm_sec),
-            static_cast<int>(request.method.size()), request.method.data(),
-            request.path.c_str());
+        char timebuf[32];
+        snprintf(timebuf, sizeof(timebuf), "[%02d/%s/%04d:%02d:%02d:%02d +0000]",
+            timeinfo->tm_mday,
+            (timeinfo->tm_mon == 0) ? "Jan" :
+            (timeinfo->tm_mon == 1) ? "Feb" :
+            (timeinfo->tm_mon == 2) ? "Mar" :
+            (timeinfo->tm_mon == 3) ? "Apr" :
+            (timeinfo->tm_mon == 4) ? "May" :
+            (timeinfo->tm_mon == 5) ? "Jun" :
+            (timeinfo->tm_mon == 6) ? "Jul" :
+            (timeinfo->tm_mon == 7) ? "Aug" :
+            (timeinfo->tm_mon == 8) ? "Sep" :
+            (timeinfo->tm_mon == 9) ? "Oct" :
+            (timeinfo->tm_mon == 10) ? "Nov" : "Dec",
+            timeinfo->tm_year + 1900,
+            timeinfo->tm_hour,
+            timeinfo->tm_min,
+            timeinfo->tm_sec);
 #endif
+
+        // Apache Combined Log Format: %h %l %u %t \"%r\" %>s %b \"%{Referer}i\" \"%{User-Agent}i\"
+        // %h = remote host, %l = remote logname (always -), %u = remote user (- if not auth)
+        // %t = time, %r = request line, %>s = status, %b = bytes
+        std::string requestLine = request.method + " " + request.path + " " + request.version;
+        
+        // Get Referer and User-Agent headers
+        const std::string* referer = request.header("referer");
+        const std::string* userAgent = request.header("user-agent");
+        std::string refererStr = referer ? *referer : "-";
+        std::string userAgentStr = userAgent ? *userAgent : "-";
+        
+        logFile_.printf("%s - - %s \"%s\" 200 - \"%s\" \"%s\"\n",
+            state.peerAddress.c_str(),
+            timebuf,
+            requestLine.c_str(),
+            refererStr.c_str(),
+            userAgentStr.c_str());
         logFile_.flush();
     }
 

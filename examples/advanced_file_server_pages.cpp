@@ -85,7 +85,7 @@ std::string generateTestingInstructions() {
     html.append("<p>Browser will show a login dialog when you access any "
                 "URL.</p>\n");
     html.append("<div class=\"success\">✓ All requests are logged to "
-                "<code>access.log</code></div>\n");
+                "<a href=\"/access.log\" target=\"_blank\"><code>access.log</code></a></div>");
     html.append("<p><strong>Public page</strong> (no login required):</p>\n");
     html.append("<div class=\"url\"><a "
                 "href=\"/public.html\">/public.html</a></div>\n");
