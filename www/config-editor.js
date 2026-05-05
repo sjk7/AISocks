@@ -78,9 +78,15 @@ async function fetchConfig() {
 
     try {
         const response = await fetch('/api/config/current');
+
+        if (response.status === 403) {
+            throw new Error('Config API is local only. You must access this page from localhost (127.0.0.1 or ::1).');
+        }
+
         if (!response.ok) {
             throw new Error('Failed to fetch configuration');
         }
+
         const config = await response.json();
         currentConfig = config;
         populateForm(config);
@@ -207,6 +213,10 @@ async function saveConfig() {
             result = JSON.parse(responseText);
         } catch (parseError) {
             throw new Error('Invalid JSON response from server: ' + parseError.message + '. Response: ' + responseText);
+        }
+
+        if (response.status === 403) {
+            throw new Error('Config API is local only. You must access this page from localhost (127.0.0.1 or ::1).');
         }
 
         if (result.success === false) {
