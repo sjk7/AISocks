@@ -637,6 +637,9 @@ void HttpFileServer::handleSaveConfig(HttpClientState& state, const HttpRequest&
         }
     }
     
+    // Debug: log the JSON body
+    printf("DEBUG: JSON body received: %s\n", jsonBody.c_str());
+    
     // Parse JSON config
     Config newConfig = config_; // Start with current config
     
