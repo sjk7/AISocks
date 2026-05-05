@@ -197,8 +197,10 @@
     <div class="container">
         <div class="header">
             <h1>⚙️ Config Editor</h1>
-            <p>Edit server configuration (local access only)</p>
+            <p>Configure your HttpFileServer settings</p>
         </div>
+
+        <div id="status" class="status"></div>
 
         <div class="content">
             <div class="section">
@@ -305,8 +307,6 @@
                 <button class="btn-secondary" onclick="loadConfig()">Reload Config</button>
                 <button class="btn-primary" onclick="saveConfig()">Save & Restart Server</button>
             </div>
-
-            <div id="status" class="status"></div>
         </div>
 
         <div class="footer">
