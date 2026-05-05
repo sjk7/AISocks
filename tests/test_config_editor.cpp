@@ -243,6 +243,7 @@ int main() {
         }
     }
 
+
     // Test 7: Different bind addresses (0.0.0.0)
     {
         printf("Test 7: Config with 0.0.0.0 bind address... ");

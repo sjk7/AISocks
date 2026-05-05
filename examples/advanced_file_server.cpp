@@ -163,7 +163,7 @@ class CustomFileServer : public HttpFileServer {
             return;
         }
 
-        // Serve rich testing instructions at root and index.html
+        // Serve rich testing instructions at root and index.html (requires auth)
         if (request.path == "/" || request.path == "/index.html") {
             const std::string instructions
                 = AdvancedFileServerPages::generateTestingInstructions();
