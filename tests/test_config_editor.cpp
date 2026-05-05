@@ -38,6 +38,10 @@ class TestFileServer : public HttpFileServer {
     bool testIsLocalClient(const std::string& address) {
         return isLocalClient(address);
     }
+    
+    void testBuildResponse(HttpClientState& state) {
+        buildResponse(state);
+    }
 };
 
 // ---------------------------------------------------------------------------
@@ -238,6 +242,34 @@ int main() {
             passed++;
         } else {
             printf("FAILED (save with defaults failed)\n");
+            failed++;
+        }
+    }
+    
+    // Test 9: Integration test - POST /api/config/save through buildResponse routing
+    {
+        printf("Test 9: POST /api/config/save through buildResponse routing... ");
+        HttpFileServer::Config config;
+        config.documentRoot = "./www";
+        TestFileServer server(ServerBind{"127.0.0.1", Port{18088}}, config);
+        
+        HttpClientState state;
+        state.peerAddress = "127.0.0.1";
+        state.request = "POST /api/config/save HTTP/1.1\r\n"
+                        "Host: localhost\r\n"
+                        "Content-Type: application/json\r\n"
+                        "Content-Length: 2\r\n"
+                        "\r\n{}";
+        state.parsedRequest = HttpRequest::parse(state.request);
+        
+        server.testBuildResponse(state);
+        
+        std::string response(state.dataView.data(), state.dataView.size());
+        if (response.find("HTTP/1.1 200 OK") != std::string::npos) {
+            printf("PASSED\n");
+            passed++;
+        } else {
+            printf("FAILED (routing test failed, got: %s)\n", response.c_str());
             failed++;
         }
     }

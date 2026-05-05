@@ -126,7 +126,8 @@ class CustomFileServer : public HttpFileServer {
                 sendError(state, 403, "Forbidden", "Config API is local only");
                 return;
             }
-            // Let base class handle the config API
+            // Restore parsedRequest for base class to use
+            state.parsedRequest = std::move(request);
             HttpFileServer::buildResponse(state);
             return;
         }
