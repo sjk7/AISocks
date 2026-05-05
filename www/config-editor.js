@@ -171,11 +171,15 @@ async function saveConfig() {
         });
 
         if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.error || 'Failed to save configuration');
+            throw new Error('Server returned error: ' + response.status);
         }
 
         const result = await response.json();
+
+        if (result.success === false) {
+            throw new Error(result.message || 'Failed to save configuration');
+        }
+
         showStatus('Configuration saved successfully! Server is restarting...', 'success');
 
         // Redirect to testing guide after 3 seconds
