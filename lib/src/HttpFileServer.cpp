@@ -617,11 +617,120 @@ void HttpFileServer::handleGetCurrentConfig(HttpClientState& state) {
 }
 
 void HttpFileServer::handleSaveConfig(HttpClientState& state, const HttpRequest& request) {
-    // For now, return a message indicating restart is needed
-    // Full implementation would parse JSON body and update config_
-    (void)request;
-    std::string json = R"({"success": false, "message": "Config editing via API is not yet implemented. To change server settings, edit the config file (e.g., server.conf) manually and restart the server."})";
+    (void)request; // Unused for now
+    // Parse JSON body from request
+    std::string jsonBody;
+    const std::string bodyPrefix = "Content-Length: ";
+    size_t contentLengthPos = state.request.find(bodyPrefix);
+    if (contentLengthPos != std::string::npos) {
+        size_t endPos = state.request.find("\r\n", contentLengthPos);
+        if (endPos != std::string::npos) {
+            std::string lengthStr = state.request.substr(contentLengthPos + bodyPrefix.length(), endPos - contentLengthPos - bodyPrefix.length());
+            size_t contentLength = std::stoul(lengthStr);
+            size_t bodyStart = state.request.find("\r\n\r\n");
+            if (bodyStart != std::string::npos) {
+                bodyStart += 4;
+                if (bodyStart + contentLength <= state.request.length()) {
+                    jsonBody = state.request.substr(bodyStart, contentLength);
+                }
+            }
+        }
+    }
     
+    // Parse JSON config
+    Config newConfig = config_; // Start with current config
+    
+    // Simple JSON parsing for key fields
+    auto extractValue = [&](const std::string& key) -> std::string {
+        std::string searchKey = "\"" + key + "\":\"";
+        size_t pos = jsonBody.find(searchKey);
+        if (pos != std::string::npos) {
+            size_t start = pos + searchKey.length();
+            size_t end = jsonBody.find("\"", start);
+            if (end != std::string::npos) {
+                return jsonBody.substr(start, end - start);
+            }
+        }
+        return "";
+    };
+    
+    auto extractNumber = [&](const std::string& key) -> int {
+        std::string searchKey = "\"" + key + "\":";
+        size_t pos = jsonBody.find(searchKey);
+        if (pos != std::string::npos) {
+            size_t start = pos + searchKey.length();
+            size_t end = jsonBody.find_first_of(",}", start);
+            if (end != std::string::npos) {
+                return std::stoi(jsonBody.substr(start, end - start));
+            }
+        }
+        return 0;
+    };
+    
+    auto extractBool = [&](const std::string& key) -> bool {
+        std::string searchKey = "\"" + key + "\":";
+        size_t pos = jsonBody.find(searchKey);
+        if (pos != std::string::npos) {
+            size_t start = pos + searchKey.length();
+            size_t end = jsonBody.find_first_of(",}", start);
+            if (end != std::string::npos) {
+                std::string value = jsonBody.substr(start, end - start);
+                return value == "true";
+            }
+        }
+        return false;
+    };
+    
+    // Update config with new values
+    newConfig.documentRoot = extractValue("wwwRoot");
+    newConfig.indexFile = extractValue("indexFile");
+    newConfig.enableLogging = extractBool("enableLogging");
+    newConfig.enableDirectoryListing = extractBool("directoryListing");
+    newConfig.logRotation.maxSizeBytes = extractNumber("logMaxSize") * 1024 * 1024; // Convert MB to bytes
+    newConfig.logRotation.maxFiles = extractNumber("logMaxFiles");
+    
+    // Update bind address and port if provided
+    std::string newBindAddress = extractValue("bindAddress");
+    int newHttpPort = extractNumber("httpPort");
+    if (!newBindAddress.empty()) {
+        bind_.address = newBindAddress;
+    }
+    if (newHttpPort > 0) {
+        bind_.port = Port{static_cast<uint16_t>(newHttpPort)};
+    }
+    
+    // Write config to server.conf file
+    std::string configContent = "# Server configuration\n";
+    configContent += "bindAddress=" + bind_.address + "\n";
+    configContent += "httpPort=" + std::to_string(newHttpPort > 0 ? newHttpPort : bind_.port.value()) + "\n";
+    configContent += "wwwRoot=" + newConfig.documentRoot + "\n";
+    configContent += "indexFile=" + newConfig.indexFile + "\n";
+    configContent += "enableLogging=" + std::string(newConfig.enableLogging ? "true" : "false") + "\n";
+    configContent += "directoryListing=" + std::string(newConfig.enableDirectoryListing ? "true" : "false") + "\n";
+    configContent += "logMaxSize=" + std::to_string(newConfig.logRotation.maxSizeBytes / (1024 * 1024)) + "\n";
+    configContent += "logMaxFiles=" + std::to_string(newConfig.logRotation.maxFiles) + "\n";
+    
+    File configFile("server.conf", "w");
+    if (!configFile.isOpen()) {
+        std::string json = R"({"success": false, "message": "Failed to write config file: server.conf"})";
+        std::string response;
+        response.reserve(256 + json.size());
+        response.append("HTTP/1.1 500 Internal Server Error\r\n");
+        response.append("Content-Type: application/json\r\nContent-Length: ");
+        response += std::to_string(json.size());
+        response.append("\r\nAccess-Control-Allow-Origin: *\r\n\r\n");
+        response.append(json);
+        state.dataBuf = std::move(response);
+        state.dataView = state.dataBuf;
+        return;
+    }
+    
+    configFile.writeString(configContent);
+    
+    // Update the in-memory config
+    config_ = newConfig;
+    
+    std::string json = R"({"success": true, "message": "Configuration saved successfully to server.conf. Restart the server to apply changes."})";
     std::string response;
     response.reserve(256 + json.size());
     response.append("HTTP/1.1 200 OK\r\n");
