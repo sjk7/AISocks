@@ -32,7 +32,7 @@ struct ServerConf {
     std::string logPath = "access.log";
     bool enableLogging = true;
     bool enableLogRotation = true;
-    size_t logMaxSizeBytes = 10 * 1024 * 1024; // 10MB
+    size_t logMaxSizeBytes = 100 * 1024 * 1024; // 100MB
     size_t logMaxFiles = 5;
 };
 
