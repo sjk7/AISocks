@@ -2,7 +2,6 @@ cmake_minimum_required(VERSION 3.15)
 
 # Library target
 add_library(aiSocksLib STATIC
-    src/pch.cpp
     src/Socket.cpp
     src/TcpSocket.cpp
     src/UdpSocket.cpp
@@ -28,6 +27,7 @@ add_library(aiSocksLib STATIC
     src/IpFilter.cpp
     src/AccessLogger.cpp
     src/DualServerOrchestrator.cpp
+    src/LogRotation.cpp
 )
 
 if(AISOCKS_ENABLE_TLS)

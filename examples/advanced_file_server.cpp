@@ -29,7 +29,6 @@
 
 #include "HttpFileServer.h"
 #include "ServerConf.h"
-#include "LogRotation.h"
 #ifdef AISOCKS_ENABLE_TLS
 #include "HttpsFileServer.h"
 #endif
@@ -84,44 +83,39 @@ bool tryParsePortArg_(const char* arg, uint16_t& outPort) {
 class CustomFileServer : public HttpFileServer {
     public:
     explicit CustomFileServer(const ServerBind& bind, const Config& config,
-        const std::string& logPath = "access.log", bool enableLogging = true,
-        const LogRotation::Config& logRotationConfig = LogRotation::Config{},
         Result<TcpSocket>* result = nullptr)
-        : HttpFileServer(bind, config, result)
-        , logRotation_(logPath, logRotationConfig) {
-
-        // Open log file if logging is enabled
-        if (enableLogging) {
-            logFile_.open(logPath.c_str(), "a");
-        }
-
+        : HttpFileServer(bind, config, result) {
         // Note: Authentication header will be added by the base class
     }
 
-    ~CustomFileServer() { logFile_.close(); }
-    
-    // Set a callback to be invoked when log rotation occurs
-    void setRotationCallback(LogRotation::RotationCallback callback) {
-        logRotation_.setCallback(std::move(callback));
+    protected:
+    /// Override to handle log rotation events (e.g., compress rotated files)
+    void onLogRotate(const std::string& rotatedFilePath) override {
+        // Example: Compress the rotated file
+        // system(("gzip " + rotatedFilePath).c_str());
+        // Or just log the event:
+        printf("Log rotated: %s\n", rotatedFilePath.c_str());
     }
 
-    protected:
     /// Override to add access logging
     void buildResponse(HttpClientState& state) override {
-        // Parse request first
-        auto request = HttpRequest::parse(state.request);
-
-        // Log the request
-        if (request.valid) {
-            logRequest(request, state);
-        }
-
         // Root redirects to the public landing page (no auth required)
-        if (request.path == "/") {
+        if (state.parsedRequest.valid && state.parsedRequest.path == "/") {
             state.dataBuf = "HTTP/1.1 302 Found\r\nLocation: "
                                 "/public.html\r\nContent-Length: 0\r\n\r\n";
             state.dataView = state.dataBuf;
             return;
+        }
+
+        // Parse request first
+        auto request = state.parsedRequest.valid
+            ? std::move(state.parsedRequest)
+            : HttpRequest::parse(state.request);
+        state.parsedRequest = HttpRequest{};
+
+        // Log the request
+        if (request.valid) {
+            logRequest(request, state);
         }
 
         // Allow a small set of paths without authentication
@@ -428,7 +422,7 @@ class CustomFileServer : public HttpFileServer {
         return content.substr(lineStarts[startIndex]);
     }
 
-    void logRequest(const HttpRequest& request, const HttpClientState& state) {
+    void logRequest(const HttpRequest& request, const HttpClientState& state) override {
         if (!logFile_.isOpen()) return;
 
         // Check if rotation is needed
@@ -578,10 +572,6 @@ class CustomFileServer : public HttpFileServer {
         }
         return "";
     }
-
-    private:
-    File logFile_;
-    LogRotation logRotation_;
 };
 int main(int argc, char* argv[]) {
 
@@ -705,19 +695,14 @@ int main(int argc, char* argv[]) {
 #endif
     {
         // HTTP mode
-        LogRotation::Config logRotationConfig;
-        logRotationConfig.enabled = conf.enableLogRotation;
-        logRotationConfig.maxSizeBytes = conf.logMaxSizeBytes;
-        logRotationConfig.maxFiles = conf.logMaxFiles;
+        config.logPath = conf.logPath;
+        config.enableLogging = conf.enableLogging;
+        config.logRotation.enabled = conf.enableLogRotation;
+        config.logRotation.maxSizeBytes = conf.logMaxSizeBytes;
+        config.logRotation.maxFiles = conf.logMaxFiles;
         
         CustomFileServer server(
-            ServerBind{conf.bindAddress, Port{conf.httpPort}}, config, conf.logPath, conf.enableLogging, logRotationConfig, &serverResult);
-        
-        // Optional: Set a callback for post-rotation processing (e.g., compression)
-        // server.setRotationCallback([](const std::string& rotatedPath) {
-        //     printf("Log rotated: %s\n", rotatedPath.c_str());
-        //     // Could add compression logic here using system() or platform-specific APIs
-        // });
+            ServerBind{conf.bindAddress, Port{conf.httpPort}}, config, &serverResult);
 
         // Check if server creation succeeded (bind/listen)
         if (!server.isValid()) {

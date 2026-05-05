@@ -175,7 +175,7 @@ if(BUILD_EXAMPLES)
         list(GET _EXAMPLES ${_j} _src)
         add_executable(${_tgt} ${_src})
         if(_tgt STREQUAL "advanced_file_server")
-            target_sources(${_tgt} PRIVATE examples/advanced_file_server_pages.cpp examples/LogRotation.cpp)
+            target_sources(${_tgt} PRIVATE examples/advanced_file_server_pages.cpp)
         endif()
         target_link_libraries(${_tgt} PRIVATE aiSocksLib)
         

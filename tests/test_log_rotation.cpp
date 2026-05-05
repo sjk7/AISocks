@@ -4,7 +4,7 @@
 // PVS-Studio Static Code Analyzer for C, C++, C#, and Java:
 // https://pvs-studio.com
 
-#include "../examples/LogRotation.h"
+#include "LogRotation.h"
 #include "FileIO.h"
 #include <cstdio>
 #include <cstring>

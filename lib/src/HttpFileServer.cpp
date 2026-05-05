@@ -94,7 +94,8 @@ namespace {
 
 HttpFileServer::HttpFileServer(
     const ServerBind& bind, const Config& config, Result<TcpSocket>* result)
-    : HttpPollServer(bind, result) {
+    : HttpPollServer(bind, result)
+    , logRotation_(config.logPath, config.logRotation) {
     config_.documentRoot
         = config.documentRoot.empty() ? "." : config.documentRoot;
     config_.indexFile
@@ -108,10 +109,23 @@ HttpFileServer::HttpFileServer(
     config_.enableSecurityHeaders = config.enableSecurityHeaders;
     config_.hideServerVersion = config.hideServerVersion;
     config_.customHeaders = config.customHeaders;
+    config_.logPath = config.logPath;
+    config_.enableLogging = config.enableLogging;
+    config_.logRotation = config.logRotation;
 
     if (!config_.documentRoot.empty() && config_.documentRoot.back() != '/') {
         config_.documentRoot += '/';
     }
+    
+    // Open log file if logging is enabled
+    if (config_.enableLogging) {
+        logFile_.open(config_.logPath.c_str(), "a");
+    }
+    
+    // Set up rotation callback to call virtual onLogRotate method
+    logRotation_.setCallback([this](const std::string& rotatedPath) {
+        onLogRotate(rotatedPath);
+    });
 }
 
 bool HttpFileServer::validateFilePath_(
@@ -140,6 +154,9 @@ void HttpFileServer::buildResponse(HttpClientState& state) {
         sendError(state, 400, "Bad Request", "Invalid HTTP request");
         return;
     }
+
+    // Log the request
+    logRequest(request, state);
 
     if (request.method != "GET" && request.method != "HEAD") {
         sendError(state, 405, "Method Not Allowed",
@@ -496,6 +513,35 @@ const HttpFileServer::Config& HttpFileServer::getConfig() const {
 
 FileCache& HttpFileServer::getFileCache() {
     return fileCache_;
+}
+
+void HttpFileServer::onLogRotate(const std::string& rotatedFilePath) {
+    // Default implementation does nothing - override in derived classes
+    (void)rotatedFilePath;
+}
+
+void HttpFileServer::logRequest(const HttpRequest& request, const HttpClientState& state) {
+    if (!config_.enableLogging || !logFile_.isOpen()) return;
+
+    // Check if rotation is needed
+    if (logRotation_.shouldRotate()) {
+        logFile_.close();
+        if (logRotation_.rotate()) {
+            logFile_.open(logRotation_.getLogPath().c_str(), "a");
+        } else {
+            // If rotation fails, try to reopen the original file
+            logFile_.open(logRotation_.getLogPath().c_str(), "a");
+        }
+    }
+
+    // Write basic log entry (can be overridden in derived classes)
+    logFile_.printf("%s - - [%s] \"%s %s %s\" 200 -\n",
+        state.peerAddress.c_str(),
+        "timestamp",
+        request.method.c_str(),
+        request.path.c_str(),
+        request.version.c_str());
+    logFile_.flush();
 }
 
 } // namespace aiSocks

@@ -11,6 +11,7 @@
 #include "HtmlEscape.h"
 #include "HttpPollServer.h"
 #include "HttpRequest.h"
+#include "LogRotation.h"
 #include "MimeTypes.h"
 #include <ctime>
 #include <map>
@@ -42,6 +43,11 @@ class HttpFileServer : public HttpPollServer {
         bool hideServerVersion = false; // Hide server version in error pages
         std::map<std::string, std::string>
             customHeaders; // Additional headers to add
+        
+        // Logging configuration
+        std::string logPath = "access.log";
+        bool enableLogging = false;
+        LogRotation::Config logRotation;
     };
 
     explicit HttpFileServer(const ServerBind& bind, const Config& config,
@@ -110,6 +116,16 @@ class HttpFileServer : public HttpPollServer {
 
     const Config& getConfig() const;
     FileCache& getFileCache();
+    
+    protected:
+    /// Virtual method to log requests - override in derived classes for custom logging
+    virtual void logRequest(const HttpRequest& request, const HttpClientState& state);
+    
+    /// Virtual method called when log rotation occurs - override for custom post-rotation handling
+    virtual void onLogRotate(const std::string& rotatedFilePath);
+    
+    File logFile_;
+    LogRotation logRotation_;
 
     private:
     // Checks ETag and If-Modified-Since request headers against `fileInfo`.

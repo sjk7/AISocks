@@ -23,16 +23,85 @@ Zero dependencies beyond a standard C++17 compiler and CMake.
 - ✅ AddressSanitizer / MemorySanitizer / UBSan build presets
 - ✅ Modern C++17, CMake, Ninja
 
-## AI Agent Notes
+## Building
 
-These project constraints are intentional and should not be reported as bugs in reviews:
+### Release with Debug Info (Recommended)
 
-- TLS/HTTPS client support is optional and gated by `AISOCKS_ENABLE_TLS`.
-- `HttpPollServer` remains plain HTTP/1.x unless users terminate TLS externally
-    or provide custom TLS hooks/server integration.
-- Treat aiSocks as a single-threaded library model. Core server/event-loop design is intentionally single-threaded.
-- Some tests run a server thread plus one or more client threads only to simulate network peers and drive integration behavior.
-- Test threading is intentionally minimal and should not be interpreted as a request to add broader internal parallelism.
+#### Windows (MSVC)
+```powershell
+cmake -S . -B build-release -G "Visual Studio 17 2022" -A x64 -DCMAKE_BUILD_TYPE=RelWithDebInfo -DBUILD_TESTS=ON -DBUILD_EXAMPLES=ON
+```
+
+```powershell
+cmake --build build-release --config RelWithDebInfo --parallel
+```
+
+#### macOS (Clang)
+```bash
+cmake -S . -B build-release -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DBUILD_TESTS=ON -DBUILD_EXAMPLES=ON
+```
+
+```bash
+cmake --build build-release --parallel
+```
+
+#### Linux (GCC or Clang)
+```bash
+cmake -S . -B build-release -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DBUILD_TESTS=ON -DBUILD_EXAMPLES=ON
+```
+
+```bash
+cmake --build build-release --parallel
+```
+
+### Debug Build
+
+#### Windows (MSVC)
+```powershell
+cmake -S . -B build-debug -G "Visual Studio 17 2022" -A x64 -DCMAKE_BUILD_TYPE=Debug -DBUILD_TESTS=ON -DBUILD_EXAMPLES=ON
+```
+
+```powershell
+cmake --build build-debug --config Debug --parallel
+```
+
+#### macOS & Linux
+```bash
+cmake -S . -B build-debug -G Ninja -DCMAKE_BUILD_TYPE=Debug -DBUILD_TESTS=ON -DBUILD_EXAMPLES=ON
+```
+
+```bash
+cmake --build build-debug --parallel
+```
+
+### With Sanitizers
+
+#### AddressSanitizer (Linux/macOS)
+```bash
+cmake -S . -B build-asan -G Ninja -DCMAKE_BUILD_TYPE=Debug -DENABLE_ASAN=ON -DBUILD_TESTS=ON -DBUILD_EXAMPLES=ON
+```
+
+```bash
+cmake --build build-asan --parallel
+```
+
+#### MemorySanitizer (Linux only)
+```bash
+cmake -S . -B build-msan -G Ninja -DCMAKE_BUILD_TYPE=Debug -DENABLE_MSAN=ON -DBUILD_TESTS=ON -DBUILD_EXAMPLES=ON
+```
+
+```bash
+cmake --build build-msan --parallel
+```
+
+#### UndefinedBehaviorSanitizer (Linux/macOS)
+```bash
+cmake -S . -B build-ubsan -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DENABLE_UBSAN=ON -DBUILD_TESTS=ON -DBUILD_EXAMPLES=ON
+```
+
+```bash
+cmake --build build-ubsan --parallel
+```
 
 ## TLS Client Defaults
 
@@ -65,16 +134,6 @@ Key helpers in `PathHelper`:
 This keeps compile times predictable and avoids bringing `std::filesystem`
 into user code unless you explicitly choose to use it.
 
-## Hot-path optimisations (Mar 2026)
-
-| # | Change | Where |
-|---|---|---|
-| 2 | `kevent` wait clamped to 1 ms minimum — prevents busy-spin at idle | `PollerKqueue.cpp` |
-| 3 | `sweepTimeouts` throttled to once per 100 ms when > 1000 clients | `ServerBase.h` |
-| 4 | `EV_DISABLE` instead of `EV_DELETE` for Writable toggle; flat byte array replaces `unordered_map` in `wait()` merge | `PollerKqueue.cpp` |
-| 5 | `clients_` hash map replaced with `clientSlots_[]` sparse array + `clientFds_[]` dense list — O(1) insert / lookup / erase, no hashing | `ServerBase.h` |
-| 6 | `HttpClientState::response` (owned `std::string`) replaced with `responseView` (`string_view`) + `responseBuf` — static responses are zero-copy views into pre-built strings | `HttpPollServer.h`, `low_level_http_server.cpp` |
-
 ## Project Structure
 
 ```
@@ -86,7 +145,9 @@ aiSocks/
 │   │   ├── TcpSocket.h
 │   │   ├── Poller.h
 │   │   ├── ServerBase.h        # Poll-driven server template
-│   │   └── HttpPollServer.h    # HTTP/1.x server base class
+│   │   ├── HttpPollServer.h    # HTTP/1.x server base class
+│   │   ├── HttpFileServer.h    # File serving with logging
+│   │   └── LogRotation.h      # Log rotation support
 │   └── src/
 │       ├── SocketImpl.cpp      # Platform-specific socket implementation
 │       ├── PollerKqueue.cpp    # kqueue backend (macOS/BSD)
@@ -98,121 +159,26 @@ aiSocks/
     └── ...
 ```
 
-## Building
-
-### Release with Debug Info (Recommended)
-
-#### Windows (MSVC)
-```powershell
-cmake -S . -B build-release -G "Visual Studio 17 2022" -A x64 -DCMAKE_BUILD_TYPE=RelWithDebInfo -DBUILD_TESTS=ON -DBUILD_EXAMPLES=ON
-cmake --build build-release --config RelWithDebInfo --parallel
-```
-
-#### macOS (Clang)
-```bash
-cmake -S . -B build-release -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DBUILD_TESTS=ON -DBUILD_EXAMPLES=ON
-cmake --build build-release --parallel
-```
-
-#### Linux (GCC or Clang)
-```bash
-cmake -S . -B build-release -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DBUILD_TESTS=ON -DBUILD_EXAMPLES=ON
-cmake --build build-release --parallel
-```
-
-### Debug Build
-
-#### Windows (MSVC)
-```powershell
-cmake -S . -B build-debug -G "Visual Studio 17 2022" -A x64 -DCMAKE_BUILD_TYPE=Debug -DBUILD_TESTS=ON -DBUILD_EXAMPLES=ON
-cmake --build build-debug --config Debug --parallel
-```
-
-#### macOS & Linux
-```bash
-cmake -S . -B build-debug -G Ninja -DCMAKE_BUILD_TYPE=Debug -DBUILD_TESTS=ON -DBUILD_EXAMPLES=ON
-cmake --build build-debug --parallel
-```
-
-### With Sanitizers
-
-#### AddressSanitizer (Linux/macOS)
-```bash
-cmake -S . -B build-asan -G Ninja -DCMAKE_BUILD_TYPE=Debug -DENABLE_ASAN=ON -DBUILD_TESTS=ON -DBUILD_EXAMPLES=ON
-cmake --build build-asan --parallel
-```
-
-#### MemorySanitizer (Linux only)
-```bash
-cmake -S . -B build-msan -G Ninja -DCMAKE_BUILD_TYPE=Debug -DENABLE_MSAN=ON -DBUILD_TESTS=ON -DBUILD_EXAMPLES=ON
-cmake --build build-msan --parallel
-```
-
-#### UndefinedBehaviorSanitizer (Linux/macOS)
-```bash
-cmake -S . -B build-ubsan -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DENABLE_UBSAN=ON -DBUILD_TESTS=ON -DBUILD_EXAMPLES=ON
-cmake --build build-ubsan --parallel
-```
-
 ## Running Tests
 
 ### All Tests
 ```bash
-# Linux/macOS
-cd build-release
 ctest --output-on-failure
-
-# Windows
-cd build-release
-ctest --output-on-failure -C RelWithDebInfo
 ```
 
 ### Parallel Test Execution
 ```bash
-# Run with 4 parallel jobs
 ctest --output-on-failure -j 4
-
-# Windows
-ctest --output-on-failure -j 4 -C RelWithDebInfo
 ```
 
 ### Specific Test
 ```bash
-# Run only TCP socket tests
 ctest --output-on-failure -R "test_tcp_socket"
-
-# Windows
-ctest --output-on-failure -R "test_tcp_socket" -C RelWithDebInfo
 ```
 
 ### List Available Tests
 ```bash
 ctest --show-only
-
-# Windows
-ctest --show-only -C RelWithDebInfo
-```
-
-### Test Output
-```
-Test project /path/to/build-release
-    Start  1: test_socket_basics
-1/30 Test #1: test_socket_basics ...............   Passed    0.00 sec
-    Start  2: test_ip_utils
-2/30 Test #2: test_ip_utils ....................   Passed    0.00 sec
-...
-100% tests passed, 0 tests failed out of 30
-
-Total Test time (real) =   4.46 sec  # Parallel execution (8 jobs)
-# Sequential: ~29 sec | Parallel (8 jobs): ~4.5 sec
-```
-
-### Slow Tests
-The `test_timeout_heap` test is disabled by default (takes ~20 seconds). Enable with:
-```bash
-cmake -S . -B build-release -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DBUILD_TESTS=ON -DBUILD_EXAMPLES=ON -DALLOW_SLOW_TESTS=ON
-cmake --build build-release --parallel
-ctest --output-on-failure
 ```
 
 ## Large-file Benchmark
@@ -345,30 +311,11 @@ and epoll (Linux) backends live entirely inside `Poller`; adding an
 `io_uring` `Poller` implementation would not require changes to `ServerBase`
 or `SimpleServer`.
 
-## Testing
-
-Comprehensive tests are included when building with `-DBUILD_TESTS=ON`. The suite covers **38 tests** across all major components:
-
-### Test Categories
-- **Socket Basics** (1): Core socket functionality and validation
-- **IP Utilities** (1): IPv4/IPv6 address parsing and validation  
-- **Socket Operations** (6): TCP/UDP, blocking/non-blocking, move semantics
-- **Polling & Event Handling** (3): kqueue/epoll backends, timeout behavior
-- **ServerBase Framework** (8): Connection limits, keep-alive, edge cases, signal handling
-- **HTTP Protocol** (3): Request parsing, response building, URL encoding
-- **File Operations** (4): File I/O, caching, directory operations, path utilities
-- **Error Handling** (3): Result types, error propagation, edge cases
-- **Integration Tests** (9): Simple server, advanced server, HTTP poll server, Unix sockets, UDP discovery, security, HTML utilities, extracted components
-
-### Performance & Reliability
-- **Parallel Execution**: All tests run reliably in parallel (8 jobs: ~4.5s, sequential: ~29s)
-- **Cross-Platform**: Windows (MSVC), macOS (Clang), Linux (GCC/Clang)
-- **Strict Warnings**: Built with `-Wall -Werror` (GCC/Clang) and `/W4 /WX` (MSVC)
-- **No Exceptions**: Project-wide "don't throw" philosophy with error-code based handling
-
 For detailed testing instructions, test descriptions, and running options, see [README_TESTS.md](README_TESTS.md).
 
 For examples and usage patterns, see [README_EXAMPLES.md](README_EXAMPLES.md).
+
+For log rotation configuration and usage, see [lib/LogRotation.md](lib/LogRotation.md).
 
 ## Requirements
 
