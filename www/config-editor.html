@@ -268,8 +268,14 @@
                 <div class="row">
                     <div class="col">
                         <div class="form-group">
-                            <label for="logMaxSizeBytes">Max Log Size (bytes)</label>
-                            <input type="number" id="logMaxSizeBytes" min="0">
+                            <label for="logMaxSizeBytes">Max Log Size</label>
+                            <select id="logMaxSizeBytes">
+                                <option value="10485760">10MB</option>
+                                <option value="104857600">100MB</option>
+                                <option value="262144000">250MB</option>
+                                <option value="524288000">500MB</option>
+                                <option value="1073741824">1GB</option>
+                            </select>
                         </div>
                     </div>
                     <div class="col">
