@@ -414,29 +414,27 @@ void HttpPollServer::dispatchBuildResponse(HttpClientState& s) {
     const size_t sp = s.request.find(' ');
     if (sp != std::string::npos && sp > 0) {
         const std::string_view m{s.request.data(), sp};
-        // Extract path from request
-        size_t pathStart = s.request.find(' ', sp + 1);
-        if (pathStart != std::string::npos) {
-            size_t pathEnd = s.request.find(' ', pathStart + 1);
-            if (pathEnd == std::string::npos) {
-                pathEnd = s.request.find('\r', pathStart + 1);
-            }
-            if (pathEnd != std::string::npos) {
-                std::string_view path{s.request.data() + pathStart + 1, pathEnd - pathStart - 1};
-                // Debug logging
-                printf("DEBUG: Method=%.*s, Path=%.*s\n", (int)m.length(), m.data(), (int)path.length(), path.data());
-                // Allow POST for config API endpoints
-                bool isConfigAPI = (path == "/api/config/save" || path == "/api/config/ips" || path == "/api/config/current");
-                if (!isConfigAPI && m != "GET" && m != "HEAD") {
-                    s.dataBuf = makeResponse("HTTP/1.1 405 Method Not Allowed",
-                        "text/plain; charset=utf-8",
-                        "405 Method Not Allowed\nOnly GET, HEAD, and POST are supported.\n",
-                        false);
-                    s.dataView = s.dataBuf;
-                    s.closeAfterSend = true;
-                    s.parsedRequest = HttpRequest{};
-                    return;
-                }
+        // Extract path from request (format: "METHOD PATH HTTP/1.1\r\n")
+        size_t pathStart = sp + 1;
+        size_t pathEnd = s.request.find(' ', pathStart);
+        if (pathEnd == std::string::npos) {
+            pathEnd = s.request.find('\r', pathStart);
+        }
+        if (pathEnd != std::string::npos && pathEnd > pathStart) {
+            std::string_view path{s.request.data() + pathStart, pathEnd - pathStart};
+            // Debug logging
+            printf("DEBUG: Method=%.*s, Path=%.*s\n", (int)m.length(), m.data(), (int)path.length(), path.data());
+            // Allow POST for config API endpoints
+            bool isConfigAPI = (path == "/api/config/save" || path == "/api/config/ips" || path == "/api/config/current");
+            if (!isConfigAPI && m != "GET" && m != "HEAD") {
+                s.dataBuf = makeResponse("HTTP/1.1 405 Method Not Allowed",
+                    "text/plain; charset=utf-8",
+                    "405 Method Not Allowed\nOnly GET, HEAD, and POST are supported.\n",
+                    false);
+                s.dataView = s.dataBuf;
+                s.closeAfterSend = true;
+                s.parsedRequest = HttpRequest{};
+                return;
             }
         }
     }
