@@ -650,7 +650,8 @@ void HttpFileServer::handleGetCurrentConfig(HttpClientState& state) {
             } else if (line.find("log_max_size=") == 0) {
                 size_t pos = line.find('=');
                 if (pos != std::string::npos) {
-                    logMaxSize = std::stoull(line.substr(pos + 1)) * 1024 * 1024; // Convert MB to bytes
+                    size_t sizeMB = std::stoull(line.substr(pos + 1));
+                    logMaxSize = (sizeMB == 0) ? (100 * 1024 * 1024) : (sizeMB * 1024 * 1024); // 0 = 100MB
                 }
             }
         }
