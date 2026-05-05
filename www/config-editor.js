@@ -42,6 +42,28 @@ function populateIPDropdown() {
     const select = document.getElementById('bindAddress');
     select.innerHTML = '';
 
+    // Add special options first
+    const specialOptions = [
+        { value: '0.0.0.0', label: '0.0.0.0 (All IPv4)' },
+        { value: '::', label: ':: (All IPv6)' },
+        { value: '127.0.0.1', label: '127.0.0.1 (Localhost IPv4)' },
+        { value: '::1', label: '::1 (Localhost IPv6)' }
+    ];
+
+    specialOptions.forEach(opt => {
+        const option = document.createElement('option');
+        option.value = opt.value;
+        option.textContent = opt.label;
+        select.appendChild(option);
+    });
+
+    // Add separator
+    const separator = document.createElement('option');
+    separator.disabled = true;
+    separator.textContent = '--- Network Interfaces ---';
+    select.appendChild(separator);
+
+    // Add library-enumerated IPs
     availableIPs.forEach(ip => {
         const option = document.createElement('option');
         option.value = ip;
