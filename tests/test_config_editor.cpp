@@ -10,6 +10,7 @@
 #include "test_helpers.h"
 
 #include <string>
+#include <fstream>
 
 using namespace aiSocks;
 
@@ -197,6 +198,51 @@ int main() {
         }
     }
     
+    // Test 7: handleSaveConfig with log_max_size
+    {
+        printf("Test 7: handleSaveConfig saves log_max_size... ");
+        HttpFileServer::Config config;
+        config.documentRoot = "./www";
+        TestFileServer server(ServerBind{"127.0.0.1", Port{18086}}, config);
+        
+        HttpClientState state;
+        state.peerAddress = "127.0.0.1";
+        HttpRequest request;
+        request.valid = true;
+        request.method = "POST";
+        request.path = "/api/config/save";
+        // JSON with log_max_size = 100MB (in bytes)
+        state.request = R"({
+            "logMaxSizeBytes": 104857600,
+            "logMaxFiles": 5
+        })";
+        
+        server.testHandleSaveConfig(state, request);
+        
+        // Read server.conf to check if log_max_size was saved
+        std::ifstream confFile("server.conf");
+        bool foundLogMaxSize = false;
+        if (confFile.is_open()) {
+            std::string line;
+            while (std::getline(confFile, line)) {
+                if (line.find("log_max_size=100") != std::string::npos) {
+                    foundLogMaxSize = true;
+                    break;
+                }
+            }
+            confFile.close();
+        }
+        
+        std::string response(state.dataView.data(), state.dataView.size());
+        if (response.find("HTTP/1.1 200 OK") != std::string::npos && foundLogMaxSize) {
+            printf("PASSED\n");
+            passed++;
+        } else {
+            printf("FAILED (log_max_size not saved correctly)\n");
+            failed++;
+        }
+    }
+
     // Test 7: Different bind addresses (0.0.0.0)
     {
         printf("Test 7: Config with 0.0.0.0 bind address... ");
