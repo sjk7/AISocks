@@ -423,6 +423,8 @@ void HttpPollServer::dispatchBuildResponse(HttpClientState& s) {
             }
             if (pathEnd != std::string::npos) {
                 std::string_view path{s.request.data() + pathStart + 1, pathEnd - pathStart - 1};
+                // Debug logging
+                printf("DEBUG: Method=%.*s, Path=%.*s\n", (int)m.length(), m.data(), (int)path.length(), path.data());
                 // Allow POST for config API endpoints
                 bool isConfigAPI = (path == "/api/config/save" || path == "/api/config/ips" || path == "/api/config/current");
                 if (!isConfigAPI && m != "GET" && m != "HEAD") {
