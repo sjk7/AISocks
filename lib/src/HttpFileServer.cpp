@@ -561,7 +561,7 @@ void HttpFileServer::handleGetAvailableIPs(HttpClientState& state) {
     // Get available IP addresses from the library
     std::vector<NetworkInterface> interfaces = Socket::getLocalAddresses();
     
-    std::string json = R"({"ips": [)";
+    std::string json = R"({"ips": ["0.0.0.0", "::",)";
     bool first = true;
     for (const auto& iface : interfaces) {
         if (!first) json += ", ";
