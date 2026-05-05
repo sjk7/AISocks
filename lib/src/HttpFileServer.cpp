@@ -695,6 +695,7 @@ void HttpFileServer::handleSaveConfig(HttpClientState& state, const HttpRequest&
     // Update bind address and port if provided
     std::string newBindAddress = extractValue("bindAddress");
     int newHttpPort = extractNumber("httpPort");
+    printf("DEBUG: Extracted bindAddress='%s', httpPort=%d\n", newBindAddress.c_str(), newHttpPort);
     if (!newBindAddress.empty()) {
         bind_.address = newBindAddress;
     }
