@@ -53,6 +53,21 @@ class CustomFileServer : public HttpFileServer {
             return;
         }
 
+        // Config editor API endpoints (local only) - handle before method check
+        if ((request.path == "/api/config/ips" && request.method == "GET") ||
+            (request.path == "/api/config/current" && request.method == "GET") ||
+            (request.path == "/api/config/save" && request.method == "POST")) {
+            // Check local access
+            if (state.peerAddress.find("127.") != 0 && state.peerAddress != "::1" && state.peerAddress != "localhost") {
+                sendError(state, 403, "Forbidden", "Config API is local only");
+                return;
+            }
+            // Restore parsedRequest for base class to use
+            state.parsedRequest = std::move(request);
+            HttpFileServer::buildResponse(state);
+            return;
+        }
+
         // Validate HTTP method (only GET and HEAD allowed)
         if (request.method != "GET" && request.method != "HEAD") {
             sendError(state, 405, "Method Not Allowed",
@@ -1650,6 +1665,37 @@ void testConcurrencyBehavior() {
     }
 }
 
+void testConfigEditorAPIBehavior() {
+    printf("[TEST] Config Editor API Behavior\n");
+    printf("=================================\n");
+
+    HttpFileServer::Config config;
+    config.documentRoot = "./www";
+    CustomFileServer server(ServerBind{"127.0.0.1", Port{18090}}, config);
+
+    // Test POST /api/config/save - should succeed after fix
+    {
+        printf("Test: POST /api/config/save through CustomFileServer routing... ");
+        HttpClientState state;
+        state.peerAddress = "127.0.0.1";
+        state.request = "POST /api/config/save HTTP/1.1\r\n"
+                        "Host: localhost\r\n"
+                        "Content-Type: application/json\r\n"
+                        "Content-Length: 2\r\n"
+                        "\r\n{}";
+        
+        server.buildResponse(state);
+        
+        std::string response = state.dataBuf;
+        if (response.find("HTTP/1.1 200 OK") != std::string::npos) {
+            printf("PASSED\n");
+        } else {
+            printf("FAILED (expected 200 OK)\n");
+            printf("Response: %s\n", response.c_str());
+        }
+    }
+}
+
 /// Main test runner - focused on behavior, not implementation
 // Test comment to verify brittleness is fixed - strings are centralized
 int main() {
@@ -1694,6 +1740,7 @@ int main() {
             testLargeFileBypassesCacheForHotPath);
         runTestWithTrace("testMimeTypeBehavior", testMimeTypeBehavior);
         runTestWithTrace("testConcurrencyBehavior", testConcurrencyBehavior);
+        runTestWithTrace("testConfigEditorAPIBehavior", testConfigEditorAPIBehavior);
 
         cleanupTestEnvironment();
 
