@@ -160,6 +160,15 @@ void HttpFileServer::buildResponse(HttpClientState& state) {
     // Log the request
     logRequest(request, state);
 
+    if (request.path == "/api/config/save" && request.method == "POST") {
+        if (!isLocalClient(state.peerAddress)) {
+            sendError(state, 403, "Forbidden", "Config API is local only");
+            return;
+        }
+        handleSaveConfig(state, request);
+        return;
+    }
+
     // Config editor API endpoints (local only)
     if (request.path == "/api/config/ips" && request.method == "GET") {
         if (!isLocalClient(state.peerAddress)) {
@@ -176,15 +185,6 @@ void HttpFileServer::buildResponse(HttpClientState& state) {
             return;
         }
         handleGetCurrentConfig(state);
-        return;
-    }
-
-    if (request.path == "/api/config/save" && request.method == "POST") {
-        if (!isLocalClient(state.peerAddress)) {
-            sendError(state, 403, "Forbidden", "Config API is local only");
-            return;
-        }
-        handleSaveConfig(state, request);
         return;
     }
 
