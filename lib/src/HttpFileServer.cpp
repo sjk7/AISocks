@@ -714,6 +714,8 @@ void HttpFileServer::handleSaveConfig(HttpClientState& state, const HttpRequest&
     configContent += "logMaxSize=" + std::to_string(newConfig.logRotation.maxSizeBytes / (1024 * 1024)) + "\n";
     configContent += "logMaxFiles=" + std::to_string(newConfig.logRotation.maxFiles) + "\n";
     
+    printf("DEBUG: Writing to server.conf:\n%s\n", configContent.c_str());
+    
     File configFile("server.conf", "w");
     if (!configFile.isOpen()) {
         std::string json = R"({"success": false, "message": "Failed to write config file: server.conf"})";
