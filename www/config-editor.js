@@ -163,8 +163,8 @@ function validateConfig(config) {
     if (config.enableHttps && (!config.key || config.key.trim() === '')) {
         throw new Error('Key file is required when HTTPS is enabled');
     }
-    if (config.logMaxFiles < 1) {
-        throw new Error('Max log files must be at least 1');
+    if (config.logMaxFiles < 2 || config.logMaxFiles > 200) {
+        throw new Error('Max log files must be between 2 and 200');
     }
     if (config.logMaxSizeBytes < 1) {
         throw new Error('Max log size must be at least 1');
