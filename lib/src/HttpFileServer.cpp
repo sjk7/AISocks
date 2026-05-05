@@ -725,6 +725,25 @@ void HttpFileServer::handleSaveConfig(HttpClientState& state, const HttpRequest&
     configContent += "log_max_size=" + std::to_string(newConfig.logRotation.maxSizeBytes / (1024 * 1024)) + "\n";
     configContent += "log_max_files=" + std::to_string(newConfig.logRotation.maxFiles) + "\n";
     
+    // HTTPS settings
+    bool enableHttps = extractBool("enableHttps");
+    int httpsPort = extractNumber("httpsPort");
+    std::string cert = extractValue("cert");
+    std::string key = extractValue("key");
+    
+    if (enableHttps || httpsPort > 0 || !cert.empty() || !key.empty()) {
+        configContent += "enable_https=" + std::string(enableHttps ? "true" : "false") + "\n";
+        if (httpsPort > 0) {
+            configContent += "https_port=" + std::to_string(httpsPort) + "\n";
+        }
+        if (!cert.empty()) {
+            configContent += "cert=" + cert + "\n";
+        }
+        if (!key.empty()) {
+            configContent += "key=" + key + "\n";
+        }
+    }
+    
     File configFile("server.conf", "w");
     if (!configFile.isOpen()) {
         std::string json = R"({"success": false, "message": "Failed to write config file: server.conf"})";
