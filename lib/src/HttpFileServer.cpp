@@ -18,6 +18,8 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <fstream>
+#include <iostream>
 
 #ifdef _WIN32
 #include <direct.h>
@@ -612,7 +614,44 @@ void HttpFileServer::handleGetCurrentConfig(HttpClientState& state) {
     json += "\"enableLogging\": " + (config_.enableLogging ? std::string("true") : std::string("false")) + ", ";
     json += "\"enableLogRotation\": " + (config_.logRotation.enabled ? std::string("true") : std::string("false")) + ", ";
     json += "\"logMaxSizeBytes\": " + std::to_string(config_.logRotation.maxSizeBytes) + ", ";
-    json += "\"logMaxFiles\": " + std::to_string(config_.logRotation.maxFiles);
+    json += "\"logMaxFiles\": " + std::to_string(config_.logRotation.maxFiles) + ", ";
+    
+    // Read HTTPS settings from server.conf if present
+    bool enableHttps = false;
+    int httpsPort = 8443;
+    std::string cert = "server-cert.pem";
+    std::string key = "server-key.pem";
+    
+    std::ifstream confFile("server.conf");
+    if (confFile.is_open()) {
+        std::string line;
+        while (std::getline(confFile, line)) {
+            if (line.find("enable_https=") == 0) {
+                enableHttps = (line.find("true") != std::string::npos);
+            } else if (line.find("https_port=") == 0) {
+                size_t pos = line.find('=');
+                if (pos != std::string::npos) {
+                    httpsPort = std::stoi(line.substr(pos + 1));
+                }
+            } else if (line.find("cert=") == 0) {
+                size_t pos = line.find('=');
+                if (pos != std::string::npos) {
+                    cert = line.substr(pos + 1);
+                }
+            } else if (line.find("key=") == 0) {
+                size_t pos = line.find('=');
+                if (pos != std::string::npos) {
+                    key = line.substr(pos + 1);
+                }
+            }
+        }
+        confFile.close();
+    }
+    
+    json += "\"enableHttps\": " + (enableHttps ? std::string("true") : std::string("false")) + ", ";
+    json += "\"httpsPort\": " + std::to_string(httpsPort) + ", ";
+    json += "\"cert\": \"" + cert + "\", ";
+    json += "\"key\": \"" + key + "\"";
     json += "}";
     
     std::string response;
