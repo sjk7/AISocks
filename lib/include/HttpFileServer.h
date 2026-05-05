@@ -132,6 +132,7 @@ class HttpFileServer : public HttpPollServer {
     virtual void handleGetCurrentConfig(HttpClientState& state);
     virtual void handleSaveConfig(HttpClientState& state, const HttpRequest& request);
     
+    ServerBind bind_;
     File logFile_;
     LogRotation logRotation_;
 

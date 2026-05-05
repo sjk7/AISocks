@@ -96,6 +96,7 @@ namespace {
 HttpFileServer::HttpFileServer(
     const ServerBind& bind, const Config& config, Result<TcpSocket>* result)
     : HttpPollServer(bind, result)
+    , bind_(bind)
     , logRotation_(config.logPath, config.logRotation) {
     config_.documentRoot
         = config.documentRoot.empty() ? "." : config.documentRoot;
@@ -585,6 +586,8 @@ void HttpFileServer::handleGetAvailableIPs(HttpClientState& state) {
 void HttpFileServer::handleGetCurrentConfig(HttpClientState& state) {
     // Return current HttpFileServer::Config as JSON
     std::string json = "{";
+    json += "\"bindAddress\": \"" + bind_.address + "\", ";
+    json += "\"httpPort\": " + std::to_string(bind_.port.value()) + ", ";
     json += "\"wwwRoot\": \"" + config_.documentRoot + "\", ";
     json += "\"indexFile\": \"" + config_.indexFile + "\", ";
     json += "\"enableDirectoryListing\": " + (config_.enableDirectoryListing ? std::string("true") : std::string("false")) + ", ";

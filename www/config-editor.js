@@ -72,6 +72,8 @@ async function fetchConfig() {
 // Populate form with config values
 function populateForm(config) {
     // Server Settings
+    document.getElementById('bindAddress').value = config.bindAddress || '0.0.0.0';
+    document.getElementById('httpPort').value = config.httpPort || 8080;
     document.getElementById('wwwRoot').value = config.wwwRoot || './www';
 
     // TLS Settings
@@ -94,6 +96,8 @@ function populateForm(config) {
 // Get form values as config object
 function getFormValues() {
     return {
+        bindAddress: document.getElementById('bindAddress').value,
+        httpPort: parseInt(document.getElementById('httpPort').value) || 8080,
         wwwRoot: document.getElementById('wwwRoot').value,
         cert: document.getElementById('cert').value,
         key: document.getElementById('key').value,
@@ -110,6 +114,12 @@ function getFormValues() {
 
 // Validate config
 function validateConfig(config) {
+    if (!config.bindAddress) {
+        throw new Error('Bind address is required');
+    }
+    if (config.httpPort < 1 || config.httpPort > 65535) {
+        throw new Error('HTTP port must be between 1 and 65535');
+    }
     if (!config.wwwRoot) {
         throw new Error('Document root is required');
     }
@@ -164,5 +174,6 @@ function loadConfig() {
 
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', () => {
+    fetchAvailableIPs();
     fetchConfig();
 });
