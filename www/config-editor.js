@@ -174,7 +174,15 @@ async function saveConfig() {
             throw new Error('Server returned error: ' + response.status);
         }
 
-        const result = await response.json();
+        const responseText = await response.text();
+        console.log('Response text:', responseText);
+
+        let result;
+        try {
+            result = JSON.parse(responseText);
+        } catch (parseError) {
+            throw new Error('Invalid JSON response from server: ' + parseError.message + '. Response: ' + responseText);
+        }
 
         if (result.success === false) {
             throw new Error(result.message || 'Failed to save configuration');
