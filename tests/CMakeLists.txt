@@ -48,6 +48,7 @@ set(TEST_SOURCES
     test_dns_resolution_gate
     test_ip_filter
     test_access_logger
+    test_log_rotation
     test_untested_paths
     test_dual_server_orchestrator
     test_dual_server_conf
@@ -176,6 +177,7 @@ set(FILE_TESTS
     test_file_cache
     test_path_helper
     test_file_server_utils
+    test_log_rotation
 )
 
 set(MISC_TESTS
@@ -230,6 +232,9 @@ macro(add_grouped_tests GROUP_NAME SOURCES)
         add_executable(${TEST_NAME} ${TEST_SRC})
         if(MSVC AND AISOCKS_ENABLE_TLS AND TEST_NAME STREQUAL "test_tls_client")
             target_sources(${TEST_NAME} PRIVATE openssl_applink.cpp)
+        endif()
+        if(TEST_NAME STREQUAL "test_log_rotation")
+            target_sources(${TEST_NAME} PRIVATE ${CMAKE_SOURCE_DIR}/examples/LogRotation.cpp)
         endif()
         target_link_libraries(${TEST_NAME} PRIVATE aiSocksLib)
         target_compile_definitions(${TEST_NAME} PRIVATE AISOCKS_TESTING=1)

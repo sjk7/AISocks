@@ -28,6 +28,11 @@
 // Demonstrates how to derive from HttpFileServer and override virtual functions
 
 #include "HttpFileServer.h"
+#include "ServerConf.h"
+#include "LogRotation.h"
+#ifdef AISOCKS_ENABLE_TLS
+#include "HttpsFileServer.h"
+#endif
 #include "advanced_file_server_strings.h"
 #include "advanced_file_server_pages.h"
 #include "CustomFileServerHtmlHelpers.h"
@@ -79,16 +84,26 @@ bool tryParsePortArg_(const char* arg, uint16_t& outPort) {
 class CustomFileServer : public HttpFileServer {
     public:
     explicit CustomFileServer(const ServerBind& bind, const Config& config,
+        const std::string& logPath = "access.log", bool enableLogging = true,
+        const LogRotation::Config& logRotationConfig = LogRotation::Config{},
         Result<TcpSocket>* result = nullptr)
-        : HttpFileServer(bind, config, result) {
+        : HttpFileServer(bind, config, result)
+        , logRotation_(logPath, logRotationConfig) {
 
-        // Open log file
-        logFile_.open("access.log", "a");
+        // Open log file if logging is enabled
+        if (enableLogging) {
+            logFile_.open(logPath.c_str(), "a");
+        }
 
         // Note: Authentication header will be added by the base class
     }
 
     ~CustomFileServer() { logFile_.close(); }
+    
+    // Set a callback to be invoked when log rotation occurs
+    void setRotationCallback(LogRotation::RotationCallback callback) {
+        logRotation_.setCallback(std::move(callback));
+    }
 
     protected:
     /// Override to add access logging
@@ -326,9 +341,6 @@ class CustomFileServer : public HttpFileServer {
             dirPath, getConfig().documentRoot);
     }
 
-    private:
-    File logFile_;
-
     bool isLocalClient(const std::string& peerAddress) const {
         return peerAddress == "127.0.0.1" || peerAddress == "::1"
             || peerAddress == "::ffff:127.0.0.1" || peerAddress == "localhost";
@@ -418,6 +430,17 @@ class CustomFileServer : public HttpFileServer {
 
     void logRequest(const HttpRequest& request, const HttpClientState& state) {
         if (!logFile_.isOpen()) return;
+
+        // Check if rotation is needed
+        if (logRotation_.shouldRotate()) {
+            logFile_.close();
+            if (logRotation_.rotate()) {
+                logFile_.open(logRotation_.getLogPath().c_str(), "a");
+            } else {
+                // If rotation fails, try to reopen the original file
+                logFile_.open(logRotation_.getLogPath().c_str(), "a");
+            }
+        }
 
         auto now = std::chrono::system_clock::now();
         auto time_t = std::chrono::system_clock::to_time_t(now);
@@ -555,6 +578,10 @@ class CustomFileServer : public HttpFileServer {
         }
         return "";
     }
+
+    private:
+    File logFile_;
+    LogRotation logRotation_;
 };
 int main(int argc, char* argv[]) {
 
@@ -586,26 +613,61 @@ int main(int argc, char* argv[]) {
     printf("%s%zu\n", ServerStrings::MAX_CLIENTS_PREFIX,
         static_cast<size_t>(ClientLimit::Default));
 
-    uint16_t port = 8080;
-    std::string root = "../www";
-
-    if (argc > 1) {
-        if (!tryParsePortArg_(argv[1], port)) {
-            fprintf(stderr,
-                "ERROR: Invalid port '%s'. Use an integer in range 1..65535.\n",
-                argv[1]);
+    // Load config file (server.conf if present, or specified with --config)
+    ServerConf conf;
+    int argStart = 1;
+    if (argc > 2 && std::string(argv[1]) == "--config") {
+        if (!loadServerConf(argv[2], conf)) {
+            fprintf(stderr, "Error: could not open config file '%s'\n", argv[2]);
             return 1;
         }
+        argStart = 3;
+    } else {
+        loadServerConf("server.conf", conf); // silent — file is optional
     }
-    if (argc > 2) {
-        root = argv[2];
+
+    // Command-line arguments override config file
+    for (int i = argStart; i < argc; ++i) {
+        std::string arg = argv[i];
+        if (arg == "--no-log") {
+            conf.enableLogging = false;
+        } else if (arg == "--log-path" && i + 1 < argc) {
+            conf.logPath = argv[++i];
+        } else if (arg == "--port" && i + 1 < argc) {
+            if (!tryParsePortArg_(argv[++i], conf.httpPort)) {
+                fprintf(stderr,
+                    "ERROR: Invalid port '%s'. Use an integer in range 1..65535.\n",
+                    argv[i]);
+                return 1;
+            }
+        } else if (arg == "--root" && i + 1 < argc) {
+            conf.wwwRoot = argv[++i];
+        } else if (arg == "--bind" && i + 1 < argc) {
+            conf.bindAddress = argv[++i];
+        } else if (arg == "--https" && i + 1 < argc) {
+            conf.enableHttps = true;
+            conf.httpsPort = static_cast<uint16_t>(std::stoi(argv[++i]));
+        } else if (arg == "--cert" && i + 1 < argc) {
+            conf.cert = argv[++i];
+        } else if (arg == "--key" && i + 1 < argc) {
+            conf.key = argv[++i];
+        } else if (i == argStart && tryParsePortArg_(argv[i], conf.httpPort)) {
+            // Legacy positional argument for port
+        } else if (i == argStart + 1) {
+            // Legacy positional argument for root
+            conf.wwwRoot = argv[i];
+        } else {
+            fprintf(stderr, "ERROR: Unknown argument '%s'\n", arg.c_str());
+            fprintf(stderr, "Usage: %s [--config FILE] [--port PORT] [--root PATH] [--bind ADDR] [--https PORT] [--cert FILE] [--key FILE] [--log-path PATH] [--no-log]\n", argv[0]);
+            return 1;
+        }
     }
 
     // Configure the file server
     HttpFileServer::Config config;
-    config.documentRoot = std::move(root);
-    config.indexFile = "index.html";
-    config.enableDirectoryListing = true;
+    config.documentRoot = std::move(conf.wwwRoot);
+    config.indexFile = conf.indexFile;
+    config.enableDirectoryListing = conf.directoryListing;
     config.enableETag = true;
     config.enableLastModified = true;
     config.maxFileSize = 50 * 1024 * 1024;
@@ -615,33 +677,70 @@ int main(int argc, char* argv[]) {
     config.customHeaders["X-Content-Type-Options"] = "nosniff";
     config.customHeaders["X-Frame-Options"] = "DENY";
 
-    // Create and start the custom server with detailed error information
+    // Create and start the server
     Result<TcpSocket> serverResult
         = Result<TcpSocket>::failure(SocketError::Unknown, "initial");
-    CustomFileServer server(
-        ServerBind{"0.0.0.0", Port{port}}, config, &serverResult);
 
-    // Check if server creation succeeded (bind/listen)
-    if (!server.isValid()) {
-        fprintf(stderr, "ERROR: Server failed to start: %s\n",
-            serverResult.message().c_str());
-        fprintf(
-            stderr, "Error code: %d\n", static_cast<int>(serverResult.error()));
+#ifdef AISOCKS_ENABLE_TLS
+    if (conf.enableHttps) {
+        // HTTPS mode
+        TlsServerConfig tls{conf.cert, conf.key};
+        HttpsFileServer server(
+            ServerBind{conf.bindAddress, Port{conf.httpsPort}}, config, tls, &serverResult);
+        
+        if (!server.isValid()) {
+            fprintf(stderr, "ERROR: Server failed to start: %s\n",
+                serverResult.message().c_str());
+            fprintf(stderr, "Error code: %d\n", static_cast<int>(serverResult.error()));
+            printf("%s", ServerStrings::SERVER_STOPPED);
+            printf("%s", ServerStrings::LOG_SAVED);
+            printf("%s", ServerStrings::THANK_YOU);
+            return 1;
+        }
+
+        printf("HTTPS server listening on %s:%u\n", conf.bindAddress.c_str(), conf.httpsPort);
+        printf("TLS enabled with cert: %s, key: %s\n", conf.cert.c_str(), conf.key.c_str());
+        server.run(ClientLimit::Unlimited);
+    } else
+#endif
+    {
+        // HTTP mode
+        LogRotation::Config logRotationConfig;
+        logRotationConfig.enabled = conf.enableLogRotation;
+        logRotationConfig.maxSizeBytes = conf.logMaxSizeBytes;
+        logRotationConfig.maxFiles = conf.logMaxFiles;
+        
+        CustomFileServer server(
+            ServerBind{conf.bindAddress, Port{conf.httpPort}}, config, conf.logPath, conf.enableLogging, logRotationConfig, &serverResult);
+        
+        // Optional: Set a callback for post-rotation processing (e.g., compression)
+        // server.setRotationCallback([](const std::string& rotatedPath) {
+        //     printf("Log rotated: %s\n", rotatedPath.c_str());
+        //     // Could add compression logic here using system() or platform-specific APIs
+        // });
+
+        // Check if server creation succeeded (bind/listen)
+        if (!server.isValid()) {
+            fprintf(stderr, "ERROR: Server failed to start: %s\n",
+                serverResult.message().c_str());
+            fprintf(
+                stderr, "Error code: %d\n", static_cast<int>(serverResult.error()));
+            printf("%s", ServerStrings::SERVER_STOPPED);
+            printf("%s", ServerStrings::LOG_SAVED);
+            printf("%s", ServerStrings::THANK_YOU);
+            return 1;
+        }
+
+        printf(ServerStrings::STARTING, conf.httpPort);
+        printf("%s%s\n", ServerStrings::SERVING_FROM, config.documentRoot.c_str());
+        printf(ServerStrings::PUBLIC_PAGE, conf.httpPort);
+
+        server.run(ClientLimit::Unlimited);
+
         printf("%s", ServerStrings::SERVER_STOPPED);
         printf("%s", ServerStrings::LOG_SAVED);
         printf("%s", ServerStrings::THANK_YOU);
-        return 1;
     }
-
-    printf(ServerStrings::STARTING, port);
-    printf("%s%s\n", ServerStrings::SERVING_FROM, config.documentRoot.c_str());
-    printf(ServerStrings::PUBLIC_PAGE, port);
-
-    server.run(ClientLimit::Unlimited);
-
-    printf("%s", ServerStrings::SERVER_STOPPED);
-    printf("%s", ServerStrings::LOG_SAVED);
-    printf("%s", ServerStrings::THANK_YOU);
 
     return 0;
 }

@@ -20,14 +20,20 @@
 // ---------------------------------------------------------------------------
 struct ServerConf {
     std::string wwwRoot = "./www";
+    std::string bindAddress = "0.0.0.0";
     uint16_t httpPort = 8080;
     uint16_t httpsPort = 8443;
     std::string cert = "server-cert.pem";
     std::string key = "server-key.pem";
     bool enableHttp = true;
-    bool enableHttps = true;
+    bool enableHttps = false;
     std::string indexFile = "index.html";
     bool directoryListing = true;
+    std::string logPath = "access.log";
+    bool enableLogging = true;
+    bool enableLogRotation = true;
+    size_t logMaxSizeBytes = 10 * 1024 * 1024; // 10MB
+    size_t logMaxFiles = 5;
 };
 
 // ---------------------------------------------------------------------------
@@ -74,6 +80,8 @@ inline bool loadServerConf(const std::string& path, ServerConf& conf) {
 
         if (k == "www_root")
             conf.wwwRoot = v;
+        else if (k == "bind_address")
+            conf.bindAddress = v;
         else if (k == "http_port")
             conf.httpPort = static_cast<uint16_t>(std::stoi(v));
         else if (k == "https_port")
@@ -90,6 +98,27 @@ inline bool loadServerConf(const std::string& path, ServerConf& conf) {
             conf.indexFile = v;
         else if (k == "directory_listing")
             conf.directoryListing = serverConfParseBool(v);
+        else if (k == "log_path")
+            conf.logPath = v;
+        else if (k == "enable_logging")
+            conf.enableLogging = serverConfParseBool(v);
+        else if (k == "enable_log_rotation")
+            conf.enableLogRotation = serverConfParseBool(v);
+        else if (k == "log_max_size") {
+            // Parse size with optional suffix (e.g., "10MB", "100KB")
+            size_t size = static_cast<size_t>(std::stoull(v, nullptr, 10));
+            
+            // Check for suffix
+            std::string upper = v;
+            for (auto& c : upper) c = static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
+            if (upper.find("KB") != std::string::npos) size *= 1024;
+            else if (upper.find("MB") != std::string::npos) size *= 1024 * 1024;
+            else if (upper.find("GB") != std::string::npos) size *= 1024 * 1024 * 1024;
+            
+            conf.logMaxSizeBytes = size;
+        }
+        else if (k == "log_max_files")
+            conf.logMaxFiles = static_cast<size_t>(std::stoull(v));
         else
             fprintf(stderr, "Warning: unknown config key '%s'\n", k.c_str());
     }
