@@ -694,6 +694,10 @@ void HttpFileServer::handleSaveConfig(HttpClientState& state, const HttpRequest&
     
     // Update config with new values
     newConfig.documentRoot = extractValue("wwwRoot");
+    // Ensure www_root ends with a slash
+    if (!newConfig.documentRoot.empty() && newConfig.documentRoot.back() != '/') {
+        newConfig.documentRoot += '/';
+    }
     newConfig.indexFile = extractValue("indexFile");
     newConfig.enableLogging = extractBool("enableLogging");
     newConfig.enableDirectoryListing = extractBool("directoryListing");
