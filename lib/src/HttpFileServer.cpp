@@ -621,6 +621,7 @@ void HttpFileServer::handleGetCurrentConfig(HttpClientState& state) {
     int httpsPort = 8443;
     std::string cert = "server-cert.pem";
     std::string key = "server-key.pem";
+    bool directoryListing = true; // default
     
     std::ifstream confFile("server.conf");
     if (confFile.is_open()) {
@@ -643,6 +644,8 @@ void HttpFileServer::handleGetCurrentConfig(HttpClientState& state) {
                 if (pos != std::string::npos) {
                     key = line.substr(pos + 1);
                 }
+            } else if (line.find("directory_listing=") == 0) {
+                directoryListing = (line.find("true") != std::string::npos);
             }
         }
         confFile.close();
@@ -651,7 +654,8 @@ void HttpFileServer::handleGetCurrentConfig(HttpClientState& state) {
     json += "\"enableHttps\": " + (enableHttps ? std::string("true") : std::string("false")) + ", ";
     json += "\"httpsPort\": " + std::to_string(httpsPort) + ", ";
     json += "\"cert\": \"" + cert + "\", ";
-    json += "\"key\": \"" + key + "\"";
+    json += "\"key\": \"" + key + "\", ";
+    json += "\"enableDirectoryListing\": " + (directoryListing ? std::string("true") : std::string("false"));
     json += "}";
     
     std::string response;
