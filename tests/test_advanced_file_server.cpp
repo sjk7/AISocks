@@ -654,10 +654,10 @@ void testPublicLandingPageSignInLinkTargetsProtectedPage() {
         !html.empty(), "Public landing page fixture should be readable");
     if (html.empty()) return;
 
-    TestFramework::assert_contains(html, "Welcome to nginx",
-        "Public landing page should contain nginx welcome content");
+    TestFramework::assert_contains(html, "Welcome",
+        "Public landing page should contain welcome content");
     TestFramework::assert_contains(
-        html, "nginx.org", "Public landing page should contain nginx.org link");
+        html, "advanced_file_server", "Public landing page should mention the server name");
     TestFramework::assert_not_contains(
         html, "href=\"/\"", "Public landing page must not link to root path");
 }
