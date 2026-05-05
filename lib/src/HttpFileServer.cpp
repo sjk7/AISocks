@@ -623,6 +623,8 @@ void HttpFileServer::handleGetCurrentConfig(HttpClientState& state) {
     std::string key = "server-key.pem";
     bool directoryListing = true; // default
     size_t logMaxSize = config_.logRotation.maxSizeBytes; // default to in-memory value
+    bool enableLogRotation = config_.logRotation.enabled; // default to in-memory value
+    std::string logPath = config_.logPath; // default to in-memory value
     
     std::ifstream confFile("server.conf");
     if (confFile.is_open()) {
@@ -653,6 +655,13 @@ void HttpFileServer::handleGetCurrentConfig(HttpClientState& state) {
                     size_t sizeMB = std::stoull(line.substr(pos + 1));
                     logMaxSize = (sizeMB == 0) ? (100 * 1024 * 1024) : (sizeMB * 1024 * 1024); // 0 = 100MB
                 }
+            } else if (line.find("enable_log_rotation=") == 0) {
+                enableLogRotation = (line.find("true") != std::string::npos);
+            } else if (line.find("log_path=") == 0) {
+                size_t pos = line.find('=');
+                if (pos != std::string::npos) {
+                    logPath = line.substr(pos + 1);
+                }
             }
         }
         confFile.close();
@@ -663,6 +672,8 @@ void HttpFileServer::handleGetCurrentConfig(HttpClientState& state) {
     json += "\"cert\": \"" + cert + "\", ";
     json += "\"key\": \"" + key + "\", ";
     json += "\"enableDirectoryListing\": " + (directoryListing ? std::string("true") : std::string("false")) + ", ";
+    json += "\"enableLogRotation\": " + (enableLogRotation ? std::string("true") : std::string("false")) + ", ";
+    json += "\"logPath\": \"" + logPath + "\", ";
     json += "\"logMaxSizeBytes\": " + std::to_string(logMaxSize);
     json += "}";
     
@@ -754,6 +765,8 @@ void HttpFileServer::handleSaveConfig(HttpClientState& state, const HttpRequest&
     newConfig.enableDirectoryListing = extractBool("directoryListing");
     newConfig.logRotation.maxSizeBytes = extractNumber("logMaxSizeBytes"); // Value is already in bytes
     newConfig.logRotation.maxFiles = extractNumber("logMaxFiles");
+    newConfig.logRotation.enabled = extractBool("enableLogRotation");
+    newConfig.logPath = extractValue("logPath");
     
     // Update bind address and port if provided
     std::string newBindAddress = extractValue("bindAddress");
@@ -773,6 +786,8 @@ void HttpFileServer::handleSaveConfig(HttpClientState& state, const HttpRequest&
     configContent += "index_file=" + newConfig.indexFile + "\n";
     configContent += "enable_logging=" + std::string(newConfig.enableLogging ? "true" : "false") + "\n";
     configContent += "directory_listing=" + std::string(newConfig.enableDirectoryListing ? "true" : "false") + "\n";
+    configContent += "log_path=" + newConfig.logPath + "\n";
+    configContent += "enable_log_rotation=" + std::string(newConfig.logRotation.enabled ? "true" : "false") + "\n";
     configContent += "log_max_size=" + std::to_string(newConfig.logRotation.maxSizeBytes / (1024 * 1024)) + "\n";
     configContent += "log_max_files=" + std::to_string(newConfig.logRotation.maxFiles) + "\n";
     
