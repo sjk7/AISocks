@@ -26,6 +26,18 @@ function hideStatus() {
     document.getElementById('status-button').style.display = 'none';
 }
 
+// Disable all form fields and buttons
+function disableForm() {
+    const inputs = document.querySelectorAll('input, select, button');
+    inputs.forEach(el => el.disabled = true);
+}
+
+// Enable all form fields and buttons
+function enableForm() {
+    const inputs = document.querySelectorAll('input, select, button');
+    inputs.forEach(el => el.disabled = false);
+}
+
 // Fetch available IP addresses
 async function fetchAvailableIPs() {
     try {
@@ -99,9 +111,11 @@ async function fetchConfig() {
         currentConfig = config;
         populateForm(config);
         hideStatus();
+        enableForm();
     } catch (error) {
         console.error('Error fetching config:', error);
         showStatusTop('Failed to load configuration: ' + error.message, 'error');
+        disableForm();
     }
 }
 
