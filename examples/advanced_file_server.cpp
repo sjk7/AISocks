@@ -687,6 +687,11 @@ int main(int argc, char* argv[]) {
         }
     }
 
+    // Resolve 'localhost' to '127.0.0.1' for server binding
+    if (conf.bindAddress == "localhost") {
+        conf.bindAddress = "127.0.0.1";
+    }
+    
     // Configure the file server
     HttpFileServer::Config config;
     config.documentRoot = std::move(conf.wwwRoot);
