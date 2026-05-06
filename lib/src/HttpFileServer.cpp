@@ -653,7 +653,12 @@ void HttpFileServer::handleGetCurrentConfig(HttpClientState& state) {
             } else if (line.find("log_max_size=") == 0) {
                 size_t pos = line.find('=');
                 if (pos != std::string::npos) {
-                    size_t sizeMB = std::stoull(line.substr(pos + 1));
+                    std::string sizeStr = line.substr(pos + 1);
+                    // Strip 'M' suffix if present
+                    if (!sizeStr.empty() && sizeStr.back() == 'M') {
+                        sizeStr.pop_back();
+                    }
+                    size_t sizeMB = std::stoull(sizeStr);
                     logMaxSize = (sizeMB == 0) ? (100 * 1024 * 1024) : (sizeMB * 1024 * 1024); // 0 = 100MB
                 }
             } else if (line.find("enable_log_rotation=") == 0) {
@@ -792,7 +797,7 @@ void HttpFileServer::handleSaveConfig(HttpClientState& state, const HttpRequest&
     configContent += "directory_listing=" + std::string(newConfig.enableDirectoryListing ? "true" : "false") + "\n";
     configContent += "log_path=" + newConfig.logPath + "\n";
     configContent += "enable_log_rotation=" + std::string(newConfig.logRotation.enabled ? "true" : "false") + "\n";
-    configContent += "log_max_size=" + std::to_string(newConfig.logRotation.maxSizeBytes / (1024 * 1024)) + "\n";
+    configContent += "log_max_size=" + std::to_string(newConfig.logRotation.maxSizeBytes / (1024 * 1024)) + "M\n";
     configContent += "log_max_files=" + std::to_string(newConfig.logRotation.maxFiles) + "\n";
     
     // HTTPS settings
